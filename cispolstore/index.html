@@ -3,19 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#0a1a2c">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CISPOLstore – Gestion</title>
 <style>
-  :root { --bg:#0b1220; --card:#131c2f; --line:#24324e; --txt:#e8eefb; --mut:#8fa0c0; --acc:#2f7bff; --acc2:#22c55e; --on-acc:#fff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+  :root { /* CISPOLstore logo palette: navy #1E3F60, orange #D5522F, yellow #E5B044, red #BE332C */
+  --bg:#0a1a2c; --card:#102338; --line:#21405f; --txt:#eef3f9; --mut:#97abc2; --acc:#d5522f; --acc2:#e5b044; --on-acc:#fff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
   header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
-  header h1 { font-size:18px; margin:0; margin-right:auto; }
-  header h1 span { color:var(--acc); }
-  header img { height:34px; border-radius:6px; }
+  header h1 { font-size:18px; margin:0; margin-right:auto; color:var(--acc); }
+  header h1 span { color:var(--txt); }
+  header img { height:40px; border-radius:8px; background:#fff; padding:2px; }
   .acc2 { color:var(--acc2); }
   nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; }
   nav button { background:var(--card); color:var(--mut); border:1px solid var(--line); padding:8px 14px; border-radius:8px; cursor:pointer; font:inherit; }
@@ -31,7 +32,7 @@
   button.sec, header .sec, label.file.sec { background:var(--card); border:1px solid var(--line); color:var(--txt); }
   button.sm { padding:3px 9px; font-size:13px; }
   button.del { background:transparent; color:var(--bad); border:1px solid var(--line); }
-  input, select, textarea { background:#0b1424; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; width:100%; }
+  input, select, textarea { background:#08182a; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; width:100%; }
   .bar input, .bar select { width:auto; min-width:180px; }
   table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
   th, td { padding:9px 10px; text-align:left; border-bottom:1px solid var(--line); vertical-align:middle; }
@@ -74,10 +75,9 @@
 </head>
 <body>
 <header>
-  <img id="logo" alt="" hidden><h1><span>CISPOL</span>store · Gestion</h1>
+  <img id="logo" src="logo.png" alt="CISPOLstore"><h1><span>CISPOL</span>store · Gestion</h1>
   <button class="sec" id="exportBtn" title="Sauvegarder toutes les données">⬇ Sauvegarde</button>
   <label class="file sec">⬆ Restaurer<input type="file" id="importFile" accept=".json" hidden></label>
-  <label class="file sec" title="Charger le logo : les couleurs de l'application s'adaptent">🎨 Logo<input type="file" id="logoFile" accept="image/*" hidden></label>
   <button class="sec" id="curBtn" title="Changer la devise">⚙ Devise</button>
 </header>
 <nav id="tabs"></nav>
@@ -98,7 +98,7 @@
   const PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   const CATS = ['Starlink', 'Routeur / WiFi', 'Accessoire', 'Abonnement', 'Service', 'Autre'];
   const EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Internet / Abonnement', 'Marketing', 'Autre'];
-  const blank = () => ({ cur: 'FCFA', theme: null, products: [], clients: [], sales: [], expenses: [] });
+  const blank = () => ({ cur: 'FCFA', products: [], clients: [], sales: [], expenses: [] });
   let db = blank();
   try { db = { ...blank(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { alert('Sauvegarde locale impossible : exportez vos données.'); } };
@@ -406,52 +406,6 @@
   };
   $('curBtn').onclick = () => modal('Devise', `<label>Symbole affiché</label><input id="f_cur" value="${esc(db.cur)}">`, () => { db.cur = val('f_cur') || 'FCFA'; save(); render(); });
 
-  // ---------- Theme (logo colors) ----------
-  function applyTheme() {
-    const t = db.theme, r = document.documentElement.style, l = $('logo');
-    if (!t) { ['--acc', '--acc2', '--on-acc'].forEach(k => r.removeProperty(k)); l.hidden = true; return; }
-    r.setProperty('--acc', t.acc); r.setProperty('--acc2', t.acc2);
-    const [R, G, B] = t.acc.match(/\w\w/g).slice(0, 3).map(h => parseInt(h, 16));
-    r.setProperty('--on-acc', (0.299 * R + 0.587 * G + 0.114 * B) > 160 ? '#111' : '#fff');
-    if (t.logo) { l.src = t.logo; l.hidden = false; }
-  }
-  function palette(img) {
-    const c = document.createElement('canvas'); c.width = c.height = 64;
-    const x = c.getContext('2d'); x.drawImage(img, 0, 0, 64, 64);
-    const px = x.getImageData(0, 0, 64, 64).data, bins = {};
-    for (let i = 0; i < px.length; i += 4) {
-      if (px[i + 3] < 200) continue;
-      const [r, g, b] = [px[i], px[i + 1], px[i + 2]], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-      if (mx - mn < 40 || mx < 50) continue; // skip grays, white, black
-      const k = [r, g, b].map(v => Math.round(v / 48) * 48).join(',');
-      (bins[k] = bins[k] || { n: 0, r: 0, g: 0, b: 0 }); const o = bins[k]; o.n++; o.r += r; o.g += g; o.b += b;
-    }
-    const hex = o => '#' + [o.r, o.g, o.b].map(v => pad2(Math.round(v / o.n))).join('');
-    const pad2 = v => v.toString(16).padStart(2, '0');
-    const hue = o => { const r = o.r / o.n, g = o.g / o.n, b = o.b / o.n, mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); return d ? (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 : 0; };
-    const top = Object.values(bins).sort((a, b) => b.n - a.n);
-    if (!top.length) return null;
-    const first = top[0], second = top.find(o => { const dh = Math.abs(hue(o) - hue(first)); return Math.min(dh, 360 - dh) > 40; }) || first;
-    return { acc: hex(first), acc2: hex(second) };
-  }
-  $('logoFile').onchange = e => {
-    const f = e.target.files[0]; if (!f) return;
-    const fr = new FileReader();
-    fr.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const p = palette(img); if (!p) return alert('Impossible de lire les couleurs du logo.');
-        // keep a small copy of the logo so it fits in localStorage
-        const c = document.createElement('canvas'), k = Math.min(1, 120 / img.height); c.width = img.width * k; c.height = img.height * k;
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        db.theme = { ...p, logo: c.toDataURL('image/png') }; save(); applyTheme(); render();
-      };
-      img.src = fr.result;
-    };
-    fr.readAsDataURL(f); e.target.value = '';
-  };
-
-  applyTheme();
   render();
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

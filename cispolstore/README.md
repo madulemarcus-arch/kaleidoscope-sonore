@@ -16,7 +16,7 @@ Ouvrir `cispolstore/index.html` dans un navigateur, ou `python3 -m http.server 8
   - *Gérés par nous* : prénom + nom, numéro de compte Starlink (ACC), adresse de l'installation, type d'abonnement, début et fin d'abonnement, montant et périodicité. Après la date de fin, un **sursis** s'applique (15 jours par défaut, modifiable pour chaque abonné) (statuts : actif → sursis → expiré, avec date de fin du sursis). Bouton **Renouveler** : enregistre le paiement (compté dans le chiffre d'affaires) et avance l'échéance. Les échéances à 7 jours ou en retard apparaissent sur le tableau de bord.
 - **Dépenses** : par catégorie.
 - **Export** : CSV par section, sauvegarde/restauration JSON complète, devise modifiable (FCFA par défaut).
-- **Logo et couleurs** : bouton « 🎨 Logo » — le logo s'affiche en en-tête et les couleurs de l'application sont reprises de l'image.
+- **Identité visuelle** : logo CISPOLstore en en-tête et comme icône ; couleurs de l'application tirées du logo (bleu marine #1E3F60, orange #D5522F, jaune #E5B044).
 
 Pensez à faire une sauvegarde JSON régulièrement : les données ne sont que dans ce navigateur.
 
