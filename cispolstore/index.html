@@ -87,12 +87,13 @@
   const daysTo = iso => Math.round((new Date(iso + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5);
   const dueInfo = c => {
     if (!c.due) return { t: '—', cls: 'mut', d: 1e9, st: '' };
-    const d = daysTo(c.due), end = addDays(c.due, GRACE);
+    const d = daysTo(c.due), G = grace(c), end = addDays(c.due, G);
     if (d >= 0) return { t: d === 0 ? 'Fin aujourd\'hui' : `Fin dans ${d} j`, cls: d <= 7 ? 'warn' : 'ok', d, st: 'actif' };
-    if (-d <= GRACE) return { t: `Sursis : ${GRACE + d} j restants (jusqu'au ${end})`, cls: 'warn', d, st: 'sursis' };
-    return { t: `Expiré depuis ${-d - GRACE} j`, cls: 'bad', d, st: 'expiré' };
+    if (-d <= G) return { t: `Sursis : ${G + d} j restants (jusqu'au ${end})`, cls: 'warn', d, st: 'sursis' };
+    return { t: `Expiré depuis ${-d - G} j`, cls: 'bad', d, st: 'expiré' };
   };
-  const GRACE = 15; // grace days after the subscription end date
+  const GRACE = 15; // default grace days after the subscription end date
+  const grace = c => Number.isFinite(c.grace) ? c.grace : GRACE;
   const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; };
   const isManaged = c => c.type === 'gere';
   const subPaid = (c, m) => (c.payments || []).filter(p => !m || month(p.date) === m).reduce((a, p) => a + p.amount, 0);
@@ -130,7 +131,7 @@
   // ---------- Clients ----------
   let ctab = 'gere';
   function clientForm(c) {
-    c = c || { type: ctab, name: '', first: '', last: '', phone: '', article: '', acc: '', addr: '', start: today(), plan: '', amount: '', due: today(), period: 1, note: '' };
+    c = c || { type: ctab, name: '', first: '', last: '', phone: '', article: '', acc: '', addr: '', start: today(), plan: '', amount: '', due: today(), grace: GRACE, period: 1, note: '' };
     modal(c.id ? 'Modifier le client' : 'Nouveau client', `
       <label>Type de client</label><select id="f_type"><option value="gere"${isManaged(c) ? ' selected' : ''}>Géré par nous (abonnement Starlink)</option><option value="mat"${isManaged(c) ? '' : ' selected'}>Achat de matériel seulement</option></select>
       <label>Téléphone</label><input id="f_phone" value="${esc(c.phone)}">
@@ -142,14 +143,14 @@
         <label>Type d'abonnement</label><input id="f_plan" list="dl_plan" value="${esc(c.plan)}"><datalist id="dl_plan">${PLANS.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
         <div class="row"><div><label>Début de l'abonnement</label><input id="f_start" type="date" value="${esc(c.start)}"></div>
         <div><label>Fin de l'abonnement (échéance)</label><input id="f_due" type="date" value="${esc(c.due)}"></div></div>
-        <p class="mut" style="margin:4px 0 0">Sursis de ${GRACE} jours après la date de fin.</p>
         <div class="row"><div><label>Montant par échéance</label><input id="f_amount" type="number" min="0" value="${c.amount}"></div>
+        <div><label>Sursis (jours)</label><input id="f_grace" type="number" min="0" value="${grace(c)}"></div>
         <div><label>Tous les (mois)</label><input id="f_period" type="number" min="1" value="${c.period || 1}"></div></div></div>
       <label>Note</label><textarea id="f_note" rows="2">${esc(c.note)}</textarea>`, () => {
       const g = val('f_type') === 'gere';
       if (g ? !(val('f_first') || val('f_last')) : !val('f_name')) { alert('Nom requis'); return false; }
       Object.assign(c, { type: g ? 'gere' : 'mat', phone: val('f_phone'), note: val('f_note') });
-      if (g) Object.assign(c, { first: val('f_first'), last: val('f_last'), name: (val('f_first') + ' ' + val('f_last')).trim(), acc: val('f_acc'), addr: val('f_addr'), start: val('f_start'), plan: val('f_plan'), amount: +val('f_amount') || 0, due: val('f_due'), period: Math.max(1, +val('f_period') || 1), payments: c.payments || [] });
+      if (g) Object.assign(c, { first: val('f_first'), last: val('f_last'), name: (val('f_first') + ' ' + val('f_last')).trim(), acc: val('f_acc'), addr: val('f_addr'), start: val('f_start'), plan: val('f_plan'), amount: +val('f_amount') || 0, due: val('f_due'), grace: Math.max(0, parseInt(val('f_grace'), 10) || 0), period: Math.max(1, +val('f_period') || 1), payments: c.payments || [] });
       else Object.assign(c, { name: val('f_name'), article: val('f_article') });
       if (!c.id) { c.id = uid(); db.clients.push(c); }
       ctab = g ? 'gere' : 'mat'; save(); render();
@@ -257,7 +258,7 @@
     produits: () => csv([['Nom', 'Catégorie', 'Prix vente', 'Prix achat', 'Stock'], ...db.products.map(p => [p.name, p.cat, p.price, p.cost, p.stock])]),
     ventes: () => csv([['Date', 'Client', 'Articles', 'Total', 'Payé', 'Reste'], ...db.sales.map(s => [s.date, (client(s.clientId) || {}).name || 'Passage', s.items.map(i => i.qty + 'x ' + i.name).join(', '), saleTotal(s), salePaid(s), saleDue(s)])]),
     depenses: () => csv([['Date', 'Libellé', 'Catégorie', 'Montant'], ...db.expenses.map(e => [e.date, e.label, e.cat, e.amount])]),
-    clients: () => csv([['Type', 'Prénom', 'Nom', 'Téléphone', 'Article acheté', 'Compte Starlink', 'Adresse installation', 'Abonnement', 'Début', 'Montant', 'Fin', 'Fin du sursis'], ...db.clients.map(c => isManaged(c) ? ['Géré', c.first, c.last, c.phone, '', c.acc, c.addr, c.plan, c.start, c.amount, c.due, c.due ? addDays(c.due, GRACE) : ''] : ['Matériel', '', c.name, c.phone, c.article, '', '', '', '', '', '', ''])]),
+    clients: () => csv([['Type', 'Prénom', 'Nom', 'Téléphone', 'Article acheté', 'Compte Starlink', 'Adresse installation', 'Abonnement', 'Début', 'Montant', 'Fin', 'Fin du sursis'], ...db.clients.map(c => isManaged(c) ? ['Géré', c.first, c.last, c.phone, '', c.acc, c.addr, c.plan, c.start, c.amount, c.due, c.due ? addDays(c.due, grace(c)) : ''] : ['Matériel', '', c.name, c.phone, c.article, '', '', '', '', '', '', ''])]),
   };
 
   // ---------- Views ----------
