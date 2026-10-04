@@ -85,7 +85,15 @@
   const pad = n => String(n).padStart(2, '0');
   const addMonths = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(y, m - 1 + n, 1); const last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate(); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(Math.min(d, last))}`; };
   const daysTo = iso => Math.round((new Date(iso + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5);
-  const dueInfo = c => { if (!c.due) return { t: '—', cls: 'mut', d: 1e9 }; const d = daysTo(c.due); return d < 0 ? { t: `En retard de ${-d} j`, cls: 'bad', d } : d === 0 ? { t: 'Aujourd\'hui', cls: 'warn', d } : d <= 7 ? { t: `Dans ${d} j`, cls: 'warn', d } : { t: `Dans ${d} j`, cls: 'ok', d }; };
+  const dueInfo = c => {
+    if (!c.due) return { t: '—', cls: 'mut', d: 1e9, st: '' };
+    const d = daysTo(c.due), end = addDays(c.due, GRACE);
+    if (d >= 0) return { t: d === 0 ? 'Fin aujourd\'hui' : `Fin dans ${d} j`, cls: d <= 7 ? 'warn' : 'ok', d, st: 'actif' };
+    if (-d <= GRACE) return { t: `Sursis : ${GRACE + d} j restants (jusqu'au ${end})`, cls: 'warn', d, st: 'sursis' };
+    return { t: `Expiré depuis ${-d - GRACE} j`, cls: 'bad', d, st: 'expiré' };
+  };
+  const GRACE = 15; // grace days after the subscription end date
+  const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; };
   const isManaged = c => c.type === 'gere';
   const subPaid = (c, m) => (c.payments || []).filter(p => !m || month(p.date) === m).reduce((a, p) => a + p.amount, 0);
   const salePaid = s => s.payments.reduce((a, p) => a + p.amount, 0);
@@ -122,7 +130,7 @@
   // ---------- Clients ----------
   let ctab = 'gere';
   function clientForm(c) {
-    c = c || { type: ctab, name: '', first: '', last: '', phone: '', article: '', acc: '', plan: '', amount: '', due: today(), period: 1, note: '' };
+    c = c || { type: ctab, name: '', first: '', last: '', phone: '', article: '', acc: '', addr: '', start: today(), plan: '', amount: '', due: today(), period: 1, note: '' };
     modal(c.id ? 'Modifier le client' : 'Nouveau client', `
       <label>Type de client</label><select id="f_type"><option value="gere"${isManaged(c) ? ' selected' : ''}>Géré par nous (abonnement Starlink)</option><option value="mat"${isManaged(c) ? '' : ' selected'}>Achat de matériel seulement</option></select>
       <label>Téléphone</label><input id="f_phone" value="${esc(c.phone)}">
@@ -130,15 +138,18 @@
         <label>Article acheté</label><input id="f_article" list="dl_prod" value="${esc(c.article)}"><datalist id="dl_prod">${db.products.map(p => `<option value="${esc(p.name)}">`).join('')}</datalist></div>
       <div id="blk_gere"><div class="row"><div><label>Prénom</label><input id="f_first" value="${esc(c.first)}"></div><div><label>Nom</label><input id="f_last" value="${esc(c.last)}"></div></div>
         <label>Numéro de compte Starlink (ACC)</label><input id="f_acc" value="${esc(c.acc)}">
+        <label>Adresse de l'installation</label><input id="f_addr" value="${esc(c.addr)}">
         <label>Type d'abonnement</label><input id="f_plan" list="dl_plan" value="${esc(c.plan)}"><datalist id="dl_plan">${PLANS.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+        <div class="row"><div><label>Début de l'abonnement</label><input id="f_start" type="date" value="${esc(c.start)}"></div>
+        <div><label>Fin de l'abonnement (échéance)</label><input id="f_due" type="date" value="${esc(c.due)}"></div></div>
+        <p class="mut" style="margin:4px 0 0">Sursis de ${GRACE} jours après la date de fin.</p>
         <div class="row"><div><label>Montant par échéance</label><input id="f_amount" type="number" min="0" value="${c.amount}"></div>
-        <div><label>Prochaine échéance</label><input id="f_due" type="date" value="${esc(c.due)}"></div>
         <div><label>Tous les (mois)</label><input id="f_period" type="number" min="1" value="${c.period || 1}"></div></div></div>
       <label>Note</label><textarea id="f_note" rows="2">${esc(c.note)}</textarea>`, () => {
       const g = val('f_type') === 'gere';
       if (g ? !(val('f_first') || val('f_last')) : !val('f_name')) { alert('Nom requis'); return false; }
       Object.assign(c, { type: g ? 'gere' : 'mat', phone: val('f_phone'), note: val('f_note') });
-      if (g) Object.assign(c, { first: val('f_first'), last: val('f_last'), name: (val('f_first') + ' ' + val('f_last')).trim(), acc: val('f_acc'), plan: val('f_plan'), amount: +val('f_amount') || 0, due: val('f_due'), period: Math.max(1, +val('f_period') || 1), payments: c.payments || [] });
+      if (g) Object.assign(c, { first: val('f_first'), last: val('f_last'), name: (val('f_first') + ' ' + val('f_last')).trim(), acc: val('f_acc'), addr: val('f_addr'), start: val('f_start'), plan: val('f_plan'), amount: +val('f_amount') || 0, due: val('f_due'), period: Math.max(1, +val('f_period') || 1), payments: c.payments || [] });
       else Object.assign(c, { name: val('f_name'), article: val('f_article') });
       if (!c.id) { c.id = uid(); db.clients.push(c); }
       ctab = g ? 'gere' : 'mat'; save(); render();
@@ -148,9 +159,9 @@
   }
 
   function renewForm(c) {
-    modal('Renouveler l\'abonnement', `<p class="mut">${esc(c.name)} · échéance actuelle : <b>${esc(c.due)}</b></p>
+    modal('Renouveler l\'abonnement', `<p class="mut">${esc(c.name)} · fin actuelle : <b>${esc(c.due)}</b></p>
       <label>Montant reçu</label><input id="f_amt" type="number" min="0" value="${c.amount}">
-      <p class="mut">Nouvelle échéance : ${esc(addMonths(c.due || today(), c.period || 1))}</p>`, () => {
+      <p class="mut">Nouvelle fin d\'abonnement : ${esc(addMonths(c.due || today(), c.period || 1))}</p>`, () => {
       const a = +val('f_amt') || 0;
       (c.payments = c.payments || []).push({ date: today(), amount: a, for: c.due });
       c.due = addMonths(c.due || today(), c.period || 1); save(); render();
@@ -246,7 +257,7 @@
     produits: () => csv([['Nom', 'Catégorie', 'Prix vente', 'Prix achat', 'Stock'], ...db.products.map(p => [p.name, p.cat, p.price, p.cost, p.stock])]),
     ventes: () => csv([['Date', 'Client', 'Articles', 'Total', 'Payé', 'Reste'], ...db.sales.map(s => [s.date, (client(s.clientId) || {}).name || 'Passage', s.items.map(i => i.qty + 'x ' + i.name).join(', '), saleTotal(s), salePaid(s), saleDue(s)])]),
     depenses: () => csv([['Date', 'Libellé', 'Catégorie', 'Montant'], ...db.expenses.map(e => [e.date, e.label, e.cat, e.amount])]),
-    clients: () => csv([['Type', 'Prénom', 'Nom', 'Téléphone', 'Article acheté', 'Compte Starlink', 'Abonnement', 'Montant', 'Échéance'], ...db.clients.map(c => isManaged(c) ? ['Géré', c.first, c.last, c.phone, '', c.acc, c.plan, c.amount, c.due] : ['Matériel', '', c.name, c.phone, c.article, '', '', '', ''])]),
+    clients: () => csv([['Type', 'Prénom', 'Nom', 'Téléphone', 'Article acheté', 'Compte Starlink', 'Adresse installation', 'Abonnement', 'Début', 'Montant', 'Fin', 'Fin du sursis'], ...db.clients.map(c => isManaged(c) ? ['Géré', c.first, c.last, c.phone, '', c.acc, c.addr, c.plan, c.start, c.amount, c.due, c.due ? addDays(c.due, GRACE) : ''] : ['Matériel', '', c.name, c.phone, c.article, '', '', '', '', '', '', ''])]),
   };
 
   // ---------- Views ----------
@@ -282,7 +293,7 @@
       <div class="card"><small>Valeur du stock (achat)</small><b>${fmt(stockVal)}</b></div></div>
       <h2>Ventes des 6 derniers mois</h2>
       <div class="card"><div style="display:flex;gap:10px;align-items:flex-end;height:140px">${series.map((v, k) => `<div style="flex:1;text-align:center"><div title="${fmt(v)}" style="background:linear-gradient(var(--acc2),var(--acc));height:${Math.round(v / max * 100)}px;border-radius:4px 4px 0 0"></div><small class="mut">${months[k].slice(5)}/${months[k].slice(2, 4)}</small></div>`).join('')}</div></div>
-      <h2>🔔 Abonnements à renouveler (7 jours)</h2>${renew.length ? `<div class="wrap"><table>${renew.map(c => `<tr><td>${esc(c.name)}<br><small class="mut">${esc(c.plan)} · ${esc(c.phone)}</small></td><td>${esc(c.due)}</td><td class="${dueInfo(c).cls}">${dueInfo(c).t}</td><td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button></td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune échéance proche.</div>'}
+      <h2>🔔 Abonnements à renouveler (fin sous 7 jours, sursis, expirés)</h2>${renew.length ? `<div class="wrap"><table>${renew.map(c => `<tr><td>${esc(c.name)}<br><small class="mut">${esc(c.plan)} · ${esc(c.phone)}</small></td><td>${esc(c.due)}</td><td class="${dueInfo(c).cls}">${dueInfo(c).t}</td><td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button></td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune échéance proche.</div>'}
       <h2>⚠ Stock bas</h2>${low.length ? `<div class="wrap"><table>${low.map(p => `<tr><td>${esc(p.name)}</td><td class="num ${p.stock <= 0 ? 'bad' : 'warn'}">${p.stock} en stock</td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune alerte.</div>'}
       <h2>Meilleures ventes</h2>${top.length ? `<div class="wrap"><table>${top.map(([n, v]) => `<tr><td>${esc(n)}</td><td class="num">${v} vendu(s)</td></tr>`).join('')}</table></div>` : '<div class="card mut">Pas encore de ventes.</div>'}`;
   }
@@ -312,8 +323,8 @@
     const head = `<div class="bar"><button class="btn" data-act="addClient">+ Client</button><input id="search" placeholder="Rechercher…" value="${esc(q)}"><button class="btn sec" data-csv="clients">CSV</button></div>
       <div class="bar"><button class="btn sm ${ctab === 'gere' ? '' : 'sec'}" data-ctab="gere">Gérés par nous (${db.clients.filter(isManaged).length})</button><button class="btn sm ${ctab === 'mat' ? '' : 'sec'}" data-ctab="mat">Matériel seulement (${db.clients.filter(c => !isManaged(c)).length})</button></div>`;
     const acts = c => `<td class="num"><button class="btn sm sec" data-edit-client="${c.id}">Modifier</button> <button class="btn sm del" data-del-client="${c.id}">✕</button></td>`;
-    if (ctab === 'gere') return head + (gere.length ? `<div class="wrap"><table><tr><th>Client</th><th>Compte Starlink</th><th>Abonnement</th><th>Échéance</th><th class="num">Montant</th><th></th></tr>${gere.map(c => { const i = dueInfo(c); return `<tr>
-      <td>${esc(c.first)} <b>${esc(c.last)}</b><br><small class="mut">${esc(c.phone)}</small></td><td>${esc(c.acc)}</td><td>${esc(c.plan)}</td>
+    if (ctab === 'gere') return head + (gere.length ? `<div class="wrap"><table><tr><th>Client</th><th>Compte Starlink</th><th>Installation</th><th>Abonnement</th><th>Fin / sursis</th><th class="num">Montant</th><th></th></tr>${gere.map(c => { const i = dueInfo(c); return `<tr>
+      <td>${esc(c.first)} <b>${esc(c.last)}</b><br><small class="mut">${esc(c.phone)}</small></td><td>${esc(c.acc)}</td><td>${esc(c.addr)}</td><td>${esc(c.plan)}<br><small class="mut">depuis ${esc(c.start || '—')}</small></td>
       <td>${esc(c.due || '—')}<br><small class="${i.cls}">${i.t}</small></td><td class="num">${fmt(c.amount)}</td>
       <td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button> <button class="btn sm sec" data-edit-client="${c.id}">Modifier</button> <button class="btn sm del" data-del-client="${c.id}">✕</button></td></tr>`; }).join('')}</table></div>` : '<div class="empty">Aucun client géré. Cliquez sur « + Client ».</div>');
     return head + (mat.length ? `<div class="wrap"><table><tr><th>Nom</th><th>Téléphone</th><th>Article acheté</th><th></th></tr>${mat.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.article)}</td>${acts(c)}</tr>`).join('')}</table></div>` : '<div class="empty">Aucun client « matériel seulement ».</div>');
