@@ -19,3 +19,12 @@ Ouvrir `cispolstore/index.html` dans un navigateur, ou `python3 -m http.server 8
 - **Logo et couleurs** : bouton « 🎨 Logo » — le logo s'affiche en en-tête et les couleurs de l'application sont reprises de l'image.
 
 Pensez à faire une sauvegarde JSON régulièrement : les données ne sont que dans ce navigateur.
+
+## Utiliser sur Android
+
+L'application est une PWA : interface adaptée au téléphone (tableaux en cartes, boutons tactiles, numéros cliquables pour appeler), installable sur l'écran d'accueil et utilisable hors connexion.
+
+1. Publier l'application sur une adresse https (le workflow `.github/workflows/pages.yml` la publie sur GitHub Pages après fusion sur `main` ; activer au préalable *Settings → Pages → Source : GitHub Actions*).
+2. Ouvrir l'adresse dans **Chrome** sur Android → menu ⋮ → **Installer l'application** (ou *Ajouter à l'écran d'accueil*).
+
+Les données restent sur chaque appareil (pas de synchronisation) : utiliser « Sauvegarde » / « Restaurer » pour les transférer d'un appareil à l'autre.

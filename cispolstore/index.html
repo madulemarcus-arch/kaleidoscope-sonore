@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>CISPOLstore – Gestion</title>
 <style>
   :root { --bg:#0b1220; --card:#131c2f; --line:#24324e; --txt:#e8eefb; --mut:#8fa0c0; --acc:#2f7bff; --acc2:#22c55e; --on-acc:#fff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
@@ -44,6 +48,27 @@
   .row { display:flex; gap:8px; } .row > * { flex:1; }
   .end { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
   .empty { color:var(--mut); padding:18px; text-align:center; }
+  html { -webkit-text-size-adjust:100%; }
+  button, label.file, nav button { touch-action:manipulation; }
+  a.tel { color:var(--acc2); text-decoration:none; }
+  @media (max-width:640px) {
+    header { padding:8px 10px; gap:6px; } header h1 { font-size:16px; width:100%; order:-1; }
+    header .sec, header label.file { padding:7px 10px; font-size:13px; }
+    nav { flex-wrap:nowrap; overflow-x:auto; padding:8px 10px; } nav button { white-space:nowrap; padding:10px 14px; }
+    main { padding:4px 10px 80px; }
+    input, select, textarea { font-size:16px; padding:11px 10px; }
+    button.btn { padding:11px 14px; } button.sm { padding:8px 11px; font-size:14px; }
+    .bar input { flex:1; min-width:0; width:100%; }
+    .row { flex-wrap:wrap; } .row > * { min-width:120px; }
+    dialog { width:100vw; max-width:100vw; max-height:100dvh; margin:0; border-radius:14px 14px 0 0; position:fixed; inset:auto 0 0 0; overflow-y:auto; }
+    #view table, #view tbody, #view tr, #view td { display:block; width:100%; }
+    #view tr:has(th) { display:none; }
+    #view tr { padding:8px 6px; border-bottom:1px solid var(--line); }
+    #view td { border:0; padding:3px 6px; text-align:left !important; white-space:normal; }
+    #view td[data-l]::before { content:attr(data-l); display:block; color:var(--mut); font-size:12px; }
+    #view td.num:last-child { padding-top:8px; }
+    th, td { padding:8px 7px; font-size:14px; } .grid { grid-template-columns:repeat(2,1fr); } .card b { font-size:18px; }
+  }
   @media print { header, nav, .bar, .noprint { display:none !important; } body { background:#fff; color:#000; } }
 </style>
 </head>
@@ -108,6 +133,7 @@
     if (onOk) dlg.querySelector('form').onsubmit = e => { e.preventDefault(); if (onOk() !== false) dlg.close(); };
     dlg.showModal();
   }
+  const tel = p => p ? `<a class="tel" href="tel:${esc(String(p).replace(/[^+\d]/g, ''))}">${esc(p)}</a>` : '';
   const val = id => $(id).value.trim();
   const opts = (list, sel) => list.map(o => `<option${o === sel ? ' selected' : ''}>${esc(o)}</option>`).join('');
 
@@ -294,7 +320,7 @@
       <div class="card"><small>Valeur du stock (achat)</small><b>${fmt(stockVal)}</b></div></div>
       <h2>Ventes des 6 derniers mois</h2>
       <div class="card"><div style="display:flex;gap:10px;align-items:flex-end;height:140px">${series.map((v, k) => `<div style="flex:1;text-align:center"><div title="${fmt(v)}" style="background:linear-gradient(var(--acc2),var(--acc));height:${Math.round(v / max * 100)}px;border-radius:4px 4px 0 0"></div><small class="mut">${months[k].slice(5)}/${months[k].slice(2, 4)}</small></div>`).join('')}</div></div>
-      <h2>🔔 Abonnements à renouveler (fin sous 7 jours, sursis, expirés)</h2>${renew.length ? `<div class="wrap"><table>${renew.map(c => `<tr><td>${esc(c.name)}<br><small class="mut">${esc(c.plan)} · ${esc(c.phone)}</small></td><td>${esc(c.due)}</td><td class="${dueInfo(c).cls}">${dueInfo(c).t}</td><td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button></td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune échéance proche.</div>'}
+      <h2>🔔 Abonnements à renouveler (fin sous 7 jours, sursis, expirés)</h2>${renew.length ? `<div class="wrap"><table>${renew.map(c => `<tr><td>${esc(c.name)}<br><small class="mut">${esc(c.plan)} · ${tel(c.phone)}</small></td><td>${esc(c.due)}</td><td class="${dueInfo(c).cls}">${dueInfo(c).t}</td><td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button></td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune échéance proche.</div>'}
       <h2>⚠ Stock bas</h2>${low.length ? `<div class="wrap"><table>${low.map(p => `<tr><td>${esc(p.name)}</td><td class="num ${p.stock <= 0 ? 'bad' : 'warn'}">${p.stock} en stock</td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune alerte.</div>'}
       <h2>Meilleures ventes</h2>${top.length ? `<div class="wrap"><table>${top.map(([n, v]) => `<tr><td>${esc(n)}</td><td class="num">${v} vendu(s)</td></tr>`).join('')}</table></div>` : '<div class="card mut">Pas encore de ventes.</div>'}`;
   }
@@ -325,10 +351,10 @@
       <div class="bar"><button class="btn sm ${ctab === 'gere' ? '' : 'sec'}" data-ctab="gere">Gérés par nous (${db.clients.filter(isManaged).length})</button><button class="btn sm ${ctab === 'mat' ? '' : 'sec'}" data-ctab="mat">Matériel seulement (${db.clients.filter(c => !isManaged(c)).length})</button></div>`;
     const acts = c => `<td class="num"><button class="btn sm sec" data-edit-client="${c.id}">Modifier</button> <button class="btn sm del" data-del-client="${c.id}">✕</button></td>`;
     if (ctab === 'gere') return head + (gere.length ? `<div class="wrap"><table><tr><th>Client</th><th>Compte Starlink</th><th>Installation</th><th>Abonnement</th><th>Fin / sursis</th><th class="num">Montant</th><th></th></tr>${gere.map(c => { const i = dueInfo(c); return `<tr>
-      <td>${esc(c.first)} <b>${esc(c.last)}</b><br><small class="mut">${esc(c.phone)}</small></td><td>${esc(c.acc)}</td><td>${esc(c.addr)}</td><td>${esc(c.plan)}<br><small class="mut">depuis ${esc(c.start || '—')}</small></td>
+      <td>${esc(c.first)} <b>${esc(c.last)}</b><br><small class="mut">${tel(c.phone)}</small></td><td>${esc(c.acc)}</td><td>${esc(c.addr)}</td><td>${esc(c.plan)}<br><small class="mut">depuis ${esc(c.start || '—')}</small></td>
       <td>${esc(c.due || '—')}<br><small class="${i.cls}">${i.t}</small></td><td class="num">${fmt(c.amount)}</td>
       <td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button> <button class="btn sm sec" data-edit-client="${c.id}">Modifier</button> <button class="btn sm del" data-del-client="${c.id}">✕</button></td></tr>`; }).join('')}</table></div>` : '<div class="empty">Aucun client géré. Cliquez sur « + Client ».</div>');
-    return head + (mat.length ? `<div class="wrap"><table><tr><th>Nom</th><th>Téléphone</th><th>Article acheté</th><th></th></tr>${mat.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.article)}</td>${acts(c)}</tr>`).join('')}</table></div>` : '<div class="empty">Aucun client « matériel seulement ».</div>');
+    return head + (mat.length ? `<div class="wrap"><table><tr><th>Nom</th><th>Téléphone</th><th>Article acheté</th><th></th></tr>${mat.map(c => `<tr><td>${esc(c.name)}</td><td>${tel(c.phone)}</td><td>${esc(c.article)}</td>${acts(c)}</tr>`).join('')}</table></div>` : '<div class="empty">Aucun client « matériel seulement ».</div>');
   }
 
   function expView() {
@@ -340,6 +366,8 @@
   function render() {
     $('tabs').innerHTML = Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}" aria-pressed="${k === tab}">${v}</button>`).join('');
     $('view').innerHTML = { dash: dashView, stock: stockView, sales: salesView, clients: clientsView, exp: expView }[tab]();
+    // label cells so the mobile card layout can show column names
+    $('view').querySelectorAll('table').forEach(t => { const h = [...t.querySelectorAll('tr:first-child th')].map(x => x.textContent); if (h.length) t.querySelectorAll('tr:not(:first-child)').forEach(r => [...r.children].forEach((td, i) => { if (h[i]) td.dataset.l = h[i]; })); });
   }
 
   // ---------- Events ----------
@@ -425,6 +453,7 @@
 
   applyTheme();
   render();
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 </body>
