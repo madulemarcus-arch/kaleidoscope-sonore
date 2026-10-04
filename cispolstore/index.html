@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CISPOLstore – Gestion</title>
+<style>
+  :root { --bg:#0b1220; --card:#131c2f; --line:#24324e; --txt:#e8eefb; --mut:#8fa0c0; --acc:#2f7bff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
+  header h1 { font-size:18px; margin:0; margin-right:auto; }
+  header h1 span { color:var(--acc); }
+  nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; }
+  nav button { background:var(--card); color:var(--mut); border:1px solid var(--line); padding:8px 14px; border-radius:8px; cursor:pointer; font:inherit; }
+  nav button[aria-pressed=true] { background:var(--acc); color:#fff; border-color:var(--acc); }
+  main { padding:8px 16px 40px; max-width:1100px; margin:0 auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:8px 0 18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .card small { color:var(--mut); display:block; }
+  .card b { font-size:22px; }
+  h2 { font-size:16px; margin:20px 0 8px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px; align-items:center; }
+  button.btn, header button, label.file { background:var(--acc); color:#fff; border:0; padding:8px 14px; border-radius:8px; cursor:pointer; font:inherit; }
+  button.sec, header .sec, label.file { background:var(--card); border:1px solid var(--line); color:var(--txt); }
+  button.sm { padding:3px 9px; font-size:13px; }
+  button.del { background:transparent; color:var(--bad); border:1px solid var(--line); }
+  input, select, textarea { background:#0b1424; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; width:100%; }
+  .bar input, .bar select { width:auto; min-width:180px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th, td { padding:9px 10px; text-align:left; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--mut); font-weight:600; font-size:13px; }
+  tr:last-child td { border-bottom:0; }
+  .num { text-align:right; white-space:nowrap; }
+  .wrap { overflow-x:auto; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; border:1px solid var(--line); }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); } .mut { color:var(--mut); }
+  dialog { background:var(--card); color:var(--txt); border:1px solid var(--line); border-radius:14px; padding:18px; width:min(520px,94vw); }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  dialog h3 { margin:0 0 12px; }
+  dialog label { display:block; margin:8px 0 3px; color:var(--mut); font-size:13px; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .end { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .empty { color:var(--mut); padding:18px; text-align:center; }
+  @media print { header, nav, .bar, .noprint { display:none !important; } body { background:#fff; color:#000; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>CISPOL</span>store · Gestion</h1>
+  <button class="sec" id="exportBtn" title="Sauvegarder toutes les données">⬇ Sauvegarde</button>
+  <label class="file">⬆ Restaurer<input type="file" id="importFile" accept=".json" hidden></label>
+  <button class="sec" id="curBtn" title="Changer la devise">⚙ Devise</button>
+</header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+<dialog id="dlg"></dialog>
+
+<script>
+(() => {
+  // ---------- Utils ----------
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const month = d => d.slice(0, 7);
+
+  // ---------- Data ----------
+  const KEY = 'cispolstore-v1';
+  const CATS = ['Starlink', 'Routeur / WiFi', 'Accessoire', 'Abonnement', 'Service', 'Autre'];
+  const EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Internet / Abonnement', 'Marketing', 'Autre'];
+  const blank = () => ({ cur: 'FCFA', products: [], clients: [], sales: [], expenses: [] });
+  let db = blank();
+  try { db = { ...blank(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { alert('Sauvegarde locale impossible : exportez vos données.'); } };
+  const fmt = n => (Math.round(n) || 0).toLocaleString('fr-FR') + ' ' + db.cur;
+  const prod = id => db.products.find(p => p.id === id);
+  const client = id => db.clients.find(c => c.id === id);
+  const saleTotal = s => s.items.reduce((a, i) => a + i.qty * i.price, 0);
+  const saleCost = s => s.items.reduce((a, i) => a + i.qty * i.cost, 0);
+  const salePaid = s => s.payments.reduce((a, p) => a + p.amount, 0);
+  const saleDue = s => saleTotal(s) - salePaid(s);
+
+  // ---------- Dialog ----------
+  const dlg = $('dlg');
+  function modal(title, body, onOk, okLabel = 'Enregistrer') {
+    dlg.innerHTML = `<form method="dialog"><h3>${esc(title)}</h3>${body}<div class="end"><button type="button" class="btn sec" id="dcancel">Annuler</button>${onOk ? `<button class="btn" id="dok">${okLabel}</button>` : ''}</div></form>`;
+    $('dcancel').onclick = () => dlg.close();
+    if (onOk) dlg.querySelector('form').onsubmit = e => { e.preventDefault(); if (onOk() !== false) dlg.close(); };
+    dlg.showModal();
+  }
+  const val = id => $(id).value.trim();
+  const opts = (list, sel) => list.map(o => `<option${o === sel ? ' selected' : ''}>${esc(o)}</option>`).join('');
+
+  // ---------- Products ----------
+  function productForm(p) {
+    p = p || { name: '', cat: CATS[0], price: '', cost: '', stock: 0, min: 2 };
+    modal(p.id ? 'Modifier le produit' : 'Nouveau produit', `
+      <label>Nom</label><input id="f_name" value="${esc(p.name)}" required>
+      <label>Catégorie</label><select id="f_cat">${opts(CATS, p.cat)}</select>
+      <div class="row"><div><label>Prix de vente</label><input id="f_price" type="number" min="0" value="${p.price}"></div>
+      <div><label>Prix d'achat</label><input id="f_cost" type="number" min="0" value="${p.cost}"></div></div>
+      <div class="row"><div><label>Stock</label><input id="f_stock" type="number" min="0" value="${p.stock}"></div>
+      <div><label>Seuil d'alerte</label><input id="f_min" type="number" min="0" value="${p.min}"></div></div>`, () => {
+      if (!val('f_name')) return false;
+      Object.assign(p, { name: val('f_name'), cat: val('f_cat'), price: +val('f_price') || 0, cost: +val('f_cost') || 0, stock: +val('f_stock') || 0, min: +val('f_min') || 0 });
+      if (!p.id) { p.id = uid(); db.products.push(p); }
+      save(); render();
+    });
+  }
+
+  // ---------- Clients ----------
+  function clientForm(c) {
+    c = c || { name: '', phone: '', note: '' };
+    modal(c.id ? 'Modifier le client' : 'Nouveau client', `
+      <label>Nom</label><input id="f_name" value="${esc(c.name)}" required>
+      <label>Téléphone</label><input id="f_phone" value="${esc(c.phone)}">
+      <label>Note (adresse, kit installé…)</label><textarea id="f_note" rows="3">${esc(c.note)}</textarea>`, () => {
+      if (!val('f_name')) return false;
+      Object.assign(c, { name: val('f_name'), phone: val('f_phone'), note: val('f_note') });
+      if (!c.id) { c.id = uid(); db.clients.push(c); }
+      save(); render();
+    });
+  }
+
+  // ---------- Sales ----------
+  function saleForm() {
+    if (!db.products.length) return alert('Ajoutez d\'abord un produit.');
+    const cart = [];
+    const draw = () => {
+      const total = cart.reduce((a, i) => a + i.qty * i.price, 0);
+      $('cart').innerHTML = cart.length ? cart.map((i, k) => `<tr><td>${esc(i.name)}</td><td class="num">${i.qty} × ${fmt(i.price)}</td><td class="num">${fmt(i.qty * i.price)}</td><td><button type="button" class="btn sm del" data-rm="${k}">✕</button></td></tr>`).join('') + `<tr><th colspan="2">Total</th><th class="num">${fmt(total)}</th><td></td></tr>` : '<tr><td class="empty">Panier vide</td></tr>';
+      $('cart').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { cart.splice(+b.dataset.rm, 1); draw(); });
+      $('f_paid').value = total;
+    };
+    modal('Nouvelle vente', `
+      <label>Client</label><select id="f_client"><option value="">Client de passage</option>${db.clients.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+      <label>Date</label><input id="f_date" type="date" value="${today()}">
+      <label>Produit</label>
+      <div class="row"><select id="f_prod" style="flex:3">${db.products.map(p => `<option value="${p.id}">${esc(p.name)} (${p.cat === 'Service' || p.cat === 'Abonnement' ? '∞' : p.stock})</option>`).join('')}</select>
+      <input id="f_qty" type="number" min="1" value="1"><button type="button" class="btn sm" id="f_add" style="flex:1">Ajouter</button></div>
+      <div class="wrap"><table style="margin-top:10px"><tbody id="cart"></tbody></table></div>
+      <label>Montant payé maintenant</label><input id="f_paid" type="number" min="0" value="0">`, () => {
+      if (!cart.length) { alert('Panier vide'); return false; }
+      const sale = { id: uid(), date: val('f_date') || today(), clientId: val('f_client'), items: cart.map(i => ({ pid: i.pid, name: i.name, qty: i.qty, price: i.price, cost: i.cost })), payments: [] };
+      const paid = Math.min(+val('f_paid') || 0, saleTotal(sale));
+      if (paid > 0) sale.payments.push({ date: sale.date, amount: paid });
+      cart.forEach(i => { const p = prod(i.pid); if (p && !isService(p)) p.stock -= i.qty; });
+      db.sales.push(sale); save(); render();
+      if (confirm('Vente enregistrée. Imprimer le reçu ?')) receipt(sale);
+    });
+    $('f_add').onclick = () => {
+      const p = prod($('f_prod').value), qty = Math.max(1, +$('f_qty').value || 1);
+      if (!p) return;
+      const inCart = cart.filter(i => i.pid === p.id).reduce((a, i) => a + i.qty, 0);
+      if (!isService(p) && inCart + qty > p.stock && !confirm(`Stock insuffisant (${p.stock}). Continuer quand même ?`)) return;
+      const line = cart.find(i => i.pid === p.id);
+      if (line) line.qty += qty; else cart.push({ pid: p.id, name: p.name, qty, price: p.price, cost: p.cost });
+      draw();
+    };
+    draw();
+  }
+  const isService = p => p.cat === 'Service' || p.cat === 'Abonnement';
+
+  function payForm(s) {
+    modal('Encaisser un paiement', `<p class="mut">Reste à payer : <b>${fmt(saleDue(s))}</b></p>
+      <label>Montant</label><input id="f_amt" type="number" min="1" max="${saleDue(s)}" value="${saleDue(s)}">`, () => {
+      const a = Math.min(+val('f_amt') || 0, saleDue(s));
+      if (a <= 0) return false;
+      s.payments.push({ date: today(), amount: a }); save(); render();
+    }, 'Encaisser');
+  }
+
+  function receipt(s) {
+    const c = client(s.clientId);
+    const w = window.open('', '_blank');
+    if (!w) return alert('Autorisez les pop-ups pour imprimer.');
+    w.document.write(`<title>Reçu</title><body style="font:14px system-ui;max-width:420px;margin:20px auto"><h2>CISPOLstore</h2>
+      <p>Reçu n° ${esc(s.id.toUpperCase())}<br>Date : ${esc(s.date)}<br>Client : ${esc(c ? c.name : 'Client de passage')}</p>
+      <table style="width:100%;border-collapse:collapse">${s.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} × ${esc(fmt(i.price))}</td><td align="right">${esc(fmt(i.qty * i.price))}</td></tr>`).join('')}</table>
+      <hr><p><b>Total : ${esc(fmt(saleTotal(s)))}</b><br>Payé : ${esc(fmt(salePaid(s)))}<br>Reste : ${esc(fmt(saleDue(s)))}</p><p>Merci de votre confiance !</p><script>print()<\/script>`);
+    w.document.close();
+  }
+
+  function delSale(s) {
+    if (!confirm('Supprimer cette vente ? Le stock sera remis.')) return;
+    s.items.forEach(i => { const p = prod(i.pid); if (p && !isService(p)) p.stock += i.qty; });
+    db.sales = db.sales.filter(x => x !== s); save(); render();
+  }
+
+  // ---------- Expenses ----------
+  function expenseForm() {
+    modal('Nouvelle dépense', `
+      <label>Libellé</label><input id="f_label" required>
+      <label>Catégorie</label><select id="f_cat">${opts(EXP_CATS)}</select>
+      <div class="row"><div><label>Montant</label><input id="f_amt" type="number" min="0"></div>
+      <div><label>Date</label><input id="f_date" type="date" value="${today()}"></div></div>`, () => {
+      if (!val('f_label') || !(+val('f_amt') > 0)) return false;
+      db.expenses.push({ id: uid(), label: val('f_label'), cat: val('f_cat'), amount: +val('f_amt'), date: val('f_date') || today() });
+      save(); render();
+    });
+  }
+
+  // ---------- Export ----------
+  function download(name, text, type) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const csv = rows => '﻿' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+  const csvExports = {
+    produits: () => csv([['Nom', 'Catégorie', 'Prix vente', 'Prix achat', 'Stock'], ...db.products.map(p => [p.name, p.cat, p.price, p.cost, p.stock])]),
+    ventes: () => csv([['Date', 'Client', 'Articles', 'Total', 'Payé', 'Reste'], ...db.sales.map(s => [s.date, (client(s.clientId) || {}).name || 'Passage', s.items.map(i => i.qty + 'x ' + i.name).join(', '), saleTotal(s), salePaid(s), saleDue(s)])]),
+    depenses: () => csv([['Date', 'Libellé', 'Catégorie', 'Montant'], ...db.expenses.map(e => [e.date, e.label, e.cat, e.amount])]),
+    clients: () => csv([['Nom', 'Téléphone', 'Note'], ...db.clients.map(c => [c.name, c.phone, c.note])]),
+  };
+
+  // ---------- Views ----------
+  let tab = 'dash', q = '';
+  const TABS = { dash: 'Tableau de bord', stock: 'Produits & stock', sales: 'Ventes', clients: 'Clients', exp: 'Dépenses' };
+
+  function dashView() {
+    const m = month(today());
+    const sM = db.sales.filter(s => month(s.date) === m);
+    const rev = sM.reduce((a, s) => a + saleTotal(s), 0);
+    const margin = sM.reduce((a, s) => a + saleTotal(s) - saleCost(s), 0);
+    const exp = db.expenses.filter(e => month(e.date) === m).reduce((a, e) => a + e.amount, 0);
+    const debts = db.sales.reduce((a, s) => a + saleDue(s), 0);
+    const stockVal = db.products.filter(p => !isService(p)).reduce((a, p) => a + p.stock * p.cost, 0);
+    const low = db.products.filter(p => !isService(p) && p.stock <= p.min);
+    const profit = margin - exp;
+    // best sellers
+    const tally = {};
+    db.sales.forEach(s => s.items.forEach(i => tally[i.name] = (tally[i.name] || 0) + i.qty));
+    const top = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    // last 6 months
+    const months = [...Array(6)].map((_, k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + k); return d.toISOString().slice(0, 7); });
+    const series = months.map(mm => db.sales.filter(s => month(s.date) === mm).reduce((a, s) => a + saleTotal(s), 0));
+    const max = Math.max(...series, 1);
+    return `<div class="grid">
+      <div class="card"><small>Chiffre d'affaires (mois)</small><b>${fmt(rev)}</b></div>
+      <div class="card"><small>Marge brute (mois)</small><b>${fmt(margin)}</b></div>
+      <div class="card"><small>Dépenses (mois)</small><b>${fmt(exp)}</b></div>
+      <div class="card"><small>Bénéfice net (mois)</small><b class="${profit >= 0 ? 'ok' : 'bad'}">${fmt(profit)}</b></div>
+      <div class="card"><small>Créances clients</small><b class="${debts ? 'warn' : ''}">${fmt(debts)}</b></div>
+      <div class="card"><small>Valeur du stock (achat)</small><b>${fmt(stockVal)}</b></div></div>
+      <h2>Ventes des 6 derniers mois</h2>
+      <div class="card"><div style="display:flex;gap:10px;align-items:flex-end;height:140px">${series.map((v, k) => `<div style="flex:1;text-align:center"><div title="${fmt(v)}" style="background:var(--acc);height:${Math.round(v / max * 100)}px;border-radius:4px 4px 0 0"></div><small class="mut">${months[k].slice(5)}/${months[k].slice(2, 4)}</small></div>`).join('')}</div></div>
+      <h2>⚠ Stock bas</h2>${low.length ? `<div class="wrap"><table>${low.map(p => `<tr><td>${esc(p.name)}</td><td class="num ${p.stock <= 0 ? 'bad' : 'warn'}">${p.stock} en stock</td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune alerte.</div>'}
+      <h2>Meilleures ventes</h2>${top.length ? `<div class="wrap"><table>${top.map(([n, v]) => `<tr><td>${esc(n)}</td><td class="num">${v} vendu(s)</td></tr>`).join('')}</table></div>` : '<div class="card mut">Pas encore de ventes.</div>'}`;
+  }
+
+  function stockView() {
+    const list = db.products.filter(p => (p.name + p.cat).toLowerCase().includes(q.toLowerCase()));
+    return `<div class="bar"><button class="btn" data-act="addProd">+ Produit</button><input id="search" placeholder="Rechercher…" value="${esc(q)}"><button class="btn sec" data-csv="produits">CSV</button></div>
+      ${list.length ? `<div class="wrap"><table><tr><th>Produit</th><th>Catégorie</th><th class="num">Achat</th><th class="num">Vente</th><th class="num">Stock</th><th></th></tr>${list.map(p => `<tr>
+        <td>${esc(p.name)}</td><td><span class="tag">${esc(p.cat)}</span></td><td class="num">${fmt(p.cost)}</td><td class="num">${fmt(p.price)}</td>
+        <td class="num">${isService(p) ? '∞' : `<b class="${p.stock <= 0 ? 'bad' : p.stock <= p.min ? 'warn' : ''}">${p.stock}</b>`}</td>
+        <td class="num"><button class="btn sm sec" data-edit-prod="${p.id}">Modifier</button> <button class="btn sm del" data-del-prod="${p.id}">✕</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucun produit. Ajoutez par exemple « Kit Starlink Standard », « Routeur WiFi », « Abonnement mensuel ».</div>'}`;
+  }
+
+  function salesView() {
+    const list = [...db.sales].sort((a, b) => b.date.localeCompare(a.date));
+    return `<div class="bar"><button class="btn" data-act="addSale">+ Nouvelle vente</button><button class="btn sec" data-csv="ventes">CSV</button></div>
+      ${list.length ? `<div class="wrap"><table><tr><th>Date</th><th>Client</th><th>Articles</th><th class="num">Total</th><th class="num">Reste</th><th></th></tr>${list.map(s => `<tr>
+        <td>${esc(s.date)}</td><td>${esc((client(s.clientId) || {}).name || 'Passage')}</td><td>${esc(s.items.map(i => i.qty + '× ' + i.name).join(', '))}</td>
+        <td class="num">${fmt(saleTotal(s))}</td><td class="num ${saleDue(s) ? 'warn' : 'ok'}">${saleDue(s) ? fmt(saleDue(s)) : 'Soldé'}</td>
+        <td class="num">${saleDue(s) ? `<button class="btn sm" data-pay="${s.id}">Encaisser</button> ` : ''}<button class="btn sm sec" data-rcpt="${s.id}">Reçu</button> <button class="btn sm del" data-del-sale="${s.id}">✕</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune vente enregistrée.</div>'}`;
+  }
+
+  function clientsView() {
+    const list = db.clients.filter(c => (c.name + c.phone).toLowerCase().includes(q.toLowerCase()));
+    return `<div class="bar"><button class="btn" data-act="addClient">+ Client</button><input id="search" placeholder="Rechercher…" value="${esc(q)}"><button class="btn sec" data-csv="clients">CSV</button></div>
+      ${list.length ? `<div class="wrap"><table><tr><th>Nom</th><th>Téléphone</th><th class="num">Achats</th><th class="num">Dû</th><th></th></tr>${list.map(c => {
+        const ss = db.sales.filter(s => s.clientId === c.id), due = ss.reduce((a, s) => a + saleDue(s), 0);
+        return `<tr><td>${esc(c.name)}<br><small class="mut">${esc(c.note)}</small></td><td>${esc(c.phone)}</td><td class="num">${fmt(ss.reduce((a, s) => a + saleTotal(s), 0))}</td><td class="num ${due ? 'warn' : ''}">${fmt(due)}</td>
+        <td class="num"><button class="btn sm sec" data-edit-client="${c.id}">Modifier</button> <button class="btn sm del" data-del-client="${c.id}">✕</button></td></tr>`;
+      }).join('')}</table></div>` : '<div class="empty">Aucun client.</div>'}`;
+  }
+
+  function expView() {
+    const list = [...db.expenses].sort((a, b) => b.date.localeCompare(a.date));
+    return `<div class="bar"><button class="btn" data-act="addExp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>
+      ${list.length ? `<div class="wrap"><table><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th class="num">Montant</th><th></th></tr>${list.map(e => `<tr><td>${esc(e.date)}</td><td>${esc(e.label)}</td><td><span class="tag">${esc(e.cat)}</span></td><td class="num">${fmt(e.amount)}</td><td class="num"><button class="btn sm del" data-del-exp="${e.id}">✕</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune dépense.</div>'}`;
+  }
+
+  function render() {
+    $('tabs').innerHTML = Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}" aria-pressed="${k === tab}">${v}</button>`).join('');
+    $('view').innerHTML = { dash: dashView, stock: stockView, sales: salesView, clients: clientsView, exp: expView }[tab]();
+  }
+
+  // ---------- Events ----------
+  document.addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    const d = t.dataset;
+    if (d.tab) { tab = d.tab; q = ''; return render(); }
+    if (d.csv) return download(`cispolstore-${d.csv}-${today()}.csv`, csvExports[d.csv](), 'text/csv');
+    const acts = { addProd: () => productForm(), addSale: saleForm, addClient: () => clientForm(), addExp: expenseForm };
+    if (acts[d.act]) return acts[d.act]();
+    if (d.editProd) return productForm(prod(d.editProd));
+    if (d.editClient) return clientForm(client(d.editClient));
+    if (d.delProd && confirm('Supprimer ce produit ?')) { db.products = db.products.filter(p => p.id !== d.delProd); save(); render(); }
+    if (d.delClient && confirm('Supprimer ce client ? (ses ventes sont conservées)')) { db.sales.forEach(s => { if (s.clientId === d.delClient) s.clientId = ''; }); db.clients = db.clients.filter(c => c.id !== d.delClient); save(); render(); }
+    if (d.delExp && confirm('Supprimer cette dépense ?')) { db.expenses = db.expenses.filter(x => x.id !== d.delExp); save(); render(); }
+    if (d.delSale) delSale(db.sales.find(s => s.id === d.delSale));
+    if (d.pay) payForm(db.sales.find(s => s.id === d.pay));
+    if (d.rcpt) receipt(db.sales.find(s => s.id === d.rcpt));
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id !== 'search') return;
+    q = e.target.value; const pos = q.length; render();
+    const s = $('search'); s.focus(); s.setSelectionRange(pos, pos);
+  });
+  $('exportBtn').onclick = () => download(`cispolstore-sauvegarde-${today()}.json`, JSON.stringify(db, null, 1), 'application/json');
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(t => {
+      const data = JSON.parse(t);
+      if (!Array.isArray(data.products) || !Array.isArray(data.sales)) throw 0;
+      if (confirm('Remplacer toutes les données actuelles par cette sauvegarde ?')) { db = { ...blank(), ...data }; save(); render(); }
+    }).catch(() => alert('Fichier de sauvegarde invalide.'));
+    e.target.value = '';
+  };
+  $('curBtn').onclick = () => modal('Devise', `<label>Symbole affiché</label><input id="f_cur" value="${esc(db.cur)}">`, () => { db.cur = val('f_cur') || 'FCFA'; save(); render(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
