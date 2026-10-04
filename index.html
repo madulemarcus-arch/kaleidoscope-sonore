@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaléidoscope sonore</title>
+<style>
+  :root {
+    --bg: #07070d;
+    --panel: rgba(20, 20, 32, 0.78);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #e8e8f0;
+    --muted: #9a9ab0;
+    --accent: #b48cff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  canvas { display: block; touch-action: none; cursor: crosshair; }
+
+  .panel {
+    position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; justify-content: center;
+    padding: 10px 16px; max-width: calc(100% - 32px);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-size: 13px; user-select: none;
+  }
+  .panel label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .panel output { color: var(--text); min-width: 1.5em; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 90px; accent-color: var(--accent); }
+  input[type=color] { width: 28px; height: 22px; border: none; background: none; padding: 0; cursor: pointer; }
+  button {
+    background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font: inherit; cursor: pointer;
+  }
+  button:hover { background: rgba(255,255,255,0.12); }
+  button[aria-pressed="true"] { border-color: var(--accent); color: #fff; background: rgba(180,140,255,0.2); }
+
+  .hint {
+    position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none;
+    text-align: center; transition: opacity .6s;
+  }
+  .hint h1 { font-weight: 300; font-size: clamp(26px, 6vw, 48px); margin: 0 0 8px; letter-spacing: .02em; }
+  .hint p { color: var(--muted); margin: 0; font-size: 14px; }
+  .hint.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hint" id="hint">
+  <div>
+    <h1>✦ Kaléidoscope sonore ✦</h1>
+    <p>Dessinez à la souris ou au doigt, et écoutez.<br>
+      Raccourcis : <b>C</b> effacer · <b>S</b> enregistrer · <b>M</b> son · <b>2–9</b> symétrie</p>
+  </div>
+</div>
+
+<div class="panel">
+  <label>Symétrie <input id="sym" type="range" min="2" max="16" value="8"><output id="symOut">8</output></label>
+  <label>Pinceau <input id="size" type="range" min="1" max="20" value="4"><output id="sizeOut">4</output></label>
+  <button id="rainbow" aria-pressed="true" title="Couleur arc-en-ciel automatique">🌈 Arc-en-ciel</button>
+  <input id="color" type="color" value="#b48cff" title="Couleur fixe">
+  <button id="mirror" aria-pressed="true" title="Ajouter les reflets miroir">🪞 Miroir</button>
+  <button id="sound" aria-pressed="true" title="Son (M)">🔊 Son</button>
+  <button id="clear" title="Effacer (C)">🧽 Effacer</button>
+  <button id="save" title="Enregistrer en PNG (S)">💾 PNG</button>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  const state = {
+    sym: 8, size: 4, rainbow: true, mirror: true, sound: true,
+    color: '#b48cff', hue: 260, drawing: false, last: null, drawn: false,
+  };
+
+  // ---------- Canvas ----------
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    // Keep the existing drawing centred when the window size changes
+    const old = document.createElement('canvas');
+    old.width = canvas.width; old.height = canvas.height;
+    if (canvas.width) old.getContext('2d').drawImage(canvas, 0, 0);
+
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#07070d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (old.width) ctx.drawImage(old, (canvas.width - old.width) / 2, (canvas.height - old.height) / 2);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function clearCanvas() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#07070d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  function strokeSymmetric(a, b, color, width) {
+    const cx = W / 2, cy = H / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalCompositeOperation = 'lighter'; // overlaps glow on the dark background
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    const step = (Math.PI * 2) / state.sym;
+    for (let i = 0; i < state.sym; i++) {
+      const cos = Math.cos(step * i), sin = Math.sin(step * i);
+      const rot = (x, y) => [x * cos - y * sin, x * sin + y * cos];
+      let [x1, y1] = rot(a.x - cx, a.y - cy), [x2, y2] = rot(b.x - cx, b.y - cy);
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      if (state.mirror) {
+        [x1, y1] = rot(a.x - cx, -(a.y - cy)); [x2, y2] = rot(b.x - cx, -(b.y - cy));
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Sound ----------
+  // Pentatonic scale: any combination of notes sounds pleasant
+  const PENTA = [0, 2, 4, 7, 9];
+  let audio = null, master = null, lastNote = 0;
+
+  function initAudio() {
+    if (audio) return;
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    master = audio.createGain();
+    master.gain.value = 0.35;
+    // Simple feedback delay for a little space
+    const delay = audio.createDelay(1);
+    delay.delayTime.value = 0.28;
+    const fb = audio.createGain(); fb.gain.value = 0.35;
+    const wet = audio.createGain(); wet.gain.value = 0.4;
+    master.connect(audio.destination);
+    master.connect(delay); delay.connect(fb); fb.connect(delay);
+    delay.connect(wet); wet.connect(audio.destination);
+  }
+
+  function playNote(p) {
+    if (!state.sound || !audio) return;
+    const now = audio.currentTime;
+    if (now - lastNote < 0.07) return;
+    lastNote = now;
+
+    // Closer to the centre = higher pitch; angle sets stereo position
+    const dx = p.x - W / 2, dy = p.y - H / 2;
+    const maxR = Math.hypot(W, H) / 2;
+    const r = Math.min(Math.hypot(dx, dy) / maxR, 1);
+    const idx = Math.floor((1 - r) * 15); // 3 octaves of 5 notes
+    const semis = PENTA[idx % 5] + 12 * Math.floor(idx / 5);
+    const freq = 196 * Math.pow(2, semis / 12); // from G3
+
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = state.size > 10 ? 'triangle' : 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+
+    let out = gain;
+    if (audio.createStereoPanner) {
+      const pan = audio.createStereoPanner();
+      pan.pan.value = Math.max(-1, Math.min(1, dx / (W / 2)));
+      gain.connect(pan); out = pan;
+    }
+    osc.connect(gain); out.connect(master);
+    osc.start(now); osc.stop(now + 0.65);
+  }
+
+  // ---------- Input ----------
+  const pos = e => ({ x: e.clientX, y: e.clientY });
+
+  canvas.addEventListener('pointerdown', e => {
+    initAudio();
+    if (audio.state === 'suspended') audio.resume();
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    state.drawing = true;
+    state.last = pos(e);
+    if (!state.drawn) { state.drawn = true; $('hint').classList.add('hidden'); }
+    playNote(state.last);
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (!state.drawing) return;
+    const p = pos(e);
+    const speed = Math.hypot(p.x - state.last.x, p.y - state.last.y);
+    if (speed < 1) return;
+    state.hue = (state.hue + 0.8) % 360;
+    const color = state.rainbow ? `hsla(${state.hue}, 90%, 60%, 0.85)` : state.color;
+    // Faster strokes get slightly thinner, like a real brush
+    const width = Math.max(0.6, state.size * (1.2 - Math.min(speed, 40) / 60));
+    strokeSymmetric(state.last, p, color, width);
+    playNote(p);
+    state.last = p;
+  });
+
+  const stop = () => { state.drawing = false; state.last = null; };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointercancel', stop);
+
+  // ---------- Controls ----------
+  function setSym(n) {
+    state.sym = n; $('sym').value = n; $('symOut').textContent = n;
+  }
+  $('sym').addEventListener('input', e => setSym(+e.target.value));
+  $('size').addEventListener('input', e => { state.size = +e.target.value; $('sizeOut').textContent = state.size; });
+
+  function toggle(btn, key) {
+    state[key] = !state[key];
+    $(btn).setAttribute('aria-pressed', state[key]);
+    if (key === 'sound') $(btn).textContent = state.sound ? '🔊 Son' : '🔇 Muet';
+  }
+  $('rainbow').addEventListener('click', () => toggle('rainbow', 'rainbow'));
+  $('mirror').addEventListener('click', () => toggle('mirror', 'mirror'));
+  $('sound').addEventListener('click', () => toggle('sound', 'sound'));
+  $('color').addEventListener('input', e => {
+    state.color = e.target.value;
+    if (state.rainbow) toggle('rainbow', 'rainbow');
+  });
+
+  function save() {
+    const a = document.createElement('a');
+    a.download = `kaleidoscope-${Date.now()}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  }
+  $('clear').addEventListener('click', clearCanvas);
+  $('save').addEventListener('click', save);
+
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    const k = e.key.toLowerCase();
+    if (k === 'c') clearCanvas();
+    else if (k === 's') { e.preventDefault(); save(); }
+    else if (k === 'm') toggle('sound', 'sound');
+    else if (k >= '2' && k <= '9') setSym(+k);
+  });
+})();
+</script>
+</body>
+</html>
