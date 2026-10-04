@@ -101,7 +101,20 @@
   const blank = () => ({ cur: 'FCFA', products: [], clients: [], sales: [], expenses: [] });
   let db = blank();
   try { db = { ...blank(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch (e) {}
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { alert('Sauvegarde locale impossible : exportez vos données.'); } };
+  // Internal storage: localStorage plus an IndexedDB mirror, and a request for persistent storage so Android does not evict it.
+  const idb = (mode, fn) => new Promise((ok, ko) => {
+    const o = indexedDB.open('cispolstore', 1);
+    o.onupgradeneeded = () => o.result.createObjectStore('kv');
+    o.onerror = () => ko(o.error);
+    o.onsuccess = () => { const r = fn(o.result.transaction('kv', mode).objectStore('kv')); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); };
+  });
+  let persisted = null;
+  const save = () => {
+    const txt = JSON.stringify(db);
+    try { localStorage.setItem(KEY, txt); } catch (e) { alert('Stockage local plein ou bloqué : faites une sauvegarde.'); }
+    try { idb('readwrite', st => st.put(txt, 'db')).catch(() => {}); } catch (e) {}
+  };
+  const hasData = d => d && ['products', 'clients', 'sales', 'expenses'].some(k => (d[k] || []).length);
   const fmt = n => (Math.round(n) || 0).toLocaleString('fr-FR') + ' ' + db.cur;
   const prod = id => db.products.find(p => p.id === id);
   const client = id => db.clients.find(c => c.id === id);
@@ -291,6 +304,15 @@
   let tab = 'dash', q = '';
   const TABS = { dash: 'Tableau de bord', stock: 'Produits & stock', sales: 'Ventes', clients: 'Clients', exp: 'Dépenses' };
 
+  function storageCard() {
+    const age = db.lastBackup ? -daysTo(db.lastBackup) : null;
+    const warn = hasData(db) && (age === null || age > 7);
+    return `<div class="card"><small>Toutes les données sont enregistrées dans la mémoire interne de cet appareil, même sans internet.</small>
+      <p style="margin:8px 0 0">Protection contre l'effacement : <b class="${persisted ? 'ok' : persisted === false ? 'warn' : 'mut'}">${persisted ? 'activée' : persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b><br>
+      Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${db.lastBackup ? esc(db.lastBackup) : 'jamais'}</b></p>
+      ${warn ? '<p class="warn" style="margin:8px 0 0">Pensez à faire une sauvegarde : le bouton « ⬇ Sauvegarde » permet de l\'envoyer sur WhatsApp ou Drive.</p>' : ''}</div>`;
+  }
+
   function dashView() {
     const m = month(today());
     const sM = db.sales.filter(s => month(s.date) === m);
@@ -322,6 +344,7 @@
       <div class="card"><div style="display:flex;gap:10px;align-items:flex-end;height:140px">${series.map((v, k) => `<div style="flex:1;text-align:center"><div title="${fmt(v)}" style="background:linear-gradient(var(--acc2),var(--acc));height:${Math.round(v / max * 100)}px;border-radius:4px 4px 0 0"></div><small class="mut">${months[k].slice(5)}/${months[k].slice(2, 4)}</small></div>`).join('')}</div></div>
       <h2>🔔 Abonnements à renouveler (fin sous 7 jours, sursis, expirés)</h2>${renew.length ? `<div class="wrap"><table>${renew.map(c => `<tr><td>${esc(c.name)}<br><small class="mut">${esc(c.plan)} · ${tel(c.phone)}</small></td><td>${esc(c.due)}</td><td class="${dueInfo(c).cls}">${dueInfo(c).t}</td><td class="num"><button class="btn sm" data-renew="${c.id}">Renouveler</button></td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune échéance proche.</div>'}
       <h2>⚠ Stock bas</h2>${low.length ? `<div class="wrap"><table>${low.map(p => `<tr><td>${esc(p.name)}</td><td class="num ${p.stock <= 0 ? 'bad' : 'warn'}">${p.stock} en stock</td></tr>`).join('')}</table></div>` : '<div class="card mut">Aucune alerte.</div>'}
+      <h2>💾 Stockage sur ce téléphone</h2>${storageCard()}
       <h2>Meilleures ventes</h2>${top.length ? `<div class="wrap"><table>${top.map(([n, v]) => `<tr><td>${esc(n)}</td><td class="num">${v} vendu(s)</td></tr>`).join('')}</table></div>` : '<div class="card mut">Pas encore de ventes.</div>'}`;
   }
 
@@ -394,7 +417,15 @@
     q = e.target.value; const pos = q.length; render();
     const s = $('search'); s.focus(); s.setSelectionRange(pos, pos);
   });
-  $('exportBtn').onclick = () => download(`cispolstore-sauvegarde-${today()}.json`, JSON.stringify(db, null, 1), 'application/json');
+  $('exportBtn').onclick = async () => {
+    const name = `cispolstore-sauvegarde-${today()}.json`, txt = JSON.stringify(db, null, 1);
+    try {
+      const f = new File([txt], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Sauvegarde CISPOLstore' }); // Android share sheet: WhatsApp, Drive, e-mail…
+      else download(name, txt, 'application/json');
+    } catch (e) { if (e.name === 'AbortError') return; download(name, txt, 'application/json'); }
+    db.lastBackup = today(); save(); render();
+  };
   $('importFile').onchange = e => {
     const f = e.target.files[0]; if (!f) return;
     f.text().then(t => {
@@ -407,6 +438,9 @@
   $('curBtn').onclick = () => modal('Devise', `<label>Symbole affiché</label><input id="f_cur" value="${esc(db.cur)}">`, () => { db.cur = val('f_cur') || 'FCFA'; save(); render(); });
 
   render();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => { persisted = p; if (tab === 'dash') render(); }).catch(() => {});
+  // Recover from the IndexedDB mirror if localStorage was wiped
+  if (!hasData(db)) idb('readonly', st => st.get('db')).then(t => { if (!t) return; const d = JSON.parse(t); if (hasData(d)) { db = { ...blank(), ...d }; save(); render(); } }).catch(() => {});
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>

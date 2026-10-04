@@ -18,7 +18,13 @@ Ouvrir `cispolstore/index.html` dans un navigateur, ou `python3 -m http.server 8
 - **Export** : CSV par section, sauvegarde/restauration JSON complète, devise modifiable (FCFA par défaut).
 - **Identité visuelle** : logo CISPOLstore en en-tête et comme icône ; couleurs de l'application tirées du logo (bleu marine #1E3F60, orange #D5522F, jaune #E5B044).
 
-Pensez à faire une sauvegarde JSON régulièrement : les données ne sont que dans ce navigateur.
+
+
+## Stockage
+
+Les données sont enregistrées dans la mémoire interne de l'appareil (pas de serveur) : `localStorage` + copie dans IndexedDB, restaurée automatiquement si l'une des deux est effacée. L'application demande au navigateur un stockage persistant (accordé surtout une fois l'application installée), et le tableau de bord indique l'état de la protection et la date de la dernière sauvegarde.
+
+Le bouton « Sauvegarde » ouvre le partage Android (WhatsApp, Drive, e-mail…) ou télécharge un fichier JSON ; « Restaurer » le recharge. Une sauvegarde reste nécessaire en cas de perte ou de changement de téléphone.
 
 ## Utiliser sur Android
 
