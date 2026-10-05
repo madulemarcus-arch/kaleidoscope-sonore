@@ -1,36 +1,55 @@
-# CISPOLstore – Gestion
+# CISPOLstore Manager
 
-Application de gestion d'entreprise (un seul fichier `index.html`, sans dépendance, sans build). Les données sont stockées dans le navigateur (`localStorage`).
+Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink (ACC), abonnements, paiements, factures, stock, fournisseurs, installations, dépenses, bénéfices et rapports. Sans serveur ni dépendance : HTML + CSS + JavaScript, installable sur Android (PWA), utilisable hors connexion.
 
 ## Lancer
 
-Ouvrir `cispolstore/index.html` dans un navigateur, ou `python3 -m http.server 8000` puis http://localhost:8000/cispolstore/.
+- En ligne : publication automatique sur GitHub Pages (`.github/workflows/pages.yml`, source *GitHub Actions*), puis Chrome Android → ⋮ → **Installer l'application**.
+- En local : `python3 -m http.server 8000` dans ce dossier, puis http://localhost:8000.
+- Pas de suite de tests : vérifier à la main (clients, factures, stock, rapports, impression).
 
-## Fonctions
+## Organisation du code
 
-- **Tableau de bord** : CA, marge, dépenses, bénéfice net du mois, créances, valeur du stock, graphique 6 mois, alertes de stock bas, meilleures ventes.
-- **Produits & stock** : catalogue (Starlink, routeurs/WiFi, accessoires, abonnements, services), prix d'achat/vente, seuil d'alerte.
-- **Ventes** : panier multi-articles, client, paiement partiel, encaissement des restes à payer, reçu imprimable, décrémentation automatique du stock.
-- **Clients** (deux catégories) :
-  - *Matériel seulement* : nom, téléphone, article acheté.
-  - *Gérés par nous* : prénom + nom, numéro de compte Starlink (ACC), adresse de l'installation, type d'abonnement, début et fin d'abonnement, montant et périodicité. Après la date de fin, un **sursis** s'applique (15 jours par défaut, modifiable pour chaque abonné) (statuts : actif → sursis → expiré, avec date de fin du sursis). Bouton **Renouveler** : enregistre le paiement (compté dans le chiffre d'affaires) et avance l'échéance. Les échéances à 7 jours ou en retard apparaissent sur le tableau de bord.
-- **Dépenses** : par catégorie.
-- **Export** : CSV par section, sauvegarde/restauration JSON complète, devise modifiable (FCFA par défaut).
-- **Identité visuelle** : logo CISPOLstore en en-tête et comme icône ; couleurs de l'application tirées du logo (bleu marine #1E3F60, orange #D5522F, jaune #E5B044).
+| Fichier | Rôle |
+|---|---|
+| `index.html`, `style.css` | Structure et thèmes clair / sombre (palette du logo) |
+| `js/core.js` | Données (`App.db`), stockage, migration, règles métier (abonnements, factures, stock, montants en lettres) |
+| `js/ui.js` | Navigation, modales, thème, **PIN**, recherche globale, bouton « + » |
+| `js/clients.js` | Liste, création par type, fiche client, renouvellement |
+| `js/stock.js` | Produits, entrées/sorties, câble en mètres, fournisseurs, installations |
+| `js/invoices.js` | Factures (4 types), PDF/Word/impression, paiements, dépenses |
+| `js/reports.js` | Tableau de bord, calendrier des abonnements, rapports |
+| `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
+| `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
+| `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
+| `sw.js` | Cache hors connexion (incrémenter `CACHE` à chaque changement de fichier) |
 
+## Règles métier
 
+- **Type de client** choisi à la création, non modifiable : *géré*, *matériel uniquement*, *installation uniquement*.
+- **Abonnement** : fin = début + durée (30 jours par défaut) ; sursis = du lendemain de la fin à fin + sursis (15 jours par défaut, réglable par client). Statut automatique : actif → en sursis → inactif.
+- **Renouvellement** : nouvelle période à partir de la fin actuelle (ou d'aujourd'hui si le client est inactif), avec facture et paiement optionnels.
+- **Factures** : numéro `FAC-AAAA-0001` automatique et sans doublon ; les lignes du stock font sortir le stock (câble en mètres). Montant en lettres et équivalent CDF (taux réglable). Export PDF (via l'impression du navigateur), Word (.doc) et impression.
+- **Stock** : entrées / sorties journalisées, fournisseurs, alertes de stock bas, câble restant sur le tableau de bord.
+- **Bénéfice** = prix de vente − prix d'achat (par ligne) − dépenses. Les montants des rapports sont convertis en dollars.
+- **Recherche globale** : nom, code client, ACC (même partiel), téléphone, adresse, numéro de série, facture, produit, fournisseur.
 
-## Stockage
+## Données et sécurité
 
-Les données sont enregistrées dans la mémoire interne de l'appareil (pas de serveur) : `localStorage` + copie dans IndexedDB, restaurée automatiquement si l'une des deux est effacée. L'application demande au navigateur un stockage persistant (accordé surtout une fois l'application installée), et le tableau de bord indique l'état de la protection et la date de la dernière sauvegarde.
+- Les données restent dans la mémoire de l'appareil (`localStorage` + copie IndexedDB restaurée automatiquement ; stockage persistant demandé au navigateur). **Sauvegarde / Restaurer** reste disponible (partage Android : WhatsApp, Drive…).
+- Le **PIN à 4 chiffres** verrouille l'écran de l'application (verrouillage automatique réglable, code de récupération remis à la création). Ce n'est pas un chiffrement des données.
+- Les anciennes données de la version 1 (`cispolstore-v1`) et ses sauvegardes `.json` sont importées automatiquement.
 
-Le bouton « Sauvegarde » ouvre le partage Android (WhatsApp, Drive, e-mail…) ou télécharge un fichier JSON ; « Restaurer » le recharge. Une sauvegarde reste nécessaire en cas de perte ou de changement de téléphone.
+## Synchronisation entre appareils (optionnelle)
 
-## Utiliser sur Android
+Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Paramètres → Synchronisation → Configurer (étapes affichées dans l'application). Le script `sync/supabase.sql` ne crée qu'une table fermée au public et trois fonctions (lire, vérifier la version, écrire).
 
-L'application est une PWA : interface adaptée au téléphone (tableaux en cartes, boutons tactiles, numéros cliquables pour appeler), installable sur l'écran d'accueil et utilisable hors connexion.
+- Les données sont **chiffrées sur l'appareil** (AES-GCM, clé dérivée de la phrase secrète par PBKDF2) avant l'envoi : le serveur ne voit qu'un bloc illisible. La phrase secrète n'est jamais envoyée et ne peut pas être récupérée.
+- **Fusion** enregistrement par enregistrement par rapport à la dernière synchronisation : des modifications faites hors connexion sur plusieurs appareils se combinent (ajouts, suppressions, champs différents d'une même fiche, stock additionné). Même champ modifié des deux côtés : l'appareil qui synchronise en dernier l'emporte.
+- Deux factures créées hors connexion avec le même numéro : la plus récente est **renumérotée** automatiquement.
+- Chaque appareil garde son PIN, son thème et son verrouillage. L'icône ☁️ de l'en-tête indique l'état ; la synchronisation se fait au démarrage, après chaque modification, au retour de connexion et toutes les 90 secondes.
+- Test : script SQL vérifié sur PostgreSQL 16 (rôle `anon` sans accès direct à la table) et scénario à deux appareils validé ; non essayé avec un vrai projet Supabase.
 
-1. Publier l'application sur une adresse https (le workflow `.github/workflows/pages.yml` la publie sur GitHub Pages après fusion sur `main` ; activer au préalable *Settings → Pages → Source : GitHub Actions*).
-2. Ouvrir l'adresse dans **Chrome** sur Android → menu ⋮ → **Installer l'application** (ou *Ajouter à l'écran d'accueil*).
+## Prévu plus tard
 
-Les données restent sur chaque appareil (pas de synchronisation) : utiliser « Sauvegarde » / « Restaurer » pour les transférer d'un appareil à l'autre.
+Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), profils utilisateurs (comptable, technicien, vendeur).
