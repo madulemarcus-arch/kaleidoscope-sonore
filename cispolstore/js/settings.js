@@ -24,6 +24,7 @@
           <div class="item"><div class="grow"><b>Verrouillage automatique</b><small>Après inactivité</small></div><select id="s_lock" style="width:auto">${App.opts(LOCKS, S.lockMin)}</select></div>
           ${row('Utilisateurs', 'Un seul administrateur pour l\'instant. Les profils Comptable, Technicien et Vendeur pourront être ajoutés plus tard.')}</div>
         <p class="mut" style="font-size:13px">Le PIN verrouille l'écran de l'application ; il ne chiffre pas les données stockées dans le téléphone.</p>
+        ${App.syncCard()}
         <h2 class="sec">Données</h2><div class="list">
           ${row('Stockage interne', `Les données sont enregistrées dans la mémoire de cet appareil, même sans internet. Protection contre l'effacement : <b class="${App.persisted ? 'ok' : 'warn'}">${App.persisted ? 'activée' : App.persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b>.`)}
           ${row('Sauvegarde', `Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${S.lastBackup ? App.fdate(S.lastBackup) : 'jamais'}</b>${warn ? ' — pensez à en faire une.' : ''}`, '<button class="btn sm" data-act="backup">Sauvegarder</button>')}
@@ -62,7 +63,7 @@
 
   // ---------- Backup / restore ----------
   App.actions.backup = async () => {
-    const name = `cispolstore-sauvegarde-${App.today()}.json`, txt = JSON.stringify(App.db, null, 1);
+    const name = `cispolstore-sauvegarde-${App.today()}.json`, txt = JSON.stringify(App.exportData(), null, 1);
     try {
       const f = new File([txt], name, { type: 'application/json' });
       if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Sauvegarde CISPOLstore' });
@@ -76,7 +77,9 @@
       const o = JSON.parse(t);
       const d = o.v === 2 ? o : (Array.isArray(o.products) || Array.isArray(o.clients)) ? App.migrate(o) : null;
       if (!d) throw 0;
-      if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?')) return;
+      if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return;
+      const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
+      d.settings = { ...(d.settings || {}), pin: keep.pin, pinAsked: keep.pinAsked, theme: keep.theme, lockMin: keep.lockMin };
       App.db = d; App.save(); App.applyTheme(); App.toast('Données restaurées'); App.refresh();
     }).catch(() => App.toast('Fichier de sauvegarde invalide')).finally(() => { input.value = ''; });
   };

@@ -20,6 +20,8 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/invoices.js` | Factures (4 types), PDF/Word/impression, paiements, dépenses |
 | `js/reports.js` | Tableau de bord, calendrier des abonnements, rapports |
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
+| `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
+| `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
 | `sw.js` | Cache hors connexion (incrémenter `CACHE` à chaque changement de fichier) |
 
 ## Règles métier
@@ -34,10 +36,20 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 
 ## Données et sécurité
 
-- Les données restent dans la mémoire de l'appareil (`localStorage` + copie IndexedDB restaurée automatiquement ; stockage persistant demandé au navigateur). Pas de synchronisation entre appareils : utiliser **Sauvegarde / Restaurer** (partage Android : WhatsApp, Drive…).
+- Les données restent dans la mémoire de l'appareil (`localStorage` + copie IndexedDB restaurée automatiquement ; stockage persistant demandé au navigateur). **Sauvegarde / Restaurer** reste disponible (partage Android : WhatsApp, Drive…).
 - Le **PIN à 4 chiffres** verrouille l'écran de l'application (verrouillage automatique réglable, code de récupération remis à la création). Ce n'est pas un chiffrement des données.
 - Les anciennes données de la version 1 (`cispolstore-v1`) et ses sauvegardes `.json` sont importées automatiquement.
 
+## Synchronisation entre appareils (optionnelle)
+
+Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Paramètres → Synchronisation → Configurer (étapes affichées dans l'application). Le script `sync/supabase.sql` ne crée qu'une table fermée au public et trois fonctions (lire, vérifier la version, écrire).
+
+- Les données sont **chiffrées sur l'appareil** (AES-GCM, clé dérivée de la phrase secrète par PBKDF2) avant l'envoi : le serveur ne voit qu'un bloc illisible. La phrase secrète n'est jamais envoyée et ne peut pas être récupérée.
+- **Fusion** enregistrement par enregistrement par rapport à la dernière synchronisation : des modifications faites hors connexion sur plusieurs appareils se combinent (ajouts, suppressions, champs différents d'une même fiche, stock additionné). Même champ modifié des deux côtés : l'appareil qui synchronise en dernier l'emporte.
+- Deux factures créées hors connexion avec le même numéro : la plus récente est **renumérotée** automatiquement.
+- Chaque appareil garde son PIN, son thème et son verrouillage. L'icône ☁️ de l'en-tête indique l'état ; la synchronisation se fait au démarrage, après chaque modification, au retour de connexion et toutes les 90 secondes.
+- Test : script SQL vérifié sur PostgreSQL 16 (rôle `anon` sans accès direct à la table) et scénario à deux appareils validé ; non essayé avec un vrai projet Supabase.
+
 ## Prévu plus tard
 
-Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), synchronisation cloud et profils utilisateurs (comptable, technicien, vendeur).
+Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), profils utilisateurs (comptable, technicien, vendeur).

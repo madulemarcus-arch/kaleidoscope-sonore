@@ -85,7 +85,10 @@
     const txt = JSON.stringify(db);
     try { localStorage.setItem(KEY, txt); } catch (e) { App.toast('Stockage local plein ou bloqué : faites une sauvegarde'); }
     try { idb('readwrite', st => st.put(txt, 'db2')).catch(() => {}); } catch (e) {}
+    if (App.afterSave) App.afterSave();
   };
+  // Backup content: everything except this device's PIN
+  App.exportData = () => { const d = JSON.parse(JSON.stringify(db)); delete d.settings.pin; return d; };
   App.recover = () => idb('readonly', st => st.get('db2')).then(t => { if (!t) return false; const d = JSON.parse(t); if (App.hasData(d)) { db = normalize(d); App.save(); return true; } return false; }).catch(() => false);
 
   // ---------- Money ----------
