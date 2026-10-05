@@ -1,7 +1,7 @@
 {
-  "name": "CISPOLstore – Gestion",
-  "short_name": "CISPOLstore",
-  "description": "Gestion de stock, ventes, clients et abonnements Starlink",
+  "name": "CISPOLstore Manager",
+  "short_name": "CISPOL Manager",
+  "description": "Clients, abonnements Starlink, stock, factures et rapports",
   "lang": "fr",
   "start_url": "./index.html",
   "scope": "./",
