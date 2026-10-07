@@ -26,6 +26,7 @@
           <div class="item"><div class="grow"><b>Verrouillage automatique</b><small>Après inactivité</small></div><select id="s_lock" style="width:auto">${App.opts(LOCKS, S.lockMin)}</select></div>
           ${row('Utilisateurs', 'Un seul administrateur pour l\'instant. Les profils Comptable, Technicien et Vendeur pourront être ajoutés plus tard.')}</div>
         <p class="mut" style="font-size:13px">Le PIN verrouille l'écran de l'application ; il ne chiffre pas les données stockées dans le téléphone.</p>
+        ${App.plansCard()}
         ${App.remindCard()}
         ${App.syncCard()}
         ${App.driveCard ? App.driveCard() : ''}
@@ -89,6 +90,7 @@
       const d = o.v === 2 ? o : (Array.isArray(o.products) || Array.isArray(o.clients)) ? App.migrate(o) : null;
       if (!d) throw 0;
       if (!Array.isArray(d.technicians)) d.technicians = [];
+      if (!Array.isArray(d.penalties)) d.penalties = [];
       if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return false;
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
       d.settings = { ...(d.settings || {}), pin: keep.pin, pinAsked: keep.pinAsked, theme: keep.theme, lockMin: keep.lockMin };

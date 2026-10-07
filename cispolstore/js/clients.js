@@ -8,12 +8,12 @@
   const badge = c => { const s = App.sub(c); return c.type === 'gere' ? (s ? App.pill(s.status) : '<span class="pill">Sans abonnement</span>') : `<span class="pill blue">${c.type === 'mat' ? 'Matériel' : 'Installation'}</span>`; };
 
   // WhatsApp link with a ready-made reminder (opened manually by the user)
-  App.waLink = c => {
-    let d = String(c.phone || '').replace(/[^\d]/g, ''); if (!d) return '';
+  App.waUrl = (phone, msg) => {
+    let d = String(phone || '').replace(/[^\d]/g, ''); if (!d) return '';
     if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '243' + d.slice(1);
-    const msg = App.reminderText(c);
     return `https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
   };
+  App.waLink = c => App.waUrl(c.phone, App.reminderText(c));
 
   // ---------- List ----------
   const st = App.clState = { f: 'all', q: '' };
@@ -107,7 +107,7 @@
     const hist = [...(c.subs || [])].reverse();
     return `<div class="card"><div class="spread"><b>Compte Starlink</b>${c.acc ? copyBtn(c.acc) : ''}</div><div class="blue" style="margin-top:4px;word-break:break-all">${esc(c.acc || '—')}</div></div>
       <div class="card"><div class="spread"><b>Abonnement actuel</b>${App.pill(s.status)}</div>
-        <dl class="kv" style="margin-top:10px"><dt>Type</dt><dd>${esc(c.plan || '—')}</dd><dt>Date de début</dt><dd>${App.fdate(s.start)}</dd><dt>Date de fin</dt><dd>${App.fdate(s.end)}</dd><dt>Sursis</dt><dd>${s.grace ? App.fdate(s.gStart) + ' → ' + App.fdate(s.gEnd) : 'aucun'}</dd><dt>Tarif</dt><dd>${App.fmt(c.price || 0)}</dd><dt>Statut</dt><dd class="${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${msg}</dd></dl>
+        <dl class="kv" style="margin-top:10px"><dt>Type</dt><dd>${esc(c.plan || '—')}</dd><dt>Date de début</dt><dd>${App.fdate(s.start)}</dd><dt>Date de fin</dt><dd>${App.fdate(s.end)}</dd><dt>Sursis</dt><dd>${s.grace ? App.fdate(s.gStart) + ' → ' + App.fdate(s.gEnd) : 'aucun'}</dd><dt>Tarif</dt><dd>${App.fmt(c.price || 0)}</dd>${(m => m ? `<dt>Coût Starlink</dt><dd>${App.fmt(m.cost)}</dd><dt>Marge</dt><dd class="${m.margin > 0 ? 'ok' : 'bad'}">${App.fmt(m.margin)}</dd>` : '')(App.subMargin(c))}<dt>Statut</dt><dd class="${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${msg}</dd></dl>
         <div class="bar" style="margin-top:12px"><button class="btn" data-act="renew" data-id="${c.id}">Renouveler</button>${last ? `<button class="btn sec" data-act="go" data-v="invoice" data-id="${last.id}">Voir la facture</button>` : ''}</div></div>
       ${hist.length ? `<h2 class="sec">Périodes précédentes</h2><div class="list">${hist.map(h => `<div class="item"><div class="grow"><b>${App.fdate(h.start)} → ${App.fdate(App.addDays(h.start, h.days))}</b><small>${h.days} jours</small></div></div>`).join('')}</div>` : ''}`;
   };
@@ -118,7 +118,7 @@
     let body = '';
     if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd><dt>Type</dt><dd>${App.TYPES[c.type]}</dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Installation</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
       <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button><button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
-    if (tab === 'abo') body = aboTab(c);
+    if (tab === 'abo') body = aboTab(c) + App.penaltyBlock(c);
     if (tab === 'pay') body = `<div class="bar"><button class="btn sm" data-act="newpay" data-cid="${c.id}">+ Paiement</button></div>` + listOrEmpty(db.payments.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => { const i = App.invoice(x.invoiceId); return `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${i ? esc(i.number) : 'Sans facture'}${x.ref ? ' · ' + esc(x.ref) : ''}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`; }), 'Aucun paiement enregistré.');
     if (tab === 'fac') body = `<div class="bar"><button class="btn sm" data-act="newinv" data-cid="${c.id}">+ Nouvelle facture</button></div>` + listOrEmpty(db.invoices.filter(i => i.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)).map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }), 'Aucune facture.');
     if (tab === 'inst') body = `<div class="bar"><button class="btn sm" data-act="newinst" data-cid="${c.id}">+ Installation</button></div>` + listOrEmpty(db.installs.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.kind)}</b><small>${esc(x.tech || 'Technicien non précisé')}${x.obs ? ' · ' + esc(x.obs) : ''}</small></div><b>${App.fmt(x.price || 0)}</b></div>`), "Aucune intervention enregistrée.");
@@ -140,7 +140,7 @@
     const c = App.client(d.id), db = App.db;
     if (db.invoices.some(i => i.clientId === c.id) || db.payments.some(p => p.clientId === c.id)) return App.toast('Ce client a des factures ou paiements : suppression impossible');
     if (!App.confirm(`Supprimer définitivement ${App.cname(c)} ?`)) return;
-    db.clients = db.clients.filter(x => x !== c); db.installs = db.installs.filter(x => x.clientId !== c.id); db.log = db.log.filter(x => x.clientId !== c.id);
+    db.clients = db.clients.filter(x => x !== c); db.installs = db.installs.filter(x => x.clientId !== c.id); db.penalties = db.penalties.filter(x => x.clientId !== c.id); db.log = db.log.filter(x => x.clientId !== c.id);
     App.save(); App.toast('Client supprimé'); App.go('clients', {}, true);
   };
 

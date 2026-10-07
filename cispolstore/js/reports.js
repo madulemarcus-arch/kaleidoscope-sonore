@@ -8,10 +8,14 @@
   // Totals of invoices / expenses inside a date range, all in USD
   const finance = r => {
     const inv = App.db.invoices.filter(i => App.inRange(i.date, r));
-    const ca = inv.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency), 0);
-    const cost = inv.reduce((a, i) => a + App.usd(App.invCost(i), i.currency), 0);
+    const ca0 = inv.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency), 0);
+    const cost0 = inv.reduce((a, i) => a + App.usd(App.invCost(i), i.currency), 0);
+    const pen = App.db.penalties.filter(p => p.paid && App.inRange(p.paid, r));
+    const penIn = pen.reduce((a, p) => a + App.usd(p.amount, p.currency), 0), penCost = pen.reduce((a, p) => a + App.usd(p.cost, p.currency), 0);
     const exp = App.db.expenses.filter(e => App.inRange(e.date, r)).reduce((a, e) => a + App.usd(e.amount, e.currency), 0);
-    return { inv, ca, cost, margin: ca - cost, exp, net: ca - cost - exp };
+    // paid penalties are income, and what is passed on to Starlink is a cost: only the difference is profit
+    const ca = ca0 + penIn, cost = cost0 + penCost;
+    return { inv, ca, cost, margin: ca - cost, exp, net: ca - cost - exp, penIn, penCost };
   };
 
   // ---------- Dashboard ----------
@@ -51,6 +55,7 @@
         <div class="dash"><div style="grid-area:a">${alerts.length ? `<h2 class="sec">Alertes</h2><div class="list">${alerts.join('')}</div>` : ''}</div>
         <div style="grid-area:b"><h2 class="sec">Finances</h2>${periodChips('dper', dper)}
         <div class="grid two"><div class="stat"><small>💰 Chiffre d'affaires</small><b>${App.fmt(f.ca)}</b></div><div class="stat"><small>📈 Bénéfice net</small><b class="${f.net >= 0 ? 'ok' : 'bad'}">${App.fmt(f.net)}</b></div><div class="stat"><small>💸 Dépenses</small><b>${App.fmt(f.exp)}</b></div><div class="stat"><small>Marge brute</small><b>${App.fmt(f.margin)}</b></div></div>
+        ${App.unpaidTotal() > 0.004 ? `<button class="item" data-act="go" data-v="impayes" style="margin-bottom:12px"><span class="avatar warn">🧾</span><div class="grow"><b>Impayés : ${App.fmt(App.unpaidTotal())}</b><small>Voir et relancer</small></div><span class="mut">›</span></button>` : ''}
         <div class="card"><b>Ventes</b><div class="chart">${bars.map(b => `<div title="${App.fmt(b.v)}"><i style="height:${Math.round(b.v / max * 100)}%"></i><small>${b.l}</small></div>`).join('')}</div></div>
         </div><div style="grid-area:c"><h2 class="sec">Stock</h2><div class="grid two"><button class="stat" data-act="go" data-v="stock" style="text-align:left;font:inherit;color:inherit;cursor:pointer"><small>📦 Produits</small><b>${db.products.length}</b>${low ? `<small class="warn">${low} en stock bas</small>` : ''}</button><div class="stat"><small>📏 Câble restant</small><b>${App.nf(cable, 2)} m</b></div></div>
         </div><div style="grid-area:d">${urgent.length ? `<h2 class="sec">Renouvellements à traiter<button class="more" data-act="go" data-v="subs">Tout voir</button></h2><div class="list">${urgent.map(({ c, s }) => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>Fin ${App.fdate(s.end)}${s.status === 'sursis' ? ' · sursis → ' + App.fdate(s.gEnd) : ''}</small></div><div class="end">${App.pill(s.status)}</div></button>`).join('')}</div>` : ''}
@@ -101,16 +106,16 @@
   const REP = {
     ventes: r => { const inv = App.db.invoices.filter(i => App.inRange(i.date, r)).sort((a, b) => b.date.localeCompare(a.date)), f = finance(r), due = inv.reduce((a, i) => a + App.usd(App.invDue(i), i.currency), 0);
       return { cards: [['Factures', inv.length], ['Chiffre d\'affaires', f.ca, money], ['Reste à encaisser', due, money]], head: ['Date', 'Facture', 'Client', 'Type', 'Total ($)', 'Reste ($)'], fmt: [4, 5], rows: inv.map(i => [i.date, i.number, App.cname(App.client(i.clientId)), App.invTypes[i.type], App.usd(App.invTotal(i), i.currency), App.usd(App.invDue(i), i.currency)]) }; },
-    abos: r => { const lines = []; App.db.invoices.filter(i => App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (/^abonnement/i.test(l.desc)) lines.push([i.date, i.number, App.cname(App.client(i.clientId)), l.desc, App.usd(l.qty * l.price, i.currency)]); }));
+    abos: r => { const lines = []; App.db.invoices.filter(i => App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (/^abonnement/i.test(l.desc)) lines.push([i.date, i.number, App.cname(App.client(i.clientId)), l.desc, App.usd(l.qty * l.price, i.currency), App.usd(l.qty * (l.price - (l.cost || 0)), i.currency)]); }));
       const g = gere().map(c => App.sub(c)).filter(Boolean), n = k => g.filter(s => s.status === k).length;
-      return { cards: [['Renouvellements facturés', lines.length], ['Revenus abonnements', lines.reduce((a, x) => a + x[4], 0), money], ['Actifs / sursis / inactifs', `${n('actif')} / ${n('sursis')} / ${n('inactif')}`]], head: ['Date', 'Facture', 'Client', 'Désignation', 'Montant ($)'], fmt: [4], rows: lines.sort((a, b) => b[0].localeCompare(a[0])) }; },
+      return { cards: [['Renouvellements facturés', lines.length], ['Revenus abonnements', lines.reduce((a, x) => a + x[4], 0), money], ['Marge abonnements', lines.reduce((a, x) => a + x[5], 0), money], ['Actifs / sursis / inactifs', `${n('actif')} / ${n('sursis')} / ${n('inactif')}`]], head: ['Date', 'Facture', 'Client', 'Désignation', 'Montant ($)', 'Marge ($)'], fmt: [4, 5], rows: lines.sort((a, b) => b[0].localeCompare(a[0])) }; },
     inst: r => { const l = App.db.installs.filter(x => App.inRange(x.date, r)).sort((a, b) => b.date.localeCompare(a.date));
       return { cards: [['Installations', l.length], ['Revenus', l.reduce((a, x) => a + (x.price || 0), 0), money]], head: ['Date', 'Client', 'Type', 'Technicien', 'Prix ($)'], fmt: [4], rows: l.map(x => [x.date, App.cname(App.client(x.clientId)), x.kind, x.tech || '', x.price || 0]) }; },
     mat: r => { const by = {}; App.db.invoices.filter(i => App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (!l.pid) return; const o = by[l.pid] = by[l.pid] || { name: l.desc, unit: l.unit, q: 0, rev: 0, cost: 0 }; o.q += l.qty; o.rev += App.usd(l.qty * l.price, i.currency); o.cost += App.usd(l.qty * (l.cost || 0), i.currency); }));
       const rows = Object.values(by).sort((a, b) => b.rev - a.rev).map(o => [o.name, o.q + (o.unit ? ' ' + o.unit : ''), o.rev, o.rev - o.cost]);
       return { cards: [['Articles vendus', rows.length], ['Ventes matériel', rows.reduce((a, x) => a + x[2], 0), money], ['Marge', rows.reduce((a, x) => a + x[3], 0), money]], head: ['Article', 'Quantité', 'Ventes ($)', 'Marge ($)'], fmt: [2, 3], rows }; },
     benef: r => { const f = finance(r);
-      return { cards: [['Chiffre d\'affaires', f.ca, money], ['Coût des marchandises', f.cost, money], ['Marge brute', f.margin, money], ['Dépenses', f.exp, money], ['Bénéfice net', f.net, money]], head: ['Facture', 'Date', 'Vente ($)', 'Coût ($)', 'Bénéfice ($)'], fmt: [2, 3, 4], rows: f.inv.sort((a, b) => b.date.localeCompare(a.date)).map(i => { const v = App.usd(App.invTotal(i), i.currency), c = App.usd(App.invCost(i), i.currency); return [i.number, i.date, v, c, v - c]; }) }; },
+      return { cards: [['Chiffre d\'affaires', f.ca, money], ['Coût des marchandises', f.cost, money], ['Marge brute', f.margin, money], ['Dépenses', f.exp, money], ['Bénéfice net', f.net, money]], head: ['Facture', 'Date', 'Vente ($)', 'Coût ($)', 'Bénéfice ($)'], fmt: [2, 3, 4], rows: f.inv.sort((a, b) => b.date.localeCompare(a.date)).map(i => { const v = App.usd(App.invTotal(i), i.currency), c = App.usd(App.invCost(i), i.currency); return [i.number, i.date, v, c, v - c]; }).concat(App.db.penalties.filter(p => p.paid && App.inRange(p.paid, r)).map(p => { const v = App.usd(p.amount, p.currency), c = App.usd(p.cost, p.currency); return ['Pénalité · ' + App.cname(App.client(p.clientId)), p.paid, v, c, v - c]; })) }; },
     dep: r => { const l = App.db.expenses.filter(e => App.inRange(e.date, r)).sort((a, b) => b.date.localeCompare(a.date)), by = {}; l.forEach(e => { by[e.cat] = (by[e.cat] || 0) + App.usd(e.amount, e.currency); });
       return { cards: [['Dépenses', l.reduce((a, e) => a + App.usd(e.amount, e.currency), 0), money], ...Object.entries(by).map(([k, v]) => [k, v, money])], head: ['Date', 'Libellé', 'Catégorie', 'Montant ($)'], fmt: [3], rows: l.map(e => [e.date, e.label, e.cat, App.usd(e.amount, e.currency)]) }; },
     stock: () => { const p = App.db.products.filter(App.tracked), val = p.reduce((a, x) => a + x.qty * x.cost, 0), sale = p.reduce((a, x) => a + x.qty * x.price, 0);
