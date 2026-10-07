@@ -160,9 +160,9 @@ dialog .end { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; 
 @media print { body { background:#fff; } #top,#bottom,#fab,.noprint { display:none !important; } }
 @media (max-width:640px) { .paper .two { grid-template-columns:1fr; } .paper { padding:12px; font-size:12px; } .paper .hd { flex-direction:column; } .paper .hd .co { text-align:left; } }
 
-#upd { position:fixed; left:12px; right:12px; bottom:calc(88px + env(safe-area-inset-bottom,0px)); z-index:70; max-width:520px; margin:0 auto; display:flex; align-items:center; gap:10px; background:var(--navy); color:#fff; padding:10px 10px 10px 16px; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.35); }
-#upd span { flex:1; font-weight:600; }
-#upd .ib { width:32px; height:32px; font-size:14px; }
+#upd, #undo { position:fixed; left:12px; right:12px; bottom:calc(88px + env(safe-area-inset-bottom,0px)); z-index:70; max-width:520px; margin:0 auto; display:flex; align-items:center; gap:10px; background:var(--navy); color:#fff; padding:10px 10px 10px 16px; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+#upd span, #undo span { flex:1; font-weight:600; }
+#upd .ib, #undo .ib { width:32px; height:32px; font-size:14px; }
 
 /* ---------- wide screens (computer): side menu, wider content ---------- */
 #side { display:none; }
@@ -187,7 +187,7 @@ dialog .end { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; 
   .dash { display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"a b" "d b" "d c"; gap:0 28px; align-items:start; }
   .paper { max-width:860px; margin:0 auto; font-size:14px; }
   #toast { bottom:30px; }
-  #upd { bottom:24px; left:calc(248px + 12px); }
+  #upd, #undo { bottom:24px; left:calc(248px + 12px); }
   #clist .list, #ilist .list, #plist .list { display:grid; grid-template-columns:repeat(2,1fr); }
   #clist .item, #ilist .item, #plist .item { border-right:1px solid var(--line); }
   dialog { width:min(620px,92vw); }

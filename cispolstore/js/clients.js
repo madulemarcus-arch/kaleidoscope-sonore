@@ -162,10 +162,11 @@
        <div class="card" id="prev" style="margin-top:10px"></div>`,
       () => {
         const days = Math.max(1, Math.round(App.n('f_period')) || 30), price = App.n('f_price'), ns = App.v('f_start') || today, mode = App.v('f_pay');
+        const prevSub = { start: c.start || '', period: c.period, price: c.price };
         if (c.start) (c.subs = c.subs || []).push({ start: c.start, days: c.period || days, price: c.price || 0, date: today });
         Object.assign(c, { start: ns, period: days, price, payMode: mode });
         const end = App.addDays(ns, days);
-        if ($('f_mk').checked && price > 0) App.createInvoice({ type: 'abonnement', clientId: c.id, currency: 'USD', payMode: mode, date: today, lines: [{ pid: '', desc: `Abonnement ${c.plan || 'Starlink'} (${App.fdate(ns)} → ${App.fdate(end)})`, qty: 1, price, cost: 0, unit: '' }] }, Math.min(App.n('f_paid'), price), true);
+        if ($('f_mk').checked && price > 0) { const ri = App.createInvoice({ type: 'abonnement', clientId: c.id, currency: 'USD', payMode: mode, date: today, lines: [{ pid: '', desc: `Abonnement ${c.plan || 'Starlink'} (${App.fdate(ns)} → ${App.fdate(end)})`, qty: 1, price, cost: 0, unit: '' }] }, Math.min(App.n('f_paid'), price), true); ri.renew = { prev: prevSub, ns, date: today }; }
         App.log(c.id, `Abonnement renouvelé : ${App.fdate(ns)} → ${App.fdate(end)}`);
         App.save(); App.toast('Abonnement renouvelé'); App.refresh();
       }, 'Renouveler');

@@ -65,6 +65,15 @@
   window.addEventListener('popstate', e => { App.close(); App.state = e.state || { view: 'home', params: {} }; render(false); });
   $('backBtn').onclick = () => { const to = $('backBtn').dataset.to; if (to) App.go(to); else history.back(); };
 
+  // ---------- "Annuler" bar after a deletion ----------
+  let undoTimer = null;
+  App.undoBar = (msg, fn) => {
+    const old = $('undo'); if (old) old.remove(); clearTimeout(undoTimer);
+    const d = document.createElement('div'); d.id = 'undo'; d.innerHTML = `<span>${esc(msg)}</span><button class="btn sm" id="undogo">Annuler</button><button class="ib" id="undox" aria-label="Fermer">✕</button>`;
+    document.body.appendChild(d); const close = () => { d.remove(); clearTimeout(undoTimer); };
+    $('undogo').onclick = () => { close(); fn(); }; $('undox').onclick = close; undoTimer = setTimeout(close, 12000);
+  };
+
   // ---------- New version banner ----------
   App.showUpdate = () => {
     if ($('upd')) return;
