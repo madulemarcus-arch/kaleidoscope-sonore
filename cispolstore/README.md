@@ -26,7 +26,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/reports.js` | Tableau de bord, calendrier des abonnements, rapports |
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
-| `js/export.js` | Tableaux partagés, export Excel (.xlsx) et PDF générés sans bibliothèque |
+| `js/export.js` | Tableaux partagés, export Excel (.xlsx) généré sans bibliothèque |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
 | `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
 | `sw.js` | Cache hors connexion (**incrémenter `CACHE` à chaque publication** : c'est ce qui déclenche le message « Nouvelle version disponible ») |
@@ -67,7 +67,7 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 
 ## Sauvegarde Google Drive (optionnelle)
 
-Complète la synchronisation Supabase (qui reste active) : trois fichiers `cispolstore-AAAA-MM-JJ` (`.json` pour restaurer, `.xlsx` Excel et `.pdf` pour lire) sont déposés dans le dossier Drive « CISPOLstore sauvegardes » (les 30 plus récents de chaque type sont gardés, les autres vont à la corbeille Drive). Paramètres → Sauvegarde Google Drive :
+Complète la synchronisation Supabase (qui reste active) : deux fichiers `cispolstore-AAAA-MM-JJ` (`.json` pour restaurer, `.xlsx` Excel pour lire) sont déposés dans le dossier Drive « CISPOLstore sauvegardes » (les 30 plus récents de chaque type sont gardés, les autres vont à la corbeille Drive). Paramètres → Sauvegarde Google Drive :
 
 1. Sur console.cloud.google.com : créer un projet, activer **Google Drive API**, configurer l'écran de consentement OAuth (portée `drive.file`, **publié en production**), puis créer un **ID client OAuth** de type Application Web avec l'origine autorisée `https://madulemarcus-arch.github.io`.
 2. Coller l'ID client dans l'application, puis se connecter à Google.

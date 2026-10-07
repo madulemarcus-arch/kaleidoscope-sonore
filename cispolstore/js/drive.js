@@ -70,12 +70,12 @@
       await getToken(!!interactive);
       const fid = await folder(), name = `cispolstore-${App.today()}.json`, base = name.slice(0, -5);
       await upsert(fid, name, JSON.stringify(App.exportData()));
-      // readable copies (Excel + PDF); the JSON above is what "Restaurer" uses, so a failure here is not fatal
+      // readable Excel copy; the JSON above is what "Restaurer" uses, so a failure here is not fatal
       let extra = '';
-      try { await upsert(fid, base + '.xlsx', App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); await upsert(fid, base + '.pdf', App.makePdf(App.reportSheets(), 'Sauvegarde du ' + App.today()), 'application/pdf'); } catch (e) { if (e.code === 'auth') throw e; extra = e.message; }
+      try { await upsert(fid, base + '.xlsx', App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); } catch (e) { if (e.code === 'auth') throw e; extra = e.message; }
       // keep the 30 most recent files of each kind, move older ones to the Drive trash
       const all = await list(`'${fid}' in parents and trashed=false and name contains 'cispolstore-'`);
-      for (const ext of ['.json', '.xlsx', '.pdf']) for (const f of all.filter(f => f.name.endsWith(ext)).slice(KEEP)) await gfetch(`${API}/${f.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+      for (const ext of ['.json', '.xlsx']) for (const f of all.filter(f => f.name.endsWith(ext)).slice(KEEP)) await gfetch(`${API}/${f.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
       cfg.last = Date.now(); cfg.lastName = name; cfg.extraErr = extra; cfg.connected = true; saveCfg(); dirty = false; setStatus('idle'); warned = false;
       return name;
     } catch (e) {
@@ -110,7 +110,7 @@
     else {
       const st = { busy: 'Sauvegarde en cours…', reconnect: 'Reconnexion à Google nécessaire', error: 'Erreur : ' + esc(D.error) }[D.status] || 'Connecté';
       const cls = { reconnect: 'warn', error: 'bad' }[D.status] || 'ok';
-      body = row('État', `<b class="${cls}">${st}</b><br>Dernière sauvegarde : <b>${when(cfg.last)}</b>${cfg.lastName ? ' · ' + esc(cfg.lastName) : ''}<br>Fichiers : JSON (restauration), Excel et PDF (lecture)${cfg.extraErr ? '<br><span class="warn">Excel/PDF non envoyés : ' + esc(cfg.extraErr) + '</span>' : ''}`, D.status === 'reconnect' ? '<button class="btn sm" data-act="drive_connect">Reconnecter</button>' : '<button class="btn sm" data-act="drive_now">Sauvegarder</button>')
+      body = row('État', `<b class="${cls}">${st}</b><br>Dernière sauvegarde : <b>${when(cfg.last)}</b>${cfg.lastName ? ' · ' + esc(cfg.lastName) : ''}<br>Fichiers : JSON (restauration), Excel (lecture)${cfg.extraErr ? '<br><span class="warn">Excel non envoyé : ' + esc(cfg.extraErr) + '</span>' : ''}`, D.status === 'reconnect' ? '<button class="btn sm" data-act="drive_connect">Reconnecter</button>' : '<button class="btn sm" data-act="drive_now">Sauvegarder</button>')
         + `<div class="item"><div class="grow"><b>Sauvegarde automatique</b><small>Quand l'application est ouverte</small></div><select id="d_every" style="width:auto;max-width:55%">${App.opts(EVERY, cfg.auto ? String(cfg.every || 24) : '')}</select></div>`
         + row('Restaurer depuis Drive', 'Choisir une sauvegarde datée (.json).', '<button class="btn sm sec" data-act="drive_restore">Choisir…</button>')
         + row('Déconnexion', 'Les sauvegardes déjà dans Drive sont conservées.', '<button class="btn sm del" data-act="drive_off">Déconnecter</button>');

@@ -1,9 +1,9 @@
-// Readable exports built without any library: tables, a real .xlsx workbook (zip, no compression) and a simple PDF.
+// Readable exports built without any library: shared tables and a real .xlsx workbook (zip, no compression).
 (() => {
   'use strict';
   const App = window.App, esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  // ---------- Tables (shared by CSV, Excel and PDF) ----------
+  // ---------- Tables (shared by CSV, Excel) ----------
   App.tables = () => {
     const db = App.db;
     return {
@@ -55,42 +55,5 @@
     ]);
   };
 
-  // ---------- PDF (Helvetica, A4 landscape, tables) ----------
-  const win = { '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, 'œ': 0x9c, 'Œ': 0x8c };
-  const pdfStr = s => { let o = ''; for (const ch of String(s ?? '').replace(/[\r\n\t]+/g, ' ')) { let c = win[ch] ?? ch.charCodeAt(0); if (c > 255) c = 63; if (c === 40 || c === 41 || c === 92) o += '\\' + ch; else if (c < 32 || c > 126) o += '\\' + c.toString(8).padStart(3, '0'); else o += String.fromCharCode(c); } return o; };
-  App.makePdf = (sheets, title) => {
-    const PW = 842, PH = 595, M = 28, FS = 7.5, LH = 11, CW = FS * 0.5; // average glyph width of Helvetica ≈ 0.5 em
-    const pages = []; let cur = null, y = 0;
-    const newPage = () => { cur = []; pages.push(cur); y = PH - M; };
-    const text = (x, yy, s, size = FS, bold = false, rgb = '0 0 0') => cur.push(`${rgb} rg BT /${bold ? 'F2' : 'F1'} ${size} Tf ${x.toFixed(1)} ${yy.toFixed(1)} Td (${pdfStr(s)}) Tj ET`);
-    const rect = (x, yy, w, h, rgb) => cur.push(`${rgb} rg ${x.toFixed(1)} ${yy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re f`);
-    newPage(); rect(0, PH - 58, PW, 58, '0.07 0.21 0.36'); text(M, PH - 30, 'CISPOLstore — ' + title, 16, true, '1 1 1'); text(M, PH - 46, 'Édité le ' + App.today() + ' · ' + (App.db.settings.company.name || 'CISPOLstore'), 9, false, '0.9 0.9 0.9'); y = PH - 80;
-    for (const s of sheets) {
-      const rows = s.rows, n = rows[0].length, avail = PW - 2 * M, len = [];
-      for (let j = 0; j < n; j++) len[j] = Math.max(4, ...rows.slice(0, 400).map(r => Math.min(40, String(r[j] ?? '').length)));
-      const tot = len.reduce((a, b) => a + b, 0), w = len.map(l => avail * l / tot);
-      const cell = (v, j) => { const k = Math.max(1, Math.floor((w[j] - 6) / CW)), t = typeof v === 'number' ? String(Math.round(v * 100) / 100) : String(v ?? ''); return t.length > k ? t.slice(0, k - 1) + '…' : t; };
-      const header = () => { rect(M, y - 3, avail, LH, '0.84 0.32 0.18'); let x = M; rows[0].forEach((v, j) => { text(x + 3, y, cell(v, j), FS, true, '1 1 1'); x += w[j]; }); y -= LH + 2; };
-      if (y < 90) newPage();
-      text(M, y, `${s.title} (${rows.length - 1})`, 12, true, '0.07 0.21 0.36'); y -= 18; header();
-      if (rows.length === 1) { text(M + 3, y, 'Aucune donnée', FS, false, '0.4 0.4 0.4'); y -= LH + 14; continue; }
-      rows.slice(1).forEach((r, i) => {
-        if (y < M + LH) { newPage(); header(); }
-        if (i % 2) rect(M, y - 3, avail, LH, '0.95 0.96 0.98');
-        let x = M; r.forEach((v, j) => { text(x + 3, y, cell(v, j), FS); x += w[j]; }); y -= LH;
-      });
-      y -= 16;
-    }
-    // objects: 1 catalog, 2 pages, 3/4 fonts, then (page, content) pairs
-    const objs = ['<</Type/Catalog/Pages 2 0 R>>', `<</Type/Pages/Kids[${pages.map((_, i) => `${5 + i * 2} 0 R`).join(' ')}]/Count ${pages.length}>>`, '<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>', '<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>'];
-    pages.forEach((p, i) => {
-      const lab = `Page ${i + 1} / ${pages.length}`; p.push(`0.4 0.4 0.4 rg BT /F1 7 Tf ${PW - M - 50} 14 Td (${lab}) Tj ET`);
-      const body = p.join('\n'); objs.push(`<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Resources<</Font<</F1 3 0 R/F2 4 0 R>>>>/Contents ${6 + i * 2} 0 R>>`, `<</Length ${body.length}>>\nstream\n${body}\nendstream`);
-    });
-    let out = '%PDF-1.4\n'; const off = [];
-    objs.forEach((o, i) => { off.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
-    const xr = out.length; out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + off.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xr}\n%%EOF`;
-    const u8 = new Uint8Array(out.length); for (let i = 0; i < out.length; i++) u8[i] = out.charCodeAt(i) & 255; return u8;
-  };
   App.reportSheets = () => Object.values(App.tables());
 })();
