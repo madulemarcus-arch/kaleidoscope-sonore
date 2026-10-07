@@ -15,9 +15,9 @@
     const l = App.db.products.filter(p => (st.cat === 'all' || p.cat === st.cat) && (!q || (p.name + ' ' + p.ref + ' ' + p.cat).toLowerCase().includes(q))).sort((a, b) => a.name.localeCompare(b.name));
     $('plist').innerHTML = l.length ? `<div class="list">${l.map(p => {
       const sup = App.supplier(p.supplierId);
-      return `<div class="item"><div class="grow"><b>${esc(p.name)}</b><small>${esc(p.cat)}${p.ref ? ' · ' + esc(p.ref) : ''}${sup ? ' · ' + esc(sup.name) : ''}</small><small>Achat : ${App.fmt(p.cost)} | Vente : ${App.fmt(p.price)}${p.unit === 'm' ? ' / m' : ''}</small></div>
+      return `<div class="item"><div class="grow"><b>${esc(p.name)}</b><small>${esc(p.cat)}${p.ref ? ' · ' + esc(p.ref) : ''}${sup ? ' · ' + esc(sup.name) : ''}</small><small>${App.can('costs') ? 'Achat : ' + App.fmt(p.cost) + ' | ' : ''}Vente : ${App.fmt(p.price)}${p.unit === 'm' ? ' / m' : ''}</small></div>
         <div class="end"><span class="pill ${stClass(p)}" style="font-size:13px">${App.tracked(p) ? 'En stock : ' + qtyText(p) : 'Sans stock'}</span>
-        <span><button class="btn sm sec" data-act="stin" data-id="${p.id}">＋</button> <button class="btn sm sec" data-act="stout" data-id="${p.id}">－</button> <button class="btn sm sec" data-act="editprod" data-id="${p.id}">✎</button></span></div></div>`;
+        ${App.can('stockedit') ? `<span><button class="btn sm sec" data-act="stin" data-id="${p.id}">＋</button> <button class="btn sm sec" data-act="stout" data-id="${p.id}">－</button> <button class="btn sm sec" data-act="editprod" data-id="${p.id}">✎</button></span>` : ''}</div></div>`;
     }).join('')}</div>` : '<div class="empty">Aucun produit. Ajoutez par exemple « Starlink Mini », « Câble Cat6 (m) », « Routeur »…</div>';
   };
   App.views.stock = p => {

@@ -72,7 +72,7 @@
   };
 
   // ---------- Side menu (wide screens; hidden on phones by CSS) ----------
-  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['impayes', '🧾', 'Impayés'], ['suppliers', '🚚', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['settings', '⚙️', 'Paramètres']];
+  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['impayes', '🧾', 'Impayés'], ['suppliers', '🚚', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['settings', '⚙️', 'Paramètres']];
   $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
     <button class="btn full" data-act="quick">＋ Action rapide</button>
     <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${i}</span>${t}</button>`).join('')}</nav>
@@ -82,7 +82,7 @@
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const fn = App.actions[el.dataset.act];
-    if (fn) { e.preventDefault(); fn(el.dataset, el, e); }
+    if (fn) { e.preventDefault(); if (App.guard && !App.guard(el.dataset.act)) return App.toast('Action non autorisée pour votre profil'); fn(el.dataset, el, e); }
   });
   App.actions.go = d => { App.close(); App.go(d.v, d.p ? JSON.parse(d.p) : d.id ? { id: d.id } : {}); };
 
@@ -104,6 +104,8 @@
     try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
     catch (e) { let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) | 0; return 'x' + h; }
   };
+  App.hash = hash;
+  let recTarget = null;
   const TITLES = { enter: 'Entrez votre code PIN', new1: 'Choisissez un code PIN à 4 chiffres', new2: 'Confirmez le code PIN' };
   const drawLock = (msg = '') => {
     lockEl.hidden = false; document.body.style.overflow = 'hidden';
@@ -120,17 +122,30 @@
   };
   const unlock = () => { lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); fails = 0; };
   App.showLock = (m = 'enter', f = 'unlock') => { buf = ''; first = ''; mode = m; flow = f; App.locked = f === 'unlock'; drawLock(); };
-  App.hasPin = () => !!dbs().pin;
+  App.hasPin = () => !!(App.multi && App.multi()) || !!dbs().pin;
   const newPin = async pin => {
+    const multi = App.multi && App.multi(), target = recTarget || (multi ? App.user : null);
+    if (multi && target) for (const o of App.users()) if (o.id !== target.id && o.pin && await hash(o.pin.salt + pin) === o.pin.hash) { buf = ''; first = ''; mode = 'new1'; return drawLock('Ce code est déjà utilisé par un autre profil'); }
     const salt = App.uid(), rec = Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
-    dbs().pin = { salt, hash: await hash(salt + pin), rec: await hash(salt + rec) }; App.save();
+    const np = { salt, hash: await hash(salt + pin) };
+    if (!multi || (target && target.role === 'admin')) np.rec = await hash(salt + rec);
+    if (target) {
+      target.pin = np; dbs().users = App.users().map(x => x.id === target.id ? target : x); App.user = target; recTarget = null; App.save();
+      if (np.rec) { mode = 'showrec'; return drawLock(rec.slice(0, 4) + '-' + rec.slice(4)); }
+      unlock(); App.toast('Code PIN modifié'); if (App.applyRole) App.applyRole(); return;
+    }
+    dbs().pin = np; App.save();
     mode = 'showrec'; drawLock(rec.slice(0, 4) + '-' + rec.slice(4));
   };
   const submitPin = async () => {
-    const p = dbs().pin;
+    const p = App.multi && App.multi() ? (App.user && App.user.pin) : dbs().pin;
     if (mode === 'enter') {
       if (Date.now() < blockedUntil) { buf = ''; return drawLock('Trop d\'essais. Patientez quelques secondes.'); }
-      if (p && await hash(p.salt + buf) === p.hash) {
+      if (App.multi && App.multi() && flow === 'unlock') {
+        let found = null; for (const x of App.users()) if (x.active !== false && x.pin && await hash(x.pin.salt + buf) === x.pin.hash) { found = x; break; }
+        if (found) { unlock(); App.me_login(found); return; }
+      }
+      if ((!(App.multi && App.multi()) || flow !== 'unlock') && p && await hash(p.salt + buf) === p.hash) {
         if (flow === 'remove') { dbs().pin = null; App.save(); unlock(); App.toast('PIN désactivé'); if (App.state.view === 'settings') App.refresh(); return; }
         if (flow === 'change') { buf = ''; mode = 'new1'; return drawLock(); }
         return unlock();
@@ -157,10 +172,12 @@
     if (a === 'forgot') { mode = 'recover'; drawLock(); }
     else if (a === 'back') { App.showLock('enter', 'unlock'); }
     else if (a === 'skip' || a === 'cancel') unlock();
-    else if (a === 'recdone') { unlock(); App.toast('PIN enregistré'); if (App.state.view === 'settings') App.refresh(); }
+    else if (a === 'recdone') { unlock(); App.toast('PIN enregistré'); if (App.multi && App.multi() && App.user) { App.me_login(App.user); } else if (App.state.view === 'settings') App.refresh(); }
     else if (a === 'recok') {
-      const p = dbs().pin, code = ($('rec').value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      if (p && await hash(p.salt + code) === p.rec) { buf = ''; first = ''; mode = 'new1'; flow = 'unlock'; drawLock('Choisissez un nouveau PIN'); }
+      const code = ($('rec').value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(), multi = App.multi && App.multi();
+      let who = null; if (multi) { for (const x of App.users()) if (x.role === 'admin' && x.pin && x.pin.rec && await hash(x.pin.salt + code) === x.pin.rec) { who = x; break; } }
+      const p = dbs().pin;
+      if (multi ? who : (p && await hash(p.salt + code) === p.rec)) { recTarget = who; buf = ''; first = ''; mode = 'new1'; flow = 'unlock'; drawLock('Choisissez un nouveau PIN'); }
       else drawLock('Code de récupération incorrect');
     }
   });
@@ -182,15 +199,16 @@
     const q = norm(raw).trim(), db = App.db; if (!q) return [];
     const g = [];
     const cl = db.clients.filter(c => match([App.cname(c), c.first, c.last, c.code, c.acc, c.phone, c.phone2, c.address, c.city, c.quarter, c.installAddr, c.serial, c.kit, c.plan, c.article].join(' '), q));
-    if (cl.length) g.push(['Clients', cl.slice(0, 8).map(c => ({ v: 'client', id: c.id, t: App.cname(c), s: [App.TYPES[c.type], c.acc, c.phone].filter(Boolean).join(' · ') }))]);
+    const ok = v => !App.canView || App.canView(v);
+    if (cl.length && ok('clients')) g.push(['Clients', cl.slice(0, 8).map(c => ({ v: 'client', id: c.id, t: App.cname(c), s: [App.TYPES[c.type], c.acc, c.phone].filter(Boolean).join(' · ') }))]);
     const inv = db.invoices.filter(i => match([i.number, App.cname(App.client(i.clientId)), i.lines.map(l => l.desc).join(' ')].join(' '), q));
-    if (inv.length) g.push(['Factures', inv.slice(-8).reverse().map(i => ({ v: 'invoice', id: i.id, t: i.number, s: `${App.cname(App.client(i.clientId))} · ${App.fmt(App.invTotal(i), i.currency)}` }))]);
+    if (inv.length && ok('invoices')) g.push(['Factures', inv.slice(-8).reverse().map(i => ({ v: 'invoice', id: i.id, t: i.number, s: `${App.cname(App.client(i.clientId))} · ${App.fmt(App.invTotal(i), i.currency)}` }))]);
     const pr = db.products.filter(p => match([p.name, p.ref, p.cat].join(' '), q));
-    if (pr.length) g.push(['Stock', pr.slice(0, 8).map(p => ({ v: 'stock', id: p.id, t: p.name, s: `${p.cat} · ${App.tracked(p) ? p.qty + ' ' + p.unit : 'sans stock'}` }))]);
+    if (pr.length && ok('stock')) g.push(['Stock', pr.slice(0, 8).map(p => ({ v: 'stock', id: p.id, t: p.name, s: `${p.cat} · ${App.tracked(p) ? p.qty + ' ' + p.unit : 'sans stock'}` }))]);
     const su = db.suppliers.filter(s => match([s.name, s.phone, s.goods].join(' '), q));
-    if (su.length) g.push(['Fournisseurs', su.slice(0, 8).map(s => ({ v: 'supplier', id: s.id, t: s.name, s: s.phone || '' }))]);
+    if (su.length && ok('suppliers')) g.push(['Fournisseurs', su.slice(0, 8).map(s => ({ v: 'supplier', id: s.id, t: s.name, s: s.phone || '' }))]);
     const te = (db.technicians || []).filter(t => match([t.name, t.phone, t.role, t.zone, t.spec].join(' '), q));
-    if (te.length) g.push(['Techniciens', te.slice(0, 8).map(t => ({ v: 'technician', id: t.id, t: t.name, s: [t.role, t.phone].filter(Boolean).join(' · ') }))]);
+    if (te.length && ok('technicians')) g.push(['Techniciens', te.slice(0, 8).map(t => ({ v: 'technician', id: t.id, t: t.name, s: [t.role, t.phone].filter(Boolean).join(' · ') }))]);
     return g;
   };
   const resultsHtml = q => {
@@ -226,10 +244,10 @@
   App.actions.q_install = after(() => App.installForm());
 
   // ---------- "Plus" menu ----------
-  const item = (v, ico, t, s) => `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:var(--navy)">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
+  const item = (v, ico, t, s) => !App.canView(v) ? '' : `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:var(--navy)">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
   App.views.more = () => ({
     title: 'Plus', nav: 'more',
-    html: `<div class="list">${item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements')}${item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter')}${item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement')}${item('impayes', '🧾', 'Impayés', 'Factures à encaisser et relances')}${item('suppliers', '🚚', 'Fournisseurs', 'Gérer vos fournisseurs')}${item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink')}${item('installs', '🔧', 'Installations', 'Historique des interventions')}${item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité')}${item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…')}${item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')}<button class="item" data-act="shareapp"><span class="ico avatar" style="background:var(--navy)">📤</span><div class="grow"><b>Partager l'application</b><small>Envoyer le lien par WhatsApp, SMS…</small></div><span class="mut">›</span></button></div>
+    html: `<div class="list">${item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements')}${item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter')}${item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement')}${item('impayes', '🧾', 'Impayés', 'Factures à encaisser et relances')}${item('suppliers', '🚚', 'Fournisseurs', 'Gérer vos fournisseurs')}${item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink')}${item('livraisons', '🚚', 'Livraisons', 'Livraisons à effectuer et suivi')}${App.multi() ? item('profile', '👤', 'Mon profil', (App.user ? App.user.name : '') + ' · code PIN, changer de profil') : ''}${item('installs', '🔧', 'Installations', 'Historique des interventions')}${item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité')}${item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…')}${item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')}<button class="item" data-act="shareapp"><span class="ico avatar" style="background:var(--navy)">📤</span><div class="grow"><b>Partager l'application</b><small>Envoyer le lien par WhatsApp, SMS…</small></div><span class="mut">›</span></button></div>
       <p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0</p>`
   });
 })();

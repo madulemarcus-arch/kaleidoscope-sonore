@@ -27,6 +27,8 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
 | `js/export.js` | Tableaux partagés, export Excel (.xlsx) généré sans bibliothèque |
+| `js/roles.js` | Profils (administrateur, comptable, vendeur, technicien, livreur), code PIN personnel, écrans et actions autorisés |
+| `js/delivery.js` | Livraisons : planification, suivi, encaissement à la livraison, vue du livreur |
 | `js/techs.js` | Techniciens et collaborateurs (liste, fiche, interventions liées aux installations) |
 | `js/plans.js` | Tarifs d'abonnement : prix client, coût Starlink et marge |
 | `js/penalties.js` | Pénalités Starlink : enregistrement, paiement signalé, relance, effet sur les bénéfices |
@@ -69,6 +71,22 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 - Deux factures créées hors connexion avec le même numéro : la plus récente est **renumérotée** automatiquement.
 - Chaque appareil garde son PIN, son thème et son verrouillage. L'icône ☁️ de l'en-tête indique l'état ; la synchronisation se fait au démarrage, après chaque modification, au retour de connexion et toutes les 90 secondes.
 - Test : script SQL vérifié sur PostgreSQL 16 (rôle `anon` sans accès direct à la table) et scénario à deux appareils validé ; non essayé avec un vrai projet Supabase.
+
+## Profils et livraisons
+
+Paramètres → **Utilisateurs et profils → Activer** : vous devenez l'administrateur (votre PIN actuel est conservé) puis créez un profil par personne, avec son nom, son **code PIN à 4 chiffres** (unique) et son profil :
+
+| Profil | Voit / peut faire |
+| --- | --- |
+| Administrateur | Tout, y compris suppression, réglages, synchronisation, sauvegardes et gestion des profils |
+| Comptable | Factures, paiements, impayés, dépenses, rapports, stock, fournisseurs ; ni suppression ni réglages |
+| Vendeur | Clients, abonnements, factures, paiements, livraisons ; ni coûts, ni bénéfices, ni dépenses, ni réglages |
+| Technicien | Installations, consultation des clients et du stock (sans prix d'achat) |
+| Livreur | Uniquement **ses** livraisons : appeler, itinéraire, en route, livrée (avec encaissement), échec |
+
+À l'ouverture et après verrouillage, chacun entre son PIN : le profil correspondant est ouvert (le bouton 🔒 permet de changer de profil). Chacun change son PIN dans Plus → Mon profil. Un administrateur oublié se récupère avec son code de récupération ; les autres profils sont réinitialisés par l'administrateur. Les profils se synchronisent entre appareils (ils ne sont pas dans les sauvegardes). **Limite :** les profils règlent l'affichage et les actions ; les données restent présentes sur l'appareil et, avec la synchronisation, quiconque connaît la phrase secrète peut les lire. Ne donnez la phrase secrète qu'aux personnes de confiance.
+
+Livraisons (Plus → Livraisons, ou « 🚚 Livraison » depuis une facture) : client, facture liée, adresse et téléphone préremplis, livreur, statut (À livrer, En route, Livrée, Échec). Le livreur marque « Livrée » et saisit le montant encaissé : le paiement est enregistré sur la facture.
 
 ## Techniciens
 

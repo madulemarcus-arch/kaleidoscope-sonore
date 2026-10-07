@@ -188,7 +188,7 @@
     return {
       title: i.number, sub: 'Aperçu de la facture', back: 'invoices', nav: 'more',
       html: `<div class="spread" style="margin-bottom:10px"><span class="pill ${k}">${t}</span><span class="mut">${App.invTypes[i.type]}</span></div>
-        <div class="bar noprint">${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button></div>
+        <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button></div>
         ${App.invoiceDoc(i)}
         ${pays.length ? `<h2 class="sec">Paiements reçus</h2><div class="list">${pays.map(x => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(x.ref || x.comment || '')}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`).join('')}</div>` : ''}
         <div class="bar" style="margin-top:14px">${i.clientId ? `<button class="btn sec" data-act="go" data-v="client" data-id="${i.clientId}">Voir le client</button>` : ''}<button class="btn del" data-act="delinv" data-id="${i.id}">Supprimer la facture</button></div>`
