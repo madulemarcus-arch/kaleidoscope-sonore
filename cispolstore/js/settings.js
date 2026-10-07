@@ -32,7 +32,8 @@
           ${row('Stockage interne', `Les données sont enregistrées dans la mémoire de cet appareil, même sans internet. Protection contre l'effacement : <b class="${App.persisted ? 'ok' : 'warn'}">${App.persisted ? 'activée' : App.persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b>.`)}
           ${row('Sauvegarde', `Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${lastB ? App.fdate(lastB) : 'jamais'}</b>${warn ? ' — pensez à en faire une.' : ''}`, '<button class="btn sm" data-act="backup">Sauvegarder</button>')}
           ${row('Restaurer / importer', 'Recharger un fichier de sauvegarde (.json), y compris de l\'ancienne version.', '<label class="btn sm sec" style="cursor:pointer">Restaurer<input type="file" id="s_restore" accept=".json,application/json" hidden></label>')}
-          ${row('Exporter en CSV', 'Pour Excel ou Google Sheets.', '<button class="btn sm sec" data-act="exportcsv">Choisir…</button>')}</div>
+          ${row('Exporter en CSV', 'Un tableau à la fois (Excel, Google Sheets).', '<button class="btn sm sec" data-act="exportcsv">Choisir…</button>')}
+          ${row('Excel et PDF', 'Classeur Excel (une feuille par thème) ou rapport PDF lisible.', '<button class="btn sm sec" data-act="xlsx">Excel</button> <button class="btn sm sec" data-act="pdf">PDF</button>')}</div>
         <div class="bar" style="margin-top:16px"><button class="btn blue" data-act="lockNow">🔒 Verrouiller maintenant</button></div>`,
       after: () => {
         $('s_lock').onchange = () => { S.lockMin = +$('s_lock').value; App.save(); App.toast('Enregistré'); };
@@ -101,13 +102,9 @@
     App.modal('Exporter en CSV', one('Clients', 'clients') + one('Factures', 'factures') + one('Paiements', 'paiements') + one('Dépenses', 'depenses') + one('Stock', 'stock'));
   };
   App.actions.csvdo = d => {
-    const db = App.db, S = {
-      clients: [['Code', 'Type', 'Prénom', 'Nom', 'Téléphone', 'Adresse', 'ACC', 'N° série', 'Kit', 'Abonnement', 'Début', 'Fin', 'Fin sursis', 'Statut'], ...db.clients.map(c => { const s = App.sub(c); return [c.code, App.TYPES[c.type], c.first, c.last, c.phone, c.address, c.acc, c.serial, c.kit, c.plan, s ? s.start : '', s ? s.end : '', s ? s.gEnd : '', s ? App.STATUS[s.status][0] : '']; })],
-      factures: [['Numéro', 'Date', 'Client', 'Type', 'Devise', 'Total', 'Payé', 'Solde'], ...db.invoices.map(i => [i.number, i.date, App.cname(App.client(i.clientId)), App.invTypes[i.type], i.currency, App.invTotal(i), App.invPaid(i), App.invDue(i)])],
-      paiements: [['Date', 'Client', 'Facture', 'Montant', 'Devise', 'Mode', 'Référence', 'Commentaire'], ...db.payments.map(p => [p.date, App.cname(App.client(p.clientId)), (App.invoice(p.invoiceId) || {}).number || '', p.amount, p.currency, p.mode, p.ref, p.comment])],
-      depenses: [['Date', 'Libellé', 'Catégorie', 'Montant', 'Devise'], ...db.expenses.map(e => [e.date, e.label, e.cat, e.amount, e.currency])],
-      stock: [['Nom', 'Catégorie', 'Référence', 'Unité', 'Quantité', 'Prix achat', 'Prix vente'], ...db.products.map(p => [p.name, p.cat, p.ref, p.unit, p.qty, p.cost, p.price])]
-    };
-    App.download(`cispolstore-${d.k}-${App.today()}.csv`, App.csv(S[d.k]), 'text/csv'); App.close();
+    const S = App.tables();
+    App.download(`cispolstore-${d.k}-${App.today()}.csv`, App.csv(S[d.k].rows), 'text/csv'); App.close();
   };
+  App.actions.xlsx = () => { App.download(`cispolstore-${App.today()}.xlsx`, App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); App.toast('Fichier Excel créé'); };
+  App.actions.pdf = () => { App.download(`cispolstore-${App.today()}.pdf`, App.makePdf(App.reportSheets(), 'Rapport des données'), 'application/pdf'); App.toast('Fichier PDF créé'); };
 })();

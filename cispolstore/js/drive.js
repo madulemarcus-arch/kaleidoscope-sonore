@@ -48,7 +48,12 @@
     return (r.headers.get('content-type') || '').includes('json') ? r.json() : r.text();
   };
   const list = q => gfetch(`${API}?q=${encodeURIComponent(q)}&orderBy=${encodeURIComponent('createdTime desc')}&pageSize=100&fields=${encodeURIComponent('files(id,name,createdTime,size)')}`).then(r => r.files || []);
-  const multipart = (meta, content) => { const b = 'cispol' + Date.now(); return { body: `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${b}--`, headers: { 'Content-Type': 'multipart/related; boundary=' + b } }; };
+  const multipart = (meta, content, mime = 'application/json') => { const b = 'cispol' + Date.now(); return { body: new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${mime}\r\n\r\n`, content, `\r\n--${b}--`]), headers: { 'Content-Type': 'multipart/related; boundary=' + b } }; };
+  // create the file in the backup folder, or overwrite today's file of the same name
+  const upsert = async (fid, name, content, mime) => {
+    const ex = (await list(`name='${name}' and '${fid}' in parents and trashed=false`))[0], m = multipart(ex ? { name } : { name, parents: [fid] }, content, mime);
+    await gfetch(ex ? `${UP}/${ex.id}?uploadType=multipart&fields=id` : `${UP}?uploadType=multipart&fields=id`, { method: ex ? 'PATCH' : 'POST', ...m });
+  };
   const folder = async () => {
     if (cfg.folderId) { try { const f = await gfetch(`${API}/${cfg.folderId}?fields=id,trashed`); if (!f.trashed) return cfg.folderId; } catch (e) { if (e.status !== 404) throw e; } }
     const found = await list(`name='${FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
@@ -63,14 +68,15 @@
     if (busy) return; busy = true; setStatus('busy');
     try {
       await getToken(!!interactive);
-      const fid = await folder(), name = `cispolstore-${App.today()}.json`, text = JSON.stringify(App.exportData());
-      const ex = (await list(`name='${name}' and '${fid}' in parents and trashed=false`))[0];
-      const m = multipart(ex ? { name } : { name, parents: [fid] }, text);
-      await gfetch(ex ? `${UP}/${ex.id}?uploadType=multipart&fields=id` : `${UP}?uploadType=multipart&fields=id`, { method: ex ? 'PATCH' : 'POST', ...m });
-      // keep the 30 most recent backups, move older ones to the Drive trash
-      const all = (await list(`'${fid}' in parents and trashed=false and name contains 'cispolstore-'`));
-      for (const f of all.slice(KEEP)) await gfetch(`${API}/${f.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
-      cfg.last = Date.now(); cfg.lastName = name; cfg.connected = true; saveCfg(); dirty = false; setStatus('idle'); warned = false;
+      const fid = await folder(), name = `cispolstore-${App.today()}.json`, base = name.slice(0, -5);
+      await upsert(fid, name, JSON.stringify(App.exportData()));
+      // readable copies (Excel + PDF); the JSON above is what "Restaurer" uses, so a failure here is not fatal
+      let extra = '';
+      try { await upsert(fid, base + '.xlsx', App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); await upsert(fid, base + '.pdf', App.makePdf(App.reportSheets(), 'Sauvegarde du ' + App.today()), 'application/pdf'); } catch (e) { if (e.code === 'auth') throw e; extra = e.message; }
+      // keep the 30 most recent files of each kind, move older ones to the Drive trash
+      const all = await list(`'${fid}' in parents and trashed=false and name contains 'cispolstore-'`);
+      for (const ext of ['.json', '.xlsx', '.pdf']) for (const f of all.filter(f => f.name.endsWith(ext)).slice(KEEP)) await gfetch(`${API}/${f.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+      cfg.last = Date.now(); cfg.lastName = name; cfg.extraErr = extra; cfg.connected = true; saveCfg(); dirty = false; setStatus('idle'); warned = false;
       return name;
     } catch (e) {
       setStatus(NEED_LOGIN.includes(e.code) ? 'reconnect' : 'error', e.message); throw e;
@@ -104,9 +110,9 @@
     else {
       const st = { busy: 'Sauvegarde en cours…', reconnect: 'Reconnexion à Google nécessaire', error: 'Erreur : ' + esc(D.error) }[D.status] || 'Connecté';
       const cls = { reconnect: 'warn', error: 'bad' }[D.status] || 'ok';
-      body = row('État', `<b class="${cls}">${st}</b><br>Dernière sauvegarde : <b>${when(cfg.last)}</b>${cfg.lastName ? ' · ' + esc(cfg.lastName) : ''}`, D.status === 'reconnect' ? '<button class="btn sm" data-act="drive_connect">Reconnecter</button>' : '<button class="btn sm" data-act="drive_now">Sauvegarder</button>')
+      body = row('État', `<b class="${cls}">${st}</b><br>Dernière sauvegarde : <b>${when(cfg.last)}</b>${cfg.lastName ? ' · ' + esc(cfg.lastName) : ''}<br>Fichiers : JSON (restauration), Excel et PDF (lecture)${cfg.extraErr ? '<br><span class="warn">Excel/PDF non envoyés : ' + esc(cfg.extraErr) + '</span>' : ''}`, D.status === 'reconnect' ? '<button class="btn sm" data-act="drive_connect">Reconnecter</button>' : '<button class="btn sm" data-act="drive_now">Sauvegarder</button>')
         + `<div class="item"><div class="grow"><b>Sauvegarde automatique</b><small>Quand l'application est ouverte</small></div><select id="d_every" style="width:auto;max-width:55%">${App.opts(EVERY, cfg.auto ? String(cfg.every || 24) : '')}</select></div>`
-        + row('Restaurer depuis Drive', 'Choisir une sauvegarde datée.', '<button class="btn sm sec" data-act="drive_restore">Choisir…</button>')
+        + row('Restaurer depuis Drive', 'Choisir une sauvegarde datée (.json).', '<button class="btn sm sec" data-act="drive_restore">Choisir…</button>')
         + row('Déconnexion', 'Les sauvegardes déjà dans Drive sont conservées.', '<button class="btn sm del" data-act="drive_off">Déconnecter</button>');
     }
     return `<h2 class="sec">Sauvegarde Google Drive</h2><div class="list">${body}</div>`;
@@ -152,7 +158,7 @@
   App.actions.drive_off = () => { if (!App.confirm('Déconnecter Google Drive de cette application ?')) return; if (tok && window.google && google.accounts) { try { google.accounts.oauth2.revoke(tok, () => {}); } catch (e) {} } tok = null; cfg = {}; saveCfg(); setStatus('off'); refreshSettings(); App.toast('Google Drive déconnecté'); };
   App.actions.drive_restore = async () => {
     try {
-      await getToken(true); const fid = await folder(), files = await list(`'${fid}' in parents and trashed=false and name contains 'cispolstore-'`);
+      await getToken(true); const fid = await folder(), files = (await list(`'${fid}' in parents and trashed=false and name contains 'cispolstore-'`)).filter(f => f.name.endsWith('.json'));
       if (!files.length) return App.toast('Aucune sauvegarde dans Drive');
       App.modal('Restaurer depuis Drive', `<p class="mut">Choisissez la sauvegarde à recharger. Elle remplacera les données de cet appareil.</p><div class="list">${files.map(f => `<button class="item" data-act="drive_pick" data-id="${esc(f.id)}"><div class="grow"><b>${esc(f.name)}</b><small>${when(f.createdTime)}${f.size ? ' · ' + Math.round(f.size / 1024) + ' Ko' : ''}</small></div><span class="mut">›</span></button>`).join('')}</div>`);
     } catch (e) { App.toast(e.message); }
