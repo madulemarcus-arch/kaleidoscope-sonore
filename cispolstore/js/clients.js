@@ -11,8 +11,7 @@
   App.waLink = c => {
     let d = String(c.phone || '').replace(/[^\d]/g, ''); if (!d) return '';
     if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '243' + d.slice(1);
-    const s = App.sub(c), n = c.first || App.cname(c);
-    const msg = !s ? `Bonjour ${n}, ici CISPOLstore.` : s.status === 'actif' ? `Bonjour ${n}, votre abonnement Starlink arrive à expiration le ${App.fdate(s.end)}. Écrivez-nous pour le renouveler. Merci ! CISPOLstore` : s.status === 'sursis' ? `Bonjour ${n}, votre abonnement Starlink a expiré le ${App.fdate(s.end)}. Vous êtes en période de sursis jusqu'au ${App.fdate(s.gEnd)}. Pensez à le renouveler. CISPOLstore` : `Bonjour ${n}, votre abonnement Starlink est inactif depuis le ${App.fdate(s.gEnd)}. Contactez-nous pour le réactiver. CISPOLstore`;
+    const msg = App.reminderText(c);
     return `https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
   };
 

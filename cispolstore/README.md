@@ -27,6 +27,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
 | `js/export.js` | Tableaux partagés, export Excel (.xlsx) généré sans bibliothèque |
+| `js/remind.js` | Rappels WhatsApp d'échéance (liste « Rappels » et messages modifiables) |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
 | `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
 | `sw.js` | Cache hors connexion (**incrémenter `CACHE` à chaque publication** : c'est ce qui déclenche le message « Nouvelle version disponible ») |
@@ -64,6 +65,10 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 - Deux factures créées hors connexion avec le même numéro : la plus récente est **renumérotée** automatiquement.
 - Chaque appareil garde son PIN, son thème et son verrouillage. L'icône ☁️ de l'en-tête indique l'état ; la synchronisation se fait au démarrage, après chaque modification, au retour de connexion et toutes les 90 secondes.
 - Test : script SQL vérifié sur PostgreSQL 16 (rôle `anon` sans accès direct à la table) et scénario à deux appareils validé ; non essayé avec un vrai projet Supabase.
+
+## Rappels WhatsApp
+
+Abonnements → **Rappels WhatsApp** liste les clients gérés dont l'abonnement finit dans 7 jours ou moins, en sursis, ou inactifs depuis moins de 30 jours. Le bouton « WhatsApp » ouvre la conversation avec le message déjà écrit (c'est l'utilisateur qui l'envoie) et note la date du rappel (la ligne reste grisée 2 jours). Les trois messages (bientôt expiré, sursis, inactif) se modifient dans Paramètres et se synchronisent entre appareils ; mots remplacés : `{prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc}`.
 
 ## Sauvegarde Google Drive (optionnelle)
 
