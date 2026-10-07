@@ -30,11 +30,11 @@
   document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('fold')) folds[e.target.dataset.fold] = e.target.open; }, true);
   App.fold = (id, title, body) => `<details class="fold" data-fold="${id}"${folds[id] ? ' open' : ''}><summary>${title}</summary>${body}</details>`;
   App.f = {
-    text: (id, label, val = '', x = '') => `<label class="l" for="${id}">${label}</label><input id="${id}" value="${esc(val)}" ${x}>`,
-    num: (id, label, val = '', x = '') => `<label class="l" for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${esc(val)}" ${x}>`,
-    date: (id, label, val = '', x = '') => `<label class="l" for="${id}">${label}</label><input id="${id}" type="date" value="${esc(val)}" ${x}>`,
-    sel: (id, label, list, sel = '', x = '') => `<label class="l" for="${id}">${label}</label><select id="${id}" ${x}>${App.opts(list, sel)}</select>`,
-    area: (id, label, val = '', x = '') => `<label class="l" for="${id}">${label}</label><textarea id="${id}" rows="2" ${x}>${esc(val)}</textarea>`,
+    text: (id, label, val = '', x = '') => `<div class="fld"><label class="l" for="${id}">${label}</label><input id="${id}" value="${esc(val)}" ${x}></div>`,
+    num: (id, label, val = '', x = '') => `<div class="fld"><label class="l" for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${esc(val)}" ${x}></div>`,
+    date: (id, label, val = '', x = '') => `<div class="fld"><label class="l" for="${id}">${label}</label><input id="${id}" type="date" value="${esc(val)}" ${x}></div>`,
+    sel: (id, label, list, sel = '', x = '') => `<div class="fld"><label class="l" for="${id}">${label}</label><select id="${id}" ${x}>${App.opts(list, sel)}</select></div>`,
+    area: (id, label, val = '', x = '') => `<div class="fld"><label class="l" for="${id}">${label}</label><textarea id="${id}" rows="2" ${x}>${esc(val)}</textarea></div>`,
     list: (id, items) => `<datalist id="${id}">${items.map(i => `<option value="${esc(i)}">`).join('')}</datalist>`
   };
   App.v = id => ($(id) ? $(id).value.trim() : '');

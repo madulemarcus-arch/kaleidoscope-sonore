@@ -46,7 +46,7 @@ a { color:var(--blue); }
 h2.sec { font-size:15px; margin:18px 2px 8px; display:flex; align-items:center; gap:8px; }
 h2.sec .more { margin-left:auto; font-size:13px; font-weight:400; color:var(--blue); background:none; border:0; padding:0; }
 .mut { color:var(--mut); } .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); } .blue { color:var(--blue); }
-.row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; min-width:120px; }
+.row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; min-width:120px; } .row > .fld { min-width:150px; }
 .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
 .spread { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
