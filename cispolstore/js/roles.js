@@ -75,9 +75,9 @@
   const rows = () => App.users().map(u => `<button class="item" data-act="users_edit" data-id="${u.id}" style="${u.active === false ? 'opacity:.55' : ''}"><span class="avatar">${(ROLES[u.role] || ROLES.admin).icon}</span><div class="grow"><b>${esc(u.name)}</b><small>${(ROLES[u.role] || ROLES.admin).label}${u.active === false ? ' · désactivé' : ''}</small></div><span class="mut">›</span></button>`).join('');
   App.views.users = () => ({
     title: 'Utilisateurs', back: 'settings', nav: 'more',
-    html: App.multi() ? `<div class="bar"><button class="btn" data-act="users_new">+ Nouveau profil</button></div><div class="list">${rows()}</div>
-      <div class="card" style="margin-top:12px"><b>Ce que voit chaque profil</b>${Object.values(ROLES).map(r => `<p style="margin:8px 0 0"><b>${r.icon} ${r.label}</b><br><span class="mut">${r.desc}</span></p>`).join('')}</div>
-      <p class="mut" style="font-size:13px">Chacun entre son code PIN à l'ouverture. Les profils se synchronisent entre appareils. Cela règle l'affichage et les actions autorisées ; ce n'est pas un chiffrement des données présentes sur l'appareil.</p>
+    html: App.multi() ? `<h2 class="sec">Ajouter une personne</h2><div class="list">${Object.entries(ROLES).filter(([k]) => k !== 'admin').map(([k, r]) => `<button class="item" data-act="users_new" data-role="${k}"><span class="avatar">${r.icon}</span><div class="grow"><b>${r.label}</b><small>${r.desc}</small></div><span class="btn sm">+ Ajouter</span></button>`).join('')}<button class="item" data-act="users_new" data-role="admin"><span class="avatar">${ROLES.admin.icon}</span><div class="grow"><b>Un autre administrateur</b><small>${ROLES.admin.desc}</small></div><span class="btn sm sec">+ Ajouter</span></button></div>
+      <h2 class="sec">Profils créés (${App.users().length})</h2><div class="list">${rows()}</div>
+            <p class="mut" style="font-size:13px">Chacun entre son code PIN à l'ouverture. Les profils se synchronisent entre appareils. Cela règle l'affichage et les actions autorisées ; ce n'est pas un chiffrement des données présentes sur l'appareil.</p>
       <div class="bar"><button class="btn sm del" data-act="users_off">Désactiver les profils</button></div>`
       : `<div class="card"><b>Profils désactivés</b><p class="mut">Aujourd'hui, la personne qui ouvre l'application voit et modifie tout. Activez les profils pour donner à chacun (comptable, vendeur, technicien, livreur) ses propres écrans et son propre code PIN.</p><button class="btn" data-act="users_on">Activer les profils</button></div>`
   });
@@ -92,15 +92,15 @@
       if (!hasPin && !pinOk(pin)) { $('f_msg').textContent = 'Le code doit avoir 4 chiffres'; return false; }
       (async () => {
         const u = { id: App.uid(), name, role: 'admin', active: true, pin: hasPin ? { ...S().pin } : await mkPin(pin) };
-        S().users = [u]; App.user = u; App.save(); App.close(); App.applyRole(); App.toast('Profils activés'); App.refresh();
+        S().users = [u]; App.user = u; App.save(); App.close(); App.applyRole(); App.toast('Profils activés : ajoutez maintenant vos collaborateurs'); App.refresh();
         if (!hasPin) { App.toast("Conservez bien votre code PIN d'administrateur"); }
       })(); return false;
     }, 'Activer');
   };
-  App.actions.users_new = () => userForm();
+  App.actions.users_new = d => userForm(null, d && d.role);
   App.actions.users_edit = d => userForm(App.users().find(u => u.id === d.id));
-  const userForm = u => {
-    const isNew = !u; u = u || { name: '', role: 'vendeur', active: true };
+  const userForm = (u, role) => {
+    const isNew = !u; u = u || { name: '', role: ROLES[role] ? role : 'vendeur', active: true };
     App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.sel('f_tech', 'Fiche technicien liée (profil Technicien)', [['', '— Aucune —'], ...App.db.technicians.map(t => [t.id, t.name])], u.techId || '')}${F.text('f_pin', isNew ? 'Code PIN (4 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="4" autocomplete="off"')}
       ${isNew ? '' : F.sel('f_act', 'Statut', [['1', 'Actif'], ['0', 'Désactivé']], u.active === false ? '0' : '1')}<p id="f_msg" class="warn"></p>${isNew ? '' : `<div class="bar"><button type="button" class="btn sm del" data-act="users_del" data-id="${u.id}">Supprimer ce profil</button></div>`}`, () => {
       const name = App.v('f_name'), pin = App.v('f_pin'), rl = App.v('f_role'), active = isNew || App.v('f_act') !== '0';
