@@ -29,6 +29,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/export.js` | Tableaux partagés, export Excel (.xlsx) généré sans bibliothèque |
 | `js/techs.js` | Techniciens et collaborateurs (liste, fiche, interventions liées aux installations) |
 | `js/plans.js` | Tarifs d'abonnement : prix client, coût Starlink et marge |
+| `js/penalties.js` | Pénalités Starlink : enregistrement, paiement signalé, relance, effet sur les bénéfices |
 | `js/unpaid.js` | Impayés : factures à encaisser, ancienneté, relance WhatsApp |
 | `js/remind.js` | Rappels WhatsApp d'échéance (liste « Rappels » et messages modifiables) |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
@@ -76,6 +77,10 @@ Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs 
 ## Tarifs d'abonnement et marge
 
 Paramètres → **Tarifs d'abonnement** : pour chaque type d'abonnement, le **prix client** (proposé à la création du client) et le **coût Starlink** (ce qui est reversé à Starlink). Par défaut : Résidentiel 70 $ / 64 $, soit **6 $ de marge**. Chaque facture d'abonnement reçoit automatiquement le coût du type d'abonnement (converti dans la devise de la facture), donc la marge entre dans les bénéfices et dans le rapport « Abonnements » (colonne Marge). La fiche client affiche coût et marge. Le bouton « Recalculer » applique le coût aux anciennes factures d'abonnement qui n'en avaient pas.
+
+## Pénalités
+
+Fiche client → onglet **Abonnement** → **+ Pénalité** : montant (en $ ou CDF), motif (retard, réactivation…), date, et **part reversée à Starlink** (par défaut tout le montant, donc sans marge). Une pénalité est « À payer » jusqu'à ce que **✓ Payée** soit touché (date et mode de paiement) : le statut apparaît sur la fiche, dans l'historique du client et dans l'Excel. Les pénalités à payer figurent dans **Impayés** (total et bandeau d'accueil) avec un bouton 💬 de relance WhatsApp (message modifiable). Une pénalité payée compte dans le chiffre d'affaires de la date de paiement, et la part reversée à Starlink dans le coût : seule la différence est du bénéfice.
 
 ## Impayés
 

@@ -8,10 +8,14 @@
   // Totals of invoices / expenses inside a date range, all in USD
   const finance = r => {
     const inv = App.db.invoices.filter(i => App.inRange(i.date, r));
-    const ca = inv.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency), 0);
-    const cost = inv.reduce((a, i) => a + App.usd(App.invCost(i), i.currency), 0);
+    const ca0 = inv.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency), 0);
+    const cost0 = inv.reduce((a, i) => a + App.usd(App.invCost(i), i.currency), 0);
+    const pen = App.db.penalties.filter(p => p.paid && App.inRange(p.paid, r));
+    const penIn = pen.reduce((a, p) => a + App.usd(p.amount, p.currency), 0), penCost = pen.reduce((a, p) => a + App.usd(p.cost, p.currency), 0);
     const exp = App.db.expenses.filter(e => App.inRange(e.date, r)).reduce((a, e) => a + App.usd(e.amount, e.currency), 0);
-    return { inv, ca, cost, margin: ca - cost, exp, net: ca - cost - exp };
+    // paid penalties are income, and what is passed on to Starlink is a cost: only the difference is profit
+    const ca = ca0 + penIn, cost = cost0 + penCost;
+    return { inv, ca, cost, margin: ca - cost, exp, net: ca - cost - exp, penIn, penCost };
   };
 
   // ---------- Dashboard ----------
@@ -111,7 +115,7 @@
       const rows = Object.values(by).sort((a, b) => b.rev - a.rev).map(o => [o.name, o.q + (o.unit ? ' ' + o.unit : ''), o.rev, o.rev - o.cost]);
       return { cards: [['Articles vendus', rows.length], ['Ventes matériel', rows.reduce((a, x) => a + x[2], 0), money], ['Marge', rows.reduce((a, x) => a + x[3], 0), money]], head: ['Article', 'Quantité', 'Ventes ($)', 'Marge ($)'], fmt: [2, 3], rows }; },
     benef: r => { const f = finance(r);
-      return { cards: [['Chiffre d\'affaires', f.ca, money], ['Coût des marchandises', f.cost, money], ['Marge brute', f.margin, money], ['Dépenses', f.exp, money], ['Bénéfice net', f.net, money]], head: ['Facture', 'Date', 'Vente ($)', 'Coût ($)', 'Bénéfice ($)'], fmt: [2, 3, 4], rows: f.inv.sort((a, b) => b.date.localeCompare(a.date)).map(i => { const v = App.usd(App.invTotal(i), i.currency), c = App.usd(App.invCost(i), i.currency); return [i.number, i.date, v, c, v - c]; }) }; },
+      return { cards: [['Chiffre d\'affaires', f.ca, money], ['Coût des marchandises', f.cost, money], ['Marge brute', f.margin, money], ['Dépenses', f.exp, money], ['Bénéfice net', f.net, money]], head: ['Facture', 'Date', 'Vente ($)', 'Coût ($)', 'Bénéfice ($)'], fmt: [2, 3, 4], rows: f.inv.sort((a, b) => b.date.localeCompare(a.date)).map(i => { const v = App.usd(App.invTotal(i), i.currency), c = App.usd(App.invCost(i), i.currency); return [i.number, i.date, v, c, v - c]; }).concat(App.db.penalties.filter(p => p.paid && App.inRange(p.paid, r)).map(p => { const v = App.usd(p.amount, p.currency), c = App.usd(p.cost, p.currency); return ['Pénalité · ' + App.cname(App.client(p.clientId)), p.paid, v, c, v - c]; })) }; },
     dep: r => { const l = App.db.expenses.filter(e => App.inRange(e.date, r)).sort((a, b) => b.date.localeCompare(a.date)), by = {}; l.forEach(e => { by[e.cat] = (by[e.cat] || 0) + App.usd(e.amount, e.currency); });
       return { cards: [['Dépenses', l.reduce((a, e) => a + App.usd(e.amount, e.currency), 0), money], ...Object.entries(by).map(([k, v]) => [k, v, money])], head: ['Date', 'Libellé', 'Catégorie', 'Montant ($)'], fmt: [3], rows: l.map(e => [e.date, e.label, e.cat, App.usd(e.amount, e.currency)]) }; },
     stock: () => { const p = App.db.products.filter(App.tracked), val = p.reduce((a, x) => a + x.qty * x.cost, 0), sale = p.reduce((a, x) => a + x.qty * x.price, 0);
