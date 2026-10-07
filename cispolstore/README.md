@@ -8,6 +8,11 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 - En local : `python3 -m http.server 8000` dans ce dossier, puis http://localhost:8000.
 - Pas de suite de tests : vérifier à la main (clients, factures, stock, rapports, impression).
 
+## Mise en page
+
+- **Téléphone** (< 1024 px) : menu du bas, bouton « + » central, tableaux en cartes.
+- **Ordinateur** (≥ 1024 px) : menu latéral avec toutes les sections et un bouton « Action rapide », contenu plus large, tableau de bord sur deux colonnes, listes sur deux colonnes.
+
 ## Organisation du code
 
 | Fichier | Rôle |

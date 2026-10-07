@@ -163,3 +163,33 @@ dialog .end { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; 
 #upd { position:fixed; left:12px; right:12px; bottom:calc(88px + env(safe-area-inset-bottom,0px)); z-index:70; max-width:520px; margin:0 auto; display:flex; align-items:center; gap:10px; background:var(--navy); color:#fff; padding:10px 10px 10px 16px; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.35); }
 #upd span { flex:1; font-weight:600; }
 #upd .ib { width:32px; height:32px; font-size:14px; }
+
+/* ---------- wide screens (computer): side menu, wider content ---------- */
+#side { display:none; }
+.dash { display:block; }
+@media (min-width:1024px) {
+  body { padding-left:248px; padding-bottom:0; }
+  #side { display:flex; flex-direction:column; gap:14px; position:fixed; left:0; top:0; bottom:0; width:248px; z-index:30; padding:16px 12px; background:var(--navy); color:#fff; overflow-y:auto; }
+  #side .sbrand { display:flex; align-items:center; gap:10px; padding:0 4px 4px; }
+  #side .sbrand img { height:44px; background:#fff; border-radius:10px; padding:3px; }
+  #side .sbrand b { display:flex; flex-direction:column; line-height:1.15; } #side .sbrand small { font-weight:400; opacity:.75; font-size:12px; }
+  #side nav { display:flex; flex-direction:column; gap:2px; margin-top:4px; }
+  #side nav button { display:flex; align-items:center; gap:12px; width:100%; background:none; border:0; color:rgba(255,255,255,.82); padding:10px 12px; border-radius:10px; text-align:left; font-size:15px; }
+  #side nav button span { width:22px; text-align:center; }
+  #side nav button:hover { background:rgba(255,255,255,.08); }
+  #side nav button.on { background:rgba(255,255,255,.16); color:#fff; font-weight:700; box-shadow:inset 3px 0 0 var(--acc); }
+  #side .sfoot { margin-top:auto; } #side .sfoot button { background:none; border:0; color:rgba(255,255,255,.7); padding:8px 12px; font-size:13px; text-align:left; }
+  #bottom, #fab { display:none; }
+  #top { padding:12px 28px; } #top img { display:none; } #title { font-size:19px; }
+  #view { max-width:1240px; padding:22px 28px 40px; }
+  .grid.stats { grid-template-columns:repeat(6,1fr); }
+  .chart { height:190px; }
+  .dash { display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"a b" "d b" "d c"; gap:0 28px; align-items:start; }
+  .paper { max-width:860px; margin:0 auto; font-size:14px; }
+  #toast { bottom:30px; }
+  #upd { bottom:24px; left:calc(248px + 12px); }
+  #clist .list, #ilist .list, #plist .list { display:grid; grid-template-columns:repeat(2,1fr); }
+  #clist .item, #ilist .item, #plist .item { border-right:1px solid var(--line); }
+  dialog { width:min(620px,92vw); }
+}
+@media (min-width:1500px) { #view { max-width:1360px; } }

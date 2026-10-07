@@ -47,6 +47,8 @@
     $('backBtn').hidden = !r.back; $('backBtn').dataset.to = r.back || '';
     $('logo').hidden = !!r.back;
     document.querySelectorAll('#bottom [data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === (r.nav || App.state.view)));
+    const sideKey = { client: 'clients', invoice: 'invoices', supplier: 'suppliers' }[App.state.view] || App.state.view;
+    document.querySelectorAll('#side [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === sideKey));
     if (r.after) r.after();
     window.scrollTo(0, keepScroll ? y : 0);
   };
@@ -69,6 +71,13 @@
     $('updx').onclick = () => d.remove();
   };
 
+  // ---------- Side menu (wide screens; hidden on phones by CSS) ----------
+  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['suppliers', '🚚', 'Fournisseurs'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['settings', '⚙️', 'Paramètres']];
+  $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
+    <button class="btn full" data-act="quick">＋ Action rapide</button>
+    <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${i}</span>${t}</button>`).join('')}</nav>
+    <div class="sfoot"><button data-act="shareapp">📤 Partager l'application</button></div>`;
+
   // ---------- Click delegation ----------
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
@@ -83,7 +92,7 @@
     const dark = darkNow();
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     $('themeBtn').textContent = dark ? '☀️' : '🌙';
-    const co = dbs().company; $('logo').src = co.logo || 'logo.png';
+    const co = dbs().company; $('logo').src = co.logo || 'logo.png'; if ($('slogo')) $('slogo').src = co.logo || 'logo.png';
   };
   $('themeBtn').onclick = () => { dbs().theme = darkNow() ? 'light' : 'dark'; App.save(); App.applyTheme(); };
 

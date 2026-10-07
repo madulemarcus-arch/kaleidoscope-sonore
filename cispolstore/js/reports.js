@@ -41,19 +41,20 @@
       title: 'Accueil', nav: 'home',
       html: `<h2 style="font-size:20px">Bonjour, ${esc(S.company.name)} 👋</h2><div class="mut" style="margin-bottom:10px">Voici un aperçu de votre activité · ${new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</div>
         <div class="search"><input readonly placeholder="Rechercher client, ACC, facture, matériel…" data-act="search"></div>
-        <div class="grid two">
+        <div class="grid two stats">
           <button class="stat" data-act="go" data-v="clients" style="text-align:left;font:inherit;color:inherit;cursor:pointer"><small>👥 Clients</small><b>${db.clients.length}</b><small>au total</small></button>
           <div class="stat"><small><span class="dot" style="background:var(--ok)"></span>Clients actifs</small><b>${n('actif')}</b></div>
           <div class="stat"><small><span class="dot" style="background:var(--warn)"></span>En sursis</small><b>${n('sursis')}</b></div>
           <div class="stat"><small><span class="dot" style="background:var(--bad)"></span>Inactifs</small><b>${n('inactif')}</b></div>
           <div class="stat"><small>📅 Expirent bientôt</small><b class="${soon.length ? 'warn' : ''}">${soon.length}</b></div>
           <div class="stat"><small>⚠️ Expirent aujourd'hui</small><b class="${today.length ? 'bad' : ''}">${today.length}</b></div></div>
-        ${alerts.length ? `<h2 class="sec">Alertes</h2><div class="list">${alerts.join('')}</div>` : ''}
-        <h2 class="sec">Finances</h2>${periodChips('dper', dper)}
+        <div class="dash"><div style="grid-area:a">${alerts.length ? `<h2 class="sec">Alertes</h2><div class="list">${alerts.join('')}</div>` : ''}</div>
+        <div style="grid-area:b"><h2 class="sec">Finances</h2>${periodChips('dper', dper)}
         <div class="grid two"><div class="stat"><small>💰 Chiffre d'affaires</small><b>${App.fmt(f.ca)}</b></div><div class="stat"><small>📈 Bénéfice net</small><b class="${f.net >= 0 ? 'ok' : 'bad'}">${App.fmt(f.net)}</b></div><div class="stat"><small>💸 Dépenses</small><b>${App.fmt(f.exp)}</b></div><div class="stat"><small>Marge brute</small><b>${App.fmt(f.margin)}</b></div></div>
         <div class="card"><b>Ventes</b><div class="chart">${bars.map(b => `<div title="${App.fmt(b.v)}"><i style="height:${Math.round(b.v / max * 100)}%"></i><small>${b.l}</small></div>`).join('')}</div></div>
-        <h2 class="sec">Stock</h2><div class="grid two"><button class="stat" data-act="go" data-v="stock" style="text-align:left;font:inherit;color:inherit;cursor:pointer"><small>📦 Produits</small><b>${db.products.length}</b>${low ? `<small class="warn">${low} en stock bas</small>` : ''}</button><div class="stat"><small>📏 Câble restant</small><b>${App.nf(cable, 2)} m</b></div></div>
-        ${urgent.length ? `<h2 class="sec">Renouvellements à traiter<button class="more" data-act="go" data-v="subs">Tout voir</button></h2><div class="list">${urgent.map(({ c, s }) => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>Fin ${App.fdate(s.end)}${s.status === 'sursis' ? ' · sursis → ' + App.fdate(s.gEnd) : ''}</small></div><div class="end">${App.pill(s.status)}</div></button>`).join('')}</div>` : ''}
+        </div><div style="grid-area:c"><h2 class="sec">Stock</h2><div class="grid two"><button class="stat" data-act="go" data-v="stock" style="text-align:left;font:inherit;color:inherit;cursor:pointer"><small>📦 Produits</small><b>${db.products.length}</b>${low ? `<small class="warn">${low} en stock bas</small>` : ''}</button><div class="stat"><small>📏 Câble restant</small><b>${App.nf(cable, 2)} m</b></div></div>
+        </div><div style="grid-area:d">${urgent.length ? `<h2 class="sec">Renouvellements à traiter<button class="more" data-act="go" data-v="subs">Tout voir</button></h2><div class="list">${urgent.map(({ c, s }) => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>Fin ${App.fdate(s.end)}${s.status === 'sursis' ? ' · sursis → ' + App.fdate(s.gEnd) : ''}</small></div><div class="end">${App.pill(s.status)}</div></button>`).join('')}</div>` : ''}
+        </div></div>
         ${App.hasData(db) ? '' : `<div class="card" style="margin-top:14px"><b>Bienvenue 👋</b><p class="mut">Commencez par ajouter vos produits dans <b>Stock</b>, puis créez vos clients avec le bouton <b>+</b>.</p></div>`}`
     };
   };
