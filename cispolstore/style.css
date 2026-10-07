@@ -197,3 +197,10 @@ dialog .end { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; 
 body.solo #bottom, body.solo #side, body.solo #fab { display:none !important; }
 body.solo { padding-bottom:0; }
 @media (min-width:1024px) { body.solo { padding-left:0; } body.solo #view { max-width:720px; } }
+
+details.fold { margin:18px 0 8px; }
+details.fold > summary { font-size:15px; font-weight:700; margin:0 2px 8px; cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; padding:12px 14px; background:var(--card); border:1px solid var(--line); border-radius:12px; }
+details.fold > summary::-webkit-details-marker { display:none; }
+details.fold > summary::after { content:'›'; margin-left:auto; font-size:22px; line-height:1; transition:transform .15s; color:var(--mut); }
+details.fold[open] > summary { margin-bottom:10px; }
+details.fold[open] > summary::after { transform:rotate(90deg); }

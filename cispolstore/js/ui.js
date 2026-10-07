@@ -25,6 +25,10 @@
 
   // ---------- Form helpers ----------
   App.opts = (list, sel) => list.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}"${String(v) === String(sel) ? ' selected' : ''}>${esc(l)}</option>`; }).join('');
+  // collapsible section: closed by default, and it stays as the user left it when the screen redraws
+  const folds = {};
+  document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('fold')) folds[e.target.dataset.fold] = e.target.open; }, true);
+  App.fold = (id, title, body) => `<details class="fold" data-fold="${id}"${folds[id] ? ' open' : ''}><summary>${title}</summary>${body}</details>`;
   App.f = {
     text: (id, label, val = '', x = '') => `<label class="l" for="${id}">${label}</label><input id="${id}" value="${esc(val)}" ${x}>`,
     num: (id, label, val = '', x = '') => `<label class="l" for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${esc(val)}" ${x}>`,
