@@ -18,6 +18,8 @@
           ${row('Abonnements', `Durée par défaut : ${S.period} jours · Sursis par défaut : ${S.grace} jours`)}
           ${row('Thème', { auto: 'Automatique (suit le téléphone)', light: 'Clair', dark: 'Sombre' }[S.theme] + ' · bouton ☀️/🌙 en haut de l\'écran')}
           ${row('Notifications', 'Les alertes d\'expiration (7, 3, 1 jour avant et le jour même) s\'affichent sur l\'écran d\'accueil.')}</div>
+        <h2 class="sec">Partager</h2><div class="list">
+          ${row("Partager l'application", `Lien à envoyer : <b style="word-break:break-all">${esc(new URL('./', location.href).href)}</b><br>Chaque personne installe l'application depuis ce lien ; ses données restent sur son appareil, sauf si elle active la synchronisation avec les mêmes réglages.`, '<button class="btn sm" data-act="shareapp">Partager</button>')}</div>
         <h2 class="sec">Sécurité</h2><div class="list">
           ${row('Code PIN', S.pin ? 'Activé (4 chiffres)' : 'Non défini : tout le monde peut ouvrir l\'application', S.pin ? '<button class="btn sm sec" data-act="pinchange">Modifier</button>' : '<button class="btn sm" data-act="pinset">Définir</button>')}
           ${S.pin ? row('Désactiver le PIN', 'Retire le verrouillage', '<button class="btn sm del" data-act="pinremove">Désactiver</button>') : ''}
@@ -38,6 +40,12 @@
     };
   };
 
+  // Share the app link (Android share sheet, otherwise copy to clipboard)
+  App.actions.shareapp = async () => {
+    const url = new URL('./', location.href).href, data = { title: 'CISPOLstore Manager', text: 'Application de gestion CISPOLstore : installez-la depuis ce lien.', url };
+    try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(url); App.toast('Lien copié'); } }
+    catch (e) { if (e.name === 'AbortError') return; try { await navigator.clipboard.writeText(url); App.toast('Lien copié'); } catch (e2) { window.prompt('Copiez ce lien :', url); } }
+  };
   App.actions.setco = () => {
     const co = App.db.settings.company;
     App.modal("Informations de l'entreprise",

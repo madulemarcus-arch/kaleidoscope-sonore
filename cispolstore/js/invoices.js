@@ -53,11 +53,21 @@
       $('cart').innerHTML = draft.lines.length ? `<div class="list">${draft.lines.map((l, k) => `<div class="item"><div class="grow"><b>${esc(l.desc)}</b><small>${l.qty} ${esc(l.unit || '')} × ${App.fmt(l.price, cur())}</small></div><b>${App.fmt(l.qty * l.price, cur())}</b><button type="button" class="btn sm del" data-act="rmline" data-i="${k}">✕</button></div>`).join('')}<div class="item"><div class="grow"><b>Total</b></div><b>${App.fmt(t, cur())}</b></div></div>` : '<div class="empty" style="padding:10px">Aucune ligne. Ajoutez un article ci-dessous.</div>';
       if (!draft.paidTouched) $('f_paid').value = t || '';
     };
-    const cl = App.clientOpts(needsClient(type) ? '— Choisir un client —' : 'Client de passage', needsClient(type) ? (type === 'installation' ? ['gere', 'install', 'mat'] : null) : null);
+    const clientSel = () => App.clientOpts(needsClient(type) ? '— Choisir un client —' : 'Client de passage', type === 'abonnement' ? ['gere'] : null);
+    const cl = clientSel();
+    const qcType = type === 'abonnement' ? 'gere' : type === 'installation' ? 'install' : type === 'materiel' ? 'mat' : 'gere';
+    const quick = `<div class="bar" style="margin-top:6px"><button type="button" class="btn sm sec" id="qc_open">＋ Nouveau client</button></div>
+       <div class="card" id="qc" hidden style="margin:8px 0">
+         <b>Nouveau client</b>
+         ${type === 'abonnement' ? '' : F.sel('qc_type', 'Type de client', [['gere', 'Géré par CISPOLstore'], ['mat', 'Matériel uniquement'], ['install', 'Installation uniquement']], qcType)}
+         <div class="row">${F.text('qc_first', 'Prénom', '')}${F.text('qc_last', 'Nom', '')}</div>
+         ${F.text('qc_phone', 'Téléphone', '', 'type="tel" inputmode="tel"')}
+         <div id="qc_gere">${F.text('qc_acc', 'Compte Starlink (ACC)', '', 'autocapitalize="characters"')}<div class="row">${F.text('qc_plan', "Type d'abonnement", '', 'list="qc_pl"')}${F.num('qc_price', 'Prix ($)', '')}${F.date('qc_start', "Début", App.today())}</div>${F.list('qc_pl', App.PLANS)}</div>
+         <div class="bar" style="margin-top:12px"><button type="button" class="btn" id="qc_save">Enregistrer le client</button><button type="button" class="btn sec" id="qc_cancel">Annuler</button></div></div>`;
     const renewBlock = ['abonnement', 'complete'].includes(type) ? `<label class="l" id="renwrap"><input type="checkbox" id="f_renew" checked style="width:auto"> Renouveler l'abonnement du client (nouvelle période) — décochez pour facturer la période en cours</label>` : '';
     const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '')}${F.text('f_obs', 'Observations', '')}</div>` : '';
     App.modal('Nouvelle facture · ' + App.invTypes[type],
-      `${F.sel('f_cl', 'Client', cl, pre.clientId || '')}
+      `${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
        <h2 class="sec">Lignes de la facture</h2><div id="cart"></div>
        <div class="card" style="margin-top:10px">
@@ -72,7 +82,7 @@
         if (needsClient(type) && !cid) { App.toast('Choisissez un client'); return false; }
         if (!draft.lines.length) { App.toast('Ajoutez au moins une ligne'); return false; }
         const date = App.v('f_date') || App.today(), curr = cur(), mode = App.v('f_pay');
-        let lines = draft.lines.map(l => ({ ...l }));
+        let lines = draft.lines.map(l => { const { auto, ...r } = l; return r; });
         let renewed = null;
         if ($('f_renew') && $('f_renew').checked && c && c.type === 'gere') {
           const s = App.sub(c), ns = s && s.status !== 'inactif' ? s.end : date, days = c.period || S.period, end = App.addDays(ns, days);
@@ -98,9 +108,33 @@
     // renewal is on by default only when the client already had a subscription invoice
     const syncRenew = () => { const cb = $('f_renew'); if (cb) cb.checked = db.invoices.some(i => i.clientId === App.v('f_cl') && i.lines.some(l => /^abonnement/i.test(l.desc))); };
     $('f_cl').addEventListener('change', syncRenew); syncRenew();
+    // quick client creation without leaving the invoice
+    const qcSync = () => { $('qc_gere').hidden = ($('qc_type') ? $('qc_type').value : 'gere') !== 'gere'; };
+    if ($('qc_type')) $('qc_type').onchange = qcSync; qcSync();
+    $('qc_open').onclick = () => { $('qc').hidden = false; $('qc_open').hidden = true; $('qc_first').focus(); };
+    const qcClose = () => { $('qc').hidden = true; $('qc_open').hidden = false; };
+    $('qc_cancel').onclick = qcClose;
+    $('qc').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.target.tagName !== 'BUTTON') $('qc_save').click(); } });
+    $('qc_save').onclick = () => {
+      const first = App.v('qc_first'), last = App.v('qc_last'); if (!first && !last) return App.toast('Saisissez au moins un nom');
+      const t = $('qc_type') ? $('qc_type').value : 'gere';
+      const c = { id: App.uid(), code: App.nextClientCode(), type: t, first, last, name: (first + ' ' + last).trim(), phone: App.v('qc_phone'), phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: 0, payMode: 'Cash', start: '', period: S.period, grace: S.grace, note: '', article: '', created: App.today(), subs: [] };
+      if (t === 'gere') Object.assign(c, { acc: App.v('qc_acc'), plan: App.v('qc_plan'), price: App.n('qc_price'), start: App.v('qc_start') || App.today() });
+      db.clients.push(c); App.log(c.id, 'Client créé (' + App.TYPES[t] + ')'); App.save();
+      $('f_cl').innerHTML = App.opts(clientSel()); $('f_cl').value = c.id; $('f_cl').dispatchEvent(new Event('change'));
+      ['qc_first', 'qc_last', 'qc_phone', 'qc_acc', 'qc_plan', 'qc_price'].forEach(i => { $(i).value = ''; }); qcClose(); App.toast('Client ajouté : ' + App.cname(c));
+    };
     // behaviour
     $('f_prod').onchange = () => { const p = App.prod($('f_prod').value); if (p) { $('f_desc').value = p.name; $('f_price').value = App.conv(p.price, 'USD', cur()); } };
-    $('f_cur').onchange = () => { draw(); };
+    // subscription invoice: the line follows the chosen client's plan and price
+    const autoSub = () => {
+      if (type !== 'abonnement') return;
+      draft.lines = draft.lines.filter(l => !l.auto); const c = App.client(App.v('f_cl'));
+      if (c && c.type === 'gere' && c.price > 0) draft.lines.unshift({ auto: true, pid: '', desc: 'Abonnement ' + (c.plan || 'Starlink'), qty: 1, price: App.conv(c.price, 'USD', cur()), cost: 0, unit: '' });
+      else if (c) $('f_addsub').click();
+    };
+    $('f_cl').addEventListener('change', () => { autoSub(); draw(); });
+    $('f_cur').onchange = () => { autoSub(); draw(); };
     $('f_add').onclick = () => {
       const p = App.prod($('f_prod').value), desc = App.v('f_desc') || (p && p.name), qty = App.n('f_qty');
       if (!desc || qty <= 0) return App.toast('Désignation et quantité requises');
@@ -111,7 +145,7 @@
     $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'Starlink'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur()) : ''; $('f_price').focus(); };
     $('f_addinst').onclick = () => { $('f_prod').value = ''; $('f_desc').value = 'Installation Starlink'; $('f_qty').value = 1; $('f_price').value = ''; $('f_price').focus(); };
     $('f_paid').oninput = () => { draft.paidTouched = true; };
-    if (type === 'abonnement') $('f_addsub').click();
+    if (type === 'abonnement') autoSub();
     if (type === 'installation') $('f_addinst').click();
     draw();
   };

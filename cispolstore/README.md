@@ -32,6 +32,8 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 - **Factures** : numéro `FAC-AAAA-0001` automatique et sans doublon ; les lignes du stock font sortir le stock (câble en mètres). Montant en lettres et équivalent CDF (taux réglable). Export PDF (via l'impression du navigateur), Word (.doc) et impression.
 - **Stock** : entrées / sorties journalisées, fournisseurs, alertes de stock bas, câble restant sur le tableau de bord.
 - **Bénéfice** = prix de vente − prix d'achat (par ligne) − dépenses. Les montants des rapports sont convertis en dollars.
+- **Nouveau client depuis une facture** : bouton « ＋ Nouveau client » dans le formulaire de facture (sans perdre la facture en cours). Pour une facture d'abonnement, seuls les clients gérés sont proposés et la ligne d'abonnement reprend l'offre et le prix du client.
+- **Partage** : « Partager l'application » (menu Plus et Paramètres) ouvre le partage Android avec le lien de l'application.
 - **Recherche globale** : nom, code client, ACC (même partiel), téléphone, adresse, numéro de série, facture, produit, fournisseur.
 
 ## Données et sécurité
