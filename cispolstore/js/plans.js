@@ -15,7 +15,7 @@
   // fills in the Starlink cost on subscription lines (called by createInvoice, and by the "recalculate" button)
   App.costSubLines = (inv, dry) => {
     let n = 0;
-    inv.lines.forEach(l => { if (!l.pid && !l.cost && /^abonnement/i.test(l.desc)) { const c = App.planCost(l.desc, App.client(inv.clientId)); if (c > 0) { if (!dry) l.cost = App.conv(c, 'USD', inv.currency); n++; } } });
+    inv.lines.forEach(l => { if (!l.pid && !l.cost && /^abonnement/i.test(l.desc)) { const c = App.planCost(l.desc, App.client(inv.clientId)); if (c > 0) { if (!dry) l.cost = App.conv(c, 'USD', inv.currency, App.rateOf(inv)); n++; } } });
     return n;
   };
 

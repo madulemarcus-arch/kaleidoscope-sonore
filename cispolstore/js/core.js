@@ -31,7 +31,7 @@
     v: 2,
     settings: {
       company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '' },
-      plans: { 'Résidentiel': { price: 70, cost: 64 } }, rate: 2400, theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
+      plans: { 'Résidentiel': { price: 70, cost: 64 } }, rate: 2400, rates: [], theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
     },
     clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], log: []
   });
@@ -82,6 +82,7 @@
     o.onsuccess = () => { const r = fn(o.result.transaction('kv', mode).objectStore('kv')); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); };
   });
   App.save = () => {
+    App.stampRates();
     const txt = JSON.stringify(db);
     try { localStorage.setItem(KEY, txt); } catch (e) { App.toast('Stockage local plein ou bloqué : faites une sauvegarde'); }
     try { idb('readwrite', st => st.put(txt, 'db2')).catch(() => {}); } catch (e) {}
@@ -92,9 +93,20 @@
   App.recover = () => idb('readonly', st => st.get('db2')).then(t => { if (!t) return false; const d = JSON.parse(t); if (App.hasData(d)) { db = normalize(d); App.save(); return true; } return false; }).catch(() => false);
 
   // ---------- Money ----------
+  // Exchange rate: the current rate, a history of every change, and a rate frozen on each invoice / payment / expense / penalty
   App.rate = () => +db.settings.rate || 2400;
-  App.conv = (n, from, to) => from === to ? n : from === 'CDF' ? n / App.rate() : n * App.rate();
-  App.usd = (n, cur) => App.conv(n, cur || 'USD', 'USD');
+  App.rateOn = d => { const h = (db.settings.rates || []).filter(x => x.date <= d).sort((a, b) => a.date.localeCompare(b.date) || (a.ts || 0) - (b.ts || 0)); return h.length ? +h[h.length - 1].rate : App.rate(); };
+  App.rateOf = r => +r.rate || App.rateOn(r.date || r.paid || App.today());
+  // gives every record its own rate (once), so changing the rate later never rewrites the past
+  const STAMPED = [['invoices', 'date'], ['payments', 'date'], ['expenses', 'date'], ['penalties', 'date']];
+  App.stampRates = () => { STAMPED.forEach(([k, f]) => (db[k] || []).forEach(r => { if (!(+r.rate > 0)) r.rate = App.rateOn(r[f] || App.today()); })); };
+  App.setRate = r => {
+    r = Math.round(+r) || 0; const S = db.settings; if (r < 1 || r === +S.rate) return false;
+    App.stampRates();   // freeze every existing record at the previous rate first
+    S.rate = r; S.rates = [...(S.rates || []), { date: App.today(), ts: Date.now(), rate: r }].slice(-400); return true;
+  };
+  App.conv = (n, from, to, rate) => from === to ? n : (rate = +rate || App.rate(), from === 'CDF' ? n / rate : n * rate);
+  App.usd = (n, cur, rec) => App.conv(n, cur || 'USD', 'USD', rec ? App.rateOf(rec) : undefined);
   const nf = (n, d) => (+n || 0).toLocaleString('fr-FR', { maximumFractionDigits: d });
   App.fmt = (n, cur = 'USD') => cur === 'CDF' ? `${nf(n, 0)} CDF` : `${nf(n, Math.abs(n % 1) > 0.004 ? 2 : 0)} $`;
   App.nf = nf;
@@ -128,7 +140,7 @@
   // ---------- Invoices ----------
   App.invTotal = i => i.lines.reduce((a, l) => a + l.qty * l.price, 0);
   App.invCost = i => i.lines.reduce((a, l) => a + l.qty * (l.cost || 0), 0);
-  App.invPaid = i => db.payments.filter(p => p.invoiceId === i.id).reduce((a, p) => a + App.conv(p.amount, p.currency, i.currency), 0);
+  App.invPaid = i => db.payments.filter(p => p.invoiceId === i.id).reduce((a, p) => a + App.conv(p.amount, p.currency, i.currency, App.rateOf(p)), 0);
   App.invDue = i => Math.max(0, App.invTotal(i) - App.invPaid(i));
   App.invStatus = i => { const t = App.invTotal(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
   App.INV = { paid: ['Payée', 'ok'], part: ['Partielle', 'warn'], unpaid: ['Impayée', 'bad'] };

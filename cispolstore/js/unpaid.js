@@ -3,13 +3,13 @@
   'use strict';
   const App = window.App, esc = App.esc;
   const open = () => App.db.invoices.filter(i => App.invDue(i) > 0.004).sort((a, b) => a.date.localeCompare(b.date));
-  App.unpaidTotal = () => open().reduce((a, i) => a + App.usd(App.invDue(i), i.currency), 0) + App.penaltyDueTotal();
+  App.unpaidTotal = () => open().reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0) + App.penaltyDueTotal();
   const recent = i => i.lastRemind && App.diff(i.lastRemind, App.today()) <= 2;
   const age = i => Math.max(0, App.diff(i.date, App.today()));
   const ageTone = d => d > 60 ? 'bad' : d > 30 ? 'warn' : '';
 
   App.views.impayes = () => {
-    const l = open(), tot = App.unpaidTotal(), old = l.filter(i => age(i) > 30).reduce((a, i) => a + App.usd(App.invDue(i), i.currency), 0);
+    const l = open(), tot = App.unpaidTotal(), old = l.filter(i => age(i) > 30).reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
     return {
       title: 'Impayés', back: 'more', nav: 'more',
       html: `<div class="grid two"><div class="stat"><small>Total à encaisser</small><b class="${tot ? 'warn' : 'ok'}">${App.fmt(tot)}</b><small>${l.length} facture(s)${App.db.penalties.some(p => !p.paid) ? ' + pénalités' : ''}</small></div><div class="stat"><small>Plus de 30 jours</small><b class="${old ? 'bad' : ''}">${App.fmt(old)}</b></div></div>

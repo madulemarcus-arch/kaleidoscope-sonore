@@ -129,7 +129,7 @@
     if (tab === 'hist') body = listOrEmpty(db.log.filter(x => x.clientId === c.id).slice().reverse().map(x => `<div class="item"><div class="grow"><b>${esc(x.text)}</b><small>${App.fdate(x.date)}</small></div></div>`), 'Aucune opération.');
     const wa = App.waLink(c);
     return {
-      title: 'Détails client', back: 'clients', nav: 'clients',
+      title: App.cname(c), sub: 'Fiche client', back: 'clients', nav: 'clients',
       html: `<div class="card"><div class="row" style="flex-wrap:nowrap;align-items:center"><span class="avatar big ${tone(c)}" style="flex:none;min-width:60px">${esc(App.initials(c))}</span><div style="flex:1;min-width:0"><h2 style="font-size:19px">${esc(App.cname(c))}</h2><div style="margin:4px 0">${badge(c)} <span class="pill">${esc(c.code)}</span></div><div class="mut">${tel(c.phone)}</div></div></div>
         <div class="bar" style="margin-top:12px">${c.phone ? `<a class="btn sm sec" href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}" style="text-decoration:none">📞 Appeler</a>` : ''}${wa ? `<a class="btn sm sec" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>` : ''}<button class="btn sm" data-act="newinv" data-cid="${c.id}">🧾 Facture</button></div></div>
         <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`

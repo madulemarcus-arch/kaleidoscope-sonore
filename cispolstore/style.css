@@ -46,7 +46,7 @@ a { color:var(--blue); }
 h2.sec { font-size:15px; margin:18px 2px 8px; display:flex; align-items:center; gap:8px; }
 h2.sec .more { margin-left:auto; font-size:13px; font-weight:400; color:var(--blue); background:none; border:0; padding:0; }
 .mut { color:var(--mut); } .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); } .blue { color:var(--blue); }
-.row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; min-width:120px; }
+.row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; min-width:120px; } .row > .fld { min-width:150px; }
 .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
 .spread { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -89,7 +89,7 @@ label.l { display:block; margin:10px 0 4px; color:var(--mut); font-size:13px; }
 button.item:active { background:var(--card2); }
 .item .grow { flex:1; min-width:0; }
 .item .grow b, .item .grow small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.item .grow small { color:var(--mut); font-size:13px; }
+.item .grow small { color:var(--mut); font-size:13px; white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
 .item .end { text-align:right; flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:3px; font-size:13px; }
 .avatar { width:42px; height:42px; border-radius:50%; background:var(--blue); color:#fff; display:grid; place-items:center; font-weight:700; flex:none; }
 .avatar.ok { background:var(--ok); } .avatar.warn { background:var(--warn); } .avatar.bad { background:var(--bad); } .avatar.mut { background:var(--mut); }
@@ -105,7 +105,7 @@ button.item:active { background:var(--card2); }
 .chart { display:flex; align-items:flex-end; gap:4px; height:130px; padding-top:8px; }
 .chart div { flex:1; text-align:center; min-width:0; display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
 .chart i { display:block; background:linear-gradient(var(--acc2),var(--acc)); border-radius:4px 4px 0 0; min-height:2px; }
-.chart small { font-size:10px; color:var(--mut); margin-top:3px; overflow:hidden; }
+.chart small { font-size:10px; color:var(--mut); margin:3px -8px 0; overflow:visible; white-space:nowrap; }
 
 /* ---------- calendar ---------- */
 .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
