@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
-  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'invoices', 'invoice', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'reports', 'settings', 'livraisons', 'users', 'more', 'profile'];
+  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'invoices', 'invoice', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'reports', 'settings', 'livraisons', 'users', 'rapportmois', 'more', 'profile'];
   // actions only the administrator may run
   const ADMIN = /^(del[a-z]+|pen_del|backup|plansfix|setco|setapp|pin[a-z]+|sync[a-z]+|drive_[a-z]+|msgreset|users_[a-z]+|dl_del|restore)$/;
   const COMMON = /^(go|copy|calday|calnav|cltab|clfilter|search|sgo|stcat|invfilter|dper|repper|reptab|paymode|lockNow|me_[a-z]+|shareapp|cf_type|dl_filter|dl_view)$/;

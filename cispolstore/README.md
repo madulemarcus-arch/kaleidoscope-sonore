@@ -33,6 +33,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/plans.js` | Tarifs d'abonnement : prix client, coût Starlink et marge |
 | `js/penalties.js` | Pénalités Starlink : enregistrement, paiement signalé, relance, effet sur les bénéfices |
 | `js/unpaid.js` | Impayés : factures à encaisser, ancienneté, relance WhatsApp |
+| `js/monthly.js` | Rapport mensuel : résumé du mois à partager, copier ou imprimer |
 | `js/remind.js` | Rappels WhatsApp d'échéance (liste « Rappels » et messages modifiables) |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
 | `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
@@ -93,6 +94,10 @@ Livraisons (Plus → Livraisons, ou « 🚚 Livraison » depuis une facture) : c
 ## Techniciens
 
 Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs et partenaires (nom, téléphone, rôle, zone, spécialité, actif/inactif). Dans « Nouvelle installation » et dans une facture d'installation, le champ Technicien propose la liste (la saisie libre reste possible) ; la fiche du technicien affiche ses interventions et leur valeur. Renommer un technicien met à jour ses installations. Commission : par technicien, **en pourcentage** du prix de l'installation ou **en montant fixe** par intervention. La fiche affiche la commission à payer et déjà payée ; « Payer la commission » fige les montants et enregistre une dépense (catégorie « Commission technicien »), ce qui garde les bénéfices exacts. Synchronisé entre appareils.
+
+## Rapport mensuel
+
+Plus → **Rapport mensuel** (administrateur et comptable) : résumé d'un mois, avec les flèches ‹ › pour changer de mois. Il rassemble le chiffre d'affaires, le coût, la marge brute, les dépenses par catégorie et le bénéfice net ; les abonnements (renouvellements, montant, marge, actifs / sursis / inactifs, à renouveler d'ici la fin du mois) ; les ventes de matériel, installations, nouveaux clients et livraisons ; les impayés à ce jour et ceux du mois, les pénalités payées et à payer ; le stock bas. Boutons : **Partager sur WhatsApp** (texte prêt à envoyer), **Copier le texte**, **Imprimer / PDF**.
 
 ## Tarifs d'abonnement et marge
 
