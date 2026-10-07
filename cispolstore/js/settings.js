@@ -14,7 +14,7 @@
       html: `<h2 class="sec">Entreprise</h2><div class="list">
           <div class="item"><img src="${esc(co.logo || 'logo.png')}" alt="" style="height:48px;background:#fff;border-radius:8px;padding:2px"><div class="grow"><b>${esc(co.name)}</b><small>${esc(co.address)}</small><small>${esc(co.phone)} · ${esc(co.email)}</small><small>RCCM : ${esc(co.rccm || '—')} · ID. Nat. : ${esc(co.idnat || '—')} · N° Impôt : ${esc(co.impot || '—')}</small></div><button class="btn sm sec" data-act="setco">Modifier</button></div></div>
         <h2 class="sec">Application</h2><div class="list">
-          ${row('Taux USD / CDF', `1 $ = ${App.nf(S.rate, 0)} CDF (utilisé sur les factures et les rapports)`, '<button class="btn sm sec" data-act="setapp">Modifier</button>')}
+          ${row('Taux USD / CDF', `1 $ = ${App.nf(S.rate, 0)} CDF (taux actuel : chaque facture et chaque paiement garde son propre taux)`, '<button class="btn sm sec" data-act="setapp">Modifier</button>')}
           ${row('Abonnements', `Durée par défaut : ${S.period} jours · Sursis par défaut : ${S.grace} jours`)}
           ${row('Thème', { auto: 'Automatique (suit le téléphone)', light: 'Clair', dark: 'Sombre' }[S.theme] + ' · bouton ☀️/🌙 en haut de l\'écran')}
           ${row('Notifications', 'Les alertes d\'expiration (7, 3, 1 jour avant et le jour même) s\'affichent sur l\'écran d\'accueil.')}</div>
@@ -66,7 +66,7 @@
   App.actions.setapp = () => {
     const S = App.db.settings;
     App.modal("Paramètres de l'application", `${F.num('f_rate', 'Taux : 1 $ = … CDF', S.rate, 'min="1"')}${F.num('f_period', "Durée d'abonnement par défaut (jours)", S.period, 'min="1"')}${F.num('f_grace', 'Sursis par défaut (jours)', S.grace)}${F.sel('f_theme', 'Thème', [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']], S.theme)}`,
-      () => { S.rate = App.n('f_rate') || 2400; S.period = Math.max(1, Math.round(App.n('f_period')) || 30); S.grace = Math.max(0, Math.round(App.n('f_grace'))); S.theme = App.v('f_theme'); App.save(); App.applyTheme(); App.refresh(); });
+      () => { App.setRate(App.n('f_rate') || 2400); S.period = Math.max(1, Math.round(App.n('f_period')) || 30); S.grace = Math.max(0, Math.round(App.n('f_grace'))); S.theme = App.v('f_theme'); App.save(); App.applyTheme(); App.refresh(); });
   };
   App.actions.pinset = () => App.showLock('new1', 'setup');
   App.actions.pinchange = () => App.showLock('enter', 'change');
@@ -101,6 +101,12 @@
   const restore = (file, input) => {
     if (!file) return;
     file.text().then(t => App.restoreData(t)).finally(() => { input.value = ''; });
+  };
+  // quick change of the day's rate (it changes often): kept in a history, every document keeps its own rate
+  App.actions.rate_edit = () => {
+    const h = (App.db.settings.rates || []).slice(-6).reverse();
+    App.modal('Taux du jour', `${App.f.num('f_rate', '1 $ = … CDF', App.rate(), 'min="1" step="1"')}<p class="mut" style="font-size:13px">Les factures et paiements déjà enregistrés gardent leur propre taux. Le nouveau taux sert pour les prochains.</p>${h.length ? `<div class="list">${h.map(x => `<div class="item"><div class="grow">${App.fdate(x.date)}</div><b>${App.nf(x.rate, 0)} CDF</b></div>`).join('')}</div>` : ''}`,
+      () => { const r = Math.round(App.n('f_rate')); if (r < 1) { App.toast('Taux invalide'); return false; } if (App.setRate(r)) { App.save(); App.toast('Taux mis à jour : ' + App.nf(r, 0) + ' CDF'); } App.refresh(); });
   };
   App.actions.exportcsv = () => {
     const db = App.db, one = (t, k) => `<button class="opt" data-act="csvdo" data-k="${k}"><span><b>${t}</b></span></button>`;

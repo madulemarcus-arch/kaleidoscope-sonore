@@ -7,7 +7,7 @@
   const list = () => App.db.penalties;
   App.penalty = id => list().find(p => p.id === id);
   const due = () => list().filter(p => !p.paid).sort((a, b) => a.date.localeCompare(b.date));
-  App.penaltyDueTotal = () => due().reduce((a, p) => a + App.usd(p.amount, p.currency), 0);
+  App.penaltyDueTotal = () => due().reduce((a, p) => a + App.usd(p.amount, p.currency, p), 0);
   const tag = p => p.paid ? `<span class="pill ok">Payée le ${App.fdate(p.paid)}</span>` : '<span class="pill bad">À payer</span>';
   const row = (p, withName) => `<div class="item"><div class="grow"><b>${withName ? esc(App.cname(App.client(p.clientId))) + ' · ' : ''}${App.fmt(p.amount, p.currency)}</b><small style="white-space:normal">${esc(p.reason)} · ${App.fdate(p.date)}${p.paid ? ' · ' + esc(p.mode || '') : ''}${p.note ? ' · ' + esc(p.note) : ''}</small></div><div class="end">${tag(p)}<span>${p.paid ? `<button class="btn sm sec" data-act="pen_unpay" data-id="${p.id}">↩︎</button>` : `<button class="btn sm" data-act="pen_pay" data-id="${p.id}">✓ Payée</button>${(App.client(p.clientId) || {}).phone ? ` <button class="btn sm sec" data-act="pen_reminder" data-id="${p.id}">💬</button>` : ''}`} <button class="btn sm sec" data-act="pen_edit" data-id="${p.id}">✏️</button></span></div></div>`;
 

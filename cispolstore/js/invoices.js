@@ -7,11 +7,11 @@
   // ---------- Creation (shared with subscription renewal) ----------
   App.createInvoice = (inv, paid = 0) => {
     const db = App.db, date = inv.date || App.today();
-    Object.assign(inv, { id: App.uid(), number: App.nextInvNumber(date.slice(0, 4)), date, ts: Date.now(), note: inv.note || '' });
+    Object.assign(inv, { id: App.uid(), number: App.nextInvNumber(date.slice(0, 4)), date, ts: Date.now(), note: inv.note || '', rate: +inv.rate > 0 ? +inv.rate : App.rateOn(date) });
     App.costSubLines(inv);
     db.invoices.push(inv);
     inv.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: -l.qty, invoiceId: inv.id, clientId: inv.clientId, date, note: 'Facture ' + inv.number }); });
-    if (paid > 0) db.payments.push({ id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: paid, currency: inv.currency, mode: inv.payMode, ref: '', comment: '' });
+    if (paid > 0) db.payments.push({ id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: paid, currency: inv.currency, rate: inv.rate, mode: inv.payMode, ref: '', comment: '' });
     App.log(inv.clientId, `Facture ${inv.number} : ${App.fmt(App.invTotal(inv), inv.currency)}`);
     return inv;
   };
@@ -24,7 +24,7 @@
     $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }).join('')}</div>` : '<div class="empty">Aucune facture.</div>';
   };
   App.views.invoices = () => {
-    const db = App.db, tot = db.invoices.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency), 0);
+    const db = App.db, tot = db.invoices.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency, i), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
     return {
       title: 'Factures', sub: `${db.invoices.length} facture(s)`, back: 'more', nav: 'more',
       html: `<div class="grid two"><div class="stat"><small>Total facturé</small><b>${App.fmt(tot)}</b></div><div class="stat"><small>Reste à encaisser</small><b class="${due ? 'warn' : ''}">${App.fmt(due)}</b></div></div>
@@ -70,6 +70,7 @@
     App.modal('Nouvelle facture · ' + App.invTypes[type],
       `${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
+       ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}<p class="mut" style="font-size:12px;margin:2px 0 0">Le taux est enregistré sur cette facture. Si vous le changez ici, il devient le taux du jour.</p>
        <h2 class="sec">Lignes de la facture</h2><div id="cart"></div>
        <div class="card" style="margin-top:10px">
          ${F.sel('f_prod', 'Article du stock / catalogue', [['', '— Ligne libre —'], ...db.products.map(p => [p.id, p.name + (App.tracked(p) ? ` (${App.nf(p.qty, 2)}${p.unit === 'm' ? ' m' : ''})` : '')])], '')}
@@ -94,7 +95,8 @@
           lines.forEach(l => { if (/^abonnement/i.test(l.desc) && !l.desc.includes('(')) l.desc += ` (${App.fdate(s.start)} → ${App.fdate(s.end)})`; });
         }
         const total = lines.reduce((a, l) => a + l.qty * l.price, 0), paid = Math.min(App.n('f_paid'), total);
-        const inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines }, paid);
+        const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
+        const inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate }, paid);
         if (renewed && c) {
           if (c.start) (c.subs = c.subs || []).push({ start: c.start, days: c.period || renewed.days, price: c.price || 0, date });
           Object.assign(c, { start: renewed.ns, period: renewed.days }); App.log(c.id, `Abonnement renouvelé : ${App.fdate(renewed.ns)} → ${App.fdate(renewed.end)}`);
@@ -102,7 +104,7 @@
         if (['installation', 'complete'].includes(type) && cid) {
           const fee = lines.filter(l => !l.pid && /install/i.test(l.desc)).reduce((a, l) => a + l.qty * l.price, 0);
           const mats = lines.filter(l => l.pid && App.tracked(App.prod(l.pid))).map(l => ({ pid: l.pid, qty: l.qty }));
-          if (fee > 0 || type === 'installation') { db.installs.push({ id: App.uid(), clientId: cid, date, kind: 'Installation Starlink', tech: App.v('f_tech'), techId: App.techId(App.v('f_tech')), price: App.usd(fee, curr), materials: mats, invoiceId: inv.id, obs: App.v('f_obs') }); App.log(cid, 'Installation facturée ' + inv.number); }
+          if (fee > 0 || type === 'installation') { db.installs.push({ id: App.uid(), clientId: cid, date, kind: 'Installation Starlink', tech: App.v('f_tech'), techId: App.techId(App.v('f_tech')), price: App.conv(fee, curr, 'USD', inv.rate), materials: mats, invoiceId: inv.id, obs: App.v('f_obs') }); App.log(cid, 'Installation facturée ' + inv.number); }
         }
         App.save(); App.toast('Facture ' + inv.number + ' créée'); App.go('invoice', { id: inv.id });
       }, 'Créer la facture');
@@ -126,12 +128,15 @@
       ['qc_first', 'qc_last', 'qc_phone', 'qc_acc', 'qc_plan', 'qc_price'].forEach(i => { $(i).value = ''; }); qcClose(); App.toast('Client ajouté : ' + App.cname(c));
     };
     // behaviour
-    $('f_prod').onchange = () => { const p = App.prod($('f_prod').value); if (p) { $('f_desc').value = p.name; $('f_price').value = App.conv(p.price, 'USD', cur()); } };
+    const frate = () => +$('f_rate').value > 0 ? +$('f_rate').value : App.rate();
+    $('f_rate').onchange = () => { autoSub(); draw(); };
+    $('f_date').onchange = () => { const r = App.rateOn($('f_date').value || App.today()); $('f_rate').value = r; autoSub(); draw(); };
+    $('f_prod').onchange = () => { const p = App.prod($('f_prod').value); if (p) { $('f_desc').value = p.name; $('f_price').value = App.conv(p.price, 'USD', cur(), frate()); } };
     // subscription invoice: the line follows the chosen client's plan and price
     const autoSub = () => {
       if (type !== 'abonnement') return;
       draft.lines = draft.lines.filter(l => !l.auto); const c = App.client(App.v('f_cl'));
-      if (c && c.type === 'gere' && c.price > 0) draft.lines.unshift({ auto: true, pid: '', desc: 'Abonnement ' + (c.plan || 'Starlink'), qty: 1, price: App.conv(c.price, 'USD', cur()), cost: 0, unit: '' });
+      if (c && c.type === 'gere' && c.price > 0) draft.lines.unshift({ auto: true, pid: '', desc: 'Abonnement ' + (c.plan || 'Starlink'), qty: 1, price: App.conv(c.price, 'USD', cur(), frate()), cost: 0, unit: '' });
       else if (c) $('f_addsub').click();
     };
     $('f_cl').addEventListener('change', () => { autoSub(); draw(); });
@@ -140,10 +145,10 @@
       const p = App.prod($('f_prod').value), desc = App.v('f_desc') || (p && p.name), qty = App.n('f_qty');
       if (!desc || qty <= 0) return App.toast('Désignation et quantité requises');
       if (p && App.tracked(p)) { const inCart = draft.lines.filter(l => l.pid === p.id).reduce((a, l) => a + l.qty, 0); if (inCart + qty > p.qty && !App.confirm(`Stock insuffisant (${App.nf(p.qty, 2)}). Continuer quand même ?`)) return; }
-      draft.lines.push({ pid: p ? p.id : '', desc, qty, price: App.n('f_price'), cost: p ? App.conv(p.cost, 'USD', cur()) : 0, unit: p ? (p.unit === 'm' ? 'm' : '') : '' });
+      draft.lines.push({ pid: p ? p.id : '', desc, qty, price: App.n('f_price'), cost: p ? App.conv(p.cost, 'USD', cur(), frate()) : 0, unit: p ? (p.unit === 'm' ? 'm' : '') : '' });
       $('f_prod').value = ''; $('f_desc').value = ''; $('f_price').value = ''; $('f_qty').value = 1; draw();
     };
-    $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'Starlink'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur()) : ''; $('f_price').focus(); };
+    $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'Starlink'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur(), frate()) : ''; $('f_price').focus(); };
     $('f_addinst').onclick = () => { $('f_prod').value = ''; $('f_desc').value = 'Installation Starlink'; $('f_qty').value = 1; $('f_price').value = ''; $('f_price').focus(); };
     $('f_paid').oninput = () => { draft.paidTouched = true; };
     if (type === 'abonnement') autoSub();
@@ -164,7 +169,7 @@
       <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', esc(App.cname(c)))}${dl('Code', esc(c ? c.code : '—'))}${dl('Adresse', esc(c ? (c.address || c.installAddr || '—') : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
       <table><thead><tr><th>Produit / Description</th><th class="r">Qté</th><th class="r">PU (${i.currency === 'CDF' ? 'CDF' : '$'})</th><th class="r">Montant (${i.currency === 'CDF' ? 'CDF' : '$'})</th></tr></thead><tbody>${i.lines.map(l => `<tr><td>${esc(l.desc)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${App.nf(l.price, 2)}</td><td class="r">${App.nf(l.qty * l.price, 2)}</td></tr>`).join('')}</tbody></table>
       <div class="tot"><div class="g"><span>Total :</span><span>${App.fmt(tot, i.currency)}</span></div><div><span>Montant payé :</span><span>${App.fmt(paid, i.currency)}</span></div><div><span>Solde :</span><span>${App.fmt(due, i.currency)}</span></div>
-      <div style="font-size:12px;color:#555"><span>Taux du jour (1 $) :</span><span>${App.nf(App.rate(), 0)} CDF</span></div><div style="font-size:12px;color:#555"><span>Équivalent en ${other} :</span><span>${App.fmt(App.conv(tot, i.currency, other), other)}</span></div></div>
+      <div style="font-size:12px;color:#555"><span>Taux appliqué (1 $) :</span><span>${App.nf(App.rateOf(i), 0)} CDF</span></div><div style="font-size:12px;color:#555"><span>Équivalent en ${other} :</span><span>${App.fmt(App.conv(tot, i.currency, other, App.rateOf(i)), other)}</span></div></div>
       <div class="words">Arrêtée la présente facture à la somme de : <b>${esc(App.amountWords(tot, i.currency))}</b>.</div><div class="thx">MERCI POUR VOTRE CONFIANCE</div></div>`;
   };
   const logoData = async () => {
@@ -213,11 +218,13 @@
       `${F.sel('f_cl', 'Client', App.clientOpts('— Aucun —'), cid0)}${F.sel('f_inv', 'Facture', invOpts(cid0), pre.invoiceId || '')}
        <div class="row">${F.num('f_amt', 'Montant', inv0 ? App.invDue(inv0) : '')}${F.sel('f_cur', 'Devise', CUR, inv0 ? inv0.currency : 'USD')}</div>
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
+       ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}
        ${F.text('f_ref', 'Référence (n° transaction)', '')}${F.text('f_com', 'Commentaire', '')}`,
       () => {
         const amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
-        const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : '');
-        db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: i ? i.currency : App.v('f_cur'), mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
+        const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
+        if (rate !== App.rate()) App.setRate(rate);
+        db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: i ? i.currency : App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
         App.log(cid, `Paiement ${App.fmt(amt, i ? i.currency : App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
         App.save(); App.toast('Paiement enregistré'); App.refresh();
       }, 'Enregistrer le paiement');
@@ -229,7 +236,7 @@
   const pq = { mode: 'all' };
   App.views.payments = () => {
     const all = App.db.payments.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)), l = all.filter(p => pq.mode === 'all' || p.mode === pq.mode);
-    const by = {}; all.forEach(p => { by[p.mode] = (by[p.mode] || 0) + App.usd(p.amount, p.currency); });
+    const by = {}; all.forEach(p => { by[p.mode] = (by[p.mode] || 0) + App.usd(p.amount, p.currency, p); });
     return {
       title: 'Paiements', sub: `${all.length} paiement(s)`, back: 'more', nav: 'more',
       html: `<div class="bar"><button class="btn" data-act="newpay">+ Paiement</button></div>
@@ -242,7 +249,7 @@
 
   // ---------- Expenses ----------
   App.views.expenses = () => {
-    const l = App.db.expenses.slice().sort((a, b) => b.date.localeCompare(a.date)), m = App.today().slice(0, 7), mt = l.filter(e => e.date.startsWith(m)).reduce((a, e) => a + App.usd(e.amount, e.currency), 0);
+    const l = App.db.expenses.slice().sort((a, b) => b.date.localeCompare(a.date)), m = App.today().slice(0, 7), mt = l.filter(e => e.date.startsWith(m)).reduce((a, e) => a + App.usd(e.amount, e.currency, e), 0);
     return {
       title: 'Dépenses', sub: `Ce mois : ${App.fmt(mt)}`, back: 'more', nav: 'more',
       html: `<div class="bar"><button class="btn" data-act="newexp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>` + (l.length ? `<div class="list">${l.map(e => `<div class="item"><div class="grow"><b>${esc(e.label)}</b><small>${App.fdate(e.date)} · ${esc(e.cat)}</small></div><b>${App.fmt(e.amount, e.currency)}</b><button class="btn sm del" data-act="delexp" data-id="${e.id}">✕</button></div>`).join('')}</div>` : '<div class="empty">Aucune dépense.</div>')

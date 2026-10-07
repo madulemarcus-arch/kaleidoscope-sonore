@@ -11,22 +11,22 @@
 
   // every figure of the report, computed once and used for both the screen and the shared text
   const data = m => {
-    const db = App.db, r = rangeOf(m), t = App.today(), f = App.finance(r), U = (n, c) => App.usd(n, c);
-    const subLines = []; f.inv.forEach(i => i.lines.forEach(l => { if (!l.pid && /^abonnement/i.test(l.desc)) subLines.push({ amt: U(l.qty * l.price, i.currency), margin: U(l.qty * (l.price - (l.cost || 0)), i.currency) }); }));
-    const matSales = f.inv.reduce((a, i) => a + i.lines.filter(l => l.pid).reduce((b, l) => b + U(l.qty * l.price, i.currency), 0), 0);
+    const db = App.db, r = rangeOf(m), t = App.today(), f = App.finance(r), U = (n, c, r) => App.usd(n, c, r);
+    const subLines = []; f.inv.forEach(i => i.lines.forEach(l => { if (!l.pid && /^abonnement/i.test(l.desc)) subLines.push({ amt: U(l.qty * l.price, i.currency, i), margin: U(l.qty * (l.price - (l.cost || 0)), i.currency, i) }); }));
+    const matSales = f.inv.reduce((a, i) => a + i.lines.filter(l => l.pid).reduce((b, l) => b + U(l.qty * l.price, i.currency, i), 0), 0);
     const inst = db.installs.filter(x => App.inRange(x.date, r)), pen = db.penalties.filter(p => p.paid && App.inRange(p.paid, r));
     const gere = db.clients.filter(c => c.type === 'gere').map(c => App.sub(c)).filter(Boolean), n = k => gere.filter(s => s.status === k).length;
     const open = db.invoices.filter(i => App.invDue(i) > 0.004), openMonth = open.filter(i => App.inRange(i.date, r));
-    const exp = {}; db.expenses.filter(e => App.inRange(e.date, r)).forEach(e => { exp[e.cat] = (exp[e.cat] || 0) + U(e.amount, e.currency); });
+    const exp = {}; db.expenses.filter(e => App.inRange(e.date, r)).forEach(e => { exp[e.cat] = (exp[e.cat] || 0) + U(e.amount, e.currency, e); });
     const dl = db.deliveries.filter(d => d.status === 'done' && d.doneAt && App.inRange(d.doneAt, r));
     return {
       m, ca: f.ca, cost: f.cost, margin: f.margin, exp: f.exp, net: f.net, nInv: f.inv.length,
       sub: { n: subLines.length, amt: subLines.reduce((a, x) => a + x.amt, 0), margin: subLines.reduce((a, x) => a + x.margin, 0) },
       matSales, inst: { n: inst.length, amt: inst.reduce((a, x) => a + (x.price || 0), 0) },
-      pen: { paid: pen.reduce((a, p) => a + U(p.amount, p.currency), 0), n: pen.length, due: App.penaltyDueTotal() },
+      pen: { paid: pen.reduce((a, p) => a + U(p.amount, p.currency, p), 0), n: pen.length, due: App.penaltyDueTotal() },
       status: { actif: n('actif'), sursis: n('sursis'), inactif: n('inactif') },
       toRenew: m === t.slice(0, 7) ? gere.filter(s => s.status === 'actif' && s.end >= t && s.end <= r[1]).length : null,
-      unpaid: { total: App.unpaidTotal(), n: open.length, month: openMonth.reduce((a, i) => a + U(App.invDue(i), i.currency), 0), nMonth: openMonth.length },
+      unpaid: { total: App.unpaidTotal(), n: open.length, month: openMonth.reduce((a, i) => a + U(App.invDue(i), i.currency, i), 0), nMonth: openMonth.length },
       lowStock: db.products.filter(p => App.tracked(p) && p.qty <= (p.min || 0)).map(p => `${p.name} (${App.nf(p.qty, 2)}${p.unit === 'm' ? ' m' : ''})`),
       exps: Object.entries(exp).sort((a, b) => b[1] - a[1]), deliveries: { done: dl.length, pending: db.deliveries.filter(d => d.status !== 'done').length },
       newClients: db.clients.filter(c => c.created && App.inRange(c.created, r)).length
