@@ -12,5 +12,14 @@
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => { App.persisted = p; if (App.state.view === 'settings') App.refresh(); }).catch(() => {});
   // Restore from the IndexedDB mirror if localStorage was wiped
   if (!App.hasData(App.db)) App.recover().then(ok => { if (ok) { App.applyTheme(); App.refresh(); } });
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Offline cache + "new version available" banner
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) App.showUpdate(); });
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(() => {});
+  }
 })();

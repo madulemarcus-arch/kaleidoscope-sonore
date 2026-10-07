@@ -22,7 +22,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
 | `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
-| `sw.js` | Cache hors connexion (incrémenter `CACHE` à chaque changement de fichier) |
+| `sw.js` | Cache hors connexion (**incrémenter `CACHE` à chaque publication** : c'est ce qui déclenche le message « Nouvelle version disponible ») |
 
 ## Règles métier
 
@@ -35,6 +35,12 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 - **Nouveau client depuis une facture** : bouton « ＋ Nouveau client » dans le formulaire de facture (sans perdre la facture en cours). Pour une facture d'abonnement, seuls les clients gérés sont proposés et la ligne d'abonnement reprend l'offre et le prix du client.
 - **Partage** : « Partager l'application » (menu Plus et Paramètres) ouvre le partage Android avec le lien de l'application.
 - **Recherche globale** : nom, code client, ACC (même partiel), téléphone, adresse, numéro de série, facture, produit, fournisseur.
+
+## Mises à jour
+
+L'application installée se met à jour seule depuis le lien : au démarrage (et toutes les 30 minutes), le navigateur compare `sw.js` ; s'il a changé, la nouvelle version est téléchargée en arrière-plan et un message « Nouvelle version disponible » propose d'actualiser. Ne plus modifier `id` ni `start_url` dans `manifest.webmanifest` (ils définissent l'identité de l'application installée).
+
+Icônes : `icon-192.png` et `icon-512.png` sont transparentes (logo et texte seulement, sans fond), sans icône « maskable ».
 
 ## Données et sécurité
 

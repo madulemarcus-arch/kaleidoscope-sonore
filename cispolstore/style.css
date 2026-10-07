@@ -159,3 +159,7 @@ dialog .end { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; 
 
 @media print { body { background:#fff; } #top,#bottom,#fab,.noprint { display:none !important; } }
 @media (max-width:640px) { .paper .two { grid-template-columns:1fr; } .paper { padding:12px; font-size:12px; } .paper .hd { flex-direction:column; } .paper .hd .co { text-align:left; } }
+
+#upd { position:fixed; left:12px; right:12px; bottom:calc(88px + env(safe-area-inset-bottom,0px)); z-index:70; max-width:520px; margin:0 auto; display:flex; align-items:center; gap:10px; background:var(--navy); color:#fff; padding:10px 10px 10px 16px; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+#upd span { flex:1; font-weight:600; }
+#upd .ib { width:32px; height:32px; font-size:14px; }

@@ -59,6 +59,16 @@
   window.addEventListener('popstate', e => { App.close(); App.state = e.state || { view: 'home', params: {} }; render(false); });
   $('backBtn').onclick = () => { const to = $('backBtn').dataset.to; if (to) App.go(to); else history.back(); };
 
+  // ---------- New version banner ----------
+  App.showUpdate = () => {
+    if ($('upd')) return;
+    const d = document.createElement('div'); d.id = 'upd';
+    d.innerHTML = '<span>Nouvelle version disponible</span><button class="btn sm" id="updgo">Actualiser</button><button class="ib" id="updx" aria-label="Plus tard">✕</button>';
+    document.body.appendChild(d);
+    $('updgo').onclick = () => location.reload();
+    $('updx').onclick = () => d.remove();
+  };
+
   // ---------- Click delegation ----------
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
