@@ -146,12 +146,12 @@
     App.actions.rmmat = d => { mats.splice(+d.i, 1); draw(); };
     App.modal("Nouvelle installation",
       `${F.sel('f_c', 'Client', cl, pre.clientId || '')}<div class="row">${F.date('f_d', "Date d'installation", App.today())}${F.sel('f_k', "Type d'installation", ['Installation Starlink', 'Installation WiFi / réseau', 'Dépannage', 'Autre'], 'Installation Starlink')}</div>
-       <div class="row">${F.text('f_t', 'Technicien', '')}${F.num('f_p', "Prix de l'installation ($)", '')}</div>
+       <div class="row">${F.text('f_t', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.num('f_p', "Prix de l'installation ($)", '')}</div>
        <label class="l">Matériel utilisé (sort du stock)</label><div class="row"><select id="f_mp" style="flex:3">${App.opts(prodOpts(true))}</select><input id="f_mq" type="number" step="any" min="0" value="1" style="flex:1"><button type="button" class="btn sm" id="f_madd" style="flex:1">Ajouter</button></div><div id="mlist" class="list" style="margin-top:8px"></div>
        ${F.area('f_o', 'Observations', '')}`,
       () => {
         if (!App.v('f_c')) { App.toast('Choisissez un client'); return false; }
-        const inst = { id: App.uid(), clientId: App.v('f_c'), date: App.v('f_d') || App.today(), kind: App.v('f_k'), tech: App.v('f_t'), price: App.n('f_p'), materials: mats.slice(), invoiceId: '', obs: App.v('f_o') };
+        const inst = { id: App.uid(), clientId: App.v('f_c'), date: App.v('f_d') || App.today(), kind: App.v('f_k'), tech: App.v('f_t'), techId: App.techId(App.v('f_t')), price: App.n('f_p'), materials: mats.slice(), invoiceId: '', obs: App.v('f_o') };
         mats.forEach(m => App.move({ pid: m.pid, qty: -m.qty, clientId: inst.clientId, date: inst.date, note: 'Installation' }));
         App.db.installs.push(inst); App.log(inst.clientId, `Installation : ${inst.kind}${inst.tech ? ' (' + inst.tech + ')' : ''}`);
         App.save(); App.toast('Installation enregistrée'); App.refresh();
