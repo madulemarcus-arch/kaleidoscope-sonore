@@ -138,7 +138,7 @@
       html: `<div class="bar"><button class="btn" data-act="newinst">+ Installation</button></div>` + (l.length ? `<div class="list">${l.map(x => `<button class="item" data-act="go" data-v="client" data-id="${x.clientId}" data-p='${JSON.stringify({ id: x.clientId, tab: 'inst' })}'><span class="avatar">🔧</span><div class="grow"><b>${esc(App.cname(App.client(x.clientId)))}</b><small>${App.fdate(x.date)} · ${esc(x.kind)} · ${esc(x.tech || '—')}</small></div><b>${App.fmt(x.price || 0)}</b></button>`).join('')}</div>` : '<div class="empty">Aucune installation enregistrée.</div>')
     };
   };
-  App.actions.newinst = d => App.installForm({ clientId: d.cid });
+  App.actions.newinst = d => App.installForm({ clientId: d.cid, tech: d.tech });
   App.installForm = (pre = {}) => {
     const cl = App.clientOpts('— Choisir —', ['gere', 'install', 'mat']); if (cl.length < 2) return App.toast("Créez d'abord un client");
     const mats = [];
@@ -146,7 +146,7 @@
     App.actions.rmmat = d => { mats.splice(+d.i, 1); draw(); };
     App.modal("Nouvelle installation",
       `${F.sel('f_c', 'Client', cl, pre.clientId || '')}<div class="row">${F.date('f_d', "Date d'installation", App.today())}${F.sel('f_k', "Type d'installation", ['Installation Starlink', 'Installation WiFi / réseau', 'Dépannage', 'Autre'], 'Installation Starlink')}</div>
-       <div class="row">${F.text('f_t', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.num('f_p', "Prix de l'installation ($)", '')}</div>
+       <div class="row">${F.text('f_t', 'Technicien', pre.tech || '', 'list="techlist" autocomplete="off"' + (pre.tech ? ' readonly' : ''))}${F.list('techlist', App.techNames())}${F.num('f_p', "Prix de l'installation ($)", '')}</div>
        <label class="l">Matériel utilisé (sort du stock)</label><div class="row"><select id="f_mp" style="flex:3">${App.opts(prodOpts(true))}</select><input id="f_mq" type="number" step="any" min="0" value="1" style="flex:1"><button type="button" class="btn sm" id="f_madd" style="flex:1">Ajouter</button></div><div id="mlist" class="list" style="margin-top:8px"></div>
        ${F.area('f_o', 'Observations', '')}`,
       () => {

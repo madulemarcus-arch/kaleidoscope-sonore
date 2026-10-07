@@ -57,6 +57,15 @@
     App.db.expenses.push({ id: App.uid(), label: 'Commission ' + t.name, cat: 'Commission technicien', amount: sum, currency: 'USD', date: App.today() });
     App.save(); App.toast('Commission payée et dépense enregistrée'); App.refresh();
   };
+  // single window of the "Technicien" profile: own interventions + record a new installation
+  App.views.mestaches = () => {
+    const me = App.me() || {}, t = me.techId && App.tech(me.techId), name = t ? t.name : me.name;
+    const l = App.db.installs.filter(x => (t && x.techId === t.id) || norm(x.tech) === norm(name)).sort((a, b) => b.date.localeCompare(a.date));
+    const card = x => { const c = App.client(x.clientId), ad = (c && (c.installAddr || c.address)) || '', ph = c && c.phone;
+      return `<div class="card"><div class="spread"><b style="font-size:17px">${esc(App.cname(c))}</b><span class="mut">${App.fdate(x.date)}</span></div><p style="margin:8px 0 2px"><b>🔧 ${esc(x.kind)}</b></p>${ad ? `<p style="margin:2px 0">📍 ${esc(ad)}</p>` : ''}${x.obs ? `<p class="mut" style="margin:2px 0">📝 ${esc(x.obs)}</p>` : ''}
+        <div class="bar" style="margin-top:8px">${ph ? `<a class="btn sm sec" href="tel:${esc(String(ph).replace(/[^+\d]/g, ''))}" style="text-decoration:none">📞 Appeler</a>` : ''}${ad ? `<a class="btn sm sec" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ad)}" target="_blank" rel="noopener" style="text-decoration:none">🗺️ Itinéraire</a>` : ''}</div></div>`; };
+    return { title: 'Mes interventions', back: '', nav: 'more', html: `<div class="bar"><button class="btn" data-act="newinst" data-tech="${esc(name)}">+ Enregistrer une installation</button></div>${l.length ? l.map(card).join('') : '<div class="empty">Aucune intervention enregistrée pour le moment.</div>'}${App.soloFoot()}` };
+  };
   App.actions.edittech = d => App.techForm(App.tech(d.id));
   App.actions.deltech = d => { const t = App.tech(d.id); if (!t || !App.confirm('Supprimer ce technicien ? Ses interventions restent enregistrées.')) return; App.db.technicians = App.db.technicians.filter(x => x !== t); App.db.installs.forEach(x => { if (x.techId === t.id) x.techId = ''; }); App.save(); App.go('technicians', {}, true); };
 })();

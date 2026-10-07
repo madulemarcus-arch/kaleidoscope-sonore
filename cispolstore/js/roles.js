@@ -11,8 +11,8 @@
     admin: { label: 'Administrateur', icon: '🛡️', views: ALL, home: 'home', nav: ['home', 'clients', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Voit et modifie tout, gère les profils et les réglages.' },
     comptable: { label: 'Comptable', icon: '📒', views: ALL.filter(v => !['settings', 'users'].includes(v)), home: 'home', nav: ['home', 'clients', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Factures, paiements, dépenses, rapports et stock. Ne supprime pas, pas de réglages.' },
     vendeur: { label: 'Vendeur', icon: '🛒', views: ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'invoices', 'invoice', 'payments', 'impayes', 'installs', 'livraisons', 'more', 'profile'], home: 'home', nav: ['home', 'clients', 'stock', 'more'], fab: true, costs: false, finance: false, stockedit: false, deny: /^(newexp|newsup|editsup|newtech|edittech|paytech|pen_edit|stin|stout|newprod|editprod|exportcsv|csvdo|xlsx|repcsv)$/, desc: 'Clients, abonnements, factures et paiements. Ne voit ni les coûts ni les bénéfices.' },
-    technicien: { label: 'Technicien', icon: '🧰', views: ['installs', 'clients', 'client', 'stock', 'more', 'profile'], home: 'installs', nav: ['installs', 'clients', 'stock', 'more'], fab: false, costs: false, finance: false, stockedit: false, only: /^(newinst|rmmat)$/, desc: 'Installations, consultation des clients et du stock.' },
-    livreur: { label: 'Livreur', icon: '🚚', views: ['livraisons', 'more', 'profile'], home: 'livraisons', nav: ['livraisons', 'more'], fab: false, costs: false, finance: false, stockedit: false, only: /^dl_[a-z]+$/, desc: 'Ne voit que ses livraisons, les marque livrées et encaisse à la livraison.' }
+    technicien: { label: 'Technicien', icon: '🧰', solo: true, views: ['mestaches'], home: 'mestaches', nav: [], fab: false, costs: false, finance: false, stockedit: false, only: /^(newinst|rmmat)$/, desc: 'Une seule fenêtre : ses interventions (client, adresse), et il enregistre ses installations.' },
+    livreur: { label: 'Livreur', icon: '🚚', solo: true, views: ['livraisons'], home: 'livraisons', nav: [], fab: false, costs: false, finance: false, stockedit: false, only: /^dl_[a-z]+$/, desc: 'Une seule fenêtre : ses livraisons (client, adresse), il note livré ou non livré.' }
   };
   App.ROLES = ROLES;
   const S = () => App.db.settings;
@@ -35,11 +35,13 @@
   const NAVI = { home: ['🏠', 'Accueil'], clients: ['👥', 'Clients'], stock: ['📦', 'Stock'], installs: ['🔧', 'Install.'], livraisons: ['🚚', 'Livraisons'], more: ['☰', 'Plus'] };
   App.applyRole = () => {
     const r = role(), m = App.me();
+    document.body.classList.toggle('solo', !!r.solo);
     const btn = v => `<button data-act="go" data-v="${v}" data-nav="${v}"><span>${NAVI[v][0]}</span>${NAVI[v][1]}</button>`;
     $('bottom').innerHTML = r.fab ? r.nav.slice(0, 2).map(btn).join('') + '<i></i>' + r.nav.slice(2).map(btn).join('') : r.nav.map(btn).join('');
     $('bottom').style.gridTemplateColumns = r.fab ? '' : `repeat(${r.nav.length},1fr)`;
     $('fab').hidden = !r.fab; $('syncBtn').hidden = !(r === ROLES.admin);
     $('searchBtn').hidden = !r.views.includes('clients');
+    if (r.solo) { $('searchBtn').hidden = true; $('syncBtn').hidden = true; }
     document.querySelectorAll('#side nav [data-v]').forEach(b => { b.hidden = !App.canView(b.dataset.v); });
     let who = $('who'); if (!who) { who = document.createElement('div'); who.id = 'who'; who.className = 'sfoot'; $('side').appendChild(who); }
     who.innerHTML = App.multi() && m ? `<small>${r.icon} ${esc(m.name)} · ${r.label}</small>` : '';
@@ -65,6 +67,8 @@
       <div class="list"><button class="item" data-act="me_pin"><span class="ico avatar" style="background:var(--navy)">🔑</span><div class="grow"><b>Changer mon code PIN</b><small>Votre code personnel à 4 chiffres</small></div><span class="mut">›</span></button>
       <button class="item" data-act="lockNow"><span class="ico avatar" style="background:var(--navy)">🔒</span><div class="grow"><b>Verrouiller / changer de profil</b><small>Un autre profil se connecte avec son propre code</small></div><span class="mut">›</span></button></div>` };
   };
+  // footer of the single-window profiles: own PIN and sign out
+  App.soloFoot = () => `<div class="bar" style="margin-top:24px;justify-content:center"><button class="btn sm sec" data-act="me_pin">🔑 Mon code PIN</button><button class="btn sm sec" data-act="lockNow">🔒 Quitter</button></div><p class="mut" style="text-align:center;font-size:13px">${esc((App.user || {}).name || '')}</p>`;
   App.actions.me_pin = () => { if (!App.user) return; App.showLock('enter', 'change'); };
 
   // ---------- Administration of profiles ----------
@@ -97,7 +101,7 @@
   App.actions.users_edit = d => userForm(App.users().find(u => u.id === d.id));
   const userForm = u => {
     const isNew = !u; u = u || { name: '', role: 'vendeur', active: true };
-    App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.text('f_pin', isNew ? 'Code PIN (4 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="4" autocomplete="off"')}
+    App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.sel('f_tech', 'Fiche technicien liée (profil Technicien)', [['', '— Aucune —'], ...App.db.technicians.map(t => [t.id, t.name])], u.techId || '')}${F.text('f_pin', isNew ? 'Code PIN (4 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="4" autocomplete="off"')}
       ${isNew ? '' : F.sel('f_act', 'Statut', [['1', 'Actif'], ['0', 'Désactivé']], u.active === false ? '0' : '1')}<p id="f_msg" class="warn"></p>${isNew ? '' : `<div class="bar"><button type="button" class="btn sm del" data-act="users_del" data-id="${u.id}">Supprimer ce profil</button></div>`}`, () => {
       const name = App.v('f_name'), pin = App.v('f_pin'), rl = App.v('f_role'), active = isNew || App.v('f_act') !== '0';
       const bad = m => { $('f_msg').textContent = m; return false; };
@@ -106,7 +110,7 @@
       if (!isNew && u.role === 'admin' && (rl !== 'admin' || !active) && !admins) return bad('Il faut garder au moins un administrateur actif');
       (async () => {
         if (pin && await clash(pin, u.id)) { $('f_msg').textContent = 'Ce code est déjà utilisé par un autre profil'; return; }
-        Object.assign(u, { name, role: rl, active }); if (pin) u.pin = { ...(await mkPin(pin)), ...(u.pin && u.pin.rec ? { rec: u.pin.rec } : {}) };
+        Object.assign(u, { name, role: rl, active, techId: App.v('f_tech') }); if (pin) u.pin = { ...(await mkPin(pin)), ...(u.pin && u.pin.rec ? { rec: u.pin.rec } : {}) };
         if (isNew) { u.id = App.uid(); S().users = [...App.users(), u]; }
         else S().users = App.users().map(x => x.id === u.id ? u : x);
         App.save(); App.close(); App.toast('Profil enregistré'); App.refresh();

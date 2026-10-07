@@ -81,12 +81,12 @@ Paramètres → **Utilisateurs et profils → Activer** : vous devenez l'adminis
 | Administrateur | Tout, y compris suppression, réglages, synchronisation, sauvegardes et gestion des profils |
 | Comptable | Factures, paiements, impayés, dépenses, rapports, stock, fournisseurs ; ni suppression ni réglages |
 | Vendeur | Clients, abonnements, factures, paiements, livraisons ; ni coûts, ni bénéfices, ni dépenses, ni réglages |
-| Technicien | Installations, consultation des clients et du stock (sans prix d'achat) |
-| Livreur | Uniquement **ses** livraisons : appeler, itinéraire, en route, livrée (avec encaissement), échec |
+| Technicien | **Une seule fenêtre** « Mes interventions » : ses installations (client, adresse, appel, itinéraire) et un bouton pour enregistrer une installation (son nom est fixé). Aucun menu |
+| Livreur | **Une seule fenêtre** « Mes livraisons » : pour chacune le client, l'adresse, le colis, 📞 Appeler, 🗺️ Itinéraire et **✓ Livré / ✗ Non livré** (avec motif). Aucun menu, aucun prix, aucune facture |
 
 À l'ouverture et après verrouillage, chacun entre son PIN : le profil correspondant est ouvert (le bouton 🔒 permet de changer de profil). Chacun change son PIN dans Plus → Mon profil. Un administrateur oublié se récupère avec son code de récupération ; les autres profils sont réinitialisés par l'administrateur. Les profils se synchronisent entre appareils (ils ne sont pas dans les sauvegardes). **Limite :** les profils règlent l'affichage et les actions ; les données restent présentes sur l'appareil et, avec la synchronisation, quiconque connaît la phrase secrète peut les lire. Ne donnez la phrase secrète qu'aux personnes de confiance.
 
-Livraisons (Plus → Livraisons, ou « 🚚 Livraison » depuis une facture) : client, facture liée, adresse et téléphone préremplis, livreur, statut (À livrer, En route, Livrée, Échec). Le livreur marque « Livrée » et saisit le montant encaissé : le paiement est enregistré sur la facture.
+Livraisons (Plus → Livraisons, ou « 🚚 Livraison » depuis une facture) : client, facture liée, adresse et téléphone préremplis, livreur, statut (À livrer, En route, Livrée, Échec). Le livreur n'a que « Livré » ou « Non livré ». Si, à la création, vous répondez « Oui » à « Le livreur encaisse la facture ? », il voit « À encaisser : X » et saisit le montant à la livraison : le paiement est enregistré sur la facture. Pour le technicien, le champ « Fiche technicien liée » du profil relie la personne à sa fiche de la liste Techniciens.
 
 ## Techniciens
 
