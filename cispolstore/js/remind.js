@@ -5,9 +5,10 @@
   const DEFAULT = {
     actif: 'Bonjour {prenom}, votre abonnement Starlink arrive à expiration le {fin} (dans {jours} jour(s)). Écrivez-nous pour le renouveler. Merci ! {entreprise}',
     sursis: "Bonjour {prenom}, votre abonnement Starlink a expiré le {fin}. Vous êtes en période de sursis jusqu'au {sursis}. Pensez à le renouveler. {entreprise}",
-    inactif: 'Bonjour {prenom}, votre abonnement Starlink est inactif depuis le {sursis}. Contactez-nous pour le réactiver. {entreprise}'
+    inactif: 'Bonjour {prenom}, votre abonnement Starlink est inactif depuis le {sursis}. Contactez-nous pour le réactiver. {entreprise}',
+    impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}'
   };
-  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif' };
+  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', impaye: 'Facture impayée' };
   const tpl = k => (App.db.settings.msgs && App.db.settings.msgs[k]) || DEFAULT[k];
 
   App.reminderText = c => {
@@ -15,6 +16,11 @@
     if (!s) return `Bonjour ${n}, ici ${co.name}.`;
     const v = { prenom: n, nom: App.cname(c), fin: App.fdate(s.end), sursis: App.fdate(s.gEnd), jours: Math.max(0, s.status === 'actif' ? s.left : 0), entreprise: co.name, acc: c.acc || '' };
     return tpl(s.status).replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
+  };
+
+  App.unpaidText = (i, c) => {
+    const co = App.db.settings.company, v = { prenom: (c && c.first) || App.cname(c), nom: App.cname(c), solde: App.fmt(App.invDue(i), i.currency), numero: i.number, date: App.fdate(i.date), entreprise: co.name };
+    return tpl('impaye').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
   };
 
   // ---------- List of clients to remind ----------
@@ -41,12 +47,12 @@
 
   // ---------- Settings card: message templates ----------
   App.remindCard = () => `<h2 class="sec">Messages de rappel WhatsApp</h2><div class="card">
-      <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc}</p>
-      ${['actif', 'sursis', 'inactif'].map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
+      <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} · impayés : {solde} {numero} {date}</p>
+      ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`;
   document.addEventListener('change', e => {
     const k = (e.target.id || '').startsWith('m_') && e.target.id.slice(2); if (!k || !(k in DEFAULT)) return;
     const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [k]: e.target.value.trim() || DEFAULT[k] }; App.save(); App.toast('Message enregistré');
   });
-  App.actions.msgreset = () => { if (!App.confirm("Remettre les trois messages d'origine ?")) return; delete App.db.settings.msgs; App.save(); App.refresh(); App.toast('Messages réinitialisés'); };
+  App.actions.msgreset = () => { if (!App.confirm("Remettre les messages d'origine ?")) return; delete App.db.settings.msgs; App.save(); App.refresh(); App.toast('Messages réinitialisés'); };
 })();

@@ -28,6 +28,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
 | `js/export.js` | Tableaux partagés, export Excel (.xlsx) généré sans bibliothèque |
 | `js/techs.js` | Techniciens et collaborateurs (liste, fiche, interventions liées aux installations) |
+| `js/unpaid.js` | Impayés : factures à encaisser, ancienneté, relance WhatsApp |
 | `js/remind.js` | Rappels WhatsApp d'échéance (liste « Rappels » et messages modifiables) |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
 | `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
@@ -70,6 +71,10 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 ## Techniciens
 
 Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs et partenaires (nom, téléphone, rôle, zone, spécialité, actif/inactif). Dans « Nouvelle installation » et dans une facture d'installation, le champ Technicien propose la liste (la saisie libre reste possible) ; la fiche du technicien affiche ses interventions et leur valeur. Renommer un technicien met à jour ses installations. Commission : par technicien, **en pourcentage** du prix de l'installation ou **en montant fixe** par intervention. La fiche affiche la commission à payer et déjà payée ; « Payer la commission » fige les montants et enregistre une dépense (catégorie « Commission technicien »), ce qui garde les bénéfices exacts. Synchronisé entre appareils.
+
+## Impayés
+
+Plus → **Impayés** liste les factures dont le solde n'est pas réglé, de la plus ancienne à la plus récente, avec le total à encaisser (en dollars), la part de plus de 30 jours et l'ancienneté de chaque facture (orange après 30 jours, rouge après 60). **💰** ouvre le paiement de la facture ; **💬** ouvre WhatsApp avec le message de relance (modifiable dans Paramètres, mots `{solde} {numero} {date}`) et note la date de relance. Un bandeau « Impayés » apparaît aussi sur l'accueil.
 
 ## Rappels WhatsApp
 

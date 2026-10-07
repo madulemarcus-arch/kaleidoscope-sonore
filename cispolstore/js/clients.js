@@ -8,12 +8,12 @@
   const badge = c => { const s = App.sub(c); return c.type === 'gere' ? (s ? App.pill(s.status) : '<span class="pill">Sans abonnement</span>') : `<span class="pill blue">${c.type === 'mat' ? 'Matériel' : 'Installation'}</span>`; };
 
   // WhatsApp link with a ready-made reminder (opened manually by the user)
-  App.waLink = c => {
-    let d = String(c.phone || '').replace(/[^\d]/g, ''); if (!d) return '';
+  App.waUrl = (phone, msg) => {
+    let d = String(phone || '').replace(/[^\d]/g, ''); if (!d) return '';
     if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '243' + d.slice(1);
-    const msg = App.reminderText(c);
     return `https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
   };
+  App.waLink = c => App.waUrl(c.phone, App.reminderText(c));
 
   // ---------- List ----------
   const st = App.clState = { f: 'all', q: '' };
