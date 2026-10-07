@@ -65,7 +65,7 @@
          <div id="qc_gere">${F.text('qc_acc', 'Compte Starlink (ACC)', '', 'autocapitalize="characters"')}<div class="row">${F.text('qc_plan', "Type d'abonnement", '', 'list="qc_pl"')}${F.num('qc_price', 'Prix ($)', '')}${F.date('qc_start', "Début", App.today())}</div>${F.list('qc_pl', App.PLANS)}</div>
          <div class="bar" style="margin-top:12px"><button type="button" class="btn" id="qc_save">Enregistrer le client</button><button type="button" class="btn sec" id="qc_cancel">Annuler</button></div></div>`;
     const renewBlock = ['abonnement', 'complete'].includes(type) ? `<label class="l" id="renwrap"><input type="checkbox" id="f_renew" checked style="width:auto"> Renouveler l'abonnement du client (nouvelle période) — décochez pour facturer la période en cours</label>` : '';
-    const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '')}${F.text('f_obs', 'Observations', '')}</div>` : '';
+    const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.text('f_obs', 'Observations', '')}</div>` : '';
     App.modal('Nouvelle facture · ' + App.invTypes[type],
       `${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
@@ -101,7 +101,7 @@
         if (['installation', 'complete'].includes(type) && cid) {
           const fee = lines.filter(l => !l.pid && /install/i.test(l.desc)).reduce((a, l) => a + l.qty * l.price, 0);
           const mats = lines.filter(l => l.pid && App.tracked(App.prod(l.pid))).map(l => ({ pid: l.pid, qty: l.qty }));
-          if (fee > 0 || type === 'installation') { db.installs.push({ id: App.uid(), clientId: cid, date, kind: 'Installation Starlink', tech: App.v('f_tech'), price: App.usd(fee, curr), materials: mats, invoiceId: inv.id, obs: App.v('f_obs') }); App.log(cid, 'Installation facturée ' + inv.number); }
+          if (fee > 0 || type === 'installation') { db.installs.push({ id: App.uid(), clientId: cid, date, kind: 'Installation Starlink', tech: App.v('f_tech'), techId: App.techId(App.v('f_tech')), price: App.usd(fee, curr), materials: mats, invoiceId: inv.id, obs: App.v('f_obs') }); App.log(cid, 'Installation facturée ' + inv.number); }
         }
         App.save(); App.toast('Facture ' + inv.number + ' créée'); App.go('invoice', { id: inv.id });
       }, 'Créer la facture');

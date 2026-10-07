@@ -47,7 +47,7 @@
     $('backBtn').hidden = !r.back; $('backBtn').dataset.to = r.back || '';
     $('logo').hidden = !!r.back;
     document.querySelectorAll('#bottom [data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === (r.nav || App.state.view)));
-    const sideKey = { client: 'clients', invoice: 'invoices', supplier: 'suppliers' }[App.state.view] || App.state.view;
+    const sideKey = { client: 'clients', invoice: 'invoices', supplier: 'suppliers', technician: 'technicians' }[App.state.view] || App.state.view;
     document.querySelectorAll('#side [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === sideKey));
     if (r.after) r.after();
     window.scrollTo(0, keepScroll ? y : 0);
@@ -72,7 +72,7 @@
   };
 
   // ---------- Side menu (wide screens; hidden on phones by CSS) ----------
-  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['suppliers', '🚚', 'Fournisseurs'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['settings', '⚙️', 'Paramètres']];
+  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['suppliers', '🚚', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['settings', '⚙️', 'Paramètres']];
   $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
     <button class="btn full" data-act="quick">＋ Action rapide</button>
     <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${i}</span>${t}</button>`).join('')}</nav>
@@ -189,6 +189,8 @@
     if (pr.length) g.push(['Stock', pr.slice(0, 8).map(p => ({ v: 'stock', id: p.id, t: p.name, s: `${p.cat} · ${App.tracked(p) ? p.qty + ' ' + p.unit : 'sans stock'}` }))]);
     const su = db.suppliers.filter(s => match([s.name, s.phone, s.goods].join(' '), q));
     if (su.length) g.push(['Fournisseurs', su.slice(0, 8).map(s => ({ v: 'supplier', id: s.id, t: s.name, s: s.phone || '' }))]);
+    const te = (db.technicians || []).filter(t => match([t.name, t.phone, t.role, t.zone, t.spec].join(' '), q));
+    if (te.length) g.push(['Techniciens', te.slice(0, 8).map(t => ({ v: 'technician', id: t.id, t: t.name, s: [t.role, t.phone].filter(Boolean).join(' · ') }))]);
     return g;
   };
   const resultsHtml = q => {
@@ -227,7 +229,7 @@
   const item = (v, ico, t, s) => `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:var(--navy)">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
   App.views.more = () => ({
     title: 'Plus', nav: 'more',
-    html: `<div class="list">${item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements')}${item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter')}${item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement')}${item('suppliers', '🚚', 'Fournisseurs', 'Gérer vos fournisseurs')}${item('installs', '🔧', 'Installations', 'Historique des interventions')}${item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité')}${item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…')}${item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')}<button class="item" data-act="shareapp"><span class="ico avatar" style="background:var(--navy)">📤</span><div class="grow"><b>Partager l'application</b><small>Envoyer le lien par WhatsApp, SMS…</small></div><span class="mut">›</span></button></div>
+    html: `<div class="list">${item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements')}${item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter')}${item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement')}${item('suppliers', '🚚', 'Fournisseurs', 'Gérer vos fournisseurs')}${item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink')}${item('installs', '🔧', 'Installations', 'Historique des interventions')}${item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité')}${item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…')}${item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')}<button class="item" data-act="shareapp"><span class="ico avatar" style="background:var(--navy)">📤</span><div class="grow"><b>Partager l'application</b><small>Envoyer le lien par WhatsApp, SMS…</small></div><span class="mut">›</span></button></div>
       <p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0</p>`
   });
 })();

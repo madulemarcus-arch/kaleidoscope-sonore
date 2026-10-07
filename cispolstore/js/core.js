@@ -20,7 +20,7 @@
   App.PAY_MODES = ['Cash', 'M-Pesa', 'Airtel Money', 'Orange Money', 'Banque', 'Carte', 'Autre'];
   App.CATS = ['Kits Starlink', 'Routeurs', 'Câbles', 'Connecteurs', 'Injecteurs PoE', 'Antennes', 'Accessoires', 'Abonnement', 'Service', 'Autre'];
   App.NO_STOCK = ['Abonnement', 'Service'];
-  App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Internet / Abonnement', 'Marketing', 'Autre'];
+  App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Commission technicien', 'Internet / Abonnement', 'Marketing', 'Autre'];
   App.PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   App.KITS = ['Starlink Mini', 'Starlink Standard'];
   App.TYPES = { gere: 'Client géré', mat: 'Matériel uniquement', install: 'Installation uniquement' };
@@ -33,7 +33,7 @@
       company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '' },
       rate: 2400, theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
     },
-    clients: [], products: [], moves: [], suppliers: [], invoices: [], payments: [], installs: [], expenses: [], log: []
+    clients: [], products: [], moves: [], suppliers: [], technicians: [], invoices: [], payments: [], installs: [], expenses: [], log: []
   });
   App.blank = blank;
   const normalize = o => {
