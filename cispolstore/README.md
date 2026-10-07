@@ -26,6 +26,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/reports.js` | Tableau de bord, calendrier des abonnements, rapports |
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
+| `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
 | `sync/supabase.sql` | Script à exécuter une fois dans le projet Supabase |
 | `sw.js` | Cache hors connexion (**incrémenter `CACHE` à chaque publication** : c'est ce qui déclenche le message « Nouvelle version disponible ») |
 
@@ -62,6 +63,16 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 - Deux factures créées hors connexion avec le même numéro : la plus récente est **renumérotée** automatiquement.
 - Chaque appareil garde son PIN, son thème et son verrouillage. L'icône ☁️ de l'en-tête indique l'état ; la synchronisation se fait au démarrage, après chaque modification, au retour de connexion et toutes les 90 secondes.
 - Test : script SQL vérifié sur PostgreSQL 16 (rôle `anon` sans accès direct à la table) et scénario à deux appareils validé ; non essayé avec un vrai projet Supabase.
+
+## Sauvegarde Google Drive (optionnelle)
+
+Complète la synchronisation Supabase (qui reste active) : un fichier `cispolstore-AAAA-MM-JJ.json` est déposé dans le dossier Drive « CISPOLstore sauvegardes » (les 30 plus récents sont gardés, les autres vont à la corbeille Drive). Paramètres → Sauvegarde Google Drive :
+
+1. Sur console.cloud.google.com : créer un projet, activer **Google Drive API**, configurer l'écran de consentement OAuth (portée `drive.file`, **publié en production**), puis créer un **ID client OAuth** de type Application Web avec l'origine autorisée `https://madulemarcus-arch.github.io`.
+2. Coller l'ID client dans l'application, puis se connecter à Google.
+3. Choisir la fréquence automatique (toutes les heures, 6 h, 24 h, seulement s'il y a eu des changements, application ouverte). « Restaurer depuis Drive » recharge une sauvegarde (le code PIN de l'appareil est conservé).
+
+Limites : l'application ne voit que les fichiers qu'elle a créés (`drive.file`) ; les sauvegardes sont du JSON lisible (non chiffré) ; l'autorisation silencieuse peut demander une reconnexion. Le service worker ne met jamais en cache les appels vers Google ou Supabase.
 
 ## Prévu plus tard
 
