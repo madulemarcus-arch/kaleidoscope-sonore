@@ -17,11 +17,12 @@
   };
 
   // ---------- Invoice list ----------
-  const st = { f: 'all', q: '' };
+  const st = { f: 'all', q: '', sel: false, picked: new Set() };
+  const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || App.invStatus(i) === st.f) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
   const drawList = () => {
-    const q = st.q.toLowerCase();
-    const l = App.db.invoices.filter(i => (st.f === 'all' || App.invStatus(i) === st.f) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number));
-    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }).join('')}</div>` : '<div class="empty">Aucune facture.</div>';
+    const l = visibleInvoices();
+    if ($('ibar')) $('ibar').innerHTML = !App.guard('delinvs') ? '' : st.sel ? `<button class="btn sm sec" data-act="inv_all">☑ Tout</button><button class="btn sm del" data-act="delinvs">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="inv_sel">Terminer</button>` : '<button class="btn sm sec" data-act="inv_sel">☑ Sélectionner pour supprimer</button>';
+    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="${st.sel ? 'inv_pick' : 'go'}" data-v="invoice" data-id="${i.id}">${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }).join('')}</div>` : '<div class="empty">Aucune facture.</div>';
   };
   App.views.invoices = () => {
     const db = App.db, tot = db.invoices.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency, i), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
@@ -30,7 +31,7 @@
       html: `<div class="grid two"><div class="stat"><small>Total facturé</small><b>${App.fmt(tot)}</b></div><div class="stat"><small>Reste à encaisser</small><b class="${due ? 'warn' : ''}">${App.fmt(due)}</b></div></div>
         <div class="search"><input id="iq" placeholder="Rechercher un numéro, un client…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées']].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
-        <div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button>`,
+        <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button>`,
       after: () => { drawList(); $('iq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
@@ -96,8 +97,10 @@
         }
         const total = lines.reduce((a, l) => a + l.qty * l.price, 0), paid = Math.min(App.n('f_paid'), total);
         const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
+        const prevSub = c ? { start: c.start || '', period: c.period, price: c.price } : null;
         const inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate }, paid);
         if (renewed && c) {
+          inv.renew = { prev: prevSub, ns: renewed.ns, date };
           if (c.start) (c.subs = c.subs || []).push({ start: c.start, days: c.period || renewed.days, price: c.price || 0, date });
           Object.assign(c, { start: renewed.ns, period: renewed.days }); App.log(c.id, `Abonnement renouvelé : ${App.fdate(renewed.ns)} → ${App.fdate(renewed.end)}`);
         }
@@ -166,7 +169,7 @@
     return `<div class="paper"><div class="hd"><div><img src="${esc(logo || co.logo || 'logo.png')}" alt=""><div><b>${esc(co.name)}</b></div></div>
       <div class="co"><b>Siège social :</b> ${esc(co.address)}<br>Tél : ${esc(co.phone)}<br>${esc(co.email)}${legal.length ? '<br>' + legal.map(esc).join('<br>') : ''}</div></div>
       <div class="two"><div class="box"><h4>FACTURE</h4><dl>${dl('Numéro', `<b>${esc(i.number)}</b>`)}${dl('Date', App.fdate(i.date))}${dl('Devise', i.currency === 'CDF' ? 'CDF' : 'USD')}${dl('Payé par', esc(i.payMode))}</dl></div>
-      <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', esc(App.cname(c)))}${dl('Code', esc(c ? c.code : '—'))}${dl('Adresse', esc(c ? (c.address || c.installAddr || '—') : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
+      <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', `<b style="font-size:1.1em">${esc(App.cname(c))}</b>`)}${dl('Code', esc(c ? c.code : '—'))}${dl('Adresse', esc(c ? (c.address || c.installAddr || '—') : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
       <table><thead><tr><th>Produit / Description</th><th class="r">Qté</th><th class="r">PU (${i.currency === 'CDF' ? 'CDF' : '$'})</th><th class="r">Montant (${i.currency === 'CDF' ? 'CDF' : '$'})</th></tr></thead><tbody>${i.lines.map(l => `<tr><td>${esc(l.desc)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${App.nf(l.price, 2)}</td><td class="r">${App.nf(l.qty * l.price, 2)}</td></tr>`).join('')}</tbody></table>
       <div class="tot"><div class="g"><span>Total :</span><span>${App.fmt(tot, i.currency)}</span></div><div><span>Montant payé :</span><span>${App.fmt(paid, i.currency)}</span></div><div><span>Solde :</span><span>${App.fmt(due, i.currency)}</span></div>
       <div style="font-size:12px;color:#555"><span>Taux appliqué (1 $) :</span><span>${App.nf(App.rateOf(i), 0)} CDF</span></div><div style="font-size:12px;color:#555"><span>Équivalent en ${other} :</span><span>${App.fmt(App.conv(tot, i.currency, other, App.rateOf(i)), other)}</span></div></div>
@@ -202,11 +205,38 @@
   App.actions.invpdf = d => { App.toast('Choisissez « Enregistrer au format PDF »'); printDoc(App.invoice(d.id)); };
   App.actions.invprint = d => printDoc(App.invoice(d.id));
   App.actions.invword = d => wordDoc(App.invoice(d.id));
+  // Removes invoices (stock put back, linked payments / installations removed, a renewal undone) with a 12-second "Annuler" bar
+  App.removeInvoices = ids => {
+    const db = App.db, list = ids.map(App.invoice).filter(Boolean); if (!list.length) return;
+    const snap = JSON.parse(JSON.stringify({ invoices: db.invoices, payments: db.payments, installs: db.installs, products: db.products, moves: db.moves, clients: db.clients, deliveries: db.deliveries }));
+    const manual = [];
+    list.forEach(i => {
+      i.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: l.qty, invoiceId: '', clientId: i.clientId, note: 'Annulation ' + i.number }); });
+      const c = App.client(i.clientId), r = i.renew;
+      if (r && c && c.start === r.ns && r.prev) { // this invoice renewed the subscription: give the previous period back
+        c.start = r.prev.start; if (r.prev.period) c.period = r.prev.period; if (r.prev.price != null) c.price = r.prev.price;
+        const k = (c.subs || []).map(x => x.date + '|' + x.start).lastIndexOf(r.date + '|' + r.prev.start); if (k >= 0) c.subs.splice(k, 1);
+      } else if (/abonnement/i.test(i.type) || i.type === 'complete') manual.push(i.number);
+      db.payments = db.payments.filter(p => p.invoiceId !== i.id); db.installs = db.installs.filter(x => x.invoiceId !== i.id);
+      (db.deliveries || []).forEach(d => { if (d.invoiceId === i.id) { d.invoiceId = ''; d.collect = false; } });
+      db.invoices = db.invoices.filter(x => x !== i); App.log(i.clientId, `Facture ${i.number} supprimée`);
+    });
+    App.save();
+    const label = list.length === 1 ? 'Facture ' + list[0].number + ' supprimée' : list.length + ' factures supprimées';
+    App.undoBar(label + (manual.length ? ' · vérifiez la période d\'abonnement du client' : ''), () => { ['invoices', 'payments', 'installs', 'products', 'moves', 'clients', 'deliveries'].forEach(k => { db[k] = snap[k]; }); App.save(); App.toast('Suppression annulée'); App.refresh(); });
+  };
   App.actions.delinv = d => {
-    const i = App.invoice(d.id); if (!App.confirm(`Supprimer la facture ${i.number} ? Le stock sera remis et ses paiements supprimés.`)) return;
-    i.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: l.qty, invoiceId: '', clientId: i.clientId, note: 'Annulation ' + i.number }); });
-    const db = App.db; db.invoices = db.invoices.filter(x => x !== i); db.payments = db.payments.filter(p => p.invoiceId !== i.id); db.installs = db.installs.filter(x => x.invoiceId !== i.id);
-    App.log(i.clientId, `Facture ${i.number} supprimée`); App.save(); App.toast('Facture supprimée'); App.go('invoices', {}, true);
+    const i = App.invoice(d.id); if (!i || !App.confirm(`Supprimer la facture ${i.number} ? Le stock sera remis et ses paiements supprimés.`)) return;
+    App.removeInvoices([i.id]); App.go('invoices', {}, true);
+  };
+  // multiple selection in the invoice list
+  App.actions.inv_sel = () => { st.sel = !st.sel; st.picked = new Set(); drawList(); };
+  App.actions.inv_pick = d => { st.picked.has(d.id) ? st.picked.delete(d.id) : st.picked.add(d.id); drawList(); };
+  App.actions.inv_all = () => { const all = visibleInvoices(); const full = all.every(i => st.picked.has(i.id)); all.forEach(i => full ? st.picked.delete(i.id) : st.picked.add(i.id)); drawList(); };
+  App.actions.delinvs = () => {
+    const ids = [...st.picked].filter(id => App.invoice(id)); if (!ids.length) return App.toast('Aucune facture sélectionnée');
+    if (!App.confirm(`Supprimer ${ids.length} facture(s) ? Le stock sera remis et leurs paiements supprimés.`)) return;
+    st.sel = false; st.picked = new Set(); App.removeInvoices(ids); drawList();
   };
 
   // ---------- Payments ----------

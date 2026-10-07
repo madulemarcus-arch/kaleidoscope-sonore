@@ -99,6 +99,10 @@ Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs 
 
 Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Application). Dans **Paramètres**, les sections longues (Partager, Tarifs d'abonnement, Messages WhatsApp, Synchronisation, Google Drive, Données) sont repliées par défaut. Sur l'accueil, l'administrateur voit un rappel tant qu'il n'a pas défini de **code PIN**, fait une **sauvegarde** (ou si la dernière date de plus de 7 jours) ou renseigné **RCCM / ID Nat. / N° Impôt**.
 
+## Supprimer des factures
+
+Réservé à l'administrateur. Une facture se supprime depuis sa page (« Supprimer la facture »), ou **plusieurs à la fois** depuis la liste : **☑ Sélectionner pour supprimer**, toucher les factures (ou « Tout »), puis **🗑 Supprimer**. Une confirmation rappelle les conséquences : le **stock est remis**, les **paiements et installations liés sont supprimés**, les livraisons liées sont détachées, et un **renouvellement d'abonnement** fait par cette facture est annulé (le client retrouve sa période précédente). Une barre **« Annuler »** reste affichée 12 secondes pour tout rétablir. Les numéros de facture ne sont **jamais réutilisés** (pas de doublon possible, même entre appareils) : la numérotation garde donc un trou à la place de la facture supprimée.
+
 ## Taux de change
 
 Le taux USD / CDF change souvent. Il se modifie en un geste : le bouton **💱 1 $ = … CDF** de l'accueil, ou Paramètres → Taux, ou le champ « Taux du jour » des formulaires de facture et de paiement (le taux saisi devient alors le taux du jour). Chaque **facture**, **paiement**, **dépense** et **pénalité** garde **son propre taux**, enregistré à sa création : changer le taux ensuite ne modifie ni les anciennes factures imprimées, ni les rapports des mois passés. Une facture antidatée propose le taux en vigueur à sa date (historique des changements conservé). À la mise à jour, les enregistrements existants reçoivent le taux du moment (leur taux d'origine n'étant pas connu) ; ils sont ensuite figés.
