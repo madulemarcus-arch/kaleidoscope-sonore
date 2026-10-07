@@ -52,10 +52,10 @@
   };
 
   // ---------- Settings card: message templates ----------
-  App.remindCard = () => `<h2 class="sec">Messages de rappel WhatsApp</h2><div class="card">
+  App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
       <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
-      <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`;
+      <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
   document.addEventListener('change', e => {
     const k = (e.target.id || '').startsWith('m_') && e.target.id.slice(2); if (!k || !(k in DEFAULT)) return;
     const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [k]: e.target.value.trim() || DEFAULT[k] }; App.save(); App.toast('Message enregistré');

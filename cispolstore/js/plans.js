@@ -23,9 +23,9 @@
     const names = [...new Set([...App.PLANS, ...Object.keys(plans())])];
     const line = (n, i) => { const p = plans()[n] || {}, m = (+p.price || 0) - (+p.cost || 0);
       return `<div class="item" style="flex-wrap:wrap"><div class="grow"><b>${esc(n)}</b><small id="pl_m${i}" class="${m > 0 ? 'ok' : ''}">${p.cost > 0 && p.price > 0 ? 'Marge : ' + App.fmt(m) : 'À renseigner'}</small></div><input id="pl_p${i}" data-plan="${esc(n)}" type="number" inputmode="decimal" step="any" min="0" placeholder="Prix client" value="${esc(p.price || '')}" style="width:96px"><input id="pl_c${i}" data-plan="${esc(n)}" type="number" inputmode="decimal" step="any" min="0" placeholder="Coût Starlink" value="${esc(p.cost || '')}" style="width:96px;margin-left:6px"></div>`; };
-    return `<h2 class="sec">Tarifs d'abonnement</h2><div class="list">${names.map(line).join('')}
+    return App.fold('plans', "Tarifs d'abonnement", `<div class="list">${names.map(line).join('')}
       <div class="item"><div class="grow"><b>Anciennes factures</b><small style="white-space:normal">Applique le coût Starlink aux factures d'abonnement déjà créées sans coût, pour corriger les marges et bénéfices passés.</small></div><button class="btn sm sec" data-act="plansfix">Recalculer</button></div></div>
-      <p class="mut" style="font-size:13px">Prix client : proposé quand on choisit ce type d'abonnement. Coût Starlink : ce que CISPOLstore reverse à Starlink ; la marge (prix − coût) est comptée dans les bénéfices.</p>`;
+      <p class="mut" style="font-size:13px">Prix client : proposé quand on choisit ce type d'abonnement. Coût Starlink : ce que CISPOLstore reverse à Starlink ; la marge (prix − coût) est comptée dans les bénéfices.</p>`);
   };
   document.addEventListener('change', e => {
     const el = e.target, n = el.dataset && el.dataset.plan; if (!n || !/^pl_[pc]\d+$/.test(el.id)) return;
