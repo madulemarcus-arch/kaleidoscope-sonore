@@ -41,11 +41,20 @@
     const cable = db.products.filter(p => p.unit === 'm' && App.tracked(p)).reduce((a, p) => a + p.qty, 0);
     const low = db.products.filter(p => App.tracked(p) && p.qty <= (p.min || 0)).length;
     const urgent = subs.filter(x => x.s.status !== 'inactif' ? x.s.left <= 7 : x.s.left >= -1).sort((a, b) => (a.s.status === 'actif' ? a.s.left : a.s.status === 'sursis' ? a.s.left - 100 : -200) - (b.s.status === 'actif' ? b.s.left : b.s.status === 'sursis' ? b.s.left - 100 : -200)).slice(0, 8);
+    // things the administrator should still set up (shown until done)
+    const setup = [];
+    if (App.role() === App.ROLES.admin) {
+      const lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, t) : null, co = S.company;
+      if (!App.hasPin()) setup.push(['🔓', "Aucun code PIN : n'importe qui peut ouvrir l'application. Définissez-en un (Paramètres → Sécurité)."]);
+      if (db.clients.length && (lastB === undefined || age === null || age > 7)) setup.push(['💾', age === null ? "Aucune sauvegarde faite : lancez-en une (Paramètres → Données) ou activez Google Drive." : `Dernière sauvegarde il y a ${age} jours : pensez à en faire une.`]);
+      if (!co.rccm && !co.idnat && !co.impot) setup.push(['📄', 'Renseignez RCCM, ID Nat. et N° Impôt (Paramètres → Entreprise) : ils figureront sur les factures.']);
+    }
+    const setupAlerts = setup.map(([ico, txt]) => `<button class="item" data-act="go" data-v="settings"><span>${ico}</span><div class="grow"><b class="warn" style="white-space:normal">${txt}</b></div><span class="mut">›</span></button>`);
     const alert = (ico, txt, cls) => `<button class="item" data-act="go" data-v="subs"><span>${ico}</span><div class="grow"><b class="${cls}" style="white-space:normal">${txt}</b></div><span class="mut">›</span></button>`;
-    const alerts = [soon.length && alert('⚠️', `${soon.length} abonnement(s) expirent bientôt (≤ 7 jours).`, 'warn'), n('sursis') && alert('🟠', `${n('sursis')} client(s) sont actuellement en sursis.`, 'warn'), becomeInactive.length && alert('🔴', `${becomeInactive.length} client(s) deviennent inactifs aujourd'hui.`, 'bad')].filter(Boolean);
+    const alerts = [soon.length && alert('⚠️', `${soon.length} abonnement(s) expirent bientôt (≤ 7 jours).`, 'warn'), n('sursis') && alert('🟠', `${n('sursis')} client(s) sont actuellement en sursis.`, 'warn'), becomeInactive.length && alert('🔴', `${becomeInactive.length} client(s) deviennent inactifs aujourd'hui.`, 'bad')].filter(Boolean).concat(setupAlerts);
     return {
       title: 'Accueil', nav: 'home',
-      html: `<h2 style="font-size:20px">Bonjour, ${esc(S.company.name)} 👋</h2><div class="mut" style="margin-bottom:10px"><button class="chip" data-act="rate_edit" style="float:right;margin-left:8px">💱 1 $ = ${App.nf(App.rate(), 0)} CDF</button>Voici un aperçu de votre activité · ${new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</div>
+      html: `<h2 style="font-size:20px">Bonjour, ${esc(App.multi() && App.user ? App.user.name : S.company.name)} 👋</h2><div class="mut" style="margin-bottom:10px"><button class="chip" data-act="rate_edit" style="float:right;margin-left:8px">💱 1 $ = ${App.nf(App.rate(), 0)} CDF</button>Voici un aperçu de votre activité · ${new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</div>
         <div class="search"><input readonly placeholder="Rechercher client, ACC, facture, matériel…" data-act="search"></div>
         <div class="grid two stats">
           <button class="stat" data-act="go" data-v="clients" style="text-align:left;font:inherit;color:inherit;cursor:pointer"><small>👥 Clients</small><b>${db.clients.length}</b><small>au total</small></button>
@@ -129,7 +138,7 @@
   App.views.reports = () => {
     const r = rng(), rep = REP[rs.tab](r), noPer = rs.tab === 'stock';
     Object.assign(lastReport, rep);
-    const show = (v, i) => rep.fmt && rep.fmt.includes(i) ? App.fmt(v) : esc(v);
+    const show = (v, i) => rep.fmt && rep.fmt.includes(i) ? App.fmt(v) : /^\d{4}-\d{2}-\d{2}$/.test(v) ? App.fdate(v) : esc(v);
     return {
       title: 'Rapports', back: 'more', nav: 'more',
       html: `<div class="tabs">${TABS.map(([k, t]) => `<button class="${rs.tab === k ? 'on' : ''}" data-act="reptab" data-t="${k}">${t}</button>`).join('')}</div>

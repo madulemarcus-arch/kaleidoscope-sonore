@@ -18,24 +18,24 @@
           ${row('Abonnements', `Durée par défaut : ${S.period} jours · Sursis par défaut : ${S.grace} jours`)}
           ${row('Thème', { auto: 'Automatique (suit le téléphone)', light: 'Clair', dark: 'Sombre' }[S.theme] + ' · bouton ☀️/🌙 en haut de l\'écran')}
           ${row('Notifications', 'Les alertes d\'expiration (7, 3, 1 jour avant et le jour même) s\'affichent sur l\'écran d\'accueil.')}</div>
-        <h2 class="sec">Partager</h2><div class="list">
-          ${row("Partager l'application", `Lien à envoyer : <b style="word-break:break-all">${esc(new URL('./', location.href).href)}</b><br>Chaque personne installe l'application depuis ce lien ; ses données restent sur son appareil, sauf si elle active la synchronisation avec les mêmes réglages.`, '<button class="btn sm" data-act="shareapp">Partager</button>')}</div>
+        ${App.fold('share', 'Partager', `<div class="list">
+          ${row("Partager l'application", `Lien à envoyer : <b style="word-break:break-all">${esc(new URL('./', location.href).href)}</b><br>Chaque personne installe l'application depuis ce lien ; ses données restent sur son appareil, sauf si elle active la synchronisation avec les mêmes réglages.`, '<button class="btn sm" data-act="shareapp">Partager</button>')}</div>`)}
         <h2 class="sec">Sécurité</h2><div class="list">
           ${App.multi() ? '' : row('Code PIN', S.pin ? 'Activé (4 chiffres)' : 'Non défini : tout le monde peut ouvrir l\'application', S.pin ? '<button class="btn sm sec" data-act="pinchange">Modifier</button>' : '<button class="btn sm" data-act="pinset">Définir</button>')}
           ${!App.multi() && S.pin ? row('Désactiver le PIN', 'Retire le verrouillage', '<button class="btn sm del" data-act="pinremove">Désactiver</button>') : ''}
-          <div class="item"><div class="grow"><b>Verrouillage automatique</b><small>Après inactivité</small></div><select id="s_lock" style="width:auto">${App.opts(LOCKS, S.lockMin)}</select></div>
+          <div class="item"><div class="grow"><b>Verrouillage auto</b><small>Après inactivité</small></div><select id="s_lock" style="width:auto">${App.opts(LOCKS, S.lockMin)}</select></div>
           ${App.usersRow()}</div>
         <p class="mut" style="font-size:13px">Le PIN verrouille l'écran de l'application ; il ne chiffre pas les données stockées dans le téléphone.</p>
         ${App.plansCard()}
         ${App.remindCard()}
-        ${App.syncCard()}
-        ${App.driveCard ? App.driveCard() : ''}
-        <h2 class="sec">Données</h2><div class="list">
-          ${row('Stockage interne', `Les données sont enregistrées dans la mémoire de cet appareil, même sans internet. Protection contre l'effacement : <b class="${App.persisted ? 'ok' : 'warn'}">${App.persisted ? 'activée' : App.persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b>.`)}
+        ${App.fold('sync', 'Synchronisation entre appareils', App.syncCard().replace(/^<h2 class="sec">.*?<\/h2>/, ''))}
+        ${App.driveCard ? App.fold('drive', 'Sauvegarde Google Drive', App.driveCard().replace(/^<h2 class="sec">.*?<\/h2>/, '')) : ''}
+        ${App.fold('data', 'Données, sauvegarde et exports', `<div class="list">
+          ${row('Stockage interne', `Les données sont enregistrées dans la mémoire de cet appareil, même sans internet. Protection contre l'effacement : <b class="${App.persisted ? 'ok' : 'warn'}">${App.persisted ? 'activée' : App.persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b>`)}
           ${row('Sauvegarde', `Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${lastB ? App.fdate(lastB) : 'jamais'}</b>${warn ? ' — pensez à en faire une.' : ''}`, '<button class="btn sm" data-act="backup">Sauvegarder</button>')}
           ${row('Restaurer / importer', 'Recharger un fichier de sauvegarde (.json), y compris de l\'ancienne version.', '<label class="btn sm sec" style="cursor:pointer">Restaurer<input type="file" id="s_restore" accept=".json,application/json" hidden></label>')}
           ${row('Exporter en CSV', 'Un tableau à la fois (Excel, Google Sheets).', '<button class="btn sm sec" data-act="exportcsv">Choisir…</button>')}
-          ${row('Exporter en Excel', 'Un classeur .xlsx avec une feuille par thème.', '<button class="btn sm sec" data-act="xlsx">Excel</button>')}</div>
+          ${row('Exporter en Excel', 'Un classeur .xlsx avec une feuille par thème.', '<button class="btn sm sec" data-act="xlsx">Excel</button>')}</div>`)}
         <div class="bar" style="margin-top:16px"><button class="btn blue" data-act="lockNow">🔒 Verrouiller maintenant</button></div>`,
       after: () => {
         $('s_lock').onchange = () => { S.lockMin = +$('s_lock').value; App.save(); App.toast('Enregistré'); };

@@ -191,7 +191,7 @@
     const i = App.invoice(p.id); if (!i) return { title: 'Facture', back: 'invoices', html: '<div class="empty">Facture introuvable.</div>' };
     const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pays = App.db.payments.filter(x => x.invoiceId === i.id);
     return {
-      title: i.number, sub: 'Aperçu de la facture', back: 'invoices', nav: 'more',
+      title: 'Facture', sub: i.number, back: 'invoices', nav: 'more',
       html: `<div class="spread" style="margin-bottom:10px"><span class="pill ${k}">${t}</span><span class="mut">${App.invTypes[i.type]}</span></div>
         <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button></div>
         ${App.invoiceDoc(i)}

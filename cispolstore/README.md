@@ -95,6 +95,10 @@ Livraisons (Plus → Livraisons, ou « 🚚 Livraison » depuis une facture) : c
 
 Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs et partenaires (nom, téléphone, rôle, zone, spécialité, actif/inactif). Dans « Nouvelle installation » et dans une facture d'installation, le champ Technicien propose la liste (la saisie libre reste possible) ; la fiche du technicien affiche ses interventions et leur valeur. Renommer un technicien met à jour ses installations. Commission : par technicien, **en pourcentage** du prix de l'installation ou **en montant fixe** par intervention. La fiche affiche la commission à payer et déjà payée ; « Payer la commission » fige les montants et enregistre une dépense (catégorie « Commission technicien »), ce qui garde les bénéfices exacts. Synchronisé entre appareils.
 
+## Affichage et rappels de configuration
+
+Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Application). Dans **Paramètres**, les sections longues (Partager, Tarifs d'abonnement, Messages WhatsApp, Synchronisation, Google Drive, Données) sont repliées par défaut. Sur l'accueil, l'administrateur voit un rappel tant qu'il n'a pas défini de **code PIN**, fait une **sauvegarde** (ou si la dernière date de plus de 7 jours) ou renseigné **RCCM / ID Nat. / N° Impôt**.
+
 ## Taux de change
 
 Le taux USD / CDF change souvent. Il se modifie en un geste : le bouton **💱 1 $ = … CDF** de l'accueil, ou Paramètres → Taux, ou le champ « Taux du jour » des formulaires de facture et de paiement (le taux saisi devient alors le taux du jour). Chaque **facture**, **paiement**, **dépense** et **pénalité** garde **son propre taux**, enregistré à sa création : changer le taux ensuite ne modifie ni les anciennes factures imprimées, ni les rapports des mois passés. Une facture antidatée propose le taux en vigueur à sa date (historique des changements conservé). À la mise à jour, les enregistrements existants reçoivent le taux du moment (leur taux d'origine n'étant pas connu) ; ils sont ensuite figés.
