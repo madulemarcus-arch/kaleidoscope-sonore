@@ -26,6 +26,7 @@
           <div class="item"><div class="grow"><b>Verrouillage automatique</b><small>Après inactivité</small></div><select id="s_lock" style="width:auto">${App.opts(LOCKS, S.lockMin)}</select></div>
           ${row('Utilisateurs', 'Un seul administrateur pour l\'instant. Les profils Comptable, Technicien et Vendeur pourront être ajoutés plus tard.')}</div>
         <p class="mut" style="font-size:13px">Le PIN verrouille l'écran de l'application ; il ne chiffre pas les données stockées dans le téléphone.</p>
+        ${App.plansCard()}
         ${App.remindCard()}
         ${App.syncCard()}
         ${App.driveCard ? App.driveCard() : ''}

@@ -8,6 +8,7 @@
   App.createInvoice = (inv, paid = 0) => {
     const db = App.db, date = inv.date || App.today();
     Object.assign(inv, { id: App.uid(), number: App.nextInvNumber(date.slice(0, 4)), date, ts: Date.now(), note: inv.note || '' });
+    App.costSubLines(inv);
     db.invoices.push(inv);
     inv.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: -l.qty, invoiceId: inv.id, clientId: inv.clientId, date, note: 'Facture ' + inv.number }); });
     if (paid > 0) db.payments.push({ id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: paid, currency: inv.currency, mode: inv.payMode, ref: '', comment: '' });
