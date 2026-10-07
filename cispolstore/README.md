@@ -69,7 +69,7 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 
 Complète la synchronisation Supabase (qui reste active) : deux fichiers `cispolstore-AAAA-MM-JJ` (`.json` pour restaurer, `.xlsx` Excel pour lire) sont déposés dans le dossier Drive « CISPOLstore sauvegardes » (les 30 plus récents de chaque type sont gardés, les autres vont à la corbeille Drive). Paramètres → Sauvegarde Google Drive :
 
-1. Sur console.cloud.google.com : créer un projet, activer **Google Drive API**, configurer l'écran de consentement OAuth (portée `drive.file`, **publié en production**), puis créer un **ID client OAuth** de type Application Web avec l'origine autorisée `https://madulemarcus-arch.github.io`.
+1. Sur console.cloud.google.com : créer un projet, activer **Google Drive API**, configurer l'écran de consentement OAuth (portée `drive.file` ; type **Interne** avec un compte Google Workspace, sinon **Externe** et **publié en production**), puis créer un **ID client OAuth** de type Application Web avec l'origine autorisée `https://madulemarcus-arch.github.io`.
 2. Coller l'ID client dans l'application, puis se connecter à Google.
 3. Choisir la fréquence automatique (toutes les heures, 6 h, 24 h, seulement s'il y a eu des changements, application ouverte). « Restaurer depuis Drive » recharge une sauvegarde (le code PIN de l'appareil est conservé).
 
