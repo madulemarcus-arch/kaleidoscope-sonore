@@ -107,7 +107,7 @@
     const hist = [...(c.subs || [])].reverse();
     return `<div class="card"><div class="spread"><b>Compte Starlink</b>${c.acc ? copyBtn(c.acc) : ''}</div><div class="blue" style="margin-top:4px;word-break:break-all">${esc(c.acc || '—')}</div></div>
       <div class="card"><div class="spread"><b>Abonnement actuel</b>${App.pill(s.status)}</div>
-        <dl class="kv" style="margin-top:10px"><dt>Type</dt><dd>${esc(c.plan || '—')}</dd><dt>Date de début</dt><dd>${App.fdate(s.start)}</dd><dt>Date de fin</dt><dd>${App.fdate(s.end)}</dd><dt>Sursis</dt><dd>${s.grace ? App.fdate(s.gStart) + ' → ' + App.fdate(s.gEnd) : 'aucun'}</dd><dt>Tarif</dt><dd>${App.fmt(c.price || 0)}</dd>${(m => m ? `<dt>Coût Starlink</dt><dd>${App.fmt(m.cost)}</dd><dt>Marge</dt><dd class="${m.margin > 0 ? 'ok' : 'bad'}">${App.fmt(m.margin)}</dd>` : '')(App.subMargin(c))}<dt>Statut</dt><dd class="${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${msg}</dd></dl>
+        <dl class="kv" style="margin-top:10px"><dt>Type</dt><dd>${esc(c.plan || '—')}</dd><dt>Date de début</dt><dd>${App.fdate(s.start)}</dd><dt>Date de fin</dt><dd>${App.fdate(s.end)}</dd><dt>Sursis</dt><dd>${s.grace ? App.fdate(s.gStart) + ' → ' + App.fdate(s.gEnd) : 'aucun'}</dd><dt>Tarif</dt><dd>${App.fmt(c.price || 0)}</dd>${(m => m && App.can('costs') ? `<dt>Coût Starlink</dt><dd>${App.fmt(m.cost)}</dd><dt>Marge</dt><dd class="${m.margin > 0 ? 'ok' : 'bad'}">${App.fmt(m.margin)}</dd>` : '')(App.subMargin(c))}<dt>Statut</dt><dd class="${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${msg}</dd></dl>
         <div class="bar" style="margin-top:12px"><button class="btn" data-act="renew" data-id="${c.id}">Renouveler</button>${last ? `<button class="btn sec" data-act="go" data-v="invoice" data-id="${last.id}">Voir la facture</button>` : ''}</div></div>
       ${hist.length ? `<h2 class="sec">Périodes précédentes</h2><div class="list">${hist.map(h => `<div class="item"><div class="grow"><b>${App.fdate(h.start)} → ${App.fdate(App.addDays(h.start, h.days))}</b><small>${h.days} jours</small></div></div>`).join('')}</div>` : ''}`;
   };
@@ -140,7 +140,7 @@
     const c = App.client(d.id), db = App.db;
     if (db.invoices.some(i => i.clientId === c.id) || db.payments.some(p => p.clientId === c.id)) return App.toast('Ce client a des factures ou paiements : suppression impossible');
     if (!App.confirm(`Supprimer définitivement ${App.cname(c)} ?`)) return;
-    db.clients = db.clients.filter(x => x !== c); db.installs = db.installs.filter(x => x.clientId !== c.id); db.penalties = db.penalties.filter(x => x.clientId !== c.id); db.log = db.log.filter(x => x.clientId !== c.id);
+    db.clients = db.clients.filter(x => x !== c); db.installs = db.installs.filter(x => x.clientId !== c.id); db.penalties = db.penalties.filter(x => x.clientId !== c.id); db.deliveries = db.deliveries.filter(x => x.clientId !== c.id); db.log = db.log.filter(x => x.clientId !== c.id);
     App.save(); App.toast('Client supprimé'); App.go('clients', {}, true);
   };
 

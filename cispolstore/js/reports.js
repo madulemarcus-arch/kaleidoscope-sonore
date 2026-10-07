@@ -53,7 +53,7 @@
           <div class="stat"><small>📅 Expirent bientôt</small><b class="${soon.length ? 'warn' : ''}">${soon.length}</b></div>
           <div class="stat"><small>⚠️ Expirent aujourd'hui</small><b class="${today.length ? 'bad' : ''}">${today.length}</b></div></div>
         <div class="dash"><div style="grid-area:a">${alerts.length ? `<h2 class="sec">Alertes</h2><div class="list">${alerts.join('')}</div>` : ''}</div>
-        <div style="grid-area:b"><h2 class="sec">Finances</h2>${periodChips('dper', dper)}
+        <div style="grid-area:b"${App.can('finance') ? '' : ' hidden'}><h2 class="sec">Finances</h2>${periodChips('dper', dper)}
         <div class="grid two"><div class="stat"><small>💰 Chiffre d'affaires</small><b>${App.fmt(f.ca)}</b></div><div class="stat"><small>📈 Bénéfice net</small><b class="${f.net >= 0 ? 'ok' : 'bad'}">${App.fmt(f.net)}</b></div><div class="stat"><small>💸 Dépenses</small><b>${App.fmt(f.exp)}</b></div><div class="stat"><small>Marge brute</small><b>${App.fmt(f.margin)}</b></div></div>
         ${App.unpaidTotal() > 0.004 ? `<button class="item" data-act="go" data-v="impayes" style="margin-bottom:12px"><span class="avatar warn">🧾</span><div class="grow"><b>Impayés : ${App.fmt(App.unpaidTotal())}</b><small>Voir et relancer</small></div><span class="mut">›</span></button>` : ''}
         <div class="card"><b>Ventes</b><div class="chart">${bars.map(b => `<div title="${App.fmt(b.v)}"><i style="height:${Math.round(b.v / max * 100)}%"></i><small>${b.l}</small></div>`).join('')}</div></div>

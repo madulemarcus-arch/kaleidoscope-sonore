@@ -5,6 +5,7 @@
   App.applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', App.applyTheme);
   App.go('home', {}, true);
+  App.applyRole();
 
   if (App.hasPin()) App.showLock('enter', 'unlock');
   else if (!App.db.settings.pinAsked) { App.db.settings.pinAsked = true; App.save(); App.showLock('new1', 'setup'); }

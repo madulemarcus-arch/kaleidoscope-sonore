@@ -193,3 +193,7 @@ dialog .end { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; 
   dialog { width:min(620px,92vw); }
 }
 @media (min-width:1500px) { #view { max-width:1360px; } }
+
+body.solo #bottom, body.solo #side, body.solo #fab { display:none !important; }
+body.solo { padding-bottom:0; }
+@media (min-width:1024px) { body.solo { padding-left:0; } body.solo #view { max-width:720px; } }

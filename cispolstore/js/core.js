@@ -33,7 +33,7 @@
       company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '' },
       plans: { 'Résidentiel': { price: 70, cost: 64 } }, rate: 2400, theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
     },
-    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], invoices: [], payments: [], installs: [], expenses: [], log: []
+    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], log: []
   });
   App.blank = blank;
   const normalize = o => {
@@ -88,7 +88,7 @@
     if (App.afterSave) App.afterSave();
   };
   // Backup content: everything except this device's PIN
-  App.exportData = () => { const d = JSON.parse(JSON.stringify(db)); delete d.settings.pin; return d; };
+  App.exportData = () => { const d = JSON.parse(JSON.stringify(db)); delete d.settings.pin; delete d.settings.users; return d; };
   App.recover = () => idb('readonly', st => st.get('db2')).then(t => { if (!t) return false; const d = JSON.parse(t); if (App.hasData(d)) { db = normalize(d); App.save(); return true; } return false; }).catch(() => false);
 
   // ---------- Money ----------
