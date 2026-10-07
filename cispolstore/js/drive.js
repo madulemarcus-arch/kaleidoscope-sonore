@@ -130,8 +130,8 @@
         <ol style="margin:8px 0 0;padding-left:18px">
           <li>Allez sur <b>console.cloud.google.com</b> et créez un projet (nom : CISPOLstore).</li>
           <li><b>APIs et services → Bibliothèque</b> : cherchez <b>Google Drive API</b> → <b>Activer</b>.</li>
-          <li><b>Écran de consentement OAuth</b> (ou « Google Auth Platform ») : type <b>Externe</b>, nom de l'application « CISPOLstore Manager », votre e-mail. Ajoutez la portée <b>…/auth/drive.file</b>, puis <b>publiez l'application</b> (« En production ») : sinon l'autorisation expire au bout de 7 jours.</li>
-          <li><b>Identifiants → Créer des identifiants → ID client OAuth</b> : type <b>Application Web</b>. Dans <b>Origines JavaScript autorisées</b>, ajoutez : <b id="d_origin">${esc(location.origin)}</b></li>
+          <li><b>Écran de consentement OAuth</b> (ou « Google Auth Platform ») : nom de l'application « CISPOLstore Manager », votre e-mail. Avec un compte Google Workspace (adresse à votre nom de domaine), choisissez <b>Interne</b> (« Audience → Rendre interne ») : rien à publier. Avec un compte Gmail, choisissez <b>Externe</b>, puis <b>publiez l'application</b> (« En production »), sinon l'autorisation expire au bout de 7 jours. Ajoutez la portée <b>…/auth/drive.file</b> (« Accès aux données »).</li>
+          <li><b>Clients → Créer un client</b> (ou Identifiants → ID client OAuth) : type <b>Application Web</b>. Dans <b>Origines JavaScript autorisées</b>, ajoutez : <b id="d_origin">${esc(location.origin)}</b></li>
           <li>Copiez l'<b>ID client</b> (il finit par <code>.apps.googleusercontent.com</code>) et collez-le ci-dessous.</li></ol>
         <div class="bar"><button type="button" class="btn sm sec" data-act="copy" data-t="${esc(location.origin)}">📋 Copier l'adresse autorisée</button></div></div>
        ${F.text('d_cid', 'ID client Google', cfg.clientId || '', 'placeholder="123456789-abc….apps.googleusercontent.com" autocapitalize="none" autocomplete="off"')}
