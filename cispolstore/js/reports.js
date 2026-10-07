@@ -18,6 +18,8 @@
     return { inv, ca, cost, margin: ca - cost, exp, net: ca - cost - exp, penIn, penCost };
   };
 
+  App.finance = finance;
+
   // ---------- Dashboard ----------
   let dper = 'month';
   const chartData = per => {
