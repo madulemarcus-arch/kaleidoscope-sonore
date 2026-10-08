@@ -106,6 +106,8 @@ Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Appl
 
 **Paiement du client à la création d'une facture** : le bloc **💰 Paiement du client** du formulaire demande « Le client a donné » (montant et devise, par défaut le total de la facture). Boutons rapides **Tout payé / Moitié / Rien payé**, mode de paiement et référence ; l'écran affiche en direct le **reste à payer** ou la **monnaie à rendre** (le paiement enregistré est plafonné au total). Un paiement en francs est enregistré en francs, au taux de la facture. Après la création, une barre propose d'imprimer le reçu, et la page de la facture résume Total / Reçu du client / Reste à payer.
 
+**Anciennes factures** : sur la page d'une facture non soldée, le bouton **💰 Encaisser** ouvre le formulaire de paiement avec les boutons **Tout le reste / Moitié**, le reste à payer en direct et la devise au choix ; un paiement ne dépasse jamais le solde. La page de chaque facture (anciennes comprises) affiche Total / Reçu du client / Reste à payer.
+
 **Preuve de paiement** : la facture (écran, impression / PDF, Word) contient un bloc **PAIEMENTS REÇUS** : date, mode, référence, montant reçu (avec le montant et le taux si payé dans l'autre devise) et **reste après chaque paiement**, ainsi que « FACTURE SOLDÉE le … » ou « Total payé / Reste à payer ». Chaque paiement a un **reçu** imprimable (🧾 sur la facture et dans Paiements, ou juste après l'enregistrement) : numéro (ex. FAC-2026-0002-P2), nom du client, montant en lettres, état de la facture et cases de signature.
 
 ## Supprimer des factures
