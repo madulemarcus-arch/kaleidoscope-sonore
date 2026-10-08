@@ -26,6 +26,17 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 .tabs button{flex:1}
 .tabs button[aria-pressed=true]{background:var(--txt);color:var(--bg)}
 #msg{min-height:20px;margin-top:8px;font-weight:600}
+#codeVendu{margin-top:10px;padding:14px;border:2px dashed var(--ok);border-radius:12px;text-align:center}
+#codeVendu b{display:block;font:700 34px/1.2 monospace;letter-spacing:4px}
+#planche{display:none}
+@media print{
+  body.imprime>*:not(#planche){display:none!important}
+  body.imprime{background:#fff;color:#000;padding:0;max-width:none}
+  body.imprime #planche{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+  .tk{border:1px dashed #000;padding:6mm 3mm;height:26.5mm;box-sizing:border-box;text-align:center;font:11px sans-serif;break-inside:avoid;overflow:hidden}
+  .tk b{display:block;font:700 18px monospace;letter-spacing:2px;margin:3px 0}
+  @page{size:A4;margin:5mm}
+}
 #lock{position:fixed;inset:0;background:var(--bg);z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
 #lock[hidden]{display:none}
 #lock input{max-width:240px;text-align:center;font-size:28px;letter-spacing:8px}
@@ -48,10 +59,11 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 
 <div class="card">
   <div class="grid" id="forfaits"></div>
-  <input id="code" placeholder="Code du ticket (facultatif)" autocapitalize="characters" autocomplete="off">
+  <input id="code" placeholder="Code du ticket (automatique si en stock)" autocapitalize="characters" autocomplete="off">
   <input id="client" placeholder="Nom du client (facultatif)" autocomplete="off">
   <button class="main" id="vendre">Enregistrer la vente</button>
   <div id="msg"></div>
+  <div id="codeVendu" hidden></div>
 </div>
 
 <div id="gerant" hidden>
@@ -72,6 +84,15 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 </div>
 
 <div class="card">
+  <b>Tickets</b>
+  <div class="mut" id="stockInfo"></div>
+  <select id="lotForfait"></select>
+  <input id="lotNombre" type="number" min="1" max="300" value="40" inputmode="numeric">
+  <button class="main" id="genererLot" style="background:#2563eb">Générer le lot</button>
+  <div id="lots"></div>
+</div>
+
+<div class="card">
   <b>Prix des forfaits</b>
   <div id="prix"></div>
   <button class="sec" id="exporter" style="margin-top:10px">Exporter en CSV (Excel)</button>
@@ -84,18 +105,22 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 
 </div>
 
+<div id="planche"></div>
+
 <script>
 (() => {
   // Plans with default prices; prices can be edited and are saved in localStorage
   const FORFAITS = [
-    { id: 'V', nom: 'Visiteur', duree: '6 heures', prix: 500, c: '#16a34a' },
-    { id: 'J', nom: 'Jour', duree: '24 heures', prix: 1000, c: '#2563eb' },
-    { id: 'S', nom: 'Semaine', duree: '7 jours', prix: 7000, c: '#ea580c' },
-    { id: 'M', nom: 'Mois', duree: '30 jours', prix: 30000, c: '#7c3aed' },
+    { id: 'V', nom: 'Visiteur', profil: 'Visiteur-6H', duree: '6 heures', prix: 500, c: '#16a34a' },
+    { id: 'J', nom: 'Jour', profil: 'Jour-24H', duree: '24 heures', prix: 1000, c: '#2563eb' },
+    { id: 'S', nom: 'Semaine', profil: 'Semaine-7J', duree: '7 jours', prix: 7000, c: '#ea580c' },
+    { id: 'M', nom: 'Mois', profil: 'Mois-30J', duree: '30 jours', prix: 30000, c: '#7c3aed' },
   ];
+  const SERVEUR = 'hotspot-cispol', SEUIL = 10; // hotspot server name on the router; low-stock warning threshold
+  const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0, O, 1, I
   const $ = id => document.getElementById(id);
   const CLE = 'caisse-simple-v1';
-  let data = { prix: {}, ventes: [] };
+  let data = { prix: {}, ventes: [], stock: [], lots: [] };
   try { data = { ...data, ...JSON.parse(localStorage.getItem(CLE) || '{}') }; } catch (e) {}
   let choix = null, periode = 'jour';
 
@@ -112,9 +137,16 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   }
   const depuis = p => data.ventes.filter(v => v.t >= debut(p)).sort((a, b) => b.t - a.t);
 
+  const nbStock = id => data.stock.filter(c => c.f === id).length;
   function dessiner() {
+    $('lotForfait').innerHTML = FORFAITS.map(f => `<option value="${f.id}">${f.nom} (${f.duree})</option>`).join('');
+    $('stockInfo').innerHTML = FORFAITS.map(f => { const n = nbStock(f.id); return `${f.nom} : <b style="color:${n < SEUIL ? '#dc2626' : 'inherit'}">${n}</b>${n < SEUIL ? ' ⚠' : ''}`; }).join(' · ');
+    $('lots').innerHTML = data.lots.slice().reverse().slice(0, 10).map(l => {
+      const f = FORFAITS.find(x => x.id === l.f);
+      return `<div class="row"><div><b>${f ? f.nom : l.f}</b> × ${l.codes.length}<div class="mut">${new Date(l.t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div><div><button class="sec" data-rsc="${l.id}">.rsc</button> <button class="sec" data-imp="${l.id}">🖨</button></div></div>`;
+    }).join('');
     $('forfaits').innerHTML = FORFAITS.map(f =>
-      `<button class="fo${choix === f.id ? ' sel' : ''}" data-id="${f.id}" style="background:${f.c}">${f.nom}<small>${f.duree} · ${fc(prixDe(f))}</small></button>`).join('');
+      `<button class="fo${choix === f.id ? ' sel' : ''}" data-id="${f.id}" style="background:${f.c}">${f.nom}<small>${f.duree} · ${fc(prixDe(f))}</small><small>${nbStock(f.id)} en stock</small></button>`).join('');
     const jour = depuis('jour');
     $('totalJour').textContent = fc(jour.reduce((s, v) => s + v.prix, 0));
     $('nbJour').textContent = jour.length + (jour.length > 1 ? ' ventes' : ' vente');
@@ -132,12 +164,51 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   $('vendre').onclick = () => {
     if (!choix) return msg('Choisissez d\'abord un forfait.', true);
     const f = FORFAITS.find(x => x.id === choix);
-    const code = $('code').value.toUpperCase().replace(/\s+/g, '');
+    let code = $('code').value.toUpperCase().replace(/\s+/g, '');
     if (code && data.ventes.some(v => v.code === code)) return msg(code + ' est déjà vendu.', true);
+    if (code) data.stock = data.stock.filter(c => c.code !== code); // typed code that was in stock
+    else { // take the oldest ticket in stock for this plan
+      const i = data.stock.findIndex(c => c.f === f.id);
+      if (i < 0) return msg('Plus de ticket ' + f.nom + ' en stock. Le gérant doit générer un lot.', true);
+      code = data.stock.splice(i, 1)[0].code;
+    }
     data.ventes.push({ t: Date.now(), f: f.id, prix: prixDe(f), code, client: $('client').value.trim().slice(0, 80) });
     save(); $('code').value = ''; $('client').value = ''; choix = null;
     msg('Vente enregistrée : ' + f.nom + ' ' + fc(prixDe(f)));
+    $('codeVendu').hidden = false; $('codeVendu').innerHTML = 'Code à donner au client<b>' + esc(code) + '</b>' + f.nom + ' · ' + f.duree;
     dessiner();
+  };
+  // ---------- Ticket generation ----------
+  function nouveauCode(prefixe) {
+    const b = crypto.getRandomValues(new Uint8Array(5));
+    return prefixe + [...b].map(x => ALPHA[x % ALPHA.length]).join('');
+  }
+  $('genererLot').onclick = () => {
+    const f = FORFAITS.find(x => x.id === $('lotForfait').value);
+    const n = Math.min(300, Math.max(1, parseInt($('lotNombre').value, 10) || 0));
+    const pris = new Set([...data.lots.flatMap(l => l.codes), ...data.ventes.map(v => v.code)]);
+    const codes = [];
+    while (codes.length < n) { const c = nouveauCode(f.id); if (!pris.has(c)) { pris.add(c); codes.push(c); } }
+    const lot = { id: 'L' + Date.now(), f: f.id, t: Date.now(), codes };
+    data.lots.push(lot); codes.forEach(code => data.stock.push({ code, f: f.id }));
+    save(); dessiner(); msg(n + ' tickets ' + f.nom + ' générés. Importez le fichier .rsc dans le routeur puis imprimez.');
+    telechargerRsc(lot);
+  };
+  function telechargerRsc(lot) {
+    const f = FORFAITS.find(x => x.id === lot.f);
+    // one plain line per ticket; comment is left empty on purpose (the router script writes the expiry there)
+    const l = ['# Lot ' + lot.id + ' - ' + f.nom + ' - ' + lot.codes.length + ' tickets', ...lot.codes.map(c => `/ip hotspot user add name=${c} password=${c} profile=${f.profil} server=${SERVEUR}`)];
+    telecharger('tickets-' + f.nom + '-' + lot.id + '.rsc', 'text/plain;charset=utf-8', l.join('\n') + '\n');
+  }
+  function imprimerLot(lot) {
+    const f = FORFAITS.find(x => x.id === lot.f);
+    $('planche').innerHTML = lot.codes.map(c => `<div class="tk">CISPOLstore WiFi Zone<b>${esc(c)}</b>${f.nom} · ${f.duree} · ${fc(prixDe(f))}</div>`).join('');
+    document.body.classList.add('imprime'); window.print(); document.body.classList.remove('imprime');
+  }
+  $('lots').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const lot = data.lots.find(l => l.id === (b.dataset.rsc || b.dataset.imp)); if (!lot) return;
+    if (b.dataset.rsc) telechargerRsc(lot); else imprimerLot(lot);
   };
   $('tabs').onclick = e => {
     const b = e.target.closest('button'); if (!b) return; periode = b.dataset.p;
@@ -172,7 +243,7 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
       const d = JSON.parse(await e.target.files[0].text());
       if (!Array.isArray(d.ventes)) throw 0;
       if (!confirm('Remplacer les données actuelles par la sauvegarde ?')) return;
-      data = { prix: d.prix || {}, ventes: d.ventes }; save(); dessiner(); msg('Sauvegarde restaurée.');
+      data = { prix: d.prix || {}, ventes: d.ventes, stock: d.stock || [], lots: d.lots || [] }; save(); dessiner(); msg('Sauvegarde restaurée.');
     } catch (err) { msg('Fichier de sauvegarde invalide.', true); }
     e.target.value = '';
   };
