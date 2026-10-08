@@ -26,9 +26,22 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 .tabs button{flex:1}
 .tabs button[aria-pressed=true]{background:var(--txt);color:var(--bg)}
 #msg{min-height:20px;margin-top:8px;font-weight:600}
+#lock{position:fixed;inset:0;background:var(--bg);z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#lock[hidden]{display:none}
+#lock input{max-width:240px;text-align:center;font-size:28px;letter-spacing:8px}
+#lock button.main{max-width:240px}
+#lockMsg{min-height:22px;margin-top:10px;font-weight:600;color:#dc2626}
 </style>
 </head>
 <body>
+<div id="lock" hidden>
+  <h1>Caisse WiFi Zone</h1>
+  <p id="lockTitre"></p>
+  <input id="pin1" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN">
+  <input id="pin2" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Répétez le PIN" hidden>
+  <button class="main" id="lockOk">OK</button>
+  <div id="lockMsg"></div>
+</div>
 <h1>Caisse WiFi Zone</h1>
 
 <div class="card">
@@ -62,6 +75,8 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   <button class="sec" id="sauver" style="margin-top:10px">Sauvegarder</button>
   <button class="sec" id="restaurer" style="margin-top:10px">Restaurer</button>
   <input type="file" id="fichier" accept=".json" hidden>
+  <button class="sec" id="changerPin" style="margin-top:10px">Changer le PIN</button>
+  <button class="sec" id="verrouiller" style="margin-top:10px">Verrouiller</button>
 </div>
 
 <script>
@@ -157,6 +172,56 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
     e.target.value = '';
   };
   dessiner();
+
+  // ---------- PIN ----------
+  // The PIN is a local lock for the device: stored as a salted hash, not real server-side security
+  const CLE_PIN = 'caisse-simple-pin';
+  let pinSauve = null, essais = 0, bloqueJusque = 0, modePin = 'saisie', ancienOk = false, dernierPin = '';
+  try { pinSauve = JSON.parse(localStorage.getItem(CLE_PIN) || 'null'); } catch (e) {}
+  async function hacher(pin, sel) {
+    const texte = sel + ':' + pin;
+    if (window.crypto && crypto.subtle) {
+      const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texte));
+      return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let x = 5381; for (let i = 0; i < texte.length; i++) x = ((x << 5) + x + texte.charCodeAt(i)) >>> 0; // fallback when crypto.subtle is unavailable (http)
+    return 'f' + x;
+  }
+  function ecranPin(mode, titre) {
+    modePin = mode; $('lockTitre').textContent = titre;
+    $('pin1').value = ''; $('pin2').value = ''; $('pin2').hidden = mode !== 'creer'; $('lockMsg').textContent = '';
+    $('lock').hidden = false; setTimeout(() => $('pin1').focus(), 50);
+  }
+  function verrouiller() {
+    if (!pinSauve) return ecranPin('creer', 'Choisissez un code PIN (4 à 8 chiffres).');
+    ecranPin('saisie', 'Entrez votre code PIN.');
+  }
+  async function validerPin() {
+    const a = $('pin1').value, err = t => { $('lockMsg').textContent = t; $('pin1').value = ''; $('pin2').value = ''; };
+    if (Date.now() < bloqueJusque) return err('Trop d\'essais. Patientez ' + Math.ceil((bloqueJusque - Date.now()) / 1000) + ' s.');
+    if (modePin === 'creer') {
+      if (!/^\d{4,8}$/.test(a)) return err('Le PIN doit avoir 4 à 8 chiffres.');
+      if (a !== $('pin2').value) return err('Les deux PIN sont différents.');
+      const sel = Math.random().toString(36).slice(2);
+      pinSauve = { sel, h: await hacher(a, sel) };
+      try { localStorage.setItem(CLE_PIN, JSON.stringify(pinSauve)); } catch (e) {}
+      $('lock').hidden = true; if (ancienOk) msg('PIN changé.'); ancienOk = false; return;
+    }
+    if (await hacher(a, pinSauve.sel) !== pinSauve.h) {
+      if (++essais >= 5) { essais = 0; bloqueJusque = Date.now() + 30e3; return err('Trop d\'essais. Patientez 30 s.'); }
+      return err('PIN incorrect.');
+    }
+    essais = 0;
+    if (modePin === 'ancien') { ancienOk = true; return ecranPin('creer', 'Choisissez le nouveau PIN.'); }
+    $('lock').hidden = true;
+  }
+  $('lockOk').onclick = validerPin;
+  $('lock').onkeydown = e => { if (e.key === 'Enter') validerPin(); };
+  $('verrouiller').onclick = verrouiller;
+  $('changerPin').onclick = () => ecranPin('ancien', 'Entrez le PIN actuel.');
+  let veille; const reveil = () => { clearTimeout(veille); veille = setTimeout(verrouiller, 5 * 60e3); }; // auto-lock after 5 min idle
+  ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, reveil, true));
+  reveil(); verrouiller();
 })();
 </script>
 </body>
