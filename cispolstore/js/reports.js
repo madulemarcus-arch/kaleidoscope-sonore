@@ -8,7 +8,7 @@
   // Totals of invoices / expenses inside a date range, all in USD
   const finance = r => {
     const inv = App.db.invoices.filter(i => App.inRange(i.date, r));
-    const ca0 = inv.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency, i), 0);
+    const ca0 = inv.reduce((a, i) => a + App.usd(App.invAgreed(i), i.currency, i), 0);
     const cost0 = inv.reduce((a, i) => a + App.usd(App.invCost(i), i.currency, i), 0);
     const pen = App.db.penalties.filter(p => p.paid && App.inRange(p.paid, r));
     const penIn = pen.reduce((a, p) => a + App.usd(p.amount, p.currency, p), 0), penCost = pen.reduce((a, p) => a + App.usd(p.cost, p.currency, p), 0);
@@ -24,7 +24,7 @@
   let dper = 'month';
   const chartData = per => {
     const t = App.today(), r = App.range(per), inv = App.db.invoices.filter(i => App.inRange(i.date, r));
-    const val = i => App.usd(App.invTotal(i), i.currency, i);
+    const val = i => App.usd(App.invAgreed(i), i.currency, i);
     let buckets;
     if (per === 'day') { buckets = Array.from({ length: 24 }, (_, h) => ({ l: h % 3 === 0 ? h + 'h' : '', v: 0 })); inv.forEach(i => { buckets[i.ts ? new Date(i.ts).getHours() : 12].v += val(i); }); }
     else if (per === 'week') { buckets = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(l => ({ l, v: 0 })); inv.forEach(i => { buckets[App.diff(r[0], i.date)].v += val(i); }); }
@@ -45,6 +45,7 @@
     const setup = [];
     if (App.role() === App.ROLES.admin) {
       const lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, t) : null, co = S.company;
+      if (App.drive && App.drive.needsAttention()) setup.push(['☁️', 'Sauvegarde Google Drive : reconnexion nécessaire (Paramètres → Sauvegarde Google Drive). Elle ne se fait pas toute seule.']);
       if (!App.hasPin()) setup.push(['🔓', "Aucun code PIN : n'importe qui peut ouvrir l'application. Définissez-en un (Paramètres → Sécurité)."]);
       if (db.clients.length && (lastB === undefined || age === null || age > 7)) setup.push(['💾', age === null ? "Aucune sauvegarde faite : lancez-en une (Paramètres → Données) ou activez Google Drive." : `Dernière sauvegarde il y a ${age} jours : pensez à en faire une.`]);
       if (!co.rccm && !co.idnat && !co.impot) setup.push(['📄', 'Renseignez RCCM, ID Nat. et N° Impôt (Paramètres → Entreprise) : ils figureront sur les factures.']);
@@ -131,7 +132,7 @@
       return { cards: [['Dépenses', l.reduce((a, e) => a + App.usd(e.amount, e.currency, e), 0), money], ...Object.entries(by).map(([k, v]) => [k, v, money])], head: ['Date', 'Libellé', 'Catégorie', 'Montant ($)'], fmt: [3], rows: l.map(e => [e.date, e.label, e.cat, App.usd(e.amount, e.currency, e)]) }; },
     stock: () => { const p = App.db.products.filter(App.tracked), val = p.reduce((a, x) => a + x.qty * x.cost, 0), sale = p.reduce((a, x) => a + x.qty * x.price, 0);
       return { cards: [['Produits suivis', p.length], ['Valeur (achat)', val, money], ['Valeur (vente)', sale, money], ['Stock bas', p.filter(x => x.qty <= (x.min || 0)).length]], head: ['Produit', 'Catégorie', 'Quantité', 'Valeur achat ($)'], fmt: [3], rows: p.sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.name, x.cat, x.qty + (x.unit === 'm' ? ' m' : ''), x.qty * x.cost]) }; },
-    clients: r => { const c = App.db.clients, tot = {}; App.db.invoices.forEach(i => { tot[i.clientId] = (tot[i.clientId] || 0) + App.usd(App.invTotal(i), i.currency, i); });
+    clients: r => { const c = App.db.clients, tot = {}; App.db.invoices.forEach(i => { tot[i.clientId] = (tot[i.clientId] || 0) + App.usd(App.invAgreed(i), i.currency, i); });
       return { cards: [['Clients', c.length], ['Gérés', c.filter(x => x.type === 'gere').length], ['Matériel / Installation', `${c.filter(x => x.type === 'mat').length} / ${c.filter(x => x.type === 'install').length}`], ['Nouveaux (période)', c.filter(x => App.inRange(x.created || '', r)).length]], head: ['Client', 'Type', 'Statut', 'Total facturé ($)'], fmt: [3], rows: c.map(x => [App.cname(x), App.TYPES[x.type], App.sub(x) ? App.STATUS[App.sub(x).status][0] : '—', tot[x.id] || 0]).sort((a, b) => b[3] - a[3]) }; }
   };
   const lastReport = { head: [], rows: [] };

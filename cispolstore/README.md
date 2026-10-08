@@ -33,6 +33,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/plans.js` | Tarifs d'abonnement : prix client, coût Starlink et marge |
 | `js/penalties.js` | Pénalités Starlink : enregistrement, paiement signalé, relance, effet sur les bénéfices |
 | `js/unpaid.js` | Impayés : factures à encaisser, ancienneté, relance WhatsApp |
+| `js/finance.js` | Onglet Finance : journal des entrées et sorties d'argent |
 | `js/monthly.js` | Rapport mensuel : résumé du mois à partager, copier ou imprimer |
 | `js/remind.js` | Rappels WhatsApp d'échéance (liste « Rappels » et messages modifiables) |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
@@ -99,6 +100,16 @@ Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs 
 
 Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Application). Dans **Paramètres**, les sections longues (Partager, Tarifs d'abonnement, Messages WhatsApp, Synchronisation, Google Drive, Données) sont repliées par défaut. Sur l'accueil, l'administrateur voit un rappel tant qu'il n'a pas défini de **code PIN**, fait une **sauvegarde** (ou si la dernière date de plus de 7 jours) ou renseigné **RCCM / ID Nat. / N° Impôt**.
 
+## Finance et reçus
+
+**Onglet Finance** (administrateur et comptable, barre du bas et menu latéral) : tout l'argent qui entre et qui sort sur la période choisie (jour, semaine, mois, année, dates libres). **Entrées** : paiements des clients et pénalités payées. **Sorties** : dépenses, commissions des techniciens et achats de stock (case à décocher : ils ne sont pas des dépenses du bénéfice, qui compte déjà le coût des marchandises vendues). Cartes Entrées / Sorties / Solde, tableau **par mode de paiement** (Cash, M-Pesa, Airtel…) et **par devise** (francs et dollars réellement encaissés), puis la liste jour par jour ; filtres Entrées / Sorties et par mode ; export CSV, impression, feuille « Finance » de l'export Excel. Chaque montant est converti avec le taux de son propre enregistrement. Les dépenses ont maintenant un champ « Payé par » ; les anciennes apparaissent en « Non précisé ».
+
+**Paiement du client à la création d'une facture** : le bloc **💰 Paiement du client** du formulaire demande « Le client a donné » (montant et devise, par défaut le total de la facture). Boutons rapides **Tout payé / Moitié / Rien payé**, mode de paiement et référence ; l'écran affiche en direct le **reste à payer** ou la **monnaie à rendre** (le paiement enregistré est plafonné au total). Un paiement en francs est enregistré en francs, au taux de la facture. Après la création, une barre propose d'imprimer le reçu, et la page de la facture résume Total / Reçu du client / Reste à payer.
+
+**Anciennes factures** : sur la page d'une facture non soldée, le bouton **💰 Encaisser** ouvre le formulaire de paiement avec les boutons **Tout le reste / Moitié**, le reste à payer en direct et la devise au choix ; un paiement ne dépasse jamais le solde. La page de chaque facture (anciennes comprises) affiche Total / Reçu du client / Reste à payer.
+
+**Facture imprimée = prix complet** : ce que le client reçoit (écran, PDF, Word, impression) montre toujours le **total de la facture**, sans paiement ni reste. Ce que le client a réellement donné s'enregistre à part, dans le système, avec un **reçu** imprimable par paiement (🧾, numéro du type FAC-2026-0002-P2, montant en lettres). Si le client **marchande**, cochez « Le client a marchandé » (à la création, ou dans « Encaisser » sur une ancienne facture) : le montant donné devient le **prix convenu**, la facture est soldée, la facture imprimée garde son prix complet, et les rapports (chiffre d'affaires, bénéfices) comptent le prix convenu. La page de la facture affiche le total imprimé, le prix convenu, le reçu et le reste.
+
 ## Supprimer des factures
 
 Réservé à l'administrateur. Une facture se supprime depuis sa page (« Supprimer la facture »), ou **plusieurs à la fois** depuis la liste : **☑ Sélectionner pour supprimer**, toucher les factures (ou « Tout »), puis **🗑 Supprimer**. Une confirmation rappelle les conséquences : le **stock est remis**, les **paiements et installations liés sont supprimés**, les livraisons liées sont détachées, et un **renouvellement d'abonnement** fait par cette facture est annulé (le client retrouve sa période précédente). Une barre **« Annuler »** reste affichée 12 secondes pour tout rétablir. Les numéros de facture ne sont **jamais réutilisés** (pas de doublon possible, même entre appareils) : la numérotation garde donc un trou à la place de la facture supprimée.
@@ -133,7 +144,7 @@ Complète la synchronisation Supabase (qui reste active) : deux fichiers `cispol
 
 1. Sur console.cloud.google.com : créer un projet, activer **Google Drive API**, configurer l'écran de consentement OAuth (portée `drive.file` ; type **Interne** avec un compte Google Workspace, sinon **Externe** et **publié en production**), puis créer un **ID client OAuth** de type Application Web avec l'origine autorisée `https://madulemarcus-arch.github.io`.
 2. Coller l'ID client dans l'application, puis se connecter à Google.
-3. Choisir la fréquence automatique (toutes les heures, 6 h, 24 h, seulement s'il y a eu des changements, application ouverte). « Restaurer depuis Drive » recharge une sauvegarde (le code PIN de l'appareil est conservé).
+3. Choisir la fréquence automatique : **une fois par jour (recommandé)**, toutes les 6 heures, toutes les heures, ou **manuelle seulement**. La sauvegarde automatique est **discrète** : elle ne part que s'il y a eu des changements, après **1 minute sans aucune activité**, jamais pendant qu'un formulaire est ouvert ni dans les 2 premières minutes après l'ouverture, sans fenêtre ni message. Options : « Seulement en Wi-Fi », « Envoyer aussi l'Excel » (en automatique, une seule fois par jour). Si Google demande de se reconnecter, l'application n'insiste pas : elle réessaie au plus toutes les 6 heures, affiche un simple rappel sur l'accueil de l'administrateur, et « Pas maintenant » le masque 24 heures. « Restaurer depuis Drive » recharge une sauvegarde (le code PIN de l'appareil est conservé).
 
 Limites : l'application ne voit que les fichiers qu'elle a créés (`drive.file`) ; les sauvegardes sont du JSON lisible (non chiffré) ; l'autorisation silencieuse peut demander une reconnexion. Le service worker ne met jamais en cache les appels vers Google ou Supabase.
 

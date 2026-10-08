@@ -67,9 +67,9 @@
 
   // ---------- "Annuler" bar after a deletion ----------
   let undoTimer = null;
-  App.undoBar = (msg, fn) => {
+  App.undoBar = (msg, fn, btn = 'Annuler') => {
     const old = $('undo'); if (old) old.remove(); clearTimeout(undoTimer);
-    const d = document.createElement('div'); d.id = 'undo'; d.innerHTML = `<span>${esc(msg)}</span><button class="btn sm" id="undogo">Annuler</button><button class="ib" id="undox" aria-label="Fermer">✕</button>`;
+    const d = document.createElement('div'); d.id = 'undo'; d.innerHTML = `<span>${esc(msg)}</span><button class="btn sm" id="undogo">${esc(btn)}</button><button class="ib" id="undox" aria-label="Fermer">✕</button>`;
     document.body.appendChild(d); const close = () => { d.remove(); clearTimeout(undoTimer); };
     $('undogo').onclick = () => { close(); fn(); }; $('undox').onclick = close; undoTimer = setTimeout(close, 12000);
   };
@@ -85,7 +85,7 @@
   };
 
   // ---------- Side menu (wide screens; hidden on phones by CSS) ----------
-  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['impayes', '⏳', 'Impayés'], ['suppliers', '🏭', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['settings', '⚙️', 'Paramètres']];
+  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['finance', '🏦', 'Finance'], ['impayes', '⏳', 'Impayés'], ['suppliers', '🏭', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['settings', '⚙️', 'Paramètres']];
   $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
     <button class="btn full" data-act="quick">＋ Action rapide</button>
     <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${i}</span>${t}</button>`).join('')}</nav>
@@ -265,7 +265,7 @@
       title: 'Plus', nav: 'more',
       html: grp('Ventes et clients', [item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements'), item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter'), item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement'), item('impayes', '⏳', 'Impayés', 'Factures à encaisser et relances')])
         + grp('Terrain et stock', [item('livraisons', '🚚', 'Livraisons', 'Livraisons à effectuer et suivi'), item('installs', '🔧', 'Installations', 'Historique des interventions'), item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink'), item('suppliers', '🏭', 'Fournisseurs', 'Gérer vos fournisseurs')])
-        + grp('Gestion', [item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
+        + grp('Gestion', [item('finance', '🏦', 'Finance', 'Entrées, sorties et caisse'), item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
         + grp('Application', [App.multi() ? item('profile', '👤', 'Mon profil', (App.user ? App.user.name : '') + ' · code PIN, changer de profil') : '', share])
         + `<p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0</p>`
     };

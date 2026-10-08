@@ -141,8 +141,10 @@
   App.invTotal = i => i.lines.reduce((a, l) => a + l.qty * l.price, 0);
   App.invCost = i => i.lines.reduce((a, l) => a + l.qty * (l.cost || 0), 0);
   App.invPaid = i => db.payments.filter(p => p.invoiceId === i.id).reduce((a, p) => a + App.conv(p.amount, p.currency, i.currency, App.rateOf(p)), 0);
-  App.invDue = i => Math.max(0, App.invTotal(i) - App.invPaid(i));
-  App.invStatus = i => { const t = App.invTotal(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
+  // negotiated price: the printed invoice keeps its full total, but what the client really owes (and what counts as revenue) is i.agreed
+  App.invAgreed = i => +i.agreed > 0 && +i.agreed < App.invTotal(i) ? +i.agreed : App.invTotal(i);
+  App.invDue = i => Math.max(0, App.invAgreed(i) - App.invPaid(i));
+  App.invStatus = i => { const t = App.invAgreed(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
   App.INV = { paid: ['Payée', 'ok'], part: ['Partielle', 'warn'], unpaid: ['Impayée', 'bad'] };
   App.invTypes = { materiel: 'Matériel', abonnement: 'Abonnement', installation: 'Installation', complete: 'Facture complète' };
   App.nextInvNumber = (year, dry) => {
@@ -157,7 +159,7 @@
   // qty > 0 adds to stock, qty < 0 removes it
   App.move = m => {
     const p = App.prod(m.pid); if (!p) return;
-    const mv = { id: App.uid(), date: m.date || App.today(), pid: m.pid, qty: m.qty, type: m.qty >= 0 ? 'in' : 'out', cost: m.cost ?? p.cost, supplierId: m.supplierId || '', invoiceId: m.invoiceId || '', clientId: m.clientId || '', note: m.note || '' };
+    const mv = { id: App.uid(), date: m.date || App.today(), pid: m.pid, qty: m.qty, type: m.qty >= 0 ? 'in' : 'out', cost: m.cost ?? p.cost, supplierId: m.supplierId || '', purchase: !!m.purchase, invoiceId: m.invoiceId || '', clientId: m.clientId || '', note: m.note || '' };
     if (App.tracked(p)) p.qty = Math.round((p.qty + m.qty) * 1000) / 1000;
     if (m.qty > 0 && m.cost != null) p.cost = m.cost;
     if (m.qty > 0 && m.supplierId) p.supplierId = m.supplierId;

@@ -73,7 +73,7 @@
        ${F.sel('f_s', 'Fournisseur', supOpts(), p.supplierId)}${F.date('f_d', 'Date', App.today())}${F.text('f_n', 'Note / n° de bon', '')}`,
       () => {
         const q = App.n('f_q'); if (q <= 0) { App.toast('Quantité invalide'); return false; }
-        App.move({ pid: App.v('f_p'), qty: q, cost: App.n('f_c'), supplierId: App.v('f_s'), date: App.v('f_d'), note: App.v('f_n') || 'Entrée de stock' });
+        App.move({ pid: App.v('f_p'), qty: q, cost: App.n('f_c'), supplierId: App.v('f_s'), date: App.v('f_d'), purchase: true, note: App.v('f_n') || 'Entrée de stock' });
         App.save(); App.toast('Stock mis à jour'); App.refresh();
       }, 'Ajouter au stock');
     $('f_p').onchange = () => { const x = App.prod($('f_p').value); $('f_c').value = x.cost; $('f_s').value = x.supplierId || ''; };
