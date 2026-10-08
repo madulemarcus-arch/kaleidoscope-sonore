@@ -143,9 +143,11 @@
   App.invPaid = i => db.payments.filter(p => p.invoiceId === i.id).reduce((a, p) => a + App.conv(p.amount, p.currency, i.currency, App.rateOf(p)), 0);
   // negotiated price: the printed invoice keeps its full total, but what the client really owes (and what counts as revenue) is i.agreed
   App.invAgreed = i => +i.agreed > 0 && +i.agreed < App.invTotal(i) ? +i.agreed : App.invTotal(i);
-  App.invDue = i => Math.max(0, App.invAgreed(i) - App.invPaid(i));
-  App.invStatus = i => { const t = App.invAgreed(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
-  App.INV = { paid: ['Payée', 'ok'], part: ['Partielle', 'warn'], unpaid: ['Impayée', 'bad'] };
+  // a pending invoice was only handed to the client: no stock out, no revenue, nothing to collect until the sale is validated
+  App.live = i => !i.pending;
+  App.invDue = i => i.pending ? 0 : Math.max(0, App.invAgreed(i) - App.invPaid(i));
+  App.invStatus = i => { if (i.pending) return 'pending'; const t = App.invAgreed(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
+  App.INV = { paid: ['Payée', 'ok'], part: ['Partielle', 'warn'], unpaid: ['Impayée', 'bad'], pending: ['En attente', 'warn'] };
   App.invTypes = { materiel: 'Matériel', abonnement: 'Abonnement', installation: 'Installation', complete: 'Facture complète' };
   App.nextInvNumber = (year, dry) => {
     const prefix = `FAC-${year}-`;

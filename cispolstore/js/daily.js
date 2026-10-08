@@ -12,7 +12,7 @@
     const usd = a => a.reduce((s, x) => s + x.usd, 0);
     const byMode = {}; rows.forEach(x => { const m = byMode[x.mode] = byMode[x.mode] || { in: {}, out: {} }; m[x.kind][x.cur] = (m[x.kind][x.cur] || 0) + x.amt; });
     const cash = { USD: 0, CDF: 0 }; rows.filter(x => x.mode === CASH).forEach(x => { cash[x.cur] = (cash[x.cur] || 0) + (x.kind === 'in' ? x.amt : -x.amt); });
-    const inv = db.invoices.filter(i => i.date === d), invAmt = inv.reduce((s, i) => s + App.usd(App.invAgreed(i), i.currency, i), 0);
+    const inv = db.invoices.filter(i => App.live(i) && i.date === d), invAmt = inv.reduce((s, i) => s + App.usd(App.invAgreed(i), i.currency, i), 0);
     const unpaid = inv.filter(i => App.invDue(i) > 0.004), unpaidAmt = unpaid.reduce((s, i) => s + App.usd(App.invDue(i), i.currency, i), 0);
     const deliveries = db.deliveries.filter(x => x.status === 'done' && x.doneAt === d).length;
     const closing = (db.closings || []).find(c => c.date === d);
