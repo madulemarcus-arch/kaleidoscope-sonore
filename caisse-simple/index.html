@@ -50,8 +50,15 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   <div class="grid" id="forfaits"></div>
   <input id="code" placeholder="Code du ticket (facultatif)" autocapitalize="characters" autocomplete="off">
   <input id="client" placeholder="Nom du client (facultatif)" autocomplete="off">
-  <button class="main" id="vendre">Enregistrer la vente</button>
+  <button class="main" id="vendre">Encaisser maintenant</button>
+  <button class="main" id="facture" style="background:#ea580c">Facture en attente (pas encore payé)</button>
   <div id="msg"></div>
+</div>
+
+<div class="card" id="carteAttente" hidden>
+  <b>Factures en attente de paiement</b>
+  <div class="mut">Pas comptées dans les ventes tant que le client n'a pas payé.</div>
+  <div id="attente"></div>
 </div>
 
 <div id="gerant" hidden>
@@ -69,6 +76,12 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   </div>
   <div class="mut" id="resume"></div>
   <div id="liste"></div>
+</div>
+
+<div class="card">
+  <b>Factures abandonnées</b>
+  <div class="mut" id="abResume"></div>
+  <div id="abandons"></div>
 </div>
 
 <div class="card">
@@ -95,7 +108,7 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   ];
   const $ = id => document.getElementById(id);
   const CLE = 'caisse-simple-v1';
-  let data = { prix: {}, ventes: [] };
+  let data = { prix: {}, ventes: [], attente: [], abandons: [], num: 0 };
   try { data = { ...data, ...JSON.parse(localStorage.getItem(CLE) || '{}') }; } catch (e) {}
   let choix = null, periode = 'jour';
 
@@ -123,20 +136,64 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
     $('liste').innerHTML = l.slice(0, 100).map(v => {
       const f = FORFAITS.find(x => x.id === v.f);
       const h = new Date(v.t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-      return `<div class="row"><div><b>${f ? f.nom : v.f}</b> ${esc(v.code || '')}<div class="mut">${h}${v.client ? ' · ' + esc(v.client) : ''}</div></div><div>${fc(v.prix)} <button class="sec" data-del="${v.t}">✕</button></div></div>`;
+      return `<div class="row"><div><b>${f ? f.nom : v.f}</b> ${v.fac ? 'F-' + String(v.fac).padStart(4, '0') + ' ' : ''}${esc(v.code || '')}<div class="mut">${h}${v.client ? ' · ' + esc(v.client) : ''}</div></div><div>${fc(v.prix)} <button class="sec" data-del="${v.t}">✕</button></div></div>`;
     }).join('') || '<div class="mut">Aucune vente.</div>';
+    const num = n => 'F-' + String(n).padStart(4, '0');
+    const ago = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 60 ? m + ' min' : m < 1440 ? Math.floor(m / 60) + ' h' : Math.floor(m / 1440) + ' j'; };
+    $('carteAttente').hidden = !data.attente.length;
+    $('attente').innerHTML = data.attente.map(e => {
+      const f = FORFAITS.find(x => x.id === e.f);
+      return `<div class="row"><div><b>${num(e.n)}</b> ${f ? f.nom : e.f} ${esc(e.code || '')}<div class="mut">${fc(e.prix)} · il y a ${ago(e.t)}${e.client ? ' · ' + esc(e.client) : ''}</div></div><div><button class="sec" data-enc="${e.id}">Encaisser</button> <button class="sec" data-imp="${e.id}">🖨</button> <button class="sec" data-abd="${e.id}">✕</button></div></div>`;
+    }).join('');
+    const ab = data.abandons.slice().reverse();
+    $('abResume').textContent = ab.length + ' abandonnée(s) · ' + fc(ab.reduce((s, e) => s + e.prix, 0)) + ' non encaissés';
+    $('abandons').innerHTML = ab.slice(0, 20).map(e => {
+      const f = FORFAITS.find(x => x.id === e.f);
+      return `<div class="row"><div><b>${num(e.n)}</b> ${f ? f.nom : e.f}<div class="mut">${new Date(e.abandonLe).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${e.client ? ' · ' + esc(e.client) : ''}</div></div><div>${fc(e.prix)}</div></div>`;
+    }).join('');
     $('prix').innerHTML = FORFAITS.map(f => `<div class="row"><span>${f.nom}</span><input type="number" min="0" step="100" data-prix="${f.id}" value="${prixDe(f)}" style="width:130px;margin:0"></div>`).join('');
   }
 
   $('forfaits').onclick = e => { const b = e.target.closest('.fo'); if (!b) return; choix = b.dataset.id; dessiner(); };
-  $('vendre').onclick = () => {
-    if (!choix) return msg('Choisissez d\'abord un forfait.', true);
+  // Read the form; returns the plan, ticket code and client, or null with an error message
+  function lireForm() {
+    if (!choix) { msg('Choisissez d\'abord un forfait.', true); return null; }
     const f = FORFAITS.find(x => x.id === choix);
     const code = $('code').value.toUpperCase().replace(/\s+/g, '');
-    if (code && data.ventes.some(v => v.code === code)) return msg(code + ' est déjà vendu.', true);
-    data.ventes.push({ t: Date.now(), f: f.id, prix: prixDe(f), code, client: $('client').value.trim().slice(0, 80) });
-    save(); $('code').value = ''; $('client').value = ''; choix = null;
-    msg('Vente enregistrée : ' + f.nom + ' ' + fc(prixDe(f)));
+    if (code && (data.ventes.some(v => v.code === code) || data.attente.some(v => v.code === code))) { msg(code + ' est déjà utilisé.', true); return null; }
+    return { f, code, client: $('client').value.trim().slice(0, 80) };
+  }
+  function viderForm() { $('code').value = ''; $('client').value = ''; choix = null; }
+  $('vendre').onclick = () => {
+    const x = lireForm(); if (!x) return;
+    data.ventes.push({ t: Date.now(), f: x.f.id, prix: prixDe(x.f), code: x.code, client: x.client });
+    save(); viderForm(); msg('Vente enregistrée : ' + x.f.nom + ' ' + fc(prixDe(x.f))); dessiner();
+  };
+  $('facture').onclick = () => {
+    const x = lireForm(); if (!x) return;
+    const e = { id: Date.now(), n: ++data.num, t: Date.now(), f: x.f.id, prix: prixDe(x.f), code: x.code, client: x.client };
+    data.attente.push(e); save(); viderForm(); msg('Facture F-' + String(e.n).padStart(4, '0') + ' en attente : ' + fc(e.prix)); dessiner(); imprimer(e);
+  };
+  function imprimer(e) {
+    const f = FORFAITS.find(x => x.id === e.f);
+    const w = window.open('', '_blank'); if (!w) return;
+    w.document.write(`<title>Facture</title><body style="font:16px sans-serif;max-width:360px;margin:20px auto"><h2>Caisse WiFi Zone</h2><p><b>Facture F-${String(e.n).padStart(4, '0')}</b><br>${new Date(e.t).toLocaleString('fr-FR')}${e.client ? '<br>Client : ' + esc(e.client) : ''}</p><p>${f.nom} (${f.duree})<br><b>${fc(e.prix)}</b></p><p><i>En attente de paiement</i></p>`);
+    w.document.close(); w.focus(); w.print();
+  }
+  $('attente').onclick = ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    const id = b.dataset.enc || b.dataset.imp || b.dataset.abd;
+    const e = data.attente.find(x => String(x.id) === id); if (!e) return;
+    if (b.dataset.imp) return imprimer(e);
+    if (b.dataset.enc) {
+      data.attente = data.attente.filter(x => x !== e);
+      data.ventes.push({ t: Date.now(), f: e.f, prix: e.prix, code: e.code, client: e.client, fac: e.n });
+      save(); msg('Facture F-' + String(e.n).padStart(4, '0') + ' encaissée : ' + fc(e.prix));
+    } else {
+      if (!confirm('Le client ne prend pas le produit ? La facture sera abandonnée.')) return;
+      data.attente = data.attente.filter(x => x !== e); data.abandons.push({ ...e, abandonLe: Date.now() });
+      save(); msg('Facture abandonnée.');
+    }
     dessiner();
   };
   $('tabs').onclick = e => {
@@ -172,7 +229,7 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
       const d = JSON.parse(await e.target.files[0].text());
       if (!Array.isArray(d.ventes)) throw 0;
       if (!confirm('Remplacer les données actuelles par la sauvegarde ?')) return;
-      data = { prix: d.prix || {}, ventes: d.ventes }; save(); dessiner(); msg('Sauvegarde restaurée.');
+      data = { prix: d.prix || {}, ventes: d.ventes, attente: d.attente || [], abandons: d.abandons || [], num: d.num || 0 }; save(); dessiner(); msg('Sauvegarde restaurée.');
     } catch (err) { msg('Fichier de sauvegarde invalide.', true); }
     e.target.value = '';
   };
