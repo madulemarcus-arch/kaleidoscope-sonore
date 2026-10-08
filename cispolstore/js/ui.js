@@ -265,7 +265,7 @@
       title: 'Plus', nav: 'more',
       html: grp('Ventes et clients', [item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements'), item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter'), item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement'), item('impayes', '⏳', 'Impayés', 'Factures à encaisser et relances')])
         + grp('Terrain et stock', [item('livraisons', '🚚', 'Livraisons', 'Livraisons à effectuer et suivi'), item('installs', '🔧', 'Installations', 'Historique des interventions'), item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink'), item('suppliers', '🏭', 'Fournisseurs', 'Gérer vos fournisseurs')])
-        + grp('Gestion', [item('finance', '🏦', 'Finance', 'Entrées, sorties et caisse'), item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
+        + grp('Gestion', [item('finance', '🏦', 'Finance', 'Entrées, sorties et caisse'), item('daily', '🌙', 'Clôture du jour', 'Récapitulatif et caisse de la journée'), item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
         + grp('Application', [App.multi() ? item('profile', '👤', 'Mon profil', (App.user ? App.user.name : '') + ' · code PIN, changer de profil') : '', share])
         + `<p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0</p>`
     };

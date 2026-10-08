@@ -7,7 +7,7 @@
 
   // Totals of invoices / expenses inside a date range, all in USD
   const finance = r => {
-    const inv = App.db.invoices.filter(i => App.inRange(i.date, r));
+    const inv = App.db.invoices.filter(i => App.live(i) && App.inRange(i.date, r));
     const ca0 = inv.reduce((a, i) => a + App.usd(App.invAgreed(i), i.currency, i), 0);
     const cost0 = inv.reduce((a, i) => a + App.usd(App.invCost(i), i.currency, i), 0);
     const pen = App.db.penalties.filter(p => p.paid && App.inRange(p.paid, r));
@@ -23,7 +23,7 @@
   // ---------- Dashboard ----------
   let dper = 'month';
   const chartData = per => {
-    const t = App.today(), r = App.range(per), inv = App.db.invoices.filter(i => App.inRange(i.date, r));
+    const t = App.today(), r = App.range(per), inv = App.db.invoices.filter(i => App.live(i) && App.inRange(i.date, r));
     const val = i => App.usd(App.invAgreed(i), i.currency, i);
     let buckets;
     if (per === 'day') { buckets = Array.from({ length: 24 }, (_, h) => ({ l: h % 3 === 0 ? h + 'h' : '', v: 0 })); inv.forEach(i => { buckets[i.ts ? new Date(i.ts).getHours() : 12].v += val(i); }); }
@@ -116,14 +116,14 @@
   const rng = () => rs.per === 'custom' ? [rs.from, rs.to] : App.range(rs.per);
   const money = 'm';
   const REP = {
-    ventes: r => { const inv = App.db.invoices.filter(i => App.inRange(i.date, r)).sort((a, b) => b.date.localeCompare(a.date)), f = finance(r), due = inv.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
+    ventes: r => { const inv = App.db.invoices.filter(i => App.live(i) && App.inRange(i.date, r)).sort((a, b) => b.date.localeCompare(a.date)), f = finance(r), due = inv.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
       return { cards: [['Factures', inv.length], ['Chiffre d\'affaires', f.ca, money], ['Reste à encaisser', due, money]], head: ['Date', 'Facture', 'Client', 'Type', 'Total ($)', 'Reste ($)'], fmt: [4, 5], rows: inv.map(i => [i.date, i.number, App.cname(App.client(i.clientId)), App.invTypes[i.type], App.usd(App.invTotal(i), i.currency, i), App.usd(App.invDue(i), i.currency, i)]) }; },
-    abos: r => { const lines = []; App.db.invoices.filter(i => App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (/^abonnement/i.test(l.desc)) lines.push([i.date, i.number, App.cname(App.client(i.clientId)), l.desc, App.usd(l.qty * l.price, i.currency, i), App.usd(l.qty * (l.price - (l.cost || 0)), i.currency)]); }));
+    abos: r => { const lines = []; App.db.invoices.filter(i => App.live(i) && App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (/^abonnement/i.test(l.desc)) lines.push([i.date, i.number, App.cname(App.client(i.clientId)), l.desc, App.usd(l.qty * l.price, i.currency, i), App.usd(l.qty * (l.price - (l.cost || 0)), i.currency)]); }));
       const g = gere().map(c => App.sub(c)).filter(Boolean), n = k => g.filter(s => s.status === k).length;
       return { cards: [['Renouvellements facturés', lines.length], ['Revenus abonnements', lines.reduce((a, x) => a + x[4], 0), money], ['Marge abonnements', lines.reduce((a, x) => a + x[5], 0), money], ['Actifs / sursis / inactifs', `${n('actif')} / ${n('sursis')} / ${n('inactif')}`]], head: ['Date', 'Facture', 'Client', 'Désignation', 'Montant ($)', 'Marge ($)'], fmt: [4, 5], rows: lines.sort((a, b) => b[0].localeCompare(a[0])) }; },
     inst: r => { const l = App.db.installs.filter(x => App.inRange(x.date, r)).sort((a, b) => b.date.localeCompare(a.date));
       return { cards: [['Installations', l.length], ['Revenus', l.reduce((a, x) => a + (x.price || 0), 0), money]], head: ['Date', 'Client', 'Type', 'Technicien', 'Prix ($)'], fmt: [4], rows: l.map(x => [x.date, App.cname(App.client(x.clientId)), x.kind, x.tech || '', x.price || 0]) }; },
-    mat: r => { const by = {}; App.db.invoices.filter(i => App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (!l.pid) return; const o = by[l.pid] = by[l.pid] || { name: l.desc, unit: l.unit, q: 0, rev: 0, cost: 0 }; o.q += l.qty; o.rev += App.usd(l.qty * l.price, i.currency, i); o.cost += App.usd(l.qty * (l.cost || 0), i.currency, i); }));
+    mat: r => { const by = {}; App.db.invoices.filter(i => App.live(i) && App.inRange(i.date, r)).forEach(i => i.lines.forEach(l => { if (!l.pid) return; const o = by[l.pid] = by[l.pid] || { name: l.desc, unit: l.unit, q: 0, rev: 0, cost: 0 }; o.q += l.qty; o.rev += App.usd(l.qty * l.price, i.currency, i); o.cost += App.usd(l.qty * (l.cost || 0), i.currency, i); }));
       const rows = Object.values(by).sort((a, b) => b.rev - a.rev).map(o => [o.name, o.q + (o.unit ? ' ' + o.unit : ''), o.rev, o.rev - o.cost]);
       return { cards: [['Articles vendus', rows.length], ['Ventes matériel', rows.reduce((a, x) => a + x[2], 0), money], ['Marge', rows.reduce((a, x) => a + x[3], 0), money]], head: ['Article', 'Quantité', 'Ventes ($)', 'Marge ($)'], fmt: [2, 3], rows }; },
     benef: r => { const f = finance(r);
@@ -132,7 +132,7 @@
       return { cards: [['Dépenses', l.reduce((a, e) => a + App.usd(e.amount, e.currency, e), 0), money], ...Object.entries(by).map(([k, v]) => [k, v, money])], head: ['Date', 'Libellé', 'Catégorie', 'Montant ($)'], fmt: [3], rows: l.map(e => [e.date, e.label, e.cat, App.usd(e.amount, e.currency, e)]) }; },
     stock: () => { const p = App.db.products.filter(App.tracked), val = p.reduce((a, x) => a + x.qty * x.cost, 0), sale = p.reduce((a, x) => a + x.qty * x.price, 0);
       return { cards: [['Produits suivis', p.length], ['Valeur (achat)', val, money], ['Valeur (vente)', sale, money], ['Stock bas', p.filter(x => x.qty <= (x.min || 0)).length]], head: ['Produit', 'Catégorie', 'Quantité', 'Valeur achat ($)'], fmt: [3], rows: p.sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.name, x.cat, x.qty + (x.unit === 'm' ? ' m' : ''), x.qty * x.cost]) }; },
-    clients: r => { const c = App.db.clients, tot = {}; App.db.invoices.forEach(i => { tot[i.clientId] = (tot[i.clientId] || 0) + App.usd(App.invAgreed(i), i.currency, i); });
+    clients: r => { const c = App.db.clients, tot = {}; App.db.invoices.filter(App.live).forEach(i => { tot[i.clientId] = (tot[i.clientId] || 0) + App.usd(App.invAgreed(i), i.currency, i); });
       return { cards: [['Clients', c.length], ['Gérés', c.filter(x => x.type === 'gere').length], ['Matériel / Installation', `${c.filter(x => x.type === 'mat').length} / ${c.filter(x => x.type === 'install').length}`], ['Nouveaux (période)', c.filter(x => App.inRange(x.created || '', r)).length]], head: ['Client', 'Type', 'Statut', 'Total facturé ($)'], fmt: [3], rows: c.map(x => [App.cname(x), App.TYPES[x.type], App.sub(x) ? App.STATUS[App.sub(x).status][0] : '—', tot[x.id] || 0]).sort((a, b) => b[3] - a[3]) }; }
   };
   const lastReport = { head: [], rows: [] };
