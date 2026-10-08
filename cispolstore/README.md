@@ -108,7 +108,7 @@ Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Appl
 
 **Anciennes factures** : sur la page d'une facture non soldée, le bouton **💰 Encaisser** ouvre le formulaire de paiement avec les boutons **Tout le reste / Moitié**, le reste à payer en direct et la devise au choix ; un paiement ne dépasse jamais le solde. La page de chaque facture (anciennes comprises) affiche Total / Reçu du client / Reste à payer.
 
-**Preuve de paiement** : la facture (écran, impression / PDF, Word) contient un bloc **PAIEMENTS REÇUS** : date, mode, référence, montant reçu (avec le montant et le taux si payé dans l'autre devise) et **reste après chaque paiement**, ainsi que « FACTURE SOLDÉE le … » ou « Total payé / Reste à payer ». Chaque paiement a un **reçu** imprimable (🧾 sur la facture et dans Paiements, ou juste après l'enregistrement) : numéro (ex. FAC-2026-0002-P2), nom du client, montant en lettres, état de la facture et cases de signature.
+**Facture imprimée = prix complet** : ce que le client reçoit (écran, PDF, Word, impression) montre toujours le **total de la facture**, sans paiement ni reste. Ce que le client a réellement donné s'enregistre à part, dans le système, avec un **reçu** imprimable par paiement (🧾, numéro du type FAC-2026-0002-P2, montant en lettres). Si le client **marchande**, cochez « Le client a marchandé » (à la création, ou dans « Encaisser » sur une ancienne facture) : le montant donné devient le **prix convenu**, la facture est soldée, la facture imprimée garde son prix complet, et les rapports (chiffre d'affaires, bénéfices) comptent le prix convenu. La page de la facture affiche le total imprimé, le prix convenu, le reçu et le reste.
 
 ## Supprimer des factures
 
