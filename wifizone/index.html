@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d5c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>WiFi Zone Manager</title>
+<style>
+:root{--bg:#f2f5f8;--card:#fff;--txt:#14202b;--mut:#64748b;--line:#e2e8f0;--acc:#0b3d5c;--ok:#15803d;--bad:#b91c1c;--warn:#b45309}
+@media (prefers-color-scheme:dark){:root{--bg:#0d141b;--card:#16202a;--txt:#eef2f6;--mut:#94a3b8;--line:#253240;--acc:#38a3d8;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24}}
+*{box-sizing:border-box}
+body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--txt);padding-bottom:84px}
+header{position:sticky;top:0;z-index:5;background:var(--acc);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px))}
+header h1{margin:0;font-size:18px}header small{opacity:.85}
+main{max-width:640px;margin:auto;padding:12px 16px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav button{flex:1;border:0;background:none;color:var(--mut);padding:10px 2px;font-size:11px;cursor:pointer}
+nav button b{display:block;font-size:20px;font-weight:400}
+nav button.on{color:var(--acc);font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.stat small{color:var(--mut);display:block}.stat b{font-size:20px}
+.mut{color:var(--mut);font-size:14px}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+h2{font-size:15px;margin:16px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.row .g{flex:1;min-width:0}.row small{display:block;color:var(--mut)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.fo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fo button{border:2px solid var(--line);background:var(--card);color:var(--txt);border-radius:12px;padding:16px 6px;font-size:16px;font-weight:700;cursor:pointer}
+.fo button small{display:block;font-weight:400;color:var(--mut)}.fo button.on{border-color:var(--acc);background:var(--acc);color:#fff}.fo button.on small{color:#fff}
+label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
+input,select{width:100%;padding:11px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--txt);margin-top:4px}
+.btn{border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;background:var(--acc);color:#fff;cursor:pointer}
+.btn.full{width:100%;margin-top:12px}.btn.sec{background:var(--card);color:var(--txt);border:1px solid var(--line);font-weight:600}
+.btn.sm{padding:7px 11px;font-size:14px;border-radius:9px}.btn.del{background:var(--bad)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.bar .btn{flex:1}
+.qty{display:flex;align-items:center;gap:12px;margin:8px 0}.qty button{width:48px;height:48px;font-size:24px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--txt);cursor:pointer}
+.qty b{font-size:26px;min-width:44px;text-align:center}
+.total{font-size:30px;font-weight:800}
+dialog{border:0;border-radius:16px;padding:16px;width:min(92vw,460px);background:var(--card);color:var(--txt)}
+dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
+.end{display:flex;gap:8px;margin-top:14px}.end .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+#toast.on{opacity:1}
+.empty{text-align:center;color:var(--mut);padding:24px 0}
+@media print{header,nav,.noprint{display:none!important}body{padding:0;background:#fff}}
+</style>
+</head>
+<body>
+<header><h1 id="ttl">WiFi Zone</h1><small id="sub"></small></header>
+<main id="view"></main>
+<nav id="nav"></nav>
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+<script>
+// WiFi Zone Manager: single-file PWA (sales of tickets, expenses, daily closing, reports). Data stays in this browser (localStorage).
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id), KEY = 'wifizone-v1';
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = () => iso(new Date());
+  const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); };
+  const fdate = s => s ? s.split('-').reverse().join('/') : '—';
+  const nf = (n, d = 0) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: d }).format(n).replace(/[  ]/g, ' ');
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const MODES = ['Cash', 'M-Pesa', 'Airtel Money', 'Orange Money', 'Banque'], CATS = ['Abonnement Starlink', 'Électricité / carburant', 'Salaire', 'Matériel / réparation', 'Papier / impression', 'Autre'];
+  const blank = () => ({ v: 1, name: 'WiFi Zone', rate: 2400, lastBackup: '', forfaits: [
+    { id: 'V', nom: 'Visiteur', duree: '6 heures', prix: 500 }, { id: 'J', nom: 'Jour', duree: '24 heures', prix: 1000 },
+    { id: 'S', nom: 'Semaine', duree: '7 jours', prix: 7000 }, { id: 'M', nom: 'Mois', duree: '30 jours', prix: 30000 }], sales: [], expenses: [], closings: [] });
+  let db; try { db = { ...blank(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) { db = blank(); }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Stockage plein : faites une sauvegarde'); } };
+  const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2400); };
+  // money: every record keeps its own currency and the rate of the day it was made
+  const toCDF = (n, cur, rate) => cur === 'USD' ? n * (rate || db.rate) : n;
+  const fmt = (n, cur = 'CDF') => cur === 'USD' ? `${nf(n, Math.abs(n % 1) > .004 ? 2 : 0)} $` : `${nf(n)} FC`;
+  const usdOf = cdf => cdf / db.rate;
+  const both = cdf => `${fmt(cdf)} <small>≈ ${fmt(usdOf(cdf), 'USD')}</small>`;
+
+  const st = { tab: 'home', per: 'day', fid: '', qty: 1, mode: 'Cash', cd: today(), rm: today().slice(0, 7) };
+  const range = per => { const t = today(); if (per === 'day') return [t, t]; if (per === 'week') return [addDays(t, -6), t]; return [t.slice(0, 7) + '-01', t]; };
+  const inR = (d, r) => d >= r[0] && d <= r[1];
+  const saleCDF = s => s.amount, expCDF = e => toCDF(e.amount, e.cur, e.rate);
+  const sum = (a, f) => a.reduce((t, x) => t + f(x), 0);
+  const fname = id => (db.forfaits.find(f => f.id === id) || { nom: 'Forfait supprimé' }).nom;
+
+  // ---------- modal ----------
+  const dlg = $('dlg');
+  const modal = (title, body, onOk, okLabel = 'Enregistrer') => {
+    dlg.innerHTML = `<form method="dialog"><h3>${esc(title)}</h3>${body}<div class="end"><button type="button" class="btn sec" id="dno">${onOk ? 'Annuler' : 'Fermer'}</button>${onOk ? `<button class="btn" id="dok">${okLabel}</button>` : ''}</div></form>`;
+    $('dno').onclick = () => dlg.close();
+    dlg.querySelector('form').onsubmit = e => { e.preventDefault(); if (onOk && onOk() === false) return; dlg.close(); };
+    if (!dlg.open) dlg.showModal();
+  };
+  const chips = (act, cur, items) => `<div class="chips">${items.map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-a="${act}" data-v="${esc(k)}">${esc(t)}</button>`).join('')}</div>`;
+
+  // ---------- views ----------
+  const views = {};
+  views.home = () => {
+    const r = range(st.per), S = db.sales.filter(s => inR(s.date, r)), E = db.expenses.filter(e => inR(e.date, r));
+    const inc = sum(S, saleCDF), out = sum(E, expCDF), net = inc - out, tickets = sum(S, s => s.qty);
+    const byF = {}; S.forEach(s => { const o = byF[s.fid] = byF[s.fid] || { q: 0, a: 0 }; o.q += s.qty; o.a += s.amount; });
+    const byM = {}; S.forEach(s => byM[s.mode] = (byM[s.mode] || 0) + s.amount);
+    const stale = !db.lastBackup || (Date.now() - db.lastBackup) > 3 * 864e5;
+    return { title: db.name, sub: fdate(r[0]) + (r[0] !== r[1] ? ' → ' + fdate(r[1]) : ''), html: `
+      ${stale && (db.sales.length || db.expenses.length) ? `<div class="card warn" data-a="goset" style="cursor:pointer">⚠ Pas de sauvegarde récente. Touchez ici pour sauvegarder vos données.</div>` : ''}
+      ${chips('per', st.per, [['day', "Aujourd'hui"], ['week', '7 jours'], ['month', 'Ce mois']])}
+      <div class="grid"><div class="stat"><small>Ventes</small><b class="ok">${fmt(inc)}</b><small>${tickets} ticket(s)</small></div><div class="stat"><small>Dépenses</small><b class="bad">${fmt(out)}</b><small>${E.length} dépense(s)</small></div></div>
+      <div class="card"><small class="mut">Bénéfice</small><div class="total ${net >= 0 ? 'ok' : 'bad'}">${fmt(net)}</div><div class="mut">≈ ${fmt(usdOf(net), 'USD')} (1 $ = ${nf(db.rate)} FC)</div></div>
+      <h2>Par forfait</h2><div class="card">${Object.keys(byF).length ? Object.entries(byF).map(([id, o]) => `<div class="row"><div class="g"><b>${esc(fname(id))}</b><small>${o.q} ticket(s)</small></div><b>${fmt(o.a)}</b></div>`).join('') : '<div class="empty">Aucune vente sur cette période.</div>'}</div>
+      <h2>Par mode de paiement</h2><div class="card">${Object.keys(byM).length ? Object.entries(byM).map(([m, a]) => `<div class="row"><div class="g">${esc(m)}</div><b>${fmt(a)}</b></div>`).join('') : '<div class="empty">—</div>'}</div>` };
+  };
+  views.sell = () => {
+    const f = db.forfaits.find(x => x.id === st.fid), t = f ? f.prix * st.qty : 0, list = db.sales.filter(s => s.date === today()).sort((a, b) => b.ts - a.ts);
+    return { title: 'Vendre', sub: fdate(today()), html: `
+      <div class="fo">${db.forfaits.map(x => `<button class="${st.fid === x.id ? 'on' : ''}" data-a="fid" data-v="${esc(x.id)}">${esc(x.nom)}<small>${esc(x.duree)} · ${fmt(x.prix)}</small></button>`).join('')}</div>
+      <div class="card"><div class="qty"><button data-a="qty" data-v="-1">−</button><b>${st.qty}</b><button data-a="qty" data-v="1">+</button><span class="mut">ticket(s)</span></div>
+        ${chips('mode', st.mode, MODES.map(m => [m, m]))}
+        <div class="mut">Total à encaisser</div><div class="total">${fmt(t)}</div>
+        <button class="btn full" data-a="sell" ${f ? '' : 'disabled style="opacity:.5"'}>✔ Enregistrer la vente</button></div>
+      <h2>Ventes d'aujourd'hui (${list.length})</h2><div class="card">${list.length ? list.map(s => `<div class="row"><div class="g"><b>${s.qty} × ${esc(fname(s.fid))}</b><small>${esc(s.mode)}${s.note ? ' · ' + esc(s.note) : ''}</small></div><b>${fmt(s.amount)}</b><button class="btn sm sec" data-a="delsale" data-v="${s.id}">✕</button></div>`).join('') : '<div class="empty">Aucune vente pour le moment.</div>'}</div>` };
+  };
+  views.exp = () => {
+    const r = range(st.per), E = db.expenses.filter(e => inR(e.date, r)).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+    return { title: 'Dépenses', sub: fdate(r[0]) + (r[0] !== r[1] ? ' → ' + fdate(r[1]) : ''), html: `
+      ${chips('per', st.per, [['day', "Aujourd'hui"], ['week', '7 jours'], ['month', 'Ce mois']])}
+      <div class="card"><small class="mut">Total des dépenses</small><div class="total bad">${fmt(sum(E, expCDF))}</div></div>
+      <button class="btn full" data-a="newexp" style="margin:0 0 12px">+ Nouvelle dépense</button>
+      <div class="card">${E.length ? E.map(e => `<div class="row"><div class="g"><b>${esc(e.label || e.cat)}</b><small>${fdate(e.date)} · ${esc(e.cat)} · ${esc(e.mode)}</small></div><b class="bad">${fmt(e.amount, e.cur)}</b><button class="btn sm sec" data-a="delexp" data-v="${e.id}">✕</button></div>`).join('') : '<div class="empty">Aucune dépense.</div>'}</div>` };
+  };
+  // daily closing: cash that should be in the drawer vs cash counted
+  const dayData = d => {
+    const S = db.sales.filter(s => s.date === d), E = db.expenses.filter(e => e.date === d), cash = { CDF: 0, USD: 0 };
+    S.filter(s => s.mode === 'Cash').forEach(s => cash.CDF += s.amount); E.filter(e => e.mode === 'Cash').forEach(e => cash[e.cur] -= e.amount);
+    return { d, S, E, inc: sum(S, saleCDF), out: sum(E, expCDF), tickets: sum(S, s => s.qty), cash, cl: db.closings.find(c => c.date === d) };
+  };
+  const dayText = x => {
+    const L = [`🌐 ${db.name} — Journée du ${fdate(x.d)}`, '', `🎫 ${x.tickets} ticket(s) vendus : ${fmt(x.inc)}`];
+    const byF = {}; x.S.forEach(s => byF[s.fid] = (byF[s.fid] || 0) + s.qty); Object.entries(byF).forEach(([id, q]) => L.push(`   • ${fname(id)} : ${q}`));
+    L.push(`💸 Dépenses : ${fmt(x.out)}`, `✅ Bénéfice du jour : ${fmt(x.inc - x.out)}`, '', `💵 Cash attendu en caisse : ${fmt(x.cash.CDF)}${Math.abs(x.cash.USD) > .004 ? ' + ' + fmt(x.cash.USD, 'USD') : ''}`);
+    if (x.cl) L.push(`Cash compté : ${fmt(x.cl.counted)}${x.cl.diff ? ' · Écart : ' + fmt(x.cl.diff) : ' · aucun écart'}`);
+    return L.join('\n');
+  };
+  views.day = () => {
+    const x = dayData(st.cd), cl = x.cl;
+    return { title: 'Clôture du jour', sub: fdate(st.cd), html: `
+      <div class="bar noprint" style="margin:0 0 10px"><button class="btn sec sm" data-a="dnav" data-v="-1">‹ Veille</button><input type="date" id="cdate" value="${st.cd}" max="${today()}" style="flex:2;margin:0"><button class="btn sec sm" data-a="dnav" data-v="1" ${st.cd >= today() ? 'disabled' : ''}>Lendemain ›</button></div>
+      <div class="grid"><div class="stat"><small>Ventes</small><b class="ok">${fmt(x.inc)}</b><small>${x.tickets} ticket(s)</small></div><div class="stat"><small>Dépenses</small><b class="bad">${fmt(x.out)}</b></div></div>
+      <div class="card"><small class="mut">Bénéfice du jour</small><div class="total ${x.inc - x.out >= 0 ? 'ok' : 'bad'}">${fmt(x.inc - x.out)}</div></div>
+      <h2>💵 Caisse (cash)</h2><div class="card"><div class="row"><div class="g">Cash attendu</div><b>${fmt(x.cash.CDF)}${Math.abs(x.cash.USD) > .004 ? ' + ' + fmt(x.cash.USD, 'USD') : ''}</b></div>
+        <label>Cash compté (FC)</label><input id="ccount" type="number" inputmode="numeric" min="0" value="${cl ? cl.counted : ''}" placeholder="${nf(x.cash.CDF)}">
+        <label>Note (facultatif)</label><input id="cnote" value="${esc(cl ? cl.note : '')}" placeholder="Ex. 2 000 FC pour le transport">
+        ${cl ? `<p class="${cl.diff ? 'warn' : 'ok'}"><b>✅ Clôturée · compté ${fmt(cl.counted)} · ${cl.diff ? 'écart ' + fmt(cl.diff) : 'aucun écart'}</b></p>` : ''}
+        <div class="bar"><button class="btn" data-a="close">${cl ? 'Mettre à jour' : '✔ Clôturer la journée'}</button>${cl ? '<button class="btn sec" data-a="reopen">Rouvrir</button>' : ''}</div></div>
+      <div class="bar noprint"><button class="btn" data-a="dwa">💬 WhatsApp</button><button class="btn sec" data-a="dcopy">📋 Copier</button><button class="btn sec" data-a="print">🖨️ Imprimer</button></div>` };
+  };
+  const monthData = m => {
+    const r = [m + '-01', m + '-31'], S = db.sales.filter(s => inR(s.date, r)), E = db.expenses.filter(e => inR(e.date, r));
+    const byF = {}, byC = {}, byD = {}; S.forEach(s => { const o = byF[s.fid] = byF[s.fid] || { q: 0, a: 0 }; o.q += s.qty; o.a += s.amount; (byD[s.date] = byD[s.date] || { i: 0, o: 0 }).i += s.amount; });
+    E.forEach(e => { byC[e.cat] = (byC[e.cat] || 0) + expCDF(e); (byD[e.date] = byD[e.date] || { i: 0, o: 0 }).o += expCDF(e); });
+    return { m, S, E, inc: sum(S, saleCDF), out: sum(E, expCDF), tickets: sum(S, s => s.qty), byF, byC, byD };
+  };
+  const monthName = m => new Date(m + '-15T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const monthText = x => {
+    const L = [`📑 ${db.name} — Rapport de ${monthName(x.m)}`, '', `🎫 ${x.tickets} ticket(s) : ${fmt(x.inc)}`];
+    Object.entries(x.byF).forEach(([id, o]) => L.push(`   • ${fname(id)} : ${o.q} (${fmt(o.a)})`));
+    L.push(`💸 Dépenses : ${fmt(x.out)}`); Object.entries(x.byC).forEach(([c, a]) => L.push(`   • ${c} : ${fmt(a)}`));
+    L.push(`✅ Bénéfice : ${fmt(x.inc - x.out)} (≈ ${fmt(usdOf(x.inc - x.out), 'USD')})`); return L.join('\n');
+  };
+  views.rep = () => {
+    const x = monthData(st.rm), days = Object.entries(x.byD).sort((a, b) => b[0].localeCompare(a[0]));
+    return { title: 'Rapport du mois', sub: monthName(st.rm), html: `
+      <div class="bar noprint" style="margin:0 0 10px"><button class="btn sec sm" data-a="mnav" data-v="-1">‹ Précédent</button><button class="btn sec sm" data-a="mnav" data-v="1" ${st.rm >= today().slice(0, 7) ? 'disabled' : ''}>Suivant ›</button></div>
+      <div class="grid"><div class="stat"><small>Ventes</small><b class="ok">${fmt(x.inc)}</b><small>${x.tickets} ticket(s)</small></div><div class="stat"><small>Dépenses</small><b class="bad">${fmt(x.out)}</b></div></div>
+      <div class="card"><small class="mut">Bénéfice net</small><div class="total ${x.inc - x.out >= 0 ? 'ok' : 'bad'}">${fmt(x.inc - x.out)}</div><div class="mut">≈ ${fmt(usdOf(x.inc - x.out), 'USD')}</div></div>
+      <h2>Par forfait</h2><div class="card">${Object.keys(x.byF).length ? Object.entries(x.byF).map(([id, o]) => `<div class="row"><div class="g"><b>${esc(fname(id))}</b><small>${o.q} ticket(s)</small></div><b>${fmt(o.a)}</b></div>`).join('') : '<div class="empty">—</div>'}</div>
+      <h2>Dépenses par catégorie</h2><div class="card">${Object.keys(x.byC).length ? Object.entries(x.byC).sort((a, b) => b[1] - a[1]).map(([c, a]) => `<div class="row"><div class="g">${esc(c)}</div><b class="bad">${fmt(a)}</b></div>`).join('') : '<div class="empty">—</div>'}</div>
+      <h2>Jour par jour</h2><div class="card">${days.length ? days.map(([d, o]) => `<div class="row"><div class="g"><b>${fdate(d)}</b><small>Ventes ${fmt(o.i)} · Dépenses ${fmt(o.o)}</small></div><b class="${o.i - o.o >= 0 ? 'ok' : 'bad'}">${fmt(o.i - o.o)}</b></div>`).join('') : '<div class="empty">—</div>'}</div>
+      <div class="bar noprint"><button class="btn" data-a="mwa">💬 WhatsApp</button><button class="btn sec" data-a="csv">⬇ CSV</button><button class="btn sec" data-a="print">🖨️ Imprimer</button></div>` };
+  };
+  views.set = () => ({ title: 'Réglages', sub: db.name, html: `
+    <div class="card"><label>Nom de l'activité</label><input id="s_name" value="${esc(db.name)}">
+      <label>Taux du jour (1 $ = … FC)</label><input id="s_rate" type="number" inputmode="numeric" min="1" value="${db.rate}">
+      <button class="btn full" data-a="saveset">Enregistrer</button></div>
+    <h2>Forfaits et prix</h2><div class="card">${db.forfaits.map(f => `<div class="row"><div class="g"><b>${esc(f.nom)}</b><small>${esc(f.duree)}</small></div><b>${fmt(f.prix)}</b><button class="btn sm sec" data-a="editf" data-v="${esc(f.id)}">✎</button></div>`).join('')}<button class="btn sec full" data-a="newf">+ Ajouter un forfait</button></div>
+    <h2>Sauvegarde</h2><div class="card"><p class="mut" style="margin-top:0">Vos données sont dans ce téléphone. ${db.lastBackup ? 'Dernière sauvegarde : ' + new Date(db.lastBackup).toLocaleString('fr-FR') : '<b class="warn">Aucune sauvegarde faite.</b>'}</p>
+      <div class="bar"><button class="btn" data-a="backup">⬇ Sauvegarder</button><button class="btn sec" data-a="restore">⬆ Restaurer</button></div><input type="file" id="rfile" accept=".json,application/json" hidden></div>
+    <p class="mut" style="text-align:center">WiFi Zone Manager · version 1.0</p>` });
+
+  const NAV = [['home', '🏠', 'Accueil'], ['sell', '🎫', 'Vendre'], ['exp', '💸', 'Dépenses'], ['day', '🌙', 'Clôture'], ['rep', '📊', 'Rapport'], ['set', '⚙️', 'Réglages']];
+  const draw = () => {
+    const v = views[st.tab](); $('ttl').textContent = v.title; $('sub').textContent = v.sub || ''; $('view').innerHTML = v.html;
+    $('nav').innerHTML = NAV.map(([k, i, t]) => `<button class="${st.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}"><b>${i}</b>${t}</button>`).join('');
+    if ($('cdate')) $('cdate').onchange = () => { const d = $('cdate').value; if (d && d <= today()) { st.cd = d; draw(); } };
+  };
+
+  // ---------- actions ----------
+  const share = t => window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
+  const copy = t => { const ok = () => toast('Copié'); try { navigator.clipboard.writeText(t).then(ok, () => prompt('Copiez :', t)); } catch (e) { prompt('Copiez :', t); } };
+  const download = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  const forfaitForm = f => modal(f ? 'Modifier le forfait' : 'Nouveau forfait', `<label>Nom</label><input id="f_nom" value="${esc(f ? f.nom : '')}"><label>Durée (ex. 24 heures)</label><input id="f_duree" value="${esc(f ? f.duree : '')}"><label>Prix (FC)</label><input id="f_prix" type="number" inputmode="numeric" min="0" value="${f ? f.prix : ''}">${f ? '<button type="button" class="btn del full" id="f_del">Supprimer ce forfait</button>' : ''}`, () => {
+    const nom = $('f_nom').value.trim(), prix = +$('f_prix').value; if (!nom || !(prix >= 0) || $('f_prix').value === '') { toast('Nom et prix requis'); return false; }
+    if (f) Object.assign(f, { nom, duree: $('f_duree').value.trim(), prix }); else db.forfaits.push({ id: uid(), nom, duree: $('f_duree').value.trim(), prix });
+    save(); draw();
+  }) || (f && ($('f_del').onclick = () => { if (confirm('Supprimer ce forfait ? Les anciennes ventes sont conservées.')) { db.forfaits = db.forfaits.filter(x => x !== f); if (st.fid === f.id) st.fid = ''; save(); dlg.close(); draw(); } }));
+  const A = {
+    tab: v => { st.tab = v; draw(); window.scrollTo(0, 0); }, per: v => { st.per = v; draw(); }, goset: () => A.tab('set'),
+    fid: v => { st.fid = v; draw(); }, qty: v => { st.qty = Math.max(1, st.qty + +v); draw(); }, mode: v => { st.mode = v; draw(); },
+    sell: () => { const f = db.forfaits.find(x => x.id === st.fid); if (!f) return; db.sales.push({ id: uid(), ts: Date.now(), date: today(), fid: f.id, qty: st.qty, amount: f.prix * st.qty, mode: st.mode, note: '' }); save(); toast(`Vente enregistrée : ${fmt(f.prix * st.qty)}`); st.qty = 1; draw(); },
+    delsale: v => { const s = db.sales.find(x => x.id === v); if (s && confirm(`Supprimer cette vente de ${fmt(s.amount)} ?`)) { db.sales = db.sales.filter(x => x !== s); save(); draw(); } },
+    newexp: () => modal('Nouvelle dépense', `<label>Libellé</label><input id="e_label" placeholder="Ex. Recharge Starlink"><label>Catégorie</label><select id="e_cat">${CATS.map(c => `<option>${esc(c)}</option>`).join('')}</select>
+      <div style="display:flex;gap:8px"><div style="flex:2"><label>Montant</label><input id="e_amt" type="number" inputmode="decimal" min="0"></div><div style="flex:1"><label>Devise</label><select id="e_cur"><option>CDF</option><option>USD</option></select></div></div>
+      <label>Payé par</label><select id="e_mode">${MODES.map(m => `<option>${esc(m)}</option>`).join('')}</select><label>Date</label><input id="e_date" type="date" value="${today()}" max="${today()}">`, () => {
+      const amount = +$('e_amt').value; if (!(amount > 0)) { toast('Montant invalide'); return false; }
+      db.expenses.push({ id: uid(), ts: Date.now(), date: $('e_date').value || today(), label: $('e_label').value.trim(), cat: $('e_cat').value, amount, cur: $('e_cur').value, rate: db.rate, mode: $('e_mode').value }); save(); draw(); toast('Dépense enregistrée');
+    }),
+    delexp: v => { const e = db.expenses.find(x => x.id === v); if (e && confirm(`Supprimer cette dépense de ${fmt(e.amount, e.cur)} ?`)) { db.expenses = db.expenses.filter(x => x !== e); save(); draw(); } },
+    dnav: v => { const n = addDays(st.cd, +v); if (n <= today()) { st.cd = n; draw(); } },
+    close: () => { const raw = $('ccount').value; if (raw === '') return toast('Saisissez le cash compté'); const x = dayData(st.cd), counted = +raw, diff = Math.round(counted - x.cash.CDF);
+      db.closings = db.closings.filter(c => c.date !== st.cd); db.closings.push({ date: st.cd, ts: Date.now(), expected: x.cash.CDF, counted, diff, note: $('cnote').value.trim() }); save(); draw(); toast('Journée clôturée'); },
+    reopen: () => { if (confirm('Rouvrir cette journée ?')) { db.closings = db.closings.filter(c => c.date !== st.cd); save(); draw(); } },
+    dwa: () => share(dayText(dayData(st.cd))), dcopy: () => copy(dayText(dayData(st.cd))), print: () => window.print(),
+    mnav: v => { const d = new Date(st.rm + '-15T12:00:00'); d.setMonth(d.getMonth() + +v); const n = iso(d).slice(0, 7); if (n <= today().slice(0, 7)) { st.rm = n; draw(); } },
+    mwa: () => share(monthText(monthData(st.rm))),
+    csv: () => { const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, x = monthData(st.rm), rows = [['Date', 'Type', 'Libellé', 'Mode', 'Devise', 'Montant', 'Équivalent FC'],
+      ...x.S.map(s => [s.date, 'Vente', `${s.qty} × ${fname(s.fid)}`, s.mode, 'CDF', s.amount, s.amount]), ...x.E.map(e => [e.date, 'Dépense', e.label || e.cat, e.mode, e.cur, -e.amount, -expCDF(e)])].sort((a, b) => a[0].localeCompare(b[0]));
+      download(`wifizone-${st.rm}.csv`, '﻿' + rows.map(r => r.map(q).join(';')).join('\n'), 'text/csv'); },
+    saveset: () => { const r = Math.round(+$('s_rate').value); if (!(r > 0)) return toast('Taux invalide'); db.name = $('s_name').value.trim() || 'WiFi Zone'; db.rate = r; save(); draw(); toast('Réglages enregistrés'); },
+    newf: () => forfaitForm(null), editf: v => forfaitForm(db.forfaits.find(f => f.id === v)),
+    backup: () => { db.lastBackup = Date.now(); save(); download(`wifizone-sauvegarde-${today()}.json`, JSON.stringify(db), 'application/json'); draw(); toast('Sauvegarde téléchargée'); },
+    restore: () => $('rfile').click()
+  };
+  document.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b && A[b.dataset.a]) A[b.dataset.a](b.dataset.v); });
+  document.addEventListener('change', e => {
+    if (e.target.id !== 'rfile' || !e.target.files[0]) return;
+    const rd = new FileReader(); rd.onload = () => { try { const d = JSON.parse(rd.result); if (!Array.isArray(d.sales) || !Array.isArray(d.expenses)) throw 0;
+      if (!confirm(`Remplacer les données actuelles par cette sauvegarde (${d.sales.length} vente(s), ${d.expenses.length} dépense(s)) ?`)) return; db = { ...blank(), ...d }; save(); draw(); toast('Sauvegarde restaurée'); } catch (x) { toast('Fichier invalide'); } };
+    rd.readAsText(e.target.files[0]); e.target.value = '';
+  });
+  draw();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
