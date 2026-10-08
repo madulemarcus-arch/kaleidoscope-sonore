@@ -29,6 +29,8 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 #codeVendu{margin-top:10px;padding:14px;border:2px dashed var(--ok);border-radius:12px;text-align:center}
 #codeVendu b{display:block;font:700 34px/1.2 monospace;letter-spacing:4px}
 #planche{display:none}
+#rappel{border-color:#dc2626;color:#dc2626;font-weight:600}
+#rappel button{margin-top:8px}
 @media print{
   body.imprime>*:not(#planche){display:none!important}
   body.imprime{background:#fff;color:#000;padding:0;max-width:none}
@@ -67,6 +69,8 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
 </div>
 
 <div id="gerant" hidden>
+<div class="card" id="rappel" hidden></div>
+
 <div class="card">
   <div class="mut" id="jourLib">Aujourd'hui</div>
   <div class="total" id="totalJour">0 FC</div>
@@ -137,8 +141,19 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   }
   const depuis = p => data.ventes.filter(v => v.t >= debut(p)).sort((a, b) => b.t - a.t);
 
+  // Backup reminder: the date of the last backup lives outside `data` so a restore does not erase it
+  const CLE_SAUV = 'caisse-simple-derniere-sauvegarde';
+  let derniereSauv = 0; try { derniereSauv = Number(localStorage.getItem(CLE_SAUV)) || 0; } catch (e) {}
+  const noterSauvegarde = () => { derniereSauv = Date.now(); try { localStorage.setItem(CLE_SAUV, derniereSauv); } catch (e) {} };
   const nbStock = id => data.stock.filter(c => c.f === id).length;
+  function rappelSauvegarde() {
+    const rien = !data.ventes.length && !data.lots.length; // nothing worth saving yet
+    const h = (Date.now() - derniereSauv) / 3600e3;
+    const r = $('rappel'); r.hidden = rien || h < 24;
+    if (!r.hidden) r.innerHTML = '⚠ ' + (derniereSauv ? 'Dernière sauvegarde il y a ' + (h < 48 ? Math.floor(h) + ' h' : Math.floor(h / 24) + ' jours') + '.' : 'Aucune sauvegarde faite.') + '<br><button class="sec" id="sauverRappel">Sauvegarder maintenant</button>';
+  }
   function dessiner() {
+    rappelSauvegarde();
     $('lotForfait').innerHTML = FORFAITS.map(f => `<option value="${f.id}">${f.nom} (${f.duree})</option>`).join('');
     $('stockInfo').innerHTML = FORFAITS.map(f => { const n = nbStock(f.id); return `${f.nom} : <b style="color:${n < SEUIL ? '#dc2626' : 'inherit'}">${n}</b>${n < SEUIL ? ' ⚠' : ''}`; }).join(' · ');
     $('lots').innerHTML = data.lots.slice().reverse().slice(0, 10).map(l => {
@@ -236,14 +251,16 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
     }
     telecharger('ventes-' + periode + '.csv', 'text/csv;charset=utf-8', '﻿' + l.join('\r\n'));
   };
-  $('sauver').onclick = () => telecharger('sauvegarde-caisse-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json', JSON.stringify(data));
+  $('sauver').onclick = faireSauvegarde;
+  $('gerant').addEventListener('click', e => { if (e.target.id === 'sauverRappel') faireSauvegarde(); });
+  function faireSauvegarde() { noterSauvegarde(); dessiner(); telecharger('sauvegarde-caisse-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json', JSON.stringify(data)); }
   $('restaurer').onclick = () => $('fichier').click();
   $('fichier').onchange = async e => {
     try {
       const d = JSON.parse(await e.target.files[0].text());
       if (!Array.isArray(d.ventes)) throw 0;
       if (!confirm('Remplacer les données actuelles par la sauvegarde ?')) return;
-      data = { prix: d.prix || {}, ventes: d.ventes, stock: d.stock || [], lots: d.lots || [] }; save(); dessiner(); msg('Sauvegarde restaurée.');
+      data = { prix: d.prix || {}, ventes: d.ventes, stock: d.stock || [], lots: d.lots || [] }; save(); noterSauvegarde(); dessiner(); msg('Sauvegarde restaurée.');
     } catch (err) { msg('Fichier de sauvegarde invalide.', true); }
     e.target.value = '';
   };
