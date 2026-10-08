@@ -30,7 +30,7 @@
         client_id: cfg.clientId, scope: SCOPE,
         callback: r => {
           if (r.error) return ko(Object.assign(new Error(r.error_description || r.error), { code: r.error }));
-          tok = r.access_token; tokExp = Date.now() + ((+r.expires_in || 3600) - 60) * 1000; cfg.connected = true; saveCfg(); ok(tok);
+          tok = r.access_token; tokExp = Date.now() + ((+r.expires_in || 3600) - 60) * 1000; cfg.connected = true; if (!cfg.mode && !('auto' in cfg)) cfg.mode = 'daily'; saveCfg(); ok(tok);
         },
         error_callback: e => ko(Object.assign(new Error(e && e.type === 'popup_closed' ? 'Fenêtre Google fermée avant la fin' : 'Connexion Google impossible (' + ((e && e.type) || 'erreur') + ')'), { code: (e && e.type) || 'popup' }))
       });
@@ -63,7 +63,7 @@
 
   // ---------- Backup ----------
   const setStatus = (st, err = '') => { D.status = st; D.error = err; };
-  D.backupNow = async interactive => {
+  D.backupNow = async (interactive, auto) => {
     if (!cfg.clientId) throw new Error('Google Drive n\'est pas configuré');
     if (busy) return; busy = true; setStatus('busy');
     try {
@@ -71,36 +71,45 @@
       const fid = await folder(), name = `cispolstore-${App.today()}.json`, base = name.slice(0, -5);
       await upsert(fid, name, JSON.stringify(App.exportData()));
       // readable Excel copy; the JSON above is what "Restaurer" uses, so a failure here is not fatal
-      let extra = '';
-      try { await upsert(fid, base + '.xlsx', App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); } catch (e) { if (e.code === 'auth') throw e; extra = e.message; }
+      let extra = ''; const today = App.today(), wantXlsx = cfg.noXlsx !== true && !(auto && cfg.lastXlsx === today);
+      if (wantXlsx) try { await upsert(fid, base + '.xlsx', App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); cfg.lastXlsx = today; } catch (e) { if (e.code === 'auth') throw e; extra = e.message; }
       // keep the 30 most recent files of each kind, move older ones to the Drive trash
       const all = await list(`'${fid}' in parents and trashed=false and name contains 'cispolstore-'`);
       for (const ext of ['.json', '.xlsx']) for (const f of all.filter(f => f.name.endsWith(ext)).slice(KEEP)) await gfetch(`${API}/${f.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
-      cfg.last = Date.now(); cfg.lastName = name; cfg.extraErr = extra; cfg.connected = true; saveCfg(); dirty = false; setStatus('idle'); warned = false;
+      cfg.last = Date.now(); cfg.lastName = name; cfg.extraErr = extra; cfg.connected = true; cfg.retryAt = 0; saveCfg(); dirty = false; setStatus('idle');
       return name;
     } catch (e) {
-      setStatus(NEED_LOGIN.includes(e.code) ? 'reconnect' : 'error', e.message); throw e;
+      setStatus(NEED_LOGIN.includes(e.code) ? 'reconnect' : 'error', e.message);
+      if (auto) { cfg.retryAt = Date.now() + 6 * 3600e3; saveCfg(); }   // a silent failure is not retried for 6 hours
+      throw e;
     } finally { busy = false; }
   };
 
-  // ---------- Automatic backups (while the app is open) ----------
-  const everyMs = () => ({ 1: 1, 6: 6, 24: 24 }[cfg.every] || 24) * 3600e3;
-  const due = () => cfg.connected && cfg.auto && dirty && Date.now() - (cfg.last || 0) >= everyMs();
+  // ---------- Automatic backups: calm by design ----------
+  // never while the person is working (waits for a minute without any touch, never with a form open), never right after opening,
+  // never by surprise on mobile data if "Wi-Fi only" is on, no pop-up, no message; a silent failure is not retried for 6 hours
+  D.minIdle = 60000; D.minUptime = 120000;
+  const bootAt = Date.now(); let lastAct = Date.now();
+  ['pointerdown', 'keydown', 'input', 'scroll', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true, capture: true }));
+  const MODES = [['daily', 'Une fois par jour (recommandé)'], ['6h', 'Toutes les 6 heures'], ['1h', 'Toutes les heures (déconseillé)'], ['manual', 'Manuelle seulement (bouton Sauvegarder)']];
+  const mode = () => cfg.mode || (cfg.auto ? ({ 1: '1h', 6: '6h', 24: 'daily' }[cfg.every] || 'daily') : cfg.connected && 'auto' in cfg ? 'manual' : 'daily');
+  const everyMs = () => ({ daily: 24, '6h': 6, '1h': 1 }[mode()] || 0) * 3600e3;
+  const slowLink = () => { const c = navigator.connection; return !!c && (c.saveData === true || (cfg.wifi && c.type === 'cellular')); };
+  const calm = () => Date.now() - lastAct >= D.minIdle && Date.now() - bootAt >= D.minUptime && !document.getElementById('dlg').open && !document.hidden;
+  const due = () => cfg.connected && everyMs() > 0 && dirty && Date.now() - (cfg.last || 0) >= everyMs() && Date.now() >= (cfg.retryAt || 0);
+  D.needsAttention = () => cfg.connected && D.status === 'reconnect' && Date.now() >= (cfg.snoozeUntil || 0);
+  const isEditing = () => { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); };
   D.tick = async () => {
-    if (!due() || busy || !navigator.onLine) return;
-    try { await D.backupNow(false); } catch (e) {
-      if (D.status === 'reconnect' && !warned) { warned = true; App.toast('Sauvegarde Drive : reconnexion nécessaire (Paramètres)'); }
-    }
-    if (App.state.view === 'settings' && !document.getElementById('dlg').open) App.refresh();
+    if (!due() || busy || !navigator.onLine || !calm() || slowLink()) return;
+    try { await D.backupNow(false, true); } catch (e) { /* silent: the status shows in Settings and on the home screen */ }
+    if (App.state.view === 'settings' && !document.getElementById('dlg').open && !isEditing()) App.refresh();
   };
   const prevAfterSave = App.afterSave;
-  App.afterSave = () => { if (prevAfterSave) prevAfterSave(); dirty = true; clearTimeout(timer); timer = setTimeout(D.tick, 30000); };
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(D.tick, 1500); });
+  App.afterSave = () => { if (prevAfterSave) prevAfterSave(); dirty = true; clearTimeout(timer); timer = setTimeout(D.tick, D.minIdle + 5000); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(D.tick, D.minIdle + 5000); });
   setInterval(D.tick, 5 * 60 * 1000);
-  setTimeout(D.tick, 8000);
 
   // ---------- Settings card ----------
-  const EVERY = [['', 'Désactivée'], ['1', 'Toutes les heures (si changement)'], ['6', 'Toutes les 6 heures (si changement)'], ['24', 'Une fois par jour (si changement)']];
   const when = ts => ts ? new Date(ts).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'jamais';
   App.driveCard = () => {
     const row = (t, s, b) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${b || ''}</div>`;
@@ -110,17 +119,20 @@
     else {
       const st = { busy: 'Sauvegarde en cours…', reconnect: 'Reconnexion à Google nécessaire', error: 'Erreur : ' + esc(D.error) }[D.status] || 'Connecté';
       const cls = { reconnect: 'warn', error: 'bad' }[D.status] || 'ok';
-      body = row('État', `<b class="${cls}">${st}</b><br>Dernière sauvegarde : <b>${when(cfg.last)}</b>${cfg.lastName ? ' · ' + esc(cfg.lastName) : ''}<br>Fichiers : JSON (restauration), Excel (lecture)${cfg.extraErr ? '<br><span class="warn">Excel non envoyé : ' + esc(cfg.extraErr) + '</span>' : ''}`, D.status === 'reconnect' ? '<button class="btn sm" data-act="drive_connect">Reconnecter</button>' : '<button class="btn sm" data-act="drive_now">Sauvegarder</button>')
-        + `<div class="item"><div class="grow"><b>Sauvegarde automatique</b><small>Quand l'application est ouverte</small></div><select id="d_every" style="width:auto;max-width:55%">${App.opts(EVERY, cfg.auto ? String(cfg.every || 24) : '')}</select></div>`
+      body = row('État', `<b class="${cls}">${st}</b><br>Dernière sauvegarde : <b>${when(cfg.last)}</b>${cfg.lastName ? ' · ' + esc(cfg.lastName) : ''}<br>Fichiers : JSON (restauration), Excel (lecture)${cfg.extraErr ? '<br><span class="warn">Excel non envoyé : ' + esc(cfg.extraErr) + '</span>' : ''}`, D.status === 'reconnect' ? '<button class="btn sm" data-act="drive_connect">Reconnecter</button> <button class="btn sm sec" data-act="drive_snooze">Pas maintenant</button>' : '<button class="btn sm" data-act="drive_now">Sauvegarder</button>')
+        + `<div class="item"><div class="grow"><b>Sauvegarde automatique</b><small style="white-space:normal">Discrète : elle attend que vous ayez cessé d'utiliser l'application pendant 1 minute, et seulement s'il y a eu des changements.</small></div><select id="d_every" style="width:auto;max-width:55%">${App.opts(MODES, mode())}</select></div>`
+        + `<div class="item"><div class="grow"><b>Seulement en Wi-Fi</b><small style="white-space:normal">Pas d'envoi automatique avec les données mobiles.</small></div><input type="checkbox" id="d_wifi" ${cfg.wifi ? 'checked' : ''} style="width:auto"></div>`
+        + `<div class="item"><div class="grow"><b>Envoyer aussi l'Excel</b><small style="white-space:normal">Une fois par jour en automatique (à chaque fois avec le bouton Sauvegarder).</small></div><input type="checkbox" id="d_xlsx" ${cfg.noXlsx ? '' : 'checked'} style="width:auto"></div>`
         + row('Restaurer depuis Drive', 'Choisir une sauvegarde datée (.json).', '<button class="btn sm sec" data-act="drive_restore">Choisir…</button>')
         + row('Déconnexion', 'Les sauvegardes déjà dans Drive sont conservées.', '<button class="btn sm del" data-act="drive_off">Déconnecter</button>');
     }
     return `<h2 class="sec">Sauvegarde Google Drive</h2><div class="list">${body}</div>`;
   };
   document.addEventListener('change', e => {
-    if (e.target.id !== 'd_every') return;
-    cfg.auto = !!e.target.value; if (e.target.value) cfg.every = +e.target.value; saveCfg();
-    App.toast(cfg.auto ? 'Sauvegarde automatique activée' : 'Sauvegarde automatique désactivée');
+    const id = e.target.id;
+    if (id === 'd_every') { cfg.mode = e.target.value; delete cfg.auto; saveCfg(); App.toast(cfg.mode === 'manual' ? 'Sauvegarde automatique désactivée' : 'Sauvegarde automatique : ' + (MODES.find(m => m[0] === cfg.mode) || [])[1]); }
+    else if (id === 'd_wifi') { cfg.wifi = e.target.checked; saveCfg(); }
+    else if (id === 'd_xlsx') { cfg.noXlsx = !e.target.checked; saveCfg(); }
   });
 
   const refreshSettings = () => { if (App.state.view === 'settings' && !document.getElementById('dlg').open) App.refresh(); };
@@ -149,6 +161,7 @@
     catch (e) { App.toast(e.message); }
     refreshSettings();
   };
+  App.actions.drive_snooze = () => { cfg.snoozeUntil = Date.now() + 24 * 3600e3; saveCfg(); App.toast('Je ne vous le rappelle pas avant 24 h'); refreshSettings(); };
   App.actions.drive_now = async () => {
     App.toast('Sauvegarde sur Drive…');
     try { const n = await D.backupNow(true); App.toast('Sauvegarde envoyée : ' + n); }
