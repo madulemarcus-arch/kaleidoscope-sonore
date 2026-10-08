@@ -1,0 +1,83 @@
+CAISSE LOCALE CISPOLstore - fonctionne sans Internet
+====================================================
+
+La caisse tourne sur un ordinateur installe sur place (portable conseille,
+ou Raspberry Pi). Le gerant et le vendeur l'ouvrent dans le navigateur de leur
+telephone, en WiFi, meme quand Starlink est coupe.
+
+Ce qu'elle fait :
+  - Vente directe : le code est cree sur le MikroTik au moment de l'encaissement.
+  - Tickets imprimes : creation de lots sur le routeur + impression A4.
+  - Ventes du jour, rapport (jour / 7 jours / mois), export Excel (CSV).
+  - Clients connectes en direct, avec possibilite de les couper.
+  - Code PIN pour le gerant et le vendeur.
+Les donnees restent sur l'ordinateur, dans le dossier "donnees"
+(une sauvegarde automatique par jour).
+
+
+A. PREPARER L'ORDINATEUR DE CAISSE
+----------------------------------
+1. Brancher l'ordinateur au port ether10 (ADMIN) du RB4011, avec un cable.
+2. Installer Node.js (version "LTS") depuis https://nodejs.org
+   (seule etape qui demande Internet, une seule fois).
+3. Copier le dossier "caisse-locale" sur l'ordinateur, par exemple dans Documents.
+4. Ordinateur portable : Parametres > Alimentation > mise en veille "Jamais"
+   quand il est branche. Laisser le chargeur branche : la batterie sert
+   d'onduleur pendant les coupures.
+
+B. PREPARER LE ROUTEUR (Winbox, New Terminal, une commande a la fois)
+---------------------------------------------------------------------
+1. Creer le groupe et l'utilisateur de la caisse (choisissez votre propre mot de passe) :
+   /user group add name=caisse policy=read,write,api,rest-api comment="Caisse locale"
+   /user add name=caisse group=caisse password=VotreMotDePasseCaisse address=192.168.88.0/24
+2. Donner l'adresse fixe 192.168.88.2 a l'ordinateur de caisse :
+   Winbox > IP > DHCP Server > onglet Leases > clic droit sur la ligne de
+   l'ordinateur > Make Static, puis double-clic > Address = 192.168.88.2 > OK.
+   Debrancher/rebrancher le cable de l'ordinateur pour qu'il prenne la nouvelle adresse.
+3. Glisser routeur-caisse.rsc dans Files, puis :
+   /import file-name=routeur-caisse.rsc
+
+C. REGLER LA CAISSE
+-------------------
+Ouvrir config.json avec le Bloc-notes (il est cree au premier demarrage a partir
+de config.exemple.json ; vous pouvez aussi le creer en copiant ce fichier) :
+  - "utilisateurs" : changez les codes PIN ("pin") et les noms. Ajoutez une ligne
+    par vendeur si besoin. role = "gerant" ou "vendeur".
+  - "routeur" > "motDePasse" : le mot de passe choisi a l'etape B1.
+  - "forfaits" : prix et noms de profils MikroTik (deja regles pour votre RB4011).
+Enregistrer, puis redemarrer la caisse.
+
+D. DEMARRER
+-----------
+Windows : double-clic sur demarrer-caisse.bat.
+  - Au premier lancement, Windows demande d'autoriser Node.js sur le reseau :
+    cochez les deux cases (prive et public) puis Autoriser.
+    Si les telephones n'arrivent pas a ouvrir la caisse, ouvrez "Invite de commandes"
+    en administrateur et tapez :
+    netsh advfirewall firewall add rule name="Caisse CISPOLstore" dir=in action=allow protocol=TCP localport=8080
+  - Demarrage automatique : Windows + R, tapez shell:startup, Entree,
+    puis placez-y un raccourci vers demarrer-caisse.bat.
+Raspberry Pi : copier caisse.service dans /etc/systemd/system/, puis
+  sudo systemctl enable --now caisse
+
+E. UTILISER
+-----------
+Sur le telephone (WiFi de la zone ou reseau admin), ouvrir :
+   http://caisse.cispol:8080     (ou http://192.168.88.2:8080)
+Entrer le code PIN. Ajouter la page a l'ecran d'accueil (menu du navigateur >
+"Ajouter a l'ecran d'accueil") pour l'ouvrir comme une application.
+
+Le point vert "Routeur OK" en haut confirme que la caisse parle au MikroTik.
+S'il devient rouge : la vente directe est bloquee, mais la vente de tickets
+imprimes continue de fonctionner.
+
+F. SAUVEGARDE
+-------------
+Le dossier "donnees" contient toutes les ventes (caisse.json) et une copie par jour.
+Copiez-le de temps en temps sur une cle USB.
+
+G. EN CAS DE PROBLEME
+---------------------
+- "Le routeur refuse l'identifiant" : verifier utilisateur/mot de passe dans config.json.
+- "Le routeur ne repond pas" : cable sur ether10 ? adresse 192.168.88.2 ? service www actif ?
+- Code PIN oublie : modifier config.json puis redemarrer la caisse.

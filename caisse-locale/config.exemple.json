@@ -1,0 +1,22 @@
+{
+  "port": 8080,
+  "site": "CISPOLstore",
+  "utilisateurs": [
+    { "nom": "Gerant", "pin": "1234", "role": "gerant" },
+    { "nom": "Vendeur", "pin": "5678", "role": "vendeur" }
+  ],
+  "forfaits": [
+    { "id": "V", "nom": "Visiteur", "duree": "6 heures", "prix": 500, "profil": "Visiteur-6H", "c": "fv" },
+    { "id": "J", "nom": "Jour", "duree": "24 heures", "prix": 1000, "profil": "Jour-24H", "c": "fj" },
+    { "id": "S", "nom": "Semaine", "duree": "7 jours", "prix": 7000, "profil": "Semaine-7J", "c": "fs" },
+    { "id": "M", "nom": "Mois", "duree": "30 jours", "prix": 30000, "profil": "Mois-30J", "c": "fm" }
+  ],
+  "seuil": 10,
+  "routeur": {
+    "adresse": "192.168.88.1",
+    "protocole": "http",
+    "utilisateur": "caisse",
+    "motDePasse": "CHANGEZ-CE-MOT-DE-PASSE",
+    "serveurHotspot": "hotspot-cispol"
+  }
+}
