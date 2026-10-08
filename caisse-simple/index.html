@@ -40,15 +40,11 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   <input id="pin1" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN">
   <input id="pin2" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Répétez le PIN" hidden>
   <button class="main" id="lockOk">OK</button>
+  <button class="sec" id="lockAnnuler" style="margin-top:10px">Annuler</button>
   <div id="lockMsg"></div>
 </div>
 <h1>Caisse WiFi Zone</h1>
-
-<div class="card">
-  <div class="mut" id="jourLib">Aujourd'hui</div>
-  <div class="total" id="totalJour">0 FC</div>
-  <div class="mut" id="nbJour">0 vente</div>
-</div>
+<button class="sec" id="ouvrirGerant" style="float:right;margin-top:-40px">🔒 Espace gérant</button>
 
 <div class="card">
   <div class="grid" id="forfaits"></div>
@@ -56,6 +52,13 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   <input id="client" placeholder="Nom du client (facultatif)" autocomplete="off">
   <button class="main" id="vendre">Enregistrer la vente</button>
   <div id="msg"></div>
+</div>
+
+<div id="gerant" hidden>
+<div class="card">
+  <div class="mut" id="jourLib">Aujourd'hui</div>
+  <div class="total" id="totalJour">0 FC</div>
+  <div class="mut" id="nbJour">0 vente</div>
 </div>
 
 <div class="card">
@@ -77,6 +80,8 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
   <input type="file" id="fichier" accept=".json" hidden>
   <button class="sec" id="changerPin" style="margin-top:10px">Changer le PIN</button>
   <button class="sec" id="verrouiller" style="margin-top:10px">Verrouiller</button>
+</div>
+
 </div>
 
 <script>
@@ -192,9 +197,12 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
     $('pin1').value = ''; $('pin2').value = ''; $('pin2').hidden = mode !== 'creer'; $('lockMsg').textContent = '';
     $('lock').hidden = false; setTimeout(() => $('pin1').focus(), 50);
   }
-  function verrouiller() {
-    if (!pinSauve) return ecranPin('creer', 'Choisissez un code PIN (4 à 8 chiffres).');
-    ecranPin('saisie', 'Entrez votre code PIN.');
+  // The sales form is open to sellers; everything else is behind the manager PIN
+  function verrouiller() { $('lock').hidden = true; $('gerant').hidden = true; $('ouvrirGerant').hidden = false; ancienOk = false; }
+  function ouvrirGerant() { $('lock').hidden = true; $('gerant').hidden = false; $('ouvrirGerant').hidden = true; dessiner(); }
+  function demanderPin() {
+    if (!pinSauve) return ecranPin('creer', 'Première fois : le gérant choisit son code PIN (4 à 8 chiffres).');
+    ecranPin('saisie', 'Code PIN du gérant.');
   }
   async function validerPin() {
     const a = $('pin1').value, err = t => { $('lockMsg').textContent = t; $('pin1').value = ''; $('pin2').value = ''; };
@@ -205,7 +213,7 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
       const sel = Math.random().toString(36).slice(2);
       pinSauve = { sel, h: await hacher(a, sel) };
       try { localStorage.setItem(CLE_PIN, JSON.stringify(pinSauve)); } catch (e) {}
-      $('lock').hidden = true; if (ancienOk) msg('PIN changé.'); ancienOk = false; return;
+      ouvrirGerant(); if (ancienOk) msg('PIN changé.'); ancienOk = false; return;
     }
     if (await hacher(a, pinSauve.sel) !== pinSauve.h) {
       if (++essais >= 5) { essais = 0; bloqueJusque = Date.now() + 30e3; return err('Trop d\'essais. Patientez 30 s.'); }
@@ -213,11 +221,13 @@ button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;backg
     }
     essais = 0;
     if (modePin === 'ancien') { ancienOk = true; return ecranPin('creer', 'Choisissez le nouveau PIN.'); }
-    $('lock').hidden = true;
+    ouvrirGerant();
   }
   $('lockOk').onclick = validerPin;
   $('lock').onkeydown = e => { if (e.key === 'Enter') validerPin(); };
   $('verrouiller').onclick = verrouiller;
+  $('ouvrirGerant').onclick = demanderPin;
+  $('lockAnnuler').onclick = verrouiller;
   $('changerPin').onclick = () => ecranPin('ancien', 'Entrez le PIN actuel.');
   let veille; const reveil = () => { clearTimeout(veille); veille = setTimeout(verrouiller, 5 * 60e3); }; // auto-lock after 5 min idle
   ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, reveil, true));
