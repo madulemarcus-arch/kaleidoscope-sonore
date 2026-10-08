@@ -143,6 +143,10 @@ Fiche client → onglet **Abonnement** → **+ Pénalité** : montant (en $ ou C
 
 Plus → **Impayés** liste les factures dont le solde n'est pas réglé, de la plus ancienne à la plus récente, avec le total à encaisser (en dollars), la part de plus de 30 jours et l'ancienneté de chaque facture (orange après 30 jours, rouge après 60). **💰** ouvre le paiement de la facture ; **💬** ouvre WhatsApp avec le message de relance (modifiable dans Paramètres, mots `{solde} {numero} {date}`) et note la date de relance. Un bandeau « Impayés » apparaît aussi sur l'accueil.
 
+## Relance en série des impayés
+
+Sur l'écran **Impayés**, le bloc **💬 Relance en série** parcourt les clients à relancer, du plus ancien impayé au plus récent (téléphone connu, pas relancés depuis 2 jours). Pour chacun, le montant et le message prêt s'affichent : **Envoyer sur WhatsApp** ouvre la conversation avec le message (il ne reste qu'à l'envoyer), marque la facture comme relancée et passe au suivant ; **Passer** saute le client. Les factures en attente ne sont pas relancées.
+
 ## Rappels WhatsApp
 
 Abonnements → **Rappels WhatsApp** liste les clients gérés dont l'abonnement finit dans 7 jours ou moins, en sursis, ou inactifs depuis moins de 30 jours. Le bouton « WhatsApp » ouvre la conversation avec le message déjà écrit (c'est l'utilisateur qui l'envoie) et note la date du rappel (la ligne reste grisée 2 jours). Les trois messages (bientôt expiré, sursis, inactif) se modifient dans Paramètres et se synchronisent entre appareils ; mots remplacés : `{prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc}`.
