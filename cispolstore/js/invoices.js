@@ -161,7 +161,18 @@
   App.actions.rmline = d => { draft.lines.splice(+d.i, 1); const ev = new Event('change'); $('f_cur').dispatchEvent(ev); };
 
   // ---------- Invoice document (screen, print, Word) ----------
-  const PAPER_CSS = `body{font:13px/1.4 Arial,sans-serif;color:#111;margin:18px}.paper .hd{display:flex;justify-content:space-between;gap:12px;border-bottom:3px solid #1e3f60;padding-bottom:10px}.paper .hd img{height:56px}.paper .co{text-align:right;font-size:12px}.paper .two{display:flex;gap:12px;margin:12px 0}.paper .box{border:1px solid #1e3f60;flex:1}.paper .box h4{margin:0;padding:4px 8px;background:#1e3f60;color:#fff;font-size:13px}.paper .box dl{margin:0;padding:6px 8px}.paper .box dl div{display:flex !important;gap:8px}.paper .box dt{width:90px;color:#555}.paper .box dd{margin:0}.paper table{width:100%;border-collapse:collapse}.paper th{background:#1e3f60;color:#fff;padding:6px;text-align:left}.paper td{padding:6px;border-bottom:1px solid #ccd}.paper .r{text-align:right}.paper .tot{margin-left:auto;width:300px;margin-top:8px}.paper .tot div{display:flex;justify-content:space-between;padding:3px 0}.paper .tot .g{font-weight:bold;font-size:15px;color:#d5522f;border-top:1px solid #1e3f60}.paper .words{margin-top:12px;font-style:italic}.paper .thx{text-align:center;color:#1e3f60;margin-top:16px;font-weight:bold}`;
+  // payments of an invoice in the order they were received, with the balance left after each one
+  App.invPayments = i => {
+    let left = App.invTotal(i);
+    return App.db.payments.map((p, k) => ({ p, k })).filter(x => x.p.invoiceId === i.id).sort((a, b) => a.p.date.localeCompare(b.p.date) || a.k - b.k).map(({ p }, n) => {
+      const inInv = App.conv(p.amount, p.currency, i.currency, App.rateOf(p)); left = Math.max(0, left - inInv);
+      return { p, n: n + 1, inInv, left, other: p.currency !== i.currency };
+    });
+  };
+  // receipt number: invoice number + order of the payment ("FAC-2026-0002-P2")
+  App.receiptNo = p => { const i = App.invoice(p.invoiceId); if (!i) return 'REC-' + (p.date || '').replace(/-/g, '') + '-' + String(p.id).slice(-4).toUpperCase(); const x = App.invPayments(i).find(y => y.p === p); return i.number + '-P' + (x ? x.n : 1); };
+
+  const PAPER_CSS = `body{font:13px/1.4 Arial,sans-serif;color:#111;margin:18px}.paper .hd{display:flex;justify-content:space-between;gap:12px;border-bottom:3px solid #1e3f60;padding-bottom:10px}.paper .hd img{height:56px}.paper .co{text-align:right;font-size:12px}.paper .two{display:flex;gap:12px;margin:12px 0}.paper .box{border:1px solid #1e3f60;flex:1}.paper .box h4{margin:0;padding:4px 8px;background:#1e3f60;color:#fff;font-size:13px}.paper .box dl{margin:0;padding:6px 8px}.paper .box dl div{display:flex !important;gap:8px}.paper .box dt{width:90px;color:#555}.paper .box dd{margin:0}.paper table{width:100%;border-collapse:collapse}.paper th{background:#1e3f60;color:#fff;padding:6px;text-align:left}.paper td{padding:6px;border-bottom:1px solid #ccd}.paper .r{text-align:right}.paper .tot{margin-left:auto;width:300px;margin-top:8px}.paper .tot div{display:flex;justify-content:space-between;padding:3px 0}.paper .tot .g{font-weight:bold;font-size:15px;color:#d5522f;border-top:1px solid #1e3f60}.paper .words{margin-top:12px;font-style:italic}.paper .thx{text-align:center;color:#1e3f60;margin-top:16px;font-weight:bold}.paper .pay{margin-top:14px}.paper .pay h4{margin:0 0 4px;color:#1e3f60}.paper .pay td,.paper .pay th{font-size:12px}.paper .sold{display:inline-block;margin-top:8px;padding:3px 10px;border:2px solid #1d8a4f;color:#1d8a4f;font-weight:bold;transform:rotate(-3deg)}.paper .sig{display:flex;gap:30px;margin-top:34px}.paper .sig div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center;font-size:12px;color:#555}.paper .rc{border:2px solid #1e3f60;padding:14px;margin-top:14px;font-size:15px;line-height:1.7}.paper .rc b.big{font-size:20px;color:#d5522f}`;
   App.invoiceDoc = (i, logo) => {
     const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), paid = App.invPaid(i), due = Math.max(0, tot - paid), other = i.currency === 'USD' ? 'CDF' : 'USD';
     const legal = [co.rccm && 'RCCM : ' + co.rccm, co.idnat && 'ID. Nat. : ' + co.idnat, co.impot && 'N° Impôt : ' + co.impot].filter(Boolean);
@@ -173,8 +184,34 @@
       <table><thead><tr><th>Produit / Description</th><th class="r">Qté</th><th class="r">PU (${i.currency === 'CDF' ? 'CDF' : '$'})</th><th class="r">Montant (${i.currency === 'CDF' ? 'CDF' : '$'})</th></tr></thead><tbody>${i.lines.map(l => `<tr><td>${esc(l.desc)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${App.nf(l.price, 2)}</td><td class="r">${App.nf(l.qty * l.price, 2)}</td></tr>`).join('')}</tbody></table>
       <div class="tot"><div class="g"><span>Total :</span><span>${App.fmt(tot, i.currency)}</span></div><div><span>Montant payé :</span><span>${App.fmt(paid, i.currency)}</span></div><div><span>Solde :</span><span>${App.fmt(due, i.currency)}</span></div>
       <div style="font-size:12px;color:#555"><span>Taux appliqué (1 $) :</span><span>${App.nf(App.rateOf(i), 0)} CDF</span></div><div style="font-size:12px;color:#555"><span>Équivalent en ${other} :</span><span>${App.fmt(App.conv(tot, i.currency, other, App.rateOf(i)), other)}</span></div></div>
+      ${(() => { const ps = App.invPayments(i); if (!ps.length) return ''; const f = (n, c) => App.fmt(n, c);
+        return `<div class="pay"><h4>PAIEMENTS REÇUS (${ps.length})</h4><table><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="r">Montant reçu</th><th class="r">Reste après</th></tr></thead><tbody>${ps.map(({ p, inInv, left, other }) => `<tr><td>${App.fdate(p.date)}</td><td>${esc(p.mode)}</td><td>${esc(p.ref || App.receiptNo(p))}</td><td class="r"><b>${f(inInv, i.currency)}</b>${other ? `<br><span style="color:#555;font-size:11px">(${f(p.amount, p.currency)} au taux de ${App.nf(App.rateOf(p), 0)})</span>` : ''}</td><td class="r">${f(left, i.currency)}</td></tr>`).join('')}</tbody></table>${due <= 0.004 ? `<div class="sold">FACTURE SOLDÉE le ${App.fdate(ps[ps.length - 1].p.date)}</div>` : `<div style="margin-top:6px"><b>Total payé : ${f(paid, i.currency)}</b> · Reste à payer : <b style="color:#d5522f">${f(due, i.currency)}</b></div>`}</div>`; })()}
       <div class="words">Arrêtée la présente facture à la somme de : <b>${esc(App.amountWords(tot, i.currency))}</b>.</div><div class="thx">MERCI POUR VOTRE CONFIANCE</div></div>`;
   };
+  // ---------- Payment receipt ----------
+  App.receiptDoc = (p, logo) => {
+    const co = App.db.settings.company, c = App.client(p.clientId), i = App.invoice(p.invoiceId), legal = [co.rccm && 'RCCM : ' + co.rccm, co.idnat && 'ID. Nat. : ' + co.idnat, co.impot && 'N° Impôt : ' + co.impot].filter(Boolean);
+    const dl = (k, v) => `<div style="display:contents"><dt>${k}</dt><dd>${v}</dd></div>`;
+    let after = '';
+    if (i) { const x = App.invPayments(i).find(y => y.p === p), tot = App.invTotal(i), paid = App.invPaid(i), due = Math.max(0, tot - paid);
+      after = `<div class="two"><div class="box"><h4>FACTURE ${esc(i.number)}</h4><dl>${dl('Date', App.fdate(i.date))}${dl('Total', App.fmt(tot, i.currency))}${dl('Déjà payé', App.fmt(paid, i.currency))}${dl('Reste', `<b>${App.fmt(due, i.currency)}</b>`)}</dl></div></div>${x && x.left <= 0.004 ? '<div class="sold">FACTURE SOLDÉE</div>' : ''}`; }
+    return `<div class="paper"><div class="hd"><div><img src="${esc(logo || co.logo || 'logo.png')}" alt=""><div><b>${esc(co.name)}</b></div></div>
+      <div class="co"><b>Siège social :</b> ${esc(co.address)}<br>Tél : ${esc(co.phone)}<br>${esc(co.email)}${legal.length ? '<br>' + legal.map(esc).join('<br>') : ''}</div></div>
+      <div class="two"><div class="box"><h4>REÇU DE PAIEMENT</h4><dl>${dl('N°', `<b>${esc(App.receiptNo(p))}</b>`)}${dl('Date', App.fdate(p.date))}${dl('Mode', esc(p.mode))}${p.ref ? dl('Référence', esc(p.ref)) : ''}</dl></div>
+      <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', `<b style="font-size:1.1em">${esc(App.cname(c))}</b>`)}${dl('Code', esc(c ? c.code : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
+      <div class="rc">Nous avons reçu de <b>${esc(App.cname(c))}</b> la somme de <b class="big">${App.fmt(p.amount, p.currency)}</b> <i>(${esc(App.amountWords(p.amount, p.currency))})</i>${i ? ` en paiement de la facture <b>${esc(i.number)}</b>` : ''}${p.comment ? ` — ${esc(p.comment)}` : ''}.</div>
+      ${after}<div class="sig"><div>Le client</div><div>${esc(co.name)}</div></div><div class="thx">MERCI POUR VOTRE CONFIANCE</div></div>`;
+  };
+  const printRaw = async (title, html) => {
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${PAPER_CSS}</style>${html}`;
+    f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); }, 400);
+    document.body.appendChild(f);
+  };
+  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw('Reçu ' + App.receiptNo(p), App.receiptDoc(p, await logoData())); };
+  App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
+    App.download(`Reçu-${no}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Reçu ${esc(no)}</title><style>${PAPER_CSS}</style></head><body>${App.receiptDoc(p, await logoData())}</body></html>`, 'application/msword'); };
+
   const logoData = async () => {
     const co = App.db.settings.company; if ((co.logo || '').startsWith('data:')) return co.logo;
     try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
@@ -198,7 +235,7 @@
       html: `<div class="spread" style="margin-bottom:10px"><span class="pill ${k}">${t}</span><span class="mut">${App.invTypes[i.type]}</span></div>
         <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button></div>
         ${App.invoiceDoc(i)}
-        ${pays.length ? `<h2 class="sec">Paiements reçus</h2><div class="list">${pays.map(x => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(x.ref || x.comment || '')}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`).join('')}</div>` : ''}
+        ${pays.length ? `<h2 class="sec noprint">Paiements reçus</h2><div class="list noprint">${App.invPayments(i).map(({ p: x, n, left }) => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(App.receiptNo(x))}${x.ref ? ' · ' + esc(x.ref) : ''} · reste ${App.fmt(left, i.currency)}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${x.id}" title="Imprimer le reçu">🧾</button></div>`).join('')}</div>` : ''}
         <div class="bar" style="margin-top:14px">${i.clientId ? `<button class="btn sec" data-act="go" data-v="client" data-id="${i.clientId}">Voir le client</button>` : ''}<button class="btn del" data-act="delinv" data-id="${i.id}">Supprimer la facture</button></div>`
     };
   };
@@ -256,7 +293,8 @@
         if (rate !== App.rate()) App.setRate(rate);
         db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: i ? i.currency : App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
         App.log(cid, `Paiement ${App.fmt(amt, i ? i.currency : App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
-        App.save(); App.toast('Paiement enregistré'); App.refresh();
+        const np = db.payments[db.payments.length - 1]; App.save(); App.refresh();
+        App.undoBar('Paiement enregistré : ' + App.fmt(amt, i ? i.currency : App.v('f_cur')), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
       }, 'Enregistrer le paiement');
     $('f_cl').onchange = () => { $('f_inv').innerHTML = App.opts(invOpts($('f_cl').value)); };
     $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = App.invDue(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } };
@@ -271,7 +309,7 @@
       title: 'Paiements', sub: `${all.length} paiement(s)`, back: 'more', nav: 'more',
       html: `<div class="bar"><button class="btn" data-act="newpay">+ Paiement</button></div>
         <div class="chips"><button class="chip ${pq.mode === 'all' ? 'on' : ''}" data-act="paymode" data-m="all">Tous</button>${App.PAY_MODES.filter(m => by[m]).map(m => `<button class="chip ${pq.mode === m ? 'on' : ''}" data-act="paymode" data-m="${esc(m)}">${esc(m)} · ${App.fmt(by[m])}</button>`).join('')}</div>
-        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small></div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
+        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small></div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${p.id}" title="Imprimer le reçu">🧾</button><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
     };
   };
   App.actions.paymode = d => { pq.mode = d.m; App.refresh(); };
@@ -282,12 +320,12 @@
     const l = App.db.expenses.slice().sort((a, b) => b.date.localeCompare(a.date)), m = App.today().slice(0, 7), mt = l.filter(e => e.date.startsWith(m)).reduce((a, e) => a + App.usd(e.amount, e.currency, e), 0);
     return {
       title: 'Dépenses', sub: `Ce mois : ${App.fmt(mt)}`, back: 'more', nav: 'more',
-      html: `<div class="bar"><button class="btn" data-act="newexp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>` + (l.length ? `<div class="list">${l.map(e => `<div class="item"><div class="grow"><b>${esc(e.label)}</b><small>${App.fdate(e.date)} · ${esc(e.cat)}</small></div><b>${App.fmt(e.amount, e.currency)}</b><button class="btn sm del" data-act="delexp" data-id="${e.id}">✕</button></div>`).join('')}</div>` : '<div class="empty">Aucune dépense.</div>')
+      html: `<div class="bar"><button class="btn" data-act="newexp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>` + (l.length ? `<div class="list">${l.map(e => `<div class="item"><div class="grow"><b>${esc(e.label)}</b><small>${App.fdate(e.date)} · ${esc(e.cat)}${e.mode ? ' · ' + esc(e.mode) : ''}</small></div><b>${App.fmt(e.amount, e.currency)}</b><button class="btn sm del" data-act="delexp" data-id="${e.id}">✕</button></div>`).join('')}</div>` : '<div class="empty">Aucune dépense.</div>')
     };
   };
-  App.actions.newexp = () => App.modal('Nouvelle dépense', `${F.text('f_label', 'Libellé', '')}${F.sel('f_cat', 'Catégorie', App.EXP_CATS)}<div class="row">${F.num('f_amt', 'Montant', '')}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div>${F.date('f_date', 'Date', App.today())}`, () => {
+  App.actions.newexp = () => App.modal('Nouvelle dépense', `${F.text('f_label', 'Libellé', '')}${F.sel('f_cat', 'Catégorie', App.EXP_CATS)}<div class="row">${F.num('f_amt', 'Montant', '')}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div><div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Payé par', App.PAY_MODES, 'Cash')}</div>`, () => {
     if (!App.v('f_label') || App.n('f_amt') <= 0) { App.toast('Libellé et montant requis'); return false; }
-    App.db.expenses.push({ id: App.uid(), label: App.v('f_label'), cat: App.v('f_cat'), amount: App.n('f_amt'), currency: App.v('f_cur'), date: App.v('f_date') || App.today() }); App.save(); App.refresh();
+    App.db.expenses.push({ id: App.uid(), label: App.v('f_label'), cat: App.v('f_cat'), amount: App.n('f_amt'), currency: App.v('f_cur'), mode: App.v('f_mode'), date: App.v('f_date') || App.today() }); App.save(); App.refresh();
   });
   App.actions.delexp = d => { if (!App.confirm('Supprimer cette dépense ?')) return; App.db.expenses = App.db.expenses.filter(e => e.id !== d.id); App.save(); App.refresh(); };
   document.addEventListener('click', e => {

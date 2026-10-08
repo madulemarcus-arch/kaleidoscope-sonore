@@ -157,7 +157,7 @@
   // qty > 0 adds to stock, qty < 0 removes it
   App.move = m => {
     const p = App.prod(m.pid); if (!p) return;
-    const mv = { id: App.uid(), date: m.date || App.today(), pid: m.pid, qty: m.qty, type: m.qty >= 0 ? 'in' : 'out', cost: m.cost ?? p.cost, supplierId: m.supplierId || '', invoiceId: m.invoiceId || '', clientId: m.clientId || '', note: m.note || '' };
+    const mv = { id: App.uid(), date: m.date || App.today(), pid: m.pid, qty: m.qty, type: m.qty >= 0 ? 'in' : 'out', cost: m.cost ?? p.cost, supplierId: m.supplierId || '', purchase: !!m.purchase, invoiceId: m.invoiceId || '', clientId: m.clientId || '', note: m.note || '' };
     if (App.tracked(p)) p.qty = Math.round((p.qty + m.qty) * 1000) / 1000;
     if (m.qty > 0 && m.cost != null) p.cost = m.cost;
     if (m.qty > 0 && m.supplierId) p.supplierId = m.supplierId;

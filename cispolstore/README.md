@@ -33,6 +33,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/plans.js` | Tarifs d'abonnement : prix client, coût Starlink et marge |
 | `js/penalties.js` | Pénalités Starlink : enregistrement, paiement signalé, relance, effet sur les bénéfices |
 | `js/unpaid.js` | Impayés : factures à encaisser, ancienneté, relance WhatsApp |
+| `js/finance.js` | Onglet Finance : journal des entrées et sorties d'argent |
 | `js/monthly.js` | Rapport mensuel : résumé du mois à partager, copier ou imprimer |
 | `js/remind.js` | Rappels WhatsApp d'échéance (liste « Rappels » et messages modifiables) |
 | `js/drive.js` | Sauvegardes datées sur Google Drive (manuelles ou automatiques) |
@@ -98,6 +99,12 @@ Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs 
 ## Affichage et rappels de configuration
 
 Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Application). Dans **Paramètres**, les sections longues (Partager, Tarifs d'abonnement, Messages WhatsApp, Synchronisation, Google Drive, Données) sont repliées par défaut. Sur l'accueil, l'administrateur voit un rappel tant qu'il n'a pas défini de **code PIN**, fait une **sauvegarde** (ou si la dernière date de plus de 7 jours) ou renseigné **RCCM / ID Nat. / N° Impôt**.
+
+## Finance et reçus
+
+**Onglet Finance** (administrateur et comptable, barre du bas et menu latéral) : tout l'argent qui entre et qui sort sur la période choisie (jour, semaine, mois, année, dates libres). **Entrées** : paiements des clients et pénalités payées. **Sorties** : dépenses, commissions des techniciens et achats de stock (case à décocher : ils ne sont pas des dépenses du bénéfice, qui compte déjà le coût des marchandises vendues). Cartes Entrées / Sorties / Solde, tableau **par mode de paiement** (Cash, M-Pesa, Airtel…) et **par devise** (francs et dollars réellement encaissés), puis la liste jour par jour ; filtres Entrées / Sorties et par mode ; export CSV, impression, feuille « Finance » de l'export Excel. Chaque montant est converti avec le taux de son propre enregistrement. Les dépenses ont maintenant un champ « Payé par » ; les anciennes apparaissent en « Non précisé ».
+
+**Preuve de paiement** : la facture (écran, impression / PDF, Word) contient un bloc **PAIEMENTS REÇUS** : date, mode, référence, montant reçu (avec le montant et le taux si payé dans l'autre devise) et **reste après chaque paiement**, ainsi que « FACTURE SOLDÉE le … » ou « Total payé / Reste à payer ». Chaque paiement a un **reçu** imprimable (🧾 sur la facture et dans Paiements, ou juste après l'enregistrement) : numéro (ex. FAC-2026-0002-P2), nom du client, montant en lettres, état de la facture et cases de signature.
 
 ## Supprimer des factures
 

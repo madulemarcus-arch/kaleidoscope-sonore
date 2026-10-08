@@ -3,13 +3,13 @@
 (() => {
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
-  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'invoices', 'invoice', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'reports', 'settings', 'livraisons', 'users', 'rapportmois', 'more', 'profile'];
+  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'invoices', 'invoice', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'reports', 'settings', 'livraisons', 'users', 'rapportmois', 'finance', 'more', 'profile'];
   // actions only the administrator may run
   const ADMIN = /^(del[a-z]+|pen_del|backup|plansfix|setco|setapp|pin[a-z]+|sync[a-z]+|drive_[a-z]+|msgreset|users_[a-z]+|dl_del|restore)$/;
   const COMMON = /^(go|copy|calday|calnav|cltab|clfilter|search|sgo|stcat|invfilter|dper|repper|reptab|paymode|lockNow|me_[a-z]+|shareapp|cf_type|dl_filter|dl_view)$/;
   const ROLES = {
-    admin: { label: 'Administrateur', icon: '🛡️', views: ALL, home: 'home', nav: ['home', 'clients', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Voit et modifie tout, gère les profils et les réglages.' },
-    comptable: { label: 'Comptable', icon: '📒', views: ALL.filter(v => !['settings', 'users'].includes(v)), home: 'home', nav: ['home', 'clients', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Factures, paiements, dépenses, rapports et stock. Ne supprime pas, pas de réglages.' },
+    admin: { label: 'Administrateur', icon: '🛡️', views: ALL, home: 'home', nav: ['home', 'clients', 'finance', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Voit et modifie tout, gère les profils et les réglages.' },
+    comptable: { label: 'Comptable', icon: '📒', views: ALL.filter(v => !['settings', 'users'].includes(v)), home: 'home', nav: ['home', 'clients', 'finance', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Factures, paiements, dépenses, rapports et stock. Ne supprime pas, pas de réglages.' },
     vendeur: { label: 'Vendeur', icon: '🛒', views: ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'invoices', 'invoice', 'payments', 'impayes', 'installs', 'livraisons', 'more', 'profile'], home: 'home', nav: ['home', 'clients', 'stock', 'more'], fab: true, costs: false, finance: false, stockedit: false, deny: /^(newexp|newsup|editsup|newtech|edittech|paytech|pen_edit|stin|stout|newprod|editprod|exportcsv|csvdo|xlsx|repcsv)$/, desc: 'Clients, abonnements, factures et paiements. Ne voit ni les coûts ni les bénéfices.' },
     technicien: { label: 'Technicien', icon: '🧰', solo: true, views: ['mestaches'], home: 'mestaches', nav: [], fab: false, costs: false, finance: false, stockedit: false, only: /^(newinst|rmmat)$/, desc: 'Une seule fenêtre : ses interventions (client, adresse), et il enregistre ses installations.' },
     livreur: { label: 'Livreur', icon: '🚚', solo: true, views: ['livraisons'], home: 'livraisons', nav: [], fab: false, costs: false, finance: false, stockedit: false, only: /^dl_[a-z]+$/, desc: 'Une seule fenêtre : ses livraisons (client, adresse), il note livré ou non livré.' }
@@ -32,13 +32,13 @@
   };
 
   // ---------- Navigation adapted to the profile ----------
-  const NAVI = { home: ['🏠', 'Accueil'], clients: ['👥', 'Clients'], stock: ['📦', 'Stock'], installs: ['🔧', 'Install.'], livraisons: ['🚚', 'Livraisons'], more: ['☰', 'Plus'] };
+  const NAVI = { home: ['🏠', 'Accueil'], clients: ['👥', 'Clients'], finance: ['🏦', 'Finance'], stock: ['📦', 'Stock'], installs: ['🔧', 'Install.'], livraisons: ['🚚', 'Livraisons'], more: ['☰', 'Plus'] };
   App.applyRole = () => {
     const r = role(), m = App.me();
     document.body.classList.toggle('solo', !!r.solo);
     const btn = v => `<button data-act="go" data-v="${v}" data-nav="${v}"><span>${NAVI[v][0]}</span>${NAVI[v][1]}</button>`;
     $('bottom').innerHTML = r.fab ? r.nav.slice(0, 2).map(btn).join('') + '<i></i>' + r.nav.slice(2).map(btn).join('') : r.nav.map(btn).join('');
-    $('bottom').style.gridTemplateColumns = r.fab ? '' : `repeat(${r.nav.length},1fr)`;
+    $('bottom').style.gridTemplateColumns = `repeat(${r.nav.length + (r.fab ? 1 : 0)},1fr)`;
     $('fab').hidden = !r.fab; $('syncBtn').hidden = !(r === ROLES.admin);
     $('searchBtn').hidden = !r.views.includes('clients');
     if (r.solo) { $('searchBtn').hidden = true; $('syncBtn').hidden = true; }
