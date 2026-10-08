@@ -1,0 +1,20 @@
+Ouvrez ce dossier (caisse-locale) dans Claude Code, puis copiez-collez le message ci-dessous :
+
+------------------------------------------------------------------------
+Bonjour. Je suis le gerant de CISPOLstore, une WiFi Zone a Kinshasa.
+Ce dossier contient ma caisse locale (Node.js, sans dependance) qui vend les tickets
+de mon hotspot MikroTik RB4011.
+
+1. Lis d'abord CLAUDE.md en entier : il decrit mon reseau, les regles des tickets,
+   les pieges deja rencontres et la feuille de route.
+2. Lance les tests (node tests/test-api.js) et dis-moi s'ils passent.
+3. Ensuite, aide-moi a faire l'etape 1 de la feuille de route : la mise en service
+   sur mon ordinateur et le test contre mon vrai routeur. Commence par la lecture seule,
+   et demande-moi toujours avant de creer ou supprimer quoi que ce soit sur le routeur.
+
+Explique-moi chaque etape en francais simple, une commande a la fois :
+je ne suis pas developpeur.
+------------------------------------------------------------------------
+
+Pour les etapes suivantes, il suffira d'ecrire par exemple :
+  "Passons a l'etape 2 de la feuille de route : la cloture de caisse."
