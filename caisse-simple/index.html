@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caisse WiFi Zone</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--txt:#1b1f24;--mut:#6b7280;--line:#e5e7eb;--ok:#16a34a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--txt:#f1f2f4;--mut:#9aa1ad;--line:#2a2f38}}
+*{box-sizing:border-box}
+body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--txt);padding:12px;max-width:560px;margin:auto}
+h1{font-size:20px;margin:4px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.total{font-size:30px;font-weight:700}
+.mut{color:var(--mut);font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fo{border:0;border-radius:12px;padding:18px 8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+.fo small{display:block;font-weight:400;opacity:.9;margin-top:4px}
+.fo.sel{outline:4px solid var(--txt)}
+input,select{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--txt);margin-top:8px}
+button.main{width:100%;margin-top:10px;padding:16px;font-size:18px;font-weight:700;border:0;border-radius:12px;background:var(--ok);color:#fff;cursor:pointer}
+button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--txt);cursor:pointer}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tabs button{flex:1}
+.tabs button[aria-pressed=true]{background:var(--txt);color:var(--bg)}
+#msg{min-height:20px;margin-top:8px;font-weight:600}
+</style>
+</head>
+<body>
+<h1>Caisse WiFi Zone</h1>
+
+<div class="card">
+  <div class="mut" id="jourLib">Aujourd'hui</div>
+  <div class="total" id="totalJour">0 FC</div>
+  <div class="mut" id="nbJour">0 vente</div>
+</div>
+
+<div class="card">
+  <div class="grid" id="forfaits"></div>
+  <input id="code" placeholder="Code du ticket (facultatif)" autocapitalize="characters" autocomplete="off">
+  <input id="client" placeholder="Nom du client (facultatif)" autocomplete="off">
+  <button class="main" id="vendre">Enregistrer la vente</button>
+  <div id="msg"></div>
+</div>
+
+<div class="card">
+  <div class="tabs" id="tabs">
+    <button class="sec" data-p="jour" aria-pressed="true">Jour</button>
+    <button class="sec" data-p="semaine" aria-pressed="false">Semaine</button>
+    <button class="sec" data-p="mois" aria-pressed="false">Mois</button>
+  </div>
+  <div class="mut" id="resume"></div>
+  <div id="liste"></div>
+</div>
+
+<div class="card">
+  <b>Prix des forfaits</b>
+  <div id="prix"></div>
+  <button class="sec" id="exporter" style="margin-top:10px">Exporter en CSV (Excel)</button>
+  <button class="sec" id="sauver" style="margin-top:10px">Sauvegarder</button>
+  <button class="sec" id="restaurer" style="margin-top:10px">Restaurer</button>
+  <input type="file" id="fichier" accept=".json" hidden>
+</div>
+
+<script>
+(() => {
+  // Plans with default prices; prices can be edited and are saved in localStorage
+  const FORFAITS = [
+    { id: 'V', nom: 'Visiteur', duree: '6 heures', prix: 500, c: '#16a34a' },
+    { id: 'J', nom: 'Jour', duree: '24 heures', prix: 1000, c: '#2563eb' },
+    { id: 'S', nom: 'Semaine', duree: '7 jours', prix: 7000, c: '#ea580c' },
+    { id: 'M', nom: 'Mois', duree: '30 jours', prix: 30000, c: '#7c3aed' },
+  ];
+  const $ = id => document.getElementById(id);
+  const CLE = 'caisse-simple-v1';
+  let data = { prix: {}, ventes: [] };
+  try { data = { ...data, ...JSON.parse(localStorage.getItem(CLE) || '{}') }; } catch (e) {}
+  let choix = null, periode = 'jour';
+
+  const save = () => { try { localStorage.setItem(CLE, JSON.stringify(data)); } catch (e) { msg('Stockage impossible : sauvegardez vos données.', true); } };
+  const prixDe = f => data.prix[f.id] != null ? data.prix[f.id] : f.prix;
+  const fc = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FC';
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function msg(t, err) { const m = $('msg'); m.textContent = t; m.style.color = err ? '#dc2626' : 'var(--ok)'; }
+  function debut(p) {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    if (p === 'semaine') d.setDate(d.getDate() - 6);
+    if (p === 'mois') d.setDate(1);
+    return d.getTime();
+  }
+  const depuis = p => data.ventes.filter(v => v.t >= debut(p)).sort((a, b) => b.t - a.t);
+
+  function dessiner() {
+    $('forfaits').innerHTML = FORFAITS.map(f =>
+      `<button class="fo${choix === f.id ? ' sel' : ''}" data-id="${f.id}" style="background:${f.c}">${f.nom}<small>${f.duree} · ${fc(prixDe(f))}</small></button>`).join('');
+    const jour = depuis('jour');
+    $('totalJour').textContent = fc(jour.reduce((s, v) => s + v.prix, 0));
+    $('nbJour').textContent = jour.length + (jour.length > 1 ? ' ventes' : ' vente');
+    const l = depuis(periode);
+    $('resume').textContent = l.length + ' vente(s) · ' + fc(l.reduce((s, v) => s + v.prix, 0));
+    $('liste').innerHTML = l.slice(0, 100).map(v => {
+      const f = FORFAITS.find(x => x.id === v.f);
+      const h = new Date(v.t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return `<div class="row"><div><b>${f ? f.nom : v.f}</b> ${esc(v.code || '')}<div class="mut">${h}${v.client ? ' · ' + esc(v.client) : ''}</div></div><div>${fc(v.prix)} <button class="sec" data-del="${v.t}">✕</button></div></div>`;
+    }).join('') || '<div class="mut">Aucune vente.</div>';
+    $('prix').innerHTML = FORFAITS.map(f => `<div class="row"><span>${f.nom}</span><input type="number" min="0" step="100" data-prix="${f.id}" value="${prixDe(f)}" style="width:130px;margin:0"></div>`).join('');
+  }
+
+  $('forfaits').onclick = e => { const b = e.target.closest('.fo'); if (!b) return; choix = b.dataset.id; dessiner(); };
+  $('vendre').onclick = () => {
+    if (!choix) return msg('Choisissez d\'abord un forfait.', true);
+    const f = FORFAITS.find(x => x.id === choix);
+    const code = $('code').value.toUpperCase().replace(/\s+/g, '');
+    if (code && data.ventes.some(v => v.code === code)) return msg(code + ' est déjà vendu.', true);
+    data.ventes.push({ t: Date.now(), f: f.id, prix: prixDe(f), code, client: $('client').value.trim().slice(0, 80) });
+    save(); $('code').value = ''; $('client').value = ''; choix = null;
+    msg('Vente enregistrée : ' + f.nom + ' ' + fc(prixDe(f)));
+    dessiner();
+  };
+  $('tabs').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return; periode = b.dataset.p;
+    document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    dessiner();
+  };
+  $('liste').onclick = e => {
+    const b = e.target.closest('[data-del]'); if (!b) return;
+    if (!confirm('Annuler cette vente ?')) return;
+    data.ventes = data.ventes.filter(v => String(v.t) !== b.dataset.del); save(); dessiner();
+  };
+  $('prix').onchange = e => {
+    const i = e.target.dataset.prix; const v = parseInt(e.target.value, 10);
+    if (i && Number.isFinite(v) && v >= 0) { data.prix[i] = v; save(); dessiner(); }
+  };
+  function telecharger(nom, type, contenu) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([contenu], { type }));
+    a.download = nom; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  $('exporter').onclick = () => {
+    const l = ['Date;Heure;Forfait;Code;Client;Prix FC'];
+    for (const v of depuis(periode).reverse()) {
+      const d = new Date(v.t), f = FORFAITS.find(x => x.id === v.f);
+      l.push([d.toLocaleDateString('fr-FR'), d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), f ? f.nom : v.f, v.code || '', (v.client || '').replace(/;/g, ','), v.prix].join(';'));
+    }
+    telecharger('ventes-' + periode + '.csv', 'text/csv;charset=utf-8', '﻿' + l.join('\r\n'));
+  };
+  $('sauver').onclick = () => telecharger('sauvegarde-caisse-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json', JSON.stringify(data));
+  $('restaurer').onclick = () => $('fichier').click();
+  $('fichier').onchange = async e => {
+    try {
+      const d = JSON.parse(await e.target.files[0].text());
+      if (!Array.isArray(d.ventes)) throw 0;
+      if (!confirm('Remplacer les données actuelles par la sauvegarde ?')) return;
+      data = { prix: d.prix || {}, ventes: d.ventes }; save(); dessiner(); msg('Sauvegarde restaurée.');
+    } catch (err) { msg('Fichier de sauvegarde invalide.', true); }
+    e.target.value = '';
+  };
+  dessiner();
+})();
+</script>
+</body>
+</html>
