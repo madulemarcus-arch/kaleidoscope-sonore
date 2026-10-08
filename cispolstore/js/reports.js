@@ -45,6 +45,7 @@
     const setup = [];
     if (App.role() === App.ROLES.admin) {
       const lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, t) : null, co = S.company;
+      if (App.drive && App.drive.needsAttention()) setup.push(['☁️', 'Sauvegarde Google Drive : reconnexion nécessaire (Paramètres → Sauvegarde Google Drive). Elle ne se fait pas toute seule.']);
       if (!App.hasPin()) setup.push(['🔓', "Aucun code PIN : n'importe qui peut ouvrir l'application. Définissez-en un (Paramètres → Sécurité)."]);
       if (db.clients.length && (lastB === undefined || age === null || age > 7)) setup.push(['💾', age === null ? "Aucune sauvegarde faite : lancez-en une (Paramètres → Données) ou activez Google Drive." : `Dernière sauvegarde il y a ${age} jours : pensez à en faire une.`]);
       if (!co.rccm && !co.idnat && !co.impot) setup.push(['📄', 'Renseignez RCCM, ID Nat. et N° Impôt (Paramètres → Entreprise) : ils figureront sur les factures.']);
