@@ -32,12 +32,16 @@
   };
 
   // ---------- Invoice list ----------
+  // pending invoices left undecided for a few days: the client should either take the product or drop it
+  const PEND_DAYS = 3, pendAge = i => Math.max(0, App.diff(i.date, App.today()));
+  App.stalePending = () => App.db.invoices.filter(i => i.pending && pendAge(i) >= PEND_DAYS).sort((a, b) => a.date.localeCompare(b.date));
+  App.actions.pend_go = () => { st.f = 'pending'; App.go('invoices'); };
   const st = { f: 'all', q: '', sel: false, picked: new Set() };
   const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || App.invStatus(i) === st.f) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
   const drawList = () => {
     const l = visibleInvoices();
     if ($('ibar')) $('ibar').innerHTML = !App.guard('delinvs') ? '' : st.sel ? `<button class="btn sm sec" data-act="inv_all">☑ Tout</button><button class="btn sm del" data-act="delinvs">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="inv_sel">Terminer</button>` : '<button class="btn sm sec" data-act="inv_sel">☑ Sélectionner pour supprimer</button>';
-    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="${st.sel ? 'inv_pick' : 'go'}" data-v="invoice" data-id="${i.id}">${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }).join('')}</div>` : '<div class="empty">Aucune facture.</div>';
+    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="${st.sel ? 'inv_pick' : 'go'}" data-v="invoice" data-id="${i.id}">${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.fdate(i.date)} · ${App.invTypes[i.type]}${i.pending ? ` · <span class="${pendAge(i) >= PEND_DAYS ? 'bad' : 'warn'}">⏳ ${pendAge(i)} j</span>` : ''}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }).join('')}</div>` : '<div class="empty">Aucune facture.</div>';
   };
   App.views.invoices = () => {
     const db = App.db, tot = db.invoices.filter(App.live).reduce((a, i) => a + App.usd(App.invAgreed(i), i.currency, i), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);

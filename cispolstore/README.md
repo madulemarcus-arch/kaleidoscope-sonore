@@ -123,6 +123,8 @@ Le taux USD / CDF change souvent. Il se modifie en un geste : le bouton **💱 1
 
 Quand un client demande seulement la facture et peut ne pas prendre le produit, cochez **⏳ Facture en attente** à la création. La facture est remise au client (prix complet) mais **rien n'est déduit du stock**, elle **ne compte ni dans les ventes, ni dans les rapports, ni dans les impayés** (filtre « En attente » dans la liste des factures), et l'abonnement ou l'installation liés ne sont pas appliqués. Sur sa page : **✅ Le client prend le produit** valide la vente (le stock est déduit, l'abonnement renouvelé, l'installation créée) puis ouvre l'encaissement ; **✖ Le client n'en veut plus** annule la facture sans toucher au stock.
 
+**Rappel** : une facture en attente depuis **3 jours ou plus** fait apparaître sur l'accueil l'alerte « ⏳ N facture(s) en attente » (un toucher ouvre la liste filtrée). Dans la liste, chaque facture en attente affiche son ancienneté (⏳ 5 j, en rouge à partir de 3 jours).
+
 ## Clôture du jour
 
 Plus → **🌙 Clôture du jour** (administrateur et comptable). Pour la date choisie (aujourd'hui par défaut, boutons Veille / Lendemain ou calendrier) : **entrées et sorties**, détail **par mode de paiement** (Cash, M-Pesa, Airtel…) et par devise, factures émises et ce qui **reste à encaisser**, livraisons faites, puis le **cash attendu en caisse** (cash encaissé − cash payé, en dollars et en francs). Saisissez le cash réellement compté et appuyez sur **Clôturer la journée** : l'**écart** est enregistré (avec une note facultative) et visible dans « Dernières clôtures » ; « Rouvrir » annule la clôture. Le récapitulatif s'envoie par **WhatsApp**, se copie ou s'imprime. Les clôtures sont sauvegardées et synchronisées comme le reste.
