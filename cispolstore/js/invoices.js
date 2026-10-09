@@ -216,56 +216,66 @@
   // receipt number: invoice number + order of the payment ("FAC-2026-0002-P2")
   App.receiptNo = p => { const i = App.invoice(p.invoiceId); if (!i) return 'REC-' + (p.date || '').replace(/-/g, '') + '-' + String(p.id).slice(-4).toUpperCase(); const x = App.invPayments(i).find(y => y.p === p); return i.number + '-P' + (x ? x.n : 1); };
 
-  const PAPER_CSS = `body{font:13px/1.4 Arial,sans-serif;color:#111;margin:18px}.paper .hd{display:flex;justify-content:space-between;gap:12px;border-bottom:3px solid #1e3f60;padding-bottom:10px}.paper .hd img{height:56px}.paper .co{text-align:right;font-size:12px}.paper .two{display:flex;gap:12px;margin:12px 0}.paper .box{border:1px solid #1e3f60;flex:1}.paper .box h4{margin:0;padding:4px 8px;background:#1e3f60;color:#fff;font-size:13px}.paper .box dl{margin:0;padding:6px 8px}.paper .box dl div{display:flex !important;gap:8px}.paper .box dt{width:90px;color:#555}.paper .box dd{margin:0}.paper table{width:100%;border-collapse:collapse}.paper th{background:#1e3f60;color:#fff;padding:6px;text-align:left}.paper td{padding:6px;border-bottom:1px solid #ccd}.paper .r{text-align:right}.paper .tot{margin-left:auto;width:300px;margin-top:8px}.paper .tot div{display:flex;justify-content:space-between;padding:3px 0}.paper .tot .g{font-weight:bold;font-size:15px;color:#d5522f;border-top:1px solid #1e3f60}.paper .words{margin-top:12px;font-style:italic}.paper .thx{text-align:center;color:#1e3f60;margin-top:16px;font-weight:bold}.paper .pay{margin-top:14px}.paper .pay h4{margin:0 0 4px;color:#1e3f60}.paper .pay td,.paper .pay th{font-size:12px}.paper .sold{display:inline-block;margin-top:8px;padding:3px 10px;border:2px solid #1d8a4f;color:#1d8a4f;font-weight:bold;transform:rotate(-3deg)}.paper .sig{display:flex;gap:30px;margin-top:34px}.paper .sig div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center;font-size:12px;color:#555}.paper .rc{border:2px solid #1e3f60;padding:14px;margin-top:14px;font-size:15px;line-height:1.7}.paper .rc b.big{font-size:20px;color:#d5522f}`;
-  App.invoiceDoc = (i, logo) => {
-    const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), other = i.currency === 'USD' ? 'CDF' : 'USD';
-    const legal = [co.rccm && 'RCCM : ' + co.rccm, co.idnat && 'ID. Nat. : ' + co.idnat, co.impot && 'N° Impôt : ' + co.impot].filter(Boolean);
-    const dl = (k, v) => `<div style="display:contents"><dt>${k}</dt><dd>${v}</dd></div>`;
-    return `<div class="paper"><div class="hd"><div><img src="${esc(logo || co.logo || 'logo.png')}" alt=""><div><b>${esc(co.name)}</b></div></div>
-      <div class="co"><b>Siège social :</b> ${esc(co.address)}<br>Tél : ${esc(co.phone)}<br>${esc(co.email)}${legal.length ? '<br>' + legal.map(esc).join('<br>') : ''}</div></div>
-      <div class="two"><div class="box"><h4>FACTURE</h4><dl>${dl('Numéro', `<b>${esc(i.number)}</b>`)}${dl('Date', App.fdate(i.date))}${dl('Devise', i.currency === 'CDF' ? 'CDF' : 'USD')}${dl('Payé par', esc(i.payMode))}</dl></div>
-      <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', `<b style="font-size:1.1em">${esc(App.cname(c))}</b>`)}${dl('Code', esc(c ? c.code : '—'))}${dl('Adresse', esc(c ? (c.address || c.installAddr || '—') : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
-      <table><thead><tr><th>Produit / Description</th><th class="r">Qté</th><th class="r">PU (${i.currency === 'CDF' ? 'CDF' : '$'})</th><th class="r">Montant (${i.currency === 'CDF' ? 'CDF' : '$'})</th></tr></thead><tbody>${i.lines.map(l => `<tr><td>${esc(l.desc)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${App.nf(l.price, 2)}</td><td class="r">${App.nf(l.qty * l.price, 2)}</td></tr>`).join('')}</tbody></table>
-      <div class="tot"><div class="g"><span>Total :</span><span>${App.fmt(tot, i.currency)}</span></div>
-      <div style="font-size:12px;color:#555"><span>Taux appliqué (1 $) :</span><span>${App.nf(App.rateOf(i), 0)} CDF</span></div><div style="font-size:12px;color:#555"><span>Équivalent en ${other} :</span><span>${App.fmt(App.conv(tot, i.currency, other, App.rateOf(i)), other)}</span></div></div>
-      <div class="words">Arrêtée la présente facture à la somme de : <b>${esc(App.amountWords(tot, i.currency))}</b>.</div><div class="thx">MERCI POUR VOTRE CONFIANCE</div></div>`;
+  // Invoice / receipt look (modelled on the company's Word invoice): serif, navy #1A365D, orange note, round stamp. Table-based so Word keeps the layout.
+  const PAPER_CSS = `.paper{font:10.5pt/1.45 Cambria,'Times New Roman',Georgia,serif;color:#1a202c;background:#fff}.paper table{width:100%;border-collapse:collapse}.paper td,.paper th{vertical-align:top}.paper .r{text-align:right}.paper .hd td{vertical-align:middle;padding:0}.paper .hd img{height:2.3cm}.paper .nm{font-size:20pt;font-weight:bold;color:#1A365D;letter-spacing:.5px}.paper .sub{font-size:8pt;color:#4A5568;letter-spacing:.8px;margin-top:2px}.paper .legal{margin:10px 0 16px;border-bottom:1px solid #1a202c}.paper .legal td{padding:0 0 9px;font-size:9.5pt;line-height:1.6;width:50%}.paper .two{margin:0 0 18px;border-collapse:separate;border-spacing:0;table-layout:fixed}.paper .box{width:47.5%;border:1px solid #E2E8F0;background:#F7FAFC;padding:10px 12px;line-height:1.6}.paper .gap{width:5%}.paper .bh{font-size:11pt;font-weight:bold;color:#1A365D;margin-bottom:6px}.paper .items{margin:0 0 16px}.paper .items th{background:#1A365D;color:#fff;padding:8px 9px;text-align:left;font-weight:bold}.paper .items th.r{text-align:right}.paper .items td{padding:8px 9px;border-bottom:1px solid #E2E8F0}.paper .tots td{padding:6px 9px;width:50%;text-align:right}.paper .tots .net td{background:#1A365D;color:#fff;font-weight:bold}.paper .rate{font-size:8.5pt;color:#4A5568;text-align:right;margin-top:5px}.paper .wb{margin:16px 0 0;border-left:4px solid #DD6B20;background:#FFFAF0;padding:10px 14px;line-height:1.7}.paper .foot{margin-top:20px;page-break-inside:avoid}.paper .foot td{vertical-align:middle}.paper .foot img{width:4.4cm}.paper .thx{font-weight:bold;color:#1A365D;letter-spacing:.6px;font-size:11pt}.paper .pay{margin-top:14px}.paper .pay h4{margin:0 0 4px;color:#1A365D}.paper .pay th{background:#1A365D;color:#fff;padding:6px;text-align:left}.paper .pay td{padding:6px;font-size:9.5pt;border-bottom:1px solid #E2E8F0}.paper .sold{display:inline-block;margin-top:10px;padding:3px 10px;border:2px solid #1d8a4f;color:#1d8a4f;font-weight:bold;transform:rotate(-3deg)}.paper .sig{display:flex;gap:30px;margin-top:34px}.paper .sig div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .rc{border-left:4px solid #DD6B20;background:#FFFAF0;padding:14px 16px;margin:0 0 16px;font-size:12pt;line-height:1.8}.paper .rc b.big{font-size:15pt;color:#DD6B20}.paper table,.paper tr{page-break-inside:avoid}@media (max-width:640px){.paper .hd td:first-child{width:36%!important}.paper .hd img{height:auto;max-width:100%}.paper .nm{font-size:14pt}.paper .legal td{display:block;width:auto;text-align:left}}`;
+  const DOC_CSS = `body{margin:0;background:#fff}@page{size:A4;margin:1.4cm 1.5cm}` + PAPER_CSS;
+  { const st = document.createElement('style'); st.id = 'paperCss'; st.textContent = PAPER_CSS; document.head.appendChild(st); }
+  // shared pieces of the printed documents
+  const money = (n, cur) => cur === 'CDF' ? App.nf(n, 0) + ' CDF' : App.nf(n, 2) + ' $';
+  const lines = a => a.filter(Boolean).map(([k, v]) => `<div>${k ? `<b>${k} : </b>` : ''}${v}</div>`).join('');
+  const docName = co => /^cispol\s*store$/i.test(co.name || '') ? 'CISPOL STORE' : String(co.name || '').toUpperCase();
+  const paperHead = (co, logo) => {
+    const legal = [co.rccm && ['RCCM', esc(co.rccm)], co.idnat && ['Id. Nat.', esc(co.idnat)], co.impot && ['N° Impôt', esc(co.impot)]];
+    return `<table class="hd"><tr><td style="width:6.2cm"><img src="${esc(logo || co.logo || 'logo.png')}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td></tr></table>
+      <table class="legal"><tr><td>${lines(legal)}</td><td class="r">${lines([['Siège Social', esc(co.address)], ['Contact', esc(co.email)], ['Téléphone', esc(co.phone)]])}</td></tr></table>`;
+  };
+  const twoBoxes = (t1, r1, t2, r2) => `<table class="two"><tr><td class="box"><div class="bh">${t1}</div>${lines(r1)}</td><td class="gap"></td>${t2 ? `<td class="box"><div class="bh">${t2}</div>${lines(r2)}</td>` : '<td class="box" style="border:0;background:none"></td>'}</tr></table>`;
+  const paperFoot = stamp => `<table class="foot"><tr><td class="thx">MERCI POUR VOTRE CONFIANCE</td><td class="r" style="width:4.8cm"><img src="${esc(stamp || 'stamp.png')}" alt=""></td></tr></table>`;
+  App.invoiceDoc = (i, logo, stamp) => {
+    const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), cur = i.currency === 'CDF' ? 'CDF' : 'USD', other = cur === 'USD' ? 'CDF' : 'USD', unit = cur === 'CDF' ? 'CDF' : 'USD';
+    const rows = i.lines.map(l => { const pr = l.pid && App.prod(l.pid); return `<tr><td>${esc(l.ref || (pr && pr.ref) || '—')}</td><td>${esc(l.desc).replace(/ \(/, '<br>(')}</td><td class="r">${money(l.price, cur)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${money(l.qty * l.price, cur)}</td></tr>`; }).join('');
+    return `<div class="paper">${paperHead(co, logo)}
+      ${twoBoxes('FACTURE', [['Numéro', `<b>${esc(i.number)}</b>`], ['Date', App.fdate(i.date)], co.city && ['Lieu', esc(co.city)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], ['Adresse', esc(c ? (c.address || c.installAddr || '—') : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
+      <table class="items"><thead><tr><th style="width:13%">Référence</th><th>Description</th><th class="r" style="width:15%">P.U. (${unit})</th><th class="r" style="width:8%">Qté</th><th class="r" style="width:20%">Montant (${unit})</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="tots"><tr><td><b>Total TTC :</b></td><td>${money(tot, cur)}</td></tr><tr class="net"><td>NET À PAYER :</td><td>${money(tot, cur)}</td></tr></table>
+      <div class="rate">Taux appliqué : 1 $ = ${App.nf(App.rateOf(i), 0)} CDF · équivalent ${money(App.conv(tot, cur, other, App.rateOf(i)), other)}</div>
+      <div class="wb"><b>Arrêtée la présente facture à la somme de : ${esc(App.amountWords(tot, cur))}</b>.<br><b>Mode de règlement : </b>${esc(co.payTerms || '')}</div>
+      ${paperFoot(stamp)}</div>`;
   };
   // ---------- Payment receipt ----------
-  App.receiptDoc = (p, logo) => {
-    const co = App.db.settings.company, c = App.client(p.clientId), i = App.invoice(p.invoiceId), legal = [co.rccm && 'RCCM : ' + co.rccm, co.idnat && 'ID. Nat. : ' + co.idnat, co.impot && 'N° Impôt : ' + co.impot].filter(Boolean);
-    const dl = (k, v) => `<div style="display:contents"><dt>${k}</dt><dd>${v}</dd></div>`;
+  App.receiptDoc = (p, logo, stamp) => {
+    const co = App.db.settings.company, c = App.client(p.clientId), i = App.invoice(p.invoiceId);
     let after = '';
     if (i) { const x = App.invPayments(i).find(y => y.p === p), tot = App.invTotal(i), paid = App.invPaid(i), due = Math.max(0, tot - paid);
-      after = `<div class="two"><div class="box"><h4>FACTURE ${esc(i.number)}</h4><dl>${dl('Date', App.fdate(i.date))}${dl('Total', App.fmt(tot, i.currency))}${dl('Déjà payé', App.fmt(paid, i.currency))}${dl('Reste', `<b>${App.fmt(due, i.currency)}</b>`)}</dl></div></div>${x && x.left <= 0.004 ? '<div class="sold">FACTURE SOLDÉE</div>' : ''}`; }
-    return `<div class="paper"><div class="hd"><div><img src="${esc(logo || co.logo || 'logo.png')}" alt=""><div><b>${esc(co.name)}</b></div></div>
-      <div class="co"><b>Siège social :</b> ${esc(co.address)}<br>Tél : ${esc(co.phone)}<br>${esc(co.email)}${legal.length ? '<br>' + legal.map(esc).join('<br>') : ''}</div></div>
-      <div class="two"><div class="box"><h4>REÇU DE PAIEMENT</h4><dl>${dl('N°', `<b>${esc(App.receiptNo(p))}</b>`)}${dl('Date', App.fdate(p.date))}${dl('Mode', esc(p.mode))}${p.ref ? dl('Référence', esc(p.ref)) : ''}</dl></div>
-      <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', `<b style="font-size:1.1em">${esc(App.cname(c))}</b>`)}${dl('Code', esc(c ? c.code : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
+      after = `${twoBoxes('FACTURE ' + esc(i.number), [['Date', App.fdate(i.date)], ['Total', money(tot, i.currency)], ['Déjà payé', money(paid, i.currency)], ['Reste', `<b>${money(due, i.currency)}</b>`]])}${x && x.left <= 0.004 ? '<div class="sold">FACTURE SOLDÉE</div>' : ''}`; }
+    return `<div class="paper">${paperHead(co, logo)}
+      ${twoBoxes('REÇU DE PAIEMENT', [['N°', `<b>${esc(App.receiptNo(p))}</b>`], ['Date', App.fdate(p.date)], ['Mode', esc(p.mode)], p.ref && ['Référence', esc(p.ref)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
       <div class="rc">Nous avons reçu de <b>${esc(App.cname(c))}</b> la somme de <b class="big">${App.fmt(p.amount, p.currency)}</b> <i>(${esc(App.amountWords(p.amount, p.currency))})</i>${i ? ` en paiement de la facture <b>${esc(i.number)}</b>` : ''}${p.comment ? ` — ${esc(p.comment)}` : ''}.</div>
-      ${after}<div class="sig"><div>Le client</div><div>${esc(co.name)}</div></div><div class="thx">MERCI POUR VOTRE CONFIANCE</div></div>`;
+      ${after}<div class="sig"><div>Le client</div><div>${esc(co.name)}</div></div>${paperFoot(stamp)}</div>`;
   };
   const printRaw = async (title, html) => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${PAPER_CSS}</style>${html}`;
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${DOC_CSS}</style>${html}`;
     f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); }, 400);
     document.body.appendChild(f);
   };
-  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw('Reçu ' + App.receiptNo(p), App.receiptDoc(p, await logoData())); };
+  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw('Reçu ' + App.receiptNo(p), App.receiptDoc(p, await logoData(), await stampData())); };
   App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
-    App.download(`Reçu-${no}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Reçu ${esc(no)}</title><style>${PAPER_CSS}</style></head><body>${App.receiptDoc(p, await logoData())}</body></html>`, 'application/msword'); };
+    App.download(`Reçu-${no}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Reçu ${esc(no)}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}</body></html>`, 'application/msword'); };
 
+  const stampData = async () => { try { const b = await (await fetch('stamp.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; } };
   const logoData = async () => {
     const co = App.db.settings.company; if ((co.logo || '').startsWith('data:')) return co.logo;
     try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
   };
   const printDoc = async inv => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${PAPER_CSS}</style>${App.invoiceDoc(inv, await logoData())}`;
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;
     f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); }, 400);
     document.body.appendChild(f);
   };
   const wordDoc = async inv => {
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${PAPER_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData())}</body></html>`;
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}</body></html>`;
     App.download(`${inv.number}.doc`, html, 'application/msword');
   };
 
