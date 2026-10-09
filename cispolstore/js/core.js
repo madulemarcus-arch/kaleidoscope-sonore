@@ -33,7 +33,7 @@
       company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '', tagline: 'SOLUTIONS TECHNOLOGIQUES ET CONNECTIVITE', city: 'Kinshasa', payTerms: 'Virement bancaire ou espèces.' },
       plans: { 'Résidentiel': { price: 70, cost: 64 } }, rate: 2400, rates: [], theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
     },
-    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], closings: [], log: []
+    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], purchases: [], closings: [], log: []
   });
   App.blank = blank;
   const normalize = o => {
@@ -98,7 +98,7 @@
   App.rateOn = d => { const h = (db.settings.rates || []).filter(x => x.date <= d).sort((a, b) => a.date.localeCompare(b.date) || (a.ts || 0) - (b.ts || 0)); return h.length ? +h[h.length - 1].rate : App.rate(); };
   App.rateOf = r => +r.rate || App.rateOn(r.date || r.paid || App.today());
   // gives every record its own rate (once), so changing the rate later never rewrites the past
-  const STAMPED = [['invoices', 'date'], ['payments', 'date'], ['expenses', 'date'], ['penalties', 'date']];
+  const STAMPED = [['invoices', 'date'], ['payments', 'date'], ['expenses', 'date'], ['purchases', 'date'], ['penalties', 'date']];
   App.stampRates = () => { STAMPED.forEach(([k, f]) => (db[k] || []).forEach(r => { if (!(+r.rate > 0)) r.rate = App.rateOn(r[f] || App.today()); })); };
   App.setRate = r => {
     r = Math.round(+r) || 0; const S = db.settings; if (r < 1 || r === +S.rate) return false;
