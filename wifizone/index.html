@@ -135,7 +135,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
         ${chips('mode', st.mode, MODES.map(m => [m, m]))}
         <div class="mut">Total à encaisser</div><div class="total">${fmt(t)}</div>
         <button class="btn full" data-a="sell" ${f ? '' : 'disabled style="opacity:.5"'}>✔ Enregistrer la vente</button></div>
-      <h2>Ventes d'aujourd'hui (${list.length})</h2><div class="card">${list.length ? list.map(s => `<div class="row"><div class="g"><b>${s.qty} × ${esc(fname(s.fid))}</b><small>${esc(s.mode)}${s.note ? ' · ' + esc(s.note) : ''}</small></div><b>${fmt(s.amount)}</b><button class="btn sm sec" data-a="delsale" data-v="${s.id}">✕</button></div>`).join('') : '<div class="empty">Aucune vente pour le moment.</div>'}</div>` };
+      <h2>Ventes d'aujourd'hui (${list.length})</h2><div class="card">${list.length ? list.map(s => `<div class="row"><div class="g"><b>${s.qty} × ${esc(fname(s.fid))}</b><small>${esc(s.mode)}${s.ref ? ' · code ' + esc(s.ref) : ''}${s.note ? ' · ' + esc(s.note) : ''}</small></div><b>${fmt(s.amount)}</b><button class="btn sm sec" data-a="delsale" data-v="${s.id}">✕</button></div>`).join('') : '<div class="empty">Aucune vente pour le moment.</div>'}</div>` };
   };
   views.exp = () => {
     const r = range(st.per), E = db.expenses.filter(e => inR(e.date, r)).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
@@ -200,6 +200,9 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
       <label>Taux du jour (1 $ = … FC)</label><input id="s_rate" type="number" inputmode="numeric" min="1" value="${db.rate}">
       <button class="btn full" data-a="saveset">Enregistrer</button></div>
     <h2>Forfaits et prix</h2><div class="card">${db.forfaits.map(f => `<div class="row"><div class="g"><b>${esc(f.nom)}</b><small>${esc(f.duree)}</small></div><b>${fmt(f.prix)}</b><button class="btn sm sec" data-a="editf" data-v="${esc(f.id)}">✎</button></div>`).join('')}<button class="btn sec full" data-a="newf">+ Ajouter un forfait</button></div>
+    <h2>Importer les ventes de la caisse</h2><div class="card"><p class="mut" style="margin-top:0">Les tickets vendus par la <b>caisse locale</b> (routeur MikroTik) ou la <b>caisse simple</b> s'importent depuis leur fichier « Exporter en CSV ». Chaque ticket devient une vente ; un ticket déjà importé (même code) n'est jamais compté deux fois.</p>
+      <label>Mode de paiement des ventes importées</label><select id="i_mode">${MODES.map(m => `<option>${esc(m)}</option>`).join('')}</select>
+      <button class="btn full" data-a="impcsv">⬆ Choisir le fichier CSV</button><input type="file" id="ifile" accept=".csv,text/csv" hidden></div>
     ${syncCard()}
     <h2>Sécurité</h2><div class="card"><div class="row"><div class="g"><b>Code PIN</b><small>${db.pin ? 'Activé : demandé à l\'ouverture' : 'Désactivé : tout le monde peut ouvrir l\'application'}</small></div></div>
       ${db.pin ? `<label>Verrouiller après</label><select id="s_lock"><option value="0" ${db.lockMin === 0 ? 'selected' : ''}>Dès que je quitte l'application</option><option value="2" ${db.lockMin === 2 ? 'selected' : ''}>2 minutes</option><option value="10" ${db.lockMin === 10 ? 'selected' : ''}>10 minutes</option></select>` : ''}
@@ -354,6 +357,27 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
     const salt = uid() + uid(); db.pin = { salt, hash: await hashPin(first, salt) }; save(); lockEl.classList.remove('on'); lockEl.innerHTML = ''; draw(); toast('Code PIN enregistré');
   }, { cancel: true, msg: 'Saisissez-le une deuxième fois' }), { cancel: true, msg: '4 chiffres' });
 
+  // ---------- Import of ticket sales exported by the cashier tools (caisse-locale / caisse-simple CSV) ----------
+  const parseCsv = txt => txt.replace(/^\ufeff/, '').split(/\r?\n/).filter(l => l.trim()).map(l => l.split(';').map(c => c.trim().replace(/^"|"$/g, '')));
+  const importSales = (txt, mode) => {
+    const rows = parseCsv(txt); if (rows.length < 2) throw new Error('Fichier vide');
+    const H = rows[0].map(h => h.toLowerCase()), col = re => H.findIndex(h => re.test(h));
+    const cD = col(/^date/), cF = col(/^forfait/), cP = col(/^prix/), cC = col(/^code/), cV = col(/^vendeur/), cH = col(/^heure/);
+    if (cD < 0 || cF < 0 || cP < 0) throw new Error('Colonnes Date, Forfait et Prix introuvables : est-ce bien un export de la caisse ?');
+    const have = new Set(db.sales.map(x => x.id)); let added = 0, dup = 0, newF = 0, total = 0;
+    rows.slice(1).forEach((c, i) => {
+      const m = (c[cD] || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/), prix = Math.round(+String(c[cP] || '').replace(/[\s\u202f\u00a0]/g, '').replace(',', '.'));
+      if (!m || !(prix >= 0) || !c[cF]) return;
+      const date = `${m[3]}-${pad(+m[2])}-${pad(+m[1])}`, code = cC >= 0 ? c[cC] : '', id = code ? 'caisse-' + code : `caisse-${date}-${cH >= 0 ? c[cH] : ''}-${i}-${prix}`;
+      if (have.has(id)) { dup++; return; }
+      let f = db.forfaits.find(x => x.nom.toLowerCase() === c[cF].toLowerCase());
+      if (!f) { f = { id: uid(), ts: Date.now() + newF, nom: c[cF], duree: '', prix }; db.forfaits.push(f); newF++; }
+      db.sales.push({ id, ts: new Date(date + 'T' + ((cH >= 0 && c[cH]) || '12:00').replace('h', ':') + ':00').getTime() || Date.now(), date, fid: f.id, qty: 1, amount: prix, mode, ref: code, note: cV >= 0 && c[cV] ? 'vendeur ' + c[cV] : 'caisse', src: 'caisse' });
+      have.add(id); added++; total += prix;
+    });
+    save(); return { added, dup, newF, total };
+  };
+
   // ---------- actions ----------
   const share = t => window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
   const copy = t => { const ok = () => toast('Copié'); try { navigator.clipboard.writeText(t).then(ok, () => prompt('Copiez :', t)); } catch (e) { prompt('Copiez :', t); } };
@@ -388,6 +412,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
     saveset: () => { const r = Math.round(+$('s_rate').value); if (!(r > 0)) return toast('Taux invalide'); db.name = $('s_name').value.trim() || 'WiFi Zone'; db.rate = r; save(); draw(); toast('Réglages enregistrés'); },
     newf: () => forfaitForm(null), editf: v => forfaitForm(db.forfaits.find(f => f.id === v)),
     backup: () => { db.lastBackup = Date.now(); save(); download(`wifizone-sauvegarde-${today()}.json`, JSON.stringify({ ...db, pin: null }), 'application/json'); draw(); toast('Sauvegarde téléchargée'); },
+    impcsv: () => $('ifile').click(),
     syncnow: async () => { toast('Synchronisation…'); toast(await SY.now()); },
     syncoff: () => { if (confirm('Déconnecter la synchronisation ? Les données restent sur ce téléphone.')) { SY.disconnect(); draw(); } },
     syncsql: () => { fetch('../sync/supabase.sql').then(r => r.text()).then(t => { try { navigator.clipboard.writeText(t); toast('Script SQL copié'); } catch (e) { toast('Copie impossible'); } }).catch(() => toast('Script indisponible')); },
@@ -407,6 +432,11 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
   };
   document.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b && A[b.dataset.a]) A[b.dataset.a](b.dataset.v); });
   document.addEventListener('change', e => {
+    if (e.target.id === 'ifile' && e.target.files[0]) {
+      const mode = $('i_mode').value, rd = new FileReader();
+      rd.onload = () => { try { const x = importSales(String(rd.result), mode); draw(); toast(x.added ? `${x.added} vente(s) importée(s) : ${fmt(x.total)}${x.dup ? ` · ${x.dup} déjà présente(s)` : ''}${x.newF ? ` · ${x.newF} forfait(s) créé(s)` : ''}` : `Rien à importer${x.dup ? ` (${x.dup} déjà présente(s))` : ''}`); } catch (er) { toast(er.message || 'Fichier invalide'); } };
+      rd.readAsText(e.target.files[0]); e.target.value = ''; return;
+    }
     if (e.target.id === 's_lock') { db.lockMin = +e.target.value; save(); toast('Enregistré'); return; }
     if (e.target.id !== 'rfile' || !e.target.files[0]) return;
     const rd = new FileReader(); rd.onload = () => { try { const d = JSON.parse(rd.result); if (!Array.isArray(d.sales) || !Array.isArray(d.expenses)) throw 0;
