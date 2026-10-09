@@ -2,7 +2,7 @@
 
 Application web installable (PWA) pour gérer **WiFi Zone** : ventes de tickets, dépenses, clôture du jour et rapport du mois. Un seul fichier `index.html`, sans serveur, sans dépendance, utilisable hors connexion. Elle est indépendante de CISPOLstore Manager (autres données, autre icône) et de `caisse-simple/` / `caisse-locale/`.
 
-Adresse une fois publiée : `https://madulemarcus-arch.github.io/kaleidoscope-sonore/wifizone/`. Sur Android : menu du navigateur → « Installer l'application ».
+**Attention : ne pas installer cette copie.** Installée depuis `/kaleidoscope-sonore/wifizone/`, Chrome remplace CISPOLstore Manager (même zone du site) : le manifeste est donc retiré ici. Pour installer WiFi Zone, il faut un dépôt séparé. Adresse de test une fois publiée : `https://madulemarcus-arch.github.io/kaleidoscope-sonore/wifizone/`. Sur Android : menu du navigateur → « Installer l'application ».
 
 ## Lancer en local
 `python3 -m http.server 8000` dans ce dossier, puis http://localhost:8000. Pas de tests automatisés : vérifier à la main.
