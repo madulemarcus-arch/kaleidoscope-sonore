@@ -46,6 +46,10 @@ input,select{width:100%;padding:11px;font-size:16px;border:1px solid var(--line)
 dialog{border:0;border-radius:16px;padding:16px;width:min(92vw,460px);background:var(--card);color:var(--txt)}
 dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
 .end{display:flex;gap:8px;margin-top:14px}.end .btn{flex:1}
+#lock{position:fixed;inset:0;z-index:50;background:var(--navy);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}#lock.on{display:flex}#lock h2{color:#fff;font-size:22px;margin:0 0 4px;text-transform:none;letter-spacing:0}#lock p{opacity:.85;margin:0 0 16px;min-height:22px}
+.dots{display:flex;gap:12px;margin:8px 0 18px}.dots i{width:16px;height:16px;border-radius:50%;border:2px solid #fff}.dots i.f{background:#fff}
+.pad{display:grid;grid-template-columns:repeat(3,72px);gap:14px}.pad button{width:72px;height:72px;border-radius:50%;border:0;background:#ffffff22;color:#fff;font-size:24px;font-weight:600;cursor:pointer}.pad button:active{background:#ffffff55}
+#lock .lnk{background:none;border:0;color:#fff;opacity:.8;margin-top:18px;text-decoration:underline;font-size:14px;cursor:pointer}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 #toast.on{opacity:1}
 .empty{text-align:center;color:var(--mut);padding:24px 0}
@@ -57,6 +61,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
 <main id="view"></main>
 <nav id="nav"></nav>
 <dialog id="dlg"></dialog>
+<div id="lock"></div>
 <div id="toast"></div>
 <script>
 // WiFi Zone Manager: single-file PWA (sales of tickets, expenses, daily closing, reports). Data stays in this browser (localStorage).
@@ -72,7 +77,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
   const nf = (n, d = 0) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: d }).format(n).replace(/[  ]/g, ' ');
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const MODES = ['Cash', 'M-Pesa', 'Airtel Money', 'Orange Money', 'Banque'], CATS = ['Abonnement Starlink', 'Électricité / carburant', 'Salaire', 'Matériel / réparation', 'Papier / impression', 'Autre'];
-  const blank = () => ({ v: 1, name: 'WiFi Zone', rate: 2400, lastBackup: '', forfaits: [
+  const blank = () => ({ v: 1, name: 'WiFi Zone', rate: 2400, lastBackup: '', pin: null, lockMin: 2, forfaits: [
     { id: 'V', nom: 'Visiteur', duree: '6 heures', prix: 500 }, { id: 'J', nom: 'Jour', duree: '24 heures', prix: 1000 },
     { id: 'S', nom: 'Semaine', duree: '7 jours', prix: 7000 }, { id: 'M', nom: 'Mois', duree: '30 jours', prix: 30000 }], sales: [], expenses: [], closings: [] });
   let db; try { db = { ...blank(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) { db = blank(); }
@@ -193,6 +198,9 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
       <label>Taux du jour (1 $ = … FC)</label><input id="s_rate" type="number" inputmode="numeric" min="1" value="${db.rate}">
       <button class="btn full" data-a="saveset">Enregistrer</button></div>
     <h2>Forfaits et prix</h2><div class="card">${db.forfaits.map(f => `<div class="row"><div class="g"><b>${esc(f.nom)}</b><small>${esc(f.duree)}</small></div><b>${fmt(f.prix)}</b><button class="btn sm sec" data-a="editf" data-v="${esc(f.id)}">✎</button></div>`).join('')}<button class="btn sec full" data-a="newf">+ Ajouter un forfait</button></div>
+    <h2>Sécurité</h2><div class="card"><div class="row"><div class="g"><b>Code PIN</b><small>${db.pin ? 'Activé : demandé à l\'ouverture' : 'Désactivé : tout le monde peut ouvrir l\'application'}</small></div></div>
+      ${db.pin ? `<label>Verrouiller après</label><select id="s_lock"><option value="0" ${db.lockMin === 0 ? 'selected' : ''}>Dès que je quitte l'application</option><option value="2" ${db.lockMin === 2 ? 'selected' : ''}>2 minutes</option><option value="10" ${db.lockMin === 10 ? 'selected' : ''}>10 minutes</option></select>` : ''}
+      <div class="bar"><button class="btn" data-a="setpin">${db.pin ? 'Changer le code' : 'Créer un code PIN'}</button>${db.pin ? '<button class="btn sec" data-a="lockn">🔒 Verrouiller</button><button class="btn sec" data-a="rmpin">Supprimer</button>' : ''}</div></div>
     <h2>Sauvegarde</h2><div class="card"><p class="mut" style="margin-top:0">Vos données sont dans ce téléphone. ${db.lastBackup ? 'Dernière sauvegarde : ' + new Date(db.lastBackup).toLocaleString('fr-FR') : '<b class="warn">Aucune sauvegarde faite.</b>'}</p>
       <div class="bar"><button class="btn" data-a="backup">⬇ Sauvegarder</button><button class="btn sec" data-a="restore">⬆ Restaurer</button></div><input type="file" id="rfile" accept=".json,application/json" hidden></div>
     <p class="mut" style="text-align:center">WiFi Zone Manager · version 1.0</p>` });
@@ -203,6 +211,46 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
     $('nav').innerHTML = NAV.map(([k, i, t]) => `<button class="${st.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}"><b>${i}</b>${t}</button>`).join('');
     if ($('cdate')) $('cdate').onchange = () => { const d = $('cdate').value; if (d && d <= today()) { st.cd = d; draw(); } };
   };
+
+  // ---------- PIN lock ----------
+  // PIN is stored as a salted SHA-256 hash (never in backups); the screen locks at start and after the app stayed hidden for lockMin minutes
+  const sha = async str => { try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { let h = 5381; for (const c of str) h = ((h << 5) + h + c.charCodeAt(0)) | 0; return 'x' + h; } };
+  const hashPin = async (pin, salt) => sha(salt + ':' + pin);
+  let lockState = { buf: '', fails: 0, until: 0, cb: null, mode: 'unlock', len: 4 };
+  const lockEl = $('lock');
+  const drawLock = (msg) => {
+    const L = lockState;
+    lockEl.innerHTML = `<h2>${esc(L.title)}</h2><p id="lmsg">${esc(msg || '')}</p><div class="dots">${Array.from({ length: L.len }, (_, i) => `<i class="${i < L.buf.length ? 'f' : ''}"></i>`).join('')}</div>
+      <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join('')}<button data-k="x" style="font-size:16px">${L.cancel ? 'Annuler' : ''}</button><button data-k="0">0</button><button data-k="d">⌫</button></div>
+      ${L.mode === 'unlock' ? '<button class="lnk" data-k="forgot">Code oublié ?</button>' : ''}`;
+    lockEl.classList.add('on');
+  };
+  // ask for a PIN: onDone(pin) is called once L.len digits are entered
+  const askPin = (title, onDone, opts = {}) => { lockState = { ...lockState, buf: '', title, cb: onDone, mode: opts.mode || 'ask', cancel: !!opts.cancel, len: 4 }; drawLock(opts.msg); };
+  const unlockScreen = () => {
+    if (!db.pin) { lockEl.classList.remove('on'); return; }
+    askPin('WiFi Zone', async pin => {
+      if (Date.now() < lockState.until) return drawLock(`Patientez ${Math.ceil((lockState.until - Date.now()) / 1000)} s`);
+      if (await hashPin(pin, db.pin.salt) === db.pin.hash) { lockState.fails = 0; lockEl.classList.remove('on'); lockEl.innerHTML = ''; return; }
+      lockState.fails++; lockState.buf = '';
+      if (lockState.fails >= 5) { lockState.until = Date.now() + 30000; lockState.fails = 0; drawLock('Trop d\'essais : attendez 30 secondes'); } else drawLock('Code incorrect');
+    }, { mode: 'unlock', msg: 'Entrez votre code PIN' });
+  };
+  lockEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k, L = lockState;
+    if (k === 'forgot') { if (confirm('Code oublié : la seule solution est d\'effacer les données de cette application sur cet appareil, puis de restaurer votre dernière sauvegarde (Réglages → Restaurer). Effacer maintenant ?')) { try { localStorage.removeItem(KEY); } catch (x) {} location.reload(); } return; }
+    if (k === 'x') { if (L.cancel) { lockEl.classList.remove('on'); lockEl.innerHTML = ''; } return; }
+    if (k === 'd') L.buf = L.buf.slice(0, -1); else if (L.buf.length < L.len) L.buf += k;
+    drawLock(); if (L.buf.length === L.len) { const pin = L.buf, cb = L.cb; setTimeout(() => cb(pin), 120); }
+  });
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else if (db.pin && hiddenAt && (Date.now() - hiddenAt) > (db.lockMin || 0) * 60000) unlockScreen(); });
+  // set / change / remove the PIN (current PIN asked first when one exists)
+  const verifyThen = fn => { if (!db.pin) return fn(); askPin('Code actuel', async pin => { if (await hashPin(pin, db.pin.salt) === db.pin.hash) { lockEl.classList.remove('on'); fn(); } else { lockState.buf = ''; drawLock('Code incorrect'); } }, { cancel: true, msg: 'Entrez votre code actuel' }); };
+  const newPin = () => askPin('Nouveau code PIN', first => askPin('Confirmez le code', async again => {
+    if (again !== first) { toast('Les deux codes sont différents'); return newPin(); }
+    const salt = uid() + uid(); db.pin = { salt, hash: await hashPin(first, salt) }; save(); lockEl.classList.remove('on'); lockEl.innerHTML = ''; draw(); toast('Code PIN enregistré');
+  }, { cancel: true, msg: 'Saisissez-le une deuxième fois' }), { cancel: true, msg: '4 chiffres' });
 
   // ---------- actions ----------
   const share = t => window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
@@ -237,17 +285,19 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
       download(`wifizone-${st.rm}.csv`, '﻿' + rows.map(r => r.map(q).join(';')).join('\n'), 'text/csv'); },
     saveset: () => { const r = Math.round(+$('s_rate').value); if (!(r > 0)) return toast('Taux invalide'); db.name = $('s_name').value.trim() || 'WiFi Zone'; db.rate = r; save(); draw(); toast('Réglages enregistrés'); },
     newf: () => forfaitForm(null), editf: v => forfaitForm(db.forfaits.find(f => f.id === v)),
-    backup: () => { db.lastBackup = Date.now(); save(); download(`wifizone-sauvegarde-${today()}.json`, JSON.stringify(db), 'application/json'); draw(); toast('Sauvegarde téléchargée'); },
+    backup: () => { db.lastBackup = Date.now(); save(); download(`wifizone-sauvegarde-${today()}.json`, JSON.stringify({ ...db, pin: null }), 'application/json'); draw(); toast('Sauvegarde téléchargée'); },
+    setpin: () => verifyThen(newPin), lockn: () => unlockScreen(), rmpin: () => verifyThen(() => { if (confirm('Supprimer le code PIN ?')) { db.pin = null; save(); draw(); toast('Code PIN supprimé'); } else draw(); }),
     restore: () => $('rfile').click()
   };
   document.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b && A[b.dataset.a]) A[b.dataset.a](b.dataset.v); });
   document.addEventListener('change', e => {
+    if (e.target.id === 's_lock') { db.lockMin = +e.target.value; save(); toast('Enregistré'); return; }
     if (e.target.id !== 'rfile' || !e.target.files[0]) return;
     const rd = new FileReader(); rd.onload = () => { try { const d = JSON.parse(rd.result); if (!Array.isArray(d.sales) || !Array.isArray(d.expenses)) throw 0;
-      if (!confirm(`Remplacer les données actuelles par cette sauvegarde (${d.sales.length} vente(s), ${d.expenses.length} dépense(s)) ?`)) return; db = { ...blank(), ...d }; save(); draw(); toast('Sauvegarde restaurée'); } catch (x) { toast('Fichier invalide'); } };
+      if (!confirm(`Remplacer les données actuelles par cette sauvegarde (${d.sales.length} vente(s), ${d.expenses.length} dépense(s)) ?`)) return; db = { ...blank(), ...d, pin: db.pin, lockMin: db.lockMin }; save(); draw(); toast('Sauvegarde restaurée'); } catch (x) { toast('Fichier invalide'); } };
     rd.readAsText(e.target.files[0]); e.target.value = '';
   });
-  draw();
+  draw(); unlockScreen();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
