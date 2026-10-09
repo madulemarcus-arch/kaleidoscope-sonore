@@ -41,6 +41,8 @@ a { color:var(--blue); }
 .grid.two { grid-template-columns:repeat(2,1fr); }
 .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:2px; }
 .stat small { color:var(--mut); font-size:12px; }
+.stat.tap { cursor:pointer; text-align:left; font:inherit; color:inherit; width:100%; }
+.stat.tap.on { border-color:var(--navy); box-shadow:0 0 0 2px var(--navy); }
 .stat b { font-size:22px; line-height:1.15; }
 .stat .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
 h2.sec { font-size:15px; margin:18px 2px 8px; display:flex; align-items:center; gap:8px; }
