@@ -105,7 +105,7 @@ Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Appl
 
 ## Achats (Factures → Achats)
 
-Dans l'onglet **Factures**, le bouton **🛍️ Achats** (à côté de **🧾 Ventes**) liste tout ce que l'entreprise a acheté. **+ Nouvel achat** demande :
+Dans l'onglet **Factures**, le bouton **🛍️ Achats** (à côté de **🧾 Ventes**) liste tout ce que l'entreprise a acheté. **+ Nouvel achat** (aussi dans le bouton **＋ Action rapide**) demande :
 - **chez qui** : un fournisseur de la liste, ou un nom à saisir (le fournisseur est alors ajouté automatiquement à Stock → Fournisseurs) ;
 - **ce qui a été acheté** : un ou plusieurs articles (description, quantité, prix unitaire), avec le **total** calculé en direct ;
 - la date, la devise ($ ou CDF), **payé par** (Cash, M-Pesa, banque…), le **n° de facture / bon** du fournisseur et une note.

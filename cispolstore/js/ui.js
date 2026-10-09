@@ -247,6 +247,7 @@
     q('q_invoice', '🧾', 'Nouvelle facture', 'Matériel, abonnement, installation…') +
     q('q_sale', '🛒', 'Nouvelle vente', 'Facture de matériel') +
     q('q_stockin', '📥', 'Entrée de stock', 'Réception de matériel') +
+    (App.can('costs') ? q('q_buy', '🛍️', 'Nouvel achat', 'Ce que vous avez acheté, chez qui, à combien') : '') +
     q('q_install', '🔧', 'Installation', 'Enregistrer une intervention'));
   const after = fn => () => { App.close(); setTimeout(fn, 30); };
   App.actions.q_client = after(() => App.clientForm());
@@ -255,6 +256,7 @@
   App.actions.q_sale = after(() => App.invoiceForm('materiel'));
   App.actions.q_stockin = after(() => App.stockInForm());
   App.actions.q_install = after(() => App.installForm());
+  App.actions.q_buy = after(() => App.actions.newbuy());
 
   // ---------- "Plus" menu ----------
   const item = (v, ico, t, s) => !App.canView(v) ? '' : `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:var(--navy)">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
