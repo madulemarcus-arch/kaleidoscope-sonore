@@ -116,7 +116,7 @@
   };
   App.views.supplier = p => {
     const s = App.supplier(p.id); if (!s) return { title: 'Fournisseur', back: 'suppliers', html: '<div class="empty">Introuvable.</div>' };
-    const buys = App.db.moves.filter(m => m.supplierId === s.id && m.qty > 0).slice().reverse();
+    const buys = App.db.moves.filter(m => m.supplierId === s.id && m.qty > 0).slice().reverse(), others = (App.db.purchases || []).filter(b => b.supplierId === s.id).sort((a, b) => b.date.localeCompare(a.date));
     const total = buys.reduce((a, m) => a + m.qty * m.cost, 0), prods = App.db.products.filter(x => x.supplierId === s.id);
     return {
       title: s.name, sub: 'Fournisseur', back: 'suppliers', nav: 'more',
@@ -124,7 +124,8 @@
         <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editsup" data-id="${s.id}">Modifier</button><button class="btn del" data-act="delsup" data-id="${s.id}">Supprimer</button></div></div>
         ${prods.length ? `<h2 class="sec">Produits</h2><div class="list">${prods.map(x => `<div class="item"><div class="grow"><b>${esc(x.name)}</b></div><span>Achat : ${App.fmt(x.cost)}</span></div>`).join('')}</div>` : ''}
         <h2 class="sec">Historique des achats <span class="more">Total ${App.fmt(total)}</span></h2>
-        ${buys.length ? `<div class="list">${buys.map(m => { const x = App.prod(m.pid); return `<div class="item"><div class="grow"><b>${esc(x ? x.name : '?')}</b><small>${App.fdate(m.date)} · ${App.nf(m.qty, 2)} × ${App.fmt(m.cost)}</small></div><b>${App.fmt(m.qty * m.cost)}</b></div>`; }).join('')}</div>` : '<div class="empty">Aucun achat enregistré. Utilisez « Entrée de stock » en choisissant ce fournisseur.</div>'}`
+        ${buys.length ? `<div class="list">${buys.map(m => { const x = App.prod(m.pid); return `<div class="item"><div class="grow"><b>${esc(x ? x.name : '?')}</b><small>${App.fdate(m.date)} · ${App.nf(m.qty, 2)} × ${App.fmt(m.cost)}</small></div><b>${App.fmt(m.qty * m.cost)}</b></div>`; }).join('')}</div>` : (others.length ? '' : '<div class="empty">Aucun achat enregistré. Utilisez « Entrée de stock » en choisissant ce fournisseur, ou Factures → Achats.</div>')}
+        ${others.length ? `<h2 class="sec">Achats enregistrés (Factures → Achats)</h2><div class="list">${others.map(b => `<button class="item" data-act="go" data-v="purchase" data-id="${b.id}"><div class="grow"><b>${esc(App.purchaseLabel(b).replace(/^Achat · /, ''))}</b><small>${App.fdate(b.date)}</small></div><b>${App.fmt(App.purchaseTotal(b), b.currency)}</b></button>`).join('')}</div>` : ''}`
     };
   };
   App.actions.editsup = d => App.supplierForm(App.supplier(d.id));

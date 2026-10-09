@@ -103,6 +103,15 @@ Plus → **Techniciens** répertorie les techniciens, installateurs, revendeurs 
 
 Le menu **Plus** est groupé (Ventes et clients, Terrain et stock, Gestion, Application). Dans **Paramètres**, les sections longues (Partager, Tarifs d'abonnement, Messages WhatsApp, Synchronisation, Google Drive, Données) sont repliées par défaut. Sur l'accueil, l'administrateur voit un rappel tant qu'il n'a pas défini de **code PIN**, fait une **sauvegarde** (ou si la dernière date de plus de 7 jours) ou renseigné **RCCM / ID Nat. / N° Impôt**.
 
+## Achats (Factures → Achats)
+
+Dans l'onglet **Factures**, le bouton **🛍️ Achats** (à côté de **🧾 Ventes**) liste tout ce que l'entreprise a acheté. **+ Nouvel achat** demande :
+- **chez qui** : un fournisseur de la liste, ou un nom à saisir (le fournisseur est alors ajouté automatiquement à Stock → Fournisseurs) ;
+- **ce qui a été acheté** : un ou plusieurs articles (description, quantité, prix unitaire), avec le **total** calculé en direct ;
+- la date, la devise ($ ou CDF), **payé par** (Cash, M-Pesa, banque…), le **n° de facture / bon** du fournisseur et une note.
+
+Un achat s'ouvre en détail (**Modifier**, **Supprimer** réservé à l'administrateur), apparaît dans la **page du fournisseur**, dans **Finance** et la **clôture du jour** comme **sortie d'argent** (type « Achat », avec son mode de paiement), et s'exporte en CSV. Les achats sont réservés aux profils qui voient les coûts (administrateur, comptable) et se synchronisent comme le reste. Pour de la marchandise qui doit entrer dans le stock, utilisez plutôt **Stock → Entrée** (une seule des deux écritures, pour ne pas compter deux fois).
+
 ## Finance et reçus
 
 **Onglet Finance** (administrateur et comptable, barre du bas et menu latéral) : tout l'argent qui entre et qui sort sur la période choisie (jour, semaine, mois, année, dates libres). **Entrées** : paiements des clients et pénalités payées. **Sorties** : dépenses, commissions des techniciens et achats de stock (case à décocher : ils ne sont pas des dépenses du bénéfice, qui compte déjà le coût des marchandises vendues). Cartes Entrées / Sorties / Solde, tableau **par mode de paiement** (Cash, M-Pesa, Airtel…) et **par devise** (francs et dollars réellement encaissés), puis la liste jour par jour ; filtres Entrées / Sorties et par mode ; export CSV, impression, feuille « Finance » de l'export Excel. Chaque montant est converti avec le taux de son propre enregistrement. Les dépenses ont maintenant un champ « Payé par » ; les anciennes apparaissent en « Non précisé ».
