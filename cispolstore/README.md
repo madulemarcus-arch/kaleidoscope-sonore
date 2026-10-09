@@ -112,6 +112,10 @@ Dans l'onglet **Factures**, le bouton **🛍️ Achats** (à côté de **🧾 Ve
 
 Un achat s'ouvre en détail (**Modifier**, **Supprimer** réservé à l'administrateur), apparaît dans la **page du fournisseur**, dans **Finance** et la **clôture du jour** comme **sortie d'argent** (type « Achat », avec son mode de paiement), et s'exporte en CSV. Les achats sont réservés aux profils qui voient les coûts (administrateur, comptable) et se synchronisent comme le reste. Pour de la marchandise qui doit entrer dans le stock, utilisez plutôt **Stock → Entrée** (une seule des deux écritures, pour ne pas compter deux fois).
 
+## Voir tous les mouvements (Finance)
+
+Dans **Finance**, touchez la case **⬇ Entrées**, **⬆ Sorties** ou **Solde** : la liste des **Mouvements** s'affiche directement, filtrée sur les entrées, les sorties ou tout (jusqu'à 1 000 lignes, jour par jour). La case choisie est encadrée ; retouchez **Solde** pour tout revoir.
+
 ## Caisse (Finance → En caisse)
 
 - **Noter le montant en caisse** : comptez ce qu'il y a dans la caisse et écrivez-le (dollars et/ou francs, date, note). L'application garde l'historique des comptages et affiche la **caisse estimée maintenant** : le dernier montant noté, puis les entrées et sorties en **Cash** des jours suivants (paiements, dépenses, achats). À chaque nouveau comptage, l'**écart** avec ce qui était attendu est enregistré (OK ou écart en $ / CDF). Le comptage est réputé fait en fin de journée : seuls les mouvements des jours suivants sont ajoutés. Seul l'administrateur peut supprimer un comptage.
