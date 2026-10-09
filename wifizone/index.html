@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b3d5c">
+<meta name="theme-color" content="#0a1f44">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>WiFi Zone Manager</title>
 <style>
-:root{--bg:#f2f5f8;--card:#fff;--txt:#14202b;--mut:#64748b;--line:#e2e8f0;--acc:#0b3d5c;--ok:#15803d;--bad:#b91c1c;--warn:#b45309}
-@media (prefers-color-scheme:dark){:root{--bg:#0d141b;--card:#16202a;--txt:#eef2f6;--mut:#94a3b8;--line:#253240;--acc:#38a3d8;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24}}
+:root{--bg:#eef2f8;--card:#fff;--txt:#0b1b3a;--mut:#56637c;--line:#d6deeb;--acc:#1b5fc1;--navy:#0a1f44;--ok:#1d7f48;--bad:#b3261e;--warn:#9a5b00;--f-v:#2e7d32;--f-j:#1b5fc1;--f-s:#c65000;--f-m:#6a1b9a}
+@media (prefers-color-scheme:dark){:root{--bg:#08111f;--card:#0f1b2e;--txt:#e7edf7;--mut:#9aa8c0;--line:#22324d;--acc:#5a95f0;--navy:#0f1b2e;--ok:#5fd08f;--bad:#ff8a80;--warn:#f2b54f;--f-v:#5cc163;--f-j:#5a95f0;--f-s:#ff9a4d;--f-m:#c38df0}}
 *{box-sizing:border-box}
 body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--txt);padding-bottom:84px}
-header{position:sticky;top:0;z-index:5;background:var(--acc);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px))}
+header{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px))}
 header h1{margin:0;font-size:18px}header small{opacity:.85}
 main{max-width:640px;margin:auto;padding:12px 16px}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
@@ -32,8 +32,8 @@ h2{font-size:15px;margin:16px 0 8px;color:var(--mut);text-transform:uppercase;le
 .chip{border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px}
 .chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .fo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
-.fo button{border:2px solid var(--line);background:var(--card);color:var(--txt);border-radius:12px;padding:16px 6px;font-size:16px;font-weight:700;cursor:pointer}
-.fo button small{display:block;font-weight:400;color:var(--mut)}.fo button.on{border-color:var(--acc);background:var(--acc);color:#fff}.fo button.on small{color:#fff}
+.fo button{--c:var(--acc);border:2px solid var(--c);background:var(--card);color:var(--c);border-radius:12px;padding:16px 6px;font-size:16px;font-weight:700;cursor:pointer}
+.fo button small{display:block;font-weight:400;color:var(--mut)}.fo button.on{background:var(--c);color:#fff}@media (prefers-color-scheme:dark){.fo button.on{color:#06101f}.fo button.on small{color:#06101f}}.fo button.on small{color:#fff}.fo button small{color:var(--mut)}
 label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
 input,select{width:100%;padding:11px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--txt);margin-top:4px}
 .btn{border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;background:var(--acc);color:#fff;cursor:pointer}
@@ -89,6 +89,9 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
   const inR = (d, r) => d >= r[0] && d <= r[1];
   const saleCDF = s => s.amount, expCDF = e => toCDF(e.amount, e.cur, e.rate);
   const sum = (a, f) => a.reduce((t, x) => t + f(x), 0);
+  // forfait colors follow the WiFi tools palette: green / blue / orange / purple, then cycling
+  const FCOL = ['var(--f-v)', 'var(--f-j)', 'var(--f-s)', 'var(--f-m)'], FBYID = { V: 0, J: 1, S: 2, M: 3 };
+  const fcol = f => FCOL[f.id in FBYID ? FBYID[f.id] : Math.max(0, db.forfaits.indexOf(f)) % 4];
   const fname = id => (db.forfaits.find(f => f.id === id) || { nom: 'Forfait supprimé' }).nom;
 
   // ---------- modal ----------
@@ -114,13 +117,13 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
       ${chips('per', st.per, [['day', "Aujourd'hui"], ['week', '7 jours'], ['month', 'Ce mois']])}
       <div class="grid"><div class="stat"><small>Ventes</small><b class="ok">${fmt(inc)}</b><small>${tickets} ticket(s)</small></div><div class="stat"><small>Dépenses</small><b class="bad">${fmt(out)}</b><small>${E.length} dépense(s)</small></div></div>
       <div class="card"><small class="mut">Bénéfice</small><div class="total ${net >= 0 ? 'ok' : 'bad'}">${fmt(net)}</div><div class="mut">≈ ${fmt(usdOf(net), 'USD')} (1 $ = ${nf(db.rate)} FC)</div></div>
-      <h2>Par forfait</h2><div class="card">${Object.keys(byF).length ? Object.entries(byF).map(([id, o]) => `<div class="row"><div class="g"><b>${esc(fname(id))}</b><small>${o.q} ticket(s)</small></div><b>${fmt(o.a)}</b></div>`).join('') : '<div class="empty">Aucune vente sur cette période.</div>'}</div>
+      <h2>Par forfait</h2><div class="card">${Object.keys(byF).length ? Object.entries(byF).map(([id, o]) => `<div class="row"><div class="g"><b><span style="color:${fcol(db.forfaits.find(f => f.id === id) || { id })}">●</span> ${esc(fname(id))}</b><small>${o.q} ticket(s)</small></div><b>${fmt(o.a)}</b></div>`).join('') : '<div class="empty">Aucune vente sur cette période.</div>'}</div>
       <h2>Par mode de paiement</h2><div class="card">${Object.keys(byM).length ? Object.entries(byM).map(([m, a]) => `<div class="row"><div class="g">${esc(m)}</div><b>${fmt(a)}</b></div>`).join('') : '<div class="empty">—</div>'}</div>` };
   };
   views.sell = () => {
     const f = db.forfaits.find(x => x.id === st.fid), t = f ? f.prix * st.qty : 0, list = db.sales.filter(s => s.date === today()).sort((a, b) => b.ts - a.ts);
     return { title: 'Vendre', sub: fdate(today()), html: `
-      <div class="fo">${db.forfaits.map(x => `<button class="${st.fid === x.id ? 'on' : ''}" data-a="fid" data-v="${esc(x.id)}">${esc(x.nom)}<small>${esc(x.duree)} · ${fmt(x.prix)}</small></button>`).join('')}</div>
+      <div class="fo">${db.forfaits.map(x => `<button class="${st.fid === x.id ? 'on' : ''}" style="--c:${fcol(x)}" data-a="fid" data-v="${esc(x.id)}">${esc(x.nom)}<small>${esc(x.duree)} · ${fmt(x.prix)}</small></button>`).join('')}</div>
       <div class="card"><div class="qty"><button data-a="qty" data-v="-1">−</button><b>${st.qty}</b><button data-a="qty" data-v="1">+</button><span class="mut">ticket(s)</span></div>
         ${chips('mode', st.mode, MODES.map(m => [m, m]))}
         <div class="mut">Total à encaisser</div><div class="total">${fmt(t)}</div>
