@@ -75,6 +75,8 @@ Un projet Supabase gratuit, créé par vous, sert de boîte aux lettres : Param�
 - Chaque appareil garde son PIN, son thème et son verrouillage. L'icône ☁️ de l'en-tête indique l'état ; la synchronisation se fait au démarrage, après chaque modification, au retour de connexion et toutes les 90 secondes.
 - Test : script SQL vérifié sur PostgreSQL 16 (rôle `anon` sans accès direct à la table) et scénario à deux appareils validé ; non essayé avec un vrai projet Supabase.
 
+**Afficher les paramètres** (administrateur) : une fois la synchronisation active, Paramètres → Synchronisation → **Afficher les paramètres** montre l'URL du projet, la clé publique et le nom d'espace, avec un bouton **Copier** pour chacun, afin de connecter un autre appareil (CISPOLstore Manager ou WiFi Zone Manager, avec le nom d'espace `wifizone`). La phrase secrète n'est enregistrée nulle part : elle ne peut pas être affichée.
+
 ## Profils et livraisons
 
 Paramètres → **Utilisateurs et profils → Activer** : vous devenez l'administrateur (votre PIN actuel est conservé) puis créez un profil par personne, avec son nom, son **code PIN à 4 chiffres** (unique) et son profil :
