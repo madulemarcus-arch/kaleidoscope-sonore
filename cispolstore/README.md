@@ -112,6 +112,14 @@ Dans l'onglet **Factures**, le bouton **🛍️ Achats** (à côté de **🧾 Ve
 
 Un achat s'ouvre en détail (**Modifier**, **Supprimer** réservé à l'administrateur), apparaît dans la **page du fournisseur**, dans **Finance** et la **clôture du jour** comme **sortie d'argent** (type « Achat », avec son mode de paiement), et s'exporte en CSV. Les achats sont réservés aux profils qui voient les coûts (administrateur, comptable) et se synchronisent comme le reste. Pour de la marchandise qui doit entrer dans le stock, utilisez plutôt **Stock → Entrée** (une seule des deux écritures, pour ne pas compter deux fois).
 
+## Vrai chiffre d'affaires : installations et abonnements mis à part
+
+Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installation** vont aux techniciens et l'**abonnement** à Starlink. Seuls les **kits, le matériel et les accessoires** sont le revenu de CISPOLstore. L'application sépare donc les trois :
+- **Facture** : un encadré « 🧮 Répartition de cette facture » montre l'installation, l'abonnement et le revenu CISPOLstore (les lignes « Installation… » et « Abonnement… » saisies sans produit du stock). Si le prix a été négocié à la baisse, les montants d'installation et d'abonnement restent fixes : la remise réduit le revenu CISPOLstore.
+- **Finance → 🧮 Où va l'argent encaissé** : sur la période, encaissé − installations − abonnements = **chiffre d'affaires CISPOLstore** (au prorata quand le client paie en plusieurs fois, dans la devise du paiement).
+- **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
+- **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
+
 ## Voir tous les mouvements (Finance)
 
 Dans **Finance**, touchez la case **⬇ Entrées**, **⬆ Sorties** ou **Solde** : la liste des **Mouvements** s'affiche directement, filtrée sur les entrées, les sorties ou tout (jusqu'à 1 000 lignes, jour par jour). La case choisie est encadrée ; retouchez **Solde** pour tout revoir.

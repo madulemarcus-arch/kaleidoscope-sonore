@@ -20,7 +20,7 @@
     const exp = {}; db.expenses.filter(e => App.inRange(e.date, r)).forEach(e => { exp[e.cat] = (exp[e.cat] || 0) + U(e.amount, e.currency, e); });
     const dl = db.deliveries.filter(d => d.status === 'done' && d.doneAt && App.inRange(d.doneAt, r));
     return {
-      m, ca: f.ca, cost: f.cost, margin: f.margin, exp: f.exp, net: f.net, nInv: f.inv.length,
+      m, ca: f.ca, real: f.real, cost: f.cost, margin: f.margin, exp: f.exp, net: f.net, nInv: f.inv.length,
       sub: { n: subLines.length, amt: subLines.reduce((a, x) => a + x.amt, 0), margin: subLines.reduce((a, x) => a + x.margin, 0) },
       matSales, inst: { n: inst.length, amt: inst.reduce((a, x) => a + (x.price || 0), 0) },
       pen: { paid: pen.reduce((a, p) => a + U(p.amount, p.currency, p), 0), n: pen.length, due: App.penaltyDueTotal() },
@@ -34,7 +34,7 @@
   };
   const text = d => {
     const co = App.db.settings.company.name, F = x => App.fmt(x), L = [`📑 ${co} — Rapport de ${label(d.m)}`, ''];
-    L.push(`💰 Chiffre d'affaires : ${F(d.ca)} (${d.nInv} facture(s))`, `📈 Marge brute : ${F(d.margin)}`, `💸 Dépenses : ${F(d.exp)}`, `✅ Bénéfice net : ${F(d.net)}`, '');
+    L.push(`💰 Total facturé : ${F(d.ca)} (${d.nInv} facture(s))`, `✅ CA réel (kits, matériel) : ${F(d.real)}`, `📈 Marge brute : ${F(d.margin)}`, `💸 Dépenses : ${F(d.exp)}`, `✅ Bénéfice net : ${F(d.net)}`, '');
     L.push(`📡 Abonnements : ${d.sub.n} renouvelé(s), ${F(d.sub.amt)} facturés, marge ${F(d.sub.margin)}`, `   Actifs ${d.status.actif} · En sursis ${d.status.sursis} · Inactifs ${d.status.inactif}${d.toRenew != null ? ` · À renouveler d'ici fin de mois : ${d.toRenew}` : ''}`);
     L.push(`🔧 Installations : ${d.inst.n} (${F(d.inst.amt)})`, `📦 Ventes de matériel : ${F(d.matSales)}`, `👥 Nouveaux clients : ${d.newClients}`, '');
     L.push(`🧾 Impayés à ce jour : ${F(d.unpaid.total)} (${d.unpaid.n} facture(s)), dont ${F(d.unpaid.month)} facturés ce mois`, `⚠️ Pénalités : ${F(d.pen.paid)} payées ce mois · ${F(d.pen.due)} à payer`);
@@ -50,8 +50,8 @@
       title: 'Rapport du mois', back: 'more', nav: 'more',
       html: `<div class="card noprint"><div class="spread"><button class="btn sm sec" data-act="rm_nav" data-n="-1">‹</button><b style="font-size:17px;text-transform:capitalize">${label(rm.m)}</b><button class="btn sm sec" data-act="rm_nav" data-n="1" ${cur ? 'disabled' : ''}>›</button></div></div>
         <h1 style="display:none">${esc(App.db.settings.company.name)} — ${label(rm.m)}</h1>
-        <div class="grid two"><div class="stat"><small>💰 Chiffre d'affaires</small><b>${F(d.ca)}</b><small>${d.nInv} facture(s)</small></div><div class="stat"><small>✅ Bénéfice net</small><b class="${d.net >= 0 ? 'ok' : 'bad'}">${F(d.net)}</b><small>marge ${pct(d.net, d.ca)} %</small></div></div>
-        <h2 class="sec">Finances</h2><div class="list">${row('Chiffre d\'affaires', F(d.ca))}${row('Coût (Starlink, marchandises)', F(d.cost))}${row('Marge brute', F(d.margin), d.margin >= 0 ? 'ok' : 'bad')}${row('Dépenses', F(d.exp))}${row('Bénéfice net', F(d.net), d.net >= 0 ? 'ok' : 'bad')}</div>
+        <div class="grid two"><div class="stat"><small>💰 Total facturé</small><b>${F(d.ca)}</b><small>${d.nInv} facture(s)</small></div><div class="stat"><small>✅ CA réel</small><b class="ok">${F(d.real)}</b><small>kits, matériel</small></div><div class="stat"><small>✅ Bénéfice net</small><b class="${d.net >= 0 ? 'ok' : 'bad'}">${F(d.net)}</b><small>marge ${pct(d.net, d.ca)} %</small></div></div>
+        <h2 class="sec">Finances</h2><div class="list">${row('Total facturé', F(d.ca))}${row('CA réel (sans abonnements ni installations)', F(d.real), 'ok')}${row('Coût (Starlink, marchandises)', F(d.cost))}${row('Marge brute', F(d.margin), d.margin >= 0 ? 'ok' : 'bad')}${row('Dépenses', F(d.exp))}${row('Bénéfice net', F(d.net), d.net >= 0 ? 'ok' : 'bad')}</div>
         ${d.exps.length ? `<div class="list" style="margin-top:8px">${d.exps.map(([k, v]) => row('<span class="mut">' + esc(k) + '</span>', F(v))).join('')}</div>` : ''}
         <h2 class="sec">Abonnements</h2><div class="list">${row('Renouvellements facturés', d.sub.n)}${row('Montant des abonnements', F(d.sub.amt))}${row('Marge sur abonnements', F(d.sub.margin), 'ok')}${row('Actifs / sursis / inactifs', `${d.status.actif} / ${d.status.sursis} / ${d.status.inactif}`)}${d.toRenew != null ? row("À renouveler d'ici fin de mois", d.toRenew, d.toRenew ? 'warn' : '') : ''}</div>
         <h2 class="sec">Ventes et services</h2><div class="list">${row('Ventes de matériel', F(d.matSales))}${row('Installations', `${d.inst.n} · ${F(d.inst.amt)}`)}${row('Nouveaux clients', d.newClients)}${row('Livraisons faites', d.deliveries.done)}</div>
