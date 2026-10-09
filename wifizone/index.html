@@ -50,6 +50,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
 .dots{display:flex;gap:12px;margin:8px 0 18px}.dots i{width:16px;height:16px;border-radius:50%;border:2px solid #fff}.dots i.f{background:#fff}
 .pad{display:grid;grid-template-columns:repeat(3,72px);gap:14px}.pad button{width:72px;height:72px;border-radius:50%;border:0;background:#ffffff22;color:#fff;font-size:24px;font-weight:600;cursor:pointer}.pad button:active{background:#ffffff55}
 #lock .lnk{background:none;border:0;color:#fff;opacity:.8;margin-top:18px;text-decoration:underline;font-size:14px;cursor:pointer}
+#syncBtn{background:none;border:0;color:#fff;font-size:20px;cursor:pointer;float:right;margin-top:-34px;padding:6px}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 #toast.on{opacity:1}
 .empty{text-align:center;color:var(--mut);padding:24px 0}
@@ -57,7 +58,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
 </style>
 </head>
 <body>
-<header><h1 id="ttl">WiFi Zone</h1><small id="sub"></small></header>
+<header><button id="syncBtn" title="Synchronisation" aria-label="Synchronisation">☁️</button><h1 id="ttl">WiFi Zone</h1><small id="sub"></small></header>
 <main id="view"></main>
 <nav id="nav"></nav>
 <dialog id="dlg"></dialog>
@@ -81,7 +82,8 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
     { id: 'V', nom: 'Visiteur', duree: '6 heures', prix: 500 }, { id: 'J', nom: 'Jour', duree: '24 heures', prix: 1000 },
     { id: 'S', nom: 'Semaine', duree: '7 jours', prix: 7000 }, { id: 'M', nom: 'Mois', duree: '30 jours', prix: 30000 }], sales: [], expenses: [], closings: [] });
   let db; try { db = { ...blank(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) { db = blank(); }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Stockage plein : faites une sauvegarde'); } };
+  db.forfaits.forEach((f, i) => { if (!f.ts) f.ts = i + 1; }); // stable order for sync
+  const save = () => { if (window.__afterSave) window.__afterSave(); try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Stockage plein : faites une sauvegarde'); } };
   const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2400); };
   // money: every record keeps its own currency and the rate of the day it was made
   const toCDF = (n, cur, rate) => cur === 'USD' ? n * (rate || db.rate) : n;
@@ -198,6 +200,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
       <label>Taux du jour (1 $ = … FC)</label><input id="s_rate" type="number" inputmode="numeric" min="1" value="${db.rate}">
       <button class="btn full" data-a="saveset">Enregistrer</button></div>
     <h2>Forfaits et prix</h2><div class="card">${db.forfaits.map(f => `<div class="row"><div class="g"><b>${esc(f.nom)}</b><small>${esc(f.duree)}</small></div><b>${fmt(f.prix)}</b><button class="btn sm sec" data-a="editf" data-v="${esc(f.id)}">✎</button></div>`).join('')}<button class="btn sec full" data-a="newf">+ Ajouter un forfait</button></div>
+    ${syncCard()}
     <h2>Sécurité</h2><div class="card"><div class="row"><div class="g"><b>Code PIN</b><small>${db.pin ? 'Activé : demandé à l\'ouverture' : 'Désactivé : tout le monde peut ouvrir l\'application'}</small></div></div>
       ${db.pin ? `<label>Verrouiller après</label><select id="s_lock"><option value="0" ${db.lockMin === 0 ? 'selected' : ''}>Dès que je quitte l'application</option><option value="2" ${db.lockMin === 2 ? 'selected' : ''}>2 minutes</option><option value="10" ${db.lockMin === 10 ? 'selected' : ''}>10 minutes</option></select>` : ''}
       <div class="bar"><button class="btn" data-a="setpin">${db.pin ? 'Changer le code' : 'Créer un code PIN'}</button>${db.pin ? '<button class="btn sec" data-a="lockn">🔒 Verrouiller</button><button class="btn sec" data-a="rmpin">Supprimer</button>' : ''}</div></div>
@@ -210,6 +213,105 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
     const v = views[st.tab](); $('ttl').textContent = v.title; $('sub').textContent = v.sub || ''; $('view').innerHTML = v.html;
     $('nav').innerHTML = NAV.map(([k, i, t]) => `<button class="${st.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}"><b>${i}</b>${t}</button>`).join('');
     if ($('cdate')) $('cdate').onchange = () => { const d = $('cdate').value; if (d && d <= today()) { st.cd = d; draw(); } };
+  };
+
+  // ---------- Multi-device sync ----------
+  // The whole data set is encrypted on the phone (AES-GCM, key derived from a passphrase) and stored as one opaque row
+  // in the user's own Supabase project (same table and functions as CISPOLstore Manager, other workspace name).
+  // Devices merge record by record against the last synced snapshot (three-way merge), so offline edits on several phones are combined.
+  const CKEY = 'wifizone-sync', COLL = ['sales', 'expenses', 'closings', 'forfaits'], SHARED = ['name', 'rate'], js = JSON.stringify;
+  let cfg = null; try { cfg = JSON.parse(localStorage.getItem(CKEY)); } catch (e) {}
+  const saveCfg = () => { try { localStorage.setItem(CKEY, js(cfg)); } catch (e) {} };
+  const SY = { status: cfg ? 'idle' : 'off', error: '', summary: '' };
+  const te = new TextEncoder(), td = new TextDecoder();
+  const toB64 = u => { let t = ''; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };
+  const fromB64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+  const derive = async (ws, pass) => {
+    const base = await crypto.subtle.importKey('raw', te.encode(pass), 'PBKDF2', false, ['deriveBits']);
+    const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: te.encode('wifizone:' + ws), iterations: 200000, hash: 'SHA-256' }, base, 512));
+    return { key: toB64(bits.slice(0, 32)), token: [...bits.slice(32)].map(b => b.toString(16).padStart(2, '0')).join('') };
+  };
+  const aes = k => crypto.subtle.importKey('raw', fromB64(k), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  const seal = async obj => { const iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aes(cfg.key), te.encode(js(obj)))); const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return toB64(out); };
+  const unseal = async blob => { const u = fromB64(blob); return JSON.parse(td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.slice(0, 12) }, await aes(cfg.key), u.slice(12)))); };
+  const rpc = async (fn, body) => {
+    const h = { 'Content-Type': 'application/json', apikey: cfg.anon }; if (cfg.anon.startsWith('eyJ')) h.Authorization = 'Bearer ' + cfg.anon;
+    const r = await fetch(cfg.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: h, body: js(body) });
+    const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+    if (!r.ok) { const m = (j && (j.message || j.hint)) || t.slice(0, 160) || ('HTTP ' + r.status); const e = new Error(m); e.forbidden = /forbidden/.test(m); e.missing = r.status === 404; throw e; }
+    return j;
+  };
+  const auth = () => ({ p_ws: cfg.ws, p_token: cfg.token });
+  const keyOf = x => x.id || x.date; // closings are keyed by their date
+  const order = a => a.slice().sort((x, y) => ((x.ts || 0) - (y.ts || 0)) || String(keyOf(x)).localeCompare(String(keyOf(y))));
+  const shared = d => { const o = {}; COLL.forEach(k => { o[k] = order(d[k] || []); }); o.settings = {}; SHARED.forEach(k => { o.settings[k] = d[k]; }); return o; };
+  const conflict = (b, l, r) => { const o = { ...r }; new Set([...Object.keys(l), ...Object.keys(b)]).forEach(k => { if (js(l[k]) !== js(b[k])) o[k] = l[k]; }); return o; };
+  const mergeColl = (b, l, r, first) => {
+    const mk = a => new Map((a || []).map(x => [keyOf(x), x])), mb = mk(b), ml = mk(l), mr = mk(r), out = [];
+    for (const k of new Set([...mr.keys(), ...ml.keys(), ...mb.keys()])) {
+      const eb = mb.get(k), el = ml.get(k), er = mr.get(k), sb = eb && js(eb), sl = el && js(el), sr = er && js(er);
+      if (el && er) { if (sl === sr) out.push(el); else if (!eb) out.push(first ? er : el); else if (sr === sb) out.push(el); else if (sl === sb) out.push(er); else out.push(conflict(eb, el, er)); }
+      else if (el) { if (!eb || sl !== sb) out.push(el); }
+      else if (er) { if (!eb || sr !== sb) out.push(er); }
+    }
+    return order(out);
+  };
+  const mergeAll = (b, l, r, first) => {
+    const o = { settings: {} }; COLL.forEach(k => { o[k] = mergeColl(b && b[k], l[k], r[k], first); });
+    SHARED.forEach(k => { const sb = b && js(b.settings[k]), sl = js(l.settings[k]), sr = js(r.settings[k]); o.settings[k] = sl === sr ? l.settings[k] : first ? r.settings[k] : sl === sb ? r.settings[k] : l.settings[k]; });
+    return o;
+  };
+  let busy = false, applying = false, dirty = true, timer = null;
+  const ICONS = { off: ['☁️', 'Synchronisation non configurée'], idle: ['☁️', 'Synchronisé'], busy: ['🔄', 'Synchronisation…'], error: ['⚠️', 'Erreur de synchronisation'], offline: ['📴', 'Hors connexion'] };
+  const setStatus = (stt, err = '') => { SY.status = stt; SY.error = err; const b = $('syncBtn'); if (b) { b.textContent = ICONS[stt][0]; b.title = ICONS[stt][1] + (err ? ' : ' + err : ''); b.style.opacity = stt === 'off' ? .5 : 1; } };
+  SY.now = async () => {
+    if (!cfg || busy) return SY.summary;
+    busy = true; setStatus('busy'); let changed = false;
+    try {
+      if (!navigator.onLine) { const e = new Error('Pas de connexion internet'); e.offline = true; throw e; }
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const head = await rpc('cispol_head', auth());
+        if (head.exists && !dirty && head.version === cfg.version) { SY.summary = 'Déjà à jour'; break; }
+        let remote = null, version = 0;
+        if (head.exists) { const r = await rpc('cispol_pull', auth()); remote = await unseal(r.blob); version = r.version; }
+        const local = shared(db);
+        if (remote) {
+          const merged = mergeAll(cfg.base ? JSON.parse(cfg.base) : null, local, remote, !cfg.base);
+          if (js(merged) !== js(local)) { applying = true; try { COLL.forEach(k => { db[k] = merged[k]; }); Object.assign(db, merged.settings); save(); } finally { applying = false; } changed = true; }
+        }
+        const now = shared(db);
+        if (remote && js(now) === js(remote)) { cfg.version = version; cfg.base = js(now); SY.summary = changed ? 'Données reçues' : 'Déjà à jour'; dirty = false; break; }
+        const res = await rpc('cispol_push', { ...auth(), p_blob: await seal(now), p_base: version });
+        if (res.ok) { cfg.version = res.version; cfg.base = js(now); dirty = false; SY.summary = changed ? 'Échangé avec les autres appareils' : 'Envoyé'; break; }
+        if (attempt === 3) throw new Error('Un autre appareil synchronise en même temps, réessayez');
+      }
+      cfg.last = Date.now(); saveCfg(); setStatus('idle');
+      if ((changed || st.tab === 'set') && !dlg.open && !lockEl.classList.contains('on')) draw();
+    } catch (e) {
+      setStatus(e.offline || !navigator.onLine ? 'offline' : 'error', e.forbidden ? 'phrase secrète incorrecte' : e.message); SY.summary = ICONS[SY.status][1] + (SY.error ? ' : ' + SY.error : '');
+    } finally { busy = false; }
+    return SY.summary;
+  };
+  const schedule = ms => { if (!cfg) return; clearTimeout(timer); timer = setTimeout(() => SY.now(), ms); };
+  window.__afterSave = () => { if (cfg && !applying) { dirty = true; schedule(4000); } };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(600); });
+  window.addEventListener('online', () => schedule(600));
+  setInterval(() => { if (cfg && !document.hidden) schedule(10); }, 90000);
+  SY.connect = async ({ url, anon, ws, pass }) => {
+    url = url.trim().replace(/\/+$/, ''); if (!/^https?:\/\//.test(url)) url = 'https://' + url;
+    ws = ws.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, ''); if (!ws) throw new Error("Nom d'espace invalide");
+    if (pass.length < 8) throw new Error('La phrase secrète doit contenir au moins 8 caractères');
+    const keys = await derive(ws, pass), prev = cfg; cfg = { url, anon: anon.trim(), ws, key: keys.key, token: keys.token, base: null, version: 0, last: 0 };
+    try { await rpc('cispol_head', auth()); } catch (e) { cfg = prev; if (e.forbidden) throw new Error('Cet espace existe déjà avec une autre phrase secrète'); if (e.missing) throw new Error("Le script SQL n'a pas été exécuté dans Supabase"); throw new Error(e.message === 'Failed to fetch' ? "Impossible de joindre l'adresse Supabase" : e.message); }
+    saveCfg(); dirty = true; setStatus('idle'); return SY.now();
+  };
+  SY.disconnect = () => { cfg = null; try { localStorage.removeItem(CKEY); } catch (e) {} setStatus('off'); SY.summary = ''; };
+  window.__sync = SY;
+  const syncCard = () => {
+    const when = cfg && cfg.last ? new Date(cfg.last).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'jamais';
+    const stt = { off: 'Non configurée', idle: 'Active', busy: 'En cours…', error: 'Erreur', offline: 'Hors connexion' }[SY.status], cls = { idle: 'ok', error: 'bad', offline: 'warn' }[SY.status] || '';
+    return `<h2>Synchronisation entre téléphones</h2><div class="card"><div class="row"><div class="g"><b>État : <span class="${cls}">${stt}</span></b><small>${cfg ? `Espace « ${esc(cfg.ws)} » · dernière synchro : ${when}${SY.error ? ' · ' + esc(SY.error) : ''}` : 'Utilisez WiFi Zone sur plusieurs téléphones avec les mêmes données.'}</small></div></div>
+      <div class="bar"><button class="btn" data-a="${cfg ? 'syncnow' : 'syncsetup'}">${cfg ? '🔄 Synchroniser maintenant' : 'Configurer'}</button>${cfg ? '<button class="btn sec" data-a="syncsetup">Modifier</button><button class="btn del" data-a="syncoff">Déconnecter</button>' : ''}</div>${cfg ? '<p class="mut" style="margin-bottom:0">Données chiffrées avant l\'envoi. Chaque téléphone garde son propre code PIN.</p>' : ''}</div>`;
   };
 
   // ---------- PIN lock ----------
@@ -258,7 +360,7 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
   const download = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
   const forfaitForm = f => modal(f ? 'Modifier le forfait' : 'Nouveau forfait', `<label>Nom</label><input id="f_nom" value="${esc(f ? f.nom : '')}"><label>Durée (ex. 24 heures)</label><input id="f_duree" value="${esc(f ? f.duree : '')}"><label>Prix (FC)</label><input id="f_prix" type="number" inputmode="numeric" min="0" value="${f ? f.prix : ''}">${f ? '<button type="button" class="btn del full" id="f_del">Supprimer ce forfait</button>' : ''}`, () => {
     const nom = $('f_nom').value.trim(), prix = +$('f_prix').value; if (!nom || !(prix >= 0) || $('f_prix').value === '') { toast('Nom et prix requis'); return false; }
-    if (f) Object.assign(f, { nom, duree: $('f_duree').value.trim(), prix }); else db.forfaits.push({ id: uid(), nom, duree: $('f_duree').value.trim(), prix });
+    if (f) Object.assign(f, { nom, duree: $('f_duree').value.trim(), prix }); else db.forfaits.push({ id: uid(), ts: Date.now(), nom, duree: $('f_duree').value.trim(), prix });
     save(); draw();
   }) || (f && ($('f_del').onclick = () => { if (confirm('Supprimer ce forfait ? Les anciennes ventes sont conservées.')) { db.forfaits = db.forfaits.filter(x => x !== f); if (st.fid === f.id) st.fid = ''; save(); dlg.close(); draw(); } }));
   const A = {
@@ -286,6 +388,20 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
     saveset: () => { const r = Math.round(+$('s_rate').value); if (!(r > 0)) return toast('Taux invalide'); db.name = $('s_name').value.trim() || 'WiFi Zone'; db.rate = r; save(); draw(); toast('Réglages enregistrés'); },
     newf: () => forfaitForm(null), editf: v => forfaitForm(db.forfaits.find(f => f.id === v)),
     backup: () => { db.lastBackup = Date.now(); save(); download(`wifizone-sauvegarde-${today()}.json`, JSON.stringify({ ...db, pin: null }), 'application/json'); draw(); toast('Sauvegarde téléchargée'); },
+    syncnow: async () => { toast('Synchronisation…'); toast(await SY.now()); },
+    syncoff: () => { if (confirm('Déconnecter la synchronisation ? Les données restent sur ce téléphone.')) { SY.disconnect(); draw(); } },
+    syncsql: () => { fetch('../sync/supabase.sql').then(r => r.text()).then(t => { try { navigator.clipboard.writeText(t); toast('Script SQL copié'); } catch (e) { toast('Copie impossible'); } }).catch(() => toast('Script indisponible')); },
+    syncsetup: () => modal('Synchronisation', `<div class="card" style="font-size:14px"><b>Déjà configuré pour CISPOLstore Manager ?</b> Utilisez la même URL et la même clé, avec le nom d'espace <b>wifizone</b> : rien d'autre à faire.<br><br><b>Sinon (une seule fois, 5 minutes)</b>
+        <ol style="margin:8px 0 0;padding-left:18px"><li>Compte gratuit sur <b>supabase.com</b>, puis un nouveau projet.</li><li><b>SQL Editor</b> → New query → collez le script → <b>Run</b>.</li><li><b>Project Settings → API</b> : copiez l'URL du projet et la clé <b>anon / publishable</b>.</li></ol>
+        <div class="bar"><button type="button" class="btn sec sm" data-a="syncsql">📋 Copier le script SQL</button></div><p style="margin-bottom:0">Sur chaque autre téléphone, saisissez <b>exactement les mêmes 4 valeurs</b>.</p></div>
+        <label>URL du projet Supabase</label><input id="y_url" value="${esc(cfg ? cfg.url : '')}" placeholder="https://xxxx.supabase.co" autocapitalize="none" autocomplete="off">
+        <label>Clé publique (anon / publishable)</label><input id="y_anon" value="${esc(cfg ? cfg.anon : '')}" autocapitalize="none" autocomplete="off">
+        <label>Nom de l'espace</label><input id="y_ws" value="${esc(cfg ? cfg.ws : 'wifizone')}" autocapitalize="none" autocomplete="off">
+        <label>Phrase secrète (8 caractères minimum)</label><input id="y_pass" type="password" autocomplete="off">
+        <p class="mut" style="font-size:13px">Les données sont chiffrées avec cette phrase avant l'envoi : sans elle, personne (même Supabase) ne peut les lire. <b>Notez-la</b> : elle ne peut pas être récupérée.</p><p id="y_msg" class="warn"></p>`, () => {
+        const msg = $('y_msg'), btn = $('dok'); msg.textContent = ''; btn.disabled = true; btn.textContent = 'Connexion…';
+        SY.connect({ url: $('y_url').value, anon: $('y_anon').value, ws: $('y_ws').value, pass: $('y_pass').value }).then(r => { dlg.close(); toast('Synchronisation activée : ' + r); draw(); }).catch(e => { msg.textContent = e.message; btn.disabled = false; btn.textContent = 'Connecter'; });
+        return false; }, 'Connecter'),
     setpin: () => verifyThen(newPin), lockn: () => unlockScreen(), rmpin: () => verifyThen(() => { if (confirm('Supprimer le code PIN ?')) { db.pin = null; save(); draw(); toast('Code PIN supprimé'); } else draw(); }),
     restore: () => $('rfile').click()
   };
@@ -297,7 +413,8 @@ dialog::backdrop{background:#0008}dialog h3{margin:0 0 6px}
       if (!confirm(`Remplacer les données actuelles par cette sauvegarde (${d.sales.length} vente(s), ${d.expenses.length} dépense(s)) ?`)) return; db = { ...blank(), ...d, pin: db.pin, lockMin: db.lockMin }; save(); draw(); toast('Sauvegarde restaurée'); } catch (x) { toast('Fichier invalide'); } };
     rd.readAsText(e.target.files[0]); e.target.value = '';
   });
-  draw(); unlockScreen();
+  const sb = $('syncBtn'); if (sb) { setStatus(SY.status); sb.onclick = () => { if (!cfg) A.tab('set'); else A.syncnow(); }; }
+  draw(); unlockScreen(); if (cfg) schedule(1500);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
