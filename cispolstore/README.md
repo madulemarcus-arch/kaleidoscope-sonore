@@ -22,7 +22,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 | `js/ui.js` | Navigation, modales, thème, **PIN**, recherche globale, bouton « + » |
 | `js/clients.js` | Liste, création par type, fiche client, renouvellement |
 | `js/stock.js` | Produits, entrées/sorties, câble en mètres, fournisseurs, installations |
-| `js/invoices.js` | Factures (4 types), PDF/Word/impression, paiements, dépenses |
+| `js/invoices.js` | Factures (4 types, gabarit imprimé type Word), PDF/Word/impression, paiements, dépenses |
 | `js/reports.js` | Tableau de bord, calendrier des abonnements, rapports |
 | `js/settings.js` | Entreprise, taux, sécurité, sauvegarde / restauration / CSV |
 | `js/sync.js` | Synchronisation entre appareils (chiffrée, fusion enregistrement par enregistrement) |
@@ -120,6 +120,12 @@ Réservé à l'administrateur. Une facture se supprime depuis sa page (« Suppri
 ## Taux de change
 
 Le taux USD / CDF change souvent. Il se modifie en un geste : le bouton **💱 1 $ = … CDF** de l'accueil, ou Paramètres → Taux, ou le champ « Taux du jour » des formulaires de facture et de paiement (le taux saisi devient alors le taux du jour). Chaque **facture**, **paiement**, **dépense** et **pénalité** garde **son propre taux**, enregistré à sa création : changer le taux ensuite ne modifie ni les anciennes factures imprimées, ni les rapports des mois passés. Une facture antidatée propose le taux en vigueur à sa date (historique des changements conservé). À la mise à jour, les enregistrements existants reçoivent le taux du moment (leur taux d'origine n'étant pas connu) ; ils sont ensuite figés.
+
+## Facture imprimée (modèle Word de l'entreprise)
+
+La facture imprimée (impression, PDF, Word) reprend le modèle de la facture Word : en-tête avec logo, **CISPOL STORE** et le sous-titre ; RCCM / Id. Nat. / N° Impôt à gauche et siège social / contact / téléphone à droite ; deux cases **FACTURE** (numéro, date, lieu) et **CLIENT** (nom, code client, adresse, téléphone) ; tableau **Référence | Description | P.U. | Qté | Montant** à en-tête bleu marine ; **Total TTC** et bandeau **NET À PAYER** ; encadré orange avec le **montant en lettres** et le **mode de règlement** ; **MERCI POUR VOTRE CONFIANCE** avec le **tampon** rond de l'entreprise. Polices et couleurs : Cambria, bleu #1A365D, orange #DD6B20. Les reçus de paiement utilisent la même présentation.
+
+Paramètres → Entreprise : *Sous-titre*, *Ville* (case « Lieu ») et *Mode de règlement* de la facture se modifient (valeurs par défaut : « SOLUTIONS TECHNOLOGIQUES ET CONNECTIVITE », « Kinshasa », « Virement bancaire ou espèces. »). La colonne *Référence* reprend la référence du produit en stock (« — » sinon). Le tampon est le fichier `stamp.png` (fond transparent). Comme avant, la facture imprimée montre toujours le prix complet, sans paiement ni reste.
 
 ## Facture en attente
 
