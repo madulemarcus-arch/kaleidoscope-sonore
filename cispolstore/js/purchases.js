@@ -77,7 +77,7 @@
     const list = App.db.purchases = App.db.purchases || [], rec = f.id ? list.find(x => x.id === f.id) : null;
     const o = { supplierId: sid, supplierName: (App.supplier(sid) || {}).name || sname, date: f.date || App.today(), currency: f.currency === 'CDF' ? 'CDF' : 'USD', mode: f.mode, ref: f.ref, note: f.note, items };
     if (rec) { if (rec.currency !== o.currency || rec.date !== o.date) delete rec.rate; Object.assign(rec, o); } else list.push({ id: App.uid(), ts: Date.now(), ...o });
-    App.stampRates(); App.save(); ps.tab = 'buy'; App.refresh(); App.toast('Achat enregistré');
+    App.stampRates(); App.save(); ps.tab = 'buy'; if (['invoices', 'purchase'].includes(App.state.view)) App.refresh(); else App.go('invoices'); App.toast('Achat enregistré');
   };
   App.actions.newbuy = () => buyForm({ supplierId: '', supplierName: '', date: App.today(), currency: 'USD', mode: 'Cash', ref: '', note: '', items: [blankItem()] });
   App.actions.editbuy = d => { const b = (App.db.purchases || []).find(x => x.id === d.id); if (b) buyForm({ ...b, items: b.items.map(x => ({ ...x })) }); };
