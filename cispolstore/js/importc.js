@@ -184,6 +184,6 @@
       e.note = [e.note, (r.upd === 'new' || r.upd === 'newer') ? `Dates mises à jour depuis Excel (${App.fdate(r.start)} → ${App.fdate(App.addDays(r.start, r.period))})` : '', r.nameFix ? 'Nom rétabli comme dans le fichier' : '', r.refFix ? 'Référence mise à jour comme dans le fichier' : ''].filter(Boolean).join('\n'); App.log(e.id, 'Fiche mise à jour (import Excel)'); });
     App.save(); im.sheets = null; im.name = ''; im.ov = new Map();
     App.undoBar(`${a.todo.length} client(s) ajouté(s)${a.merge.length ? `, ${a.merge.length} complété(s)` : ''}${a.update.length ? `, ${a.update.length} fiche(s) mise(s) à jour` : ''}`, () => { db.clients = snap.clients; db.log = snap.log; S.clientSeq = snap.seq; S.plans = snap.plans; App.save(); App.refresh(); App.toast('Import annulé'); }, 'Annuler l\'import');
-    App.go('clients');
+    App.go('clients'); App.celebrate();
   };
 })();
