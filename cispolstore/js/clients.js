@@ -38,7 +38,7 @@
       title: 'Clients', sub: `${all.length} au total`, nav: 'clients',
       html: `<div class="search"><input id="cq" placeholder="Rechercher un client, ACC, téléphone…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips">${FILTERS.map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="clfilter" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
-        <div class="bar" id="clbar" style="margin-bottom:6px"></div><div id="clist"></div><button class="btn full" data-act="newclient" style="margin-top:14px">+ Nouveau client</button>`,
+        <div class="bar" id="clbar" style="margin-bottom:6px"></div><div id="clist"></div><button class="btn full" data-act="newclient" style="margin-top:14px">+ Nouveau client</button>${App.canView('importc') ? '<button class="btn sec full" data-act="go" data-v="importc" style="margin-top:8px">📥 Importer des clients (Excel)</button>' : ''}`,
       after: () => { drawList(); $('cq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
