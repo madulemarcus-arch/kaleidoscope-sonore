@@ -48,7 +48,7 @@
     const r = fn(App.state.params) || {};
     $('title').innerHTML = r.sub ? `${esc(r.title)}<small>${esc(r.sub)}</small>` : esc(r.title || '');
     $('view').innerHTML = r.html || '';
-    const dom = { client: 'clients', clients: 'clients', importc: 'clients', finance: 'finance', daily: 'finance', payments: 'finance', expenses: 'finance', impayes: 'finance', reports: 'finance', rapportmois: 'finance', stock: 'stock', suppliers: 'stock', supplier: 'stock', purchase: 'stock', installs: 'stock', subs: 'subs', rappels: 'subs', invoices: 'invoices', invoice: 'invoices', importf: 'invoices' }[App.state.view];
+    const dom = { client: 'clients', clients: 'clients', importc: 'clients', finance: 'finance', daily: 'finance', payments: 'finance', expenses: 'finance', impayes: 'finance', reports: 'finance', rapportmois: 'finance', stock: 'stock', product: 'stock', suppliers: 'stock', supplier: 'stock', purchase: 'stock', installs: 'stock', subs: 'subs', rappels: 'subs', invoices: 'invoices', invoice: 'invoices', importf: 'invoices' }[App.state.view];
     if (dom) document.documentElement.dataset.dom = dom; else delete document.documentElement.dataset.dom;
     $('backBtn').hidden = !r.back; $('backBtn').dataset.to = r.back || '';
     $('logo').hidden = !!r.back;

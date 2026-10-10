@@ -541,3 +541,11 @@ button.item:active, .card[data-act]:active, .chip:active, .tabs button:active, .
 .sbadge.ok { background:rgba(62,207,142,.25); } .sbadge.warn { background:rgba(246,196,83,.3); }
 button.sbadge:active { transform:scale(.96); }
 .phero .chead small { color:rgba(255,255,255,.82); }
+
+/* Design v2 — stock cliquable : puces du résumé, lignes de produits */
+.cstats > button { background:rgba(255,255,255,.12); border:0; border-radius:14px; padding:9px 12px; color:#fff; text-align:left; font:inherit; cursor:pointer; transition:transform .12s, background .15s; }
+.cstats > button:hover { background:rgba(255,255,255,.2); } .cstats > button:active { transform:scale(.97); }
+.cstats > button b { display:block; font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.cstats > button small { opacity:.8; font-size:12px; } .cstats > button.bad b { color:#ffb4a8; } .cstats > button.bad small { color:inherit; }
+.item[data-act="go"][role="button"] { cursor:pointer; } .item[role="button"]:active { background:var(--card2); }
+.stat.tap small.mut { margin-top:2px; }
