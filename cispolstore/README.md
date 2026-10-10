@@ -120,6 +120,15 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Importer des clients (Excel ou CSV)
+
+**Paramètres → Données → Importer des clients** (administrateur). Choisissez un fichier **.xlsx** (ou .csv) : il est lu dans l'appareil, rien n'est envoyé sur internet.
+- L'application reconnaît les colonnes d'après leur titre (nom, ACC, téléphone, abonnement, date de paiement, date d'expiration, solde dû, référence, observation, n°) ; vous pouvez corriger l'association dans « Colonnes reconnues ».
+- Elle affiche un **aperçu** : clients lus, à ajouter, déjà présents (même compte ACC), lignes en double fusionnées, clients de même nom avec des ACC différents (plusieurs kits : tous ajoutés), dates incohérentes.
+- Chaque ligne devient un **client géré** : prénom / nom, téléphone (0 ajouté devant les numéros à 9 chiffres), ACC, formule, **date de début = date de paiement**, **durée = date d'expiration − date de paiement**, la colonne « Référence » dans « Référence / adresse d'installation ». Sans dates, le client est ajouté « sans abonnement ». Les formules inconnues (ex. Illimité, 250 Go) sont créées avec un prix proposé d'après les soldes dus (modifiable avant l'import ; coût Starlink à 0, à régler dans Paramètres → formules).
+- Les observations « désactivé / bloqué », les **soldes dus** (aucune facture n'est créée), les dates à vérifier et le n° du fichier sont notés dans la **note** du client.
+- Après l'import, une barre **Annuler l'import** retire tous les clients ajoutés. Réimporter le même fichier n'ajoute rien (les ACC déjà présents sont ignorés).
+
 ## Abonnements : compteurs cliquables
 
 Dans **Abonnements**, touchez **Actifs**, **En sursis** ou **Inactifs** : la liste des clients de cette catégorie s'affiche juste en dessous (nom, formule, téléphone, date de fin ; « dans N jours » pour les actifs, « jusqu'au… » pour le sursis, « fin le… » pour les inactifs). Touchez un client pour ouvrir sa fiche, retouchez le compteur pour fermer la liste.
