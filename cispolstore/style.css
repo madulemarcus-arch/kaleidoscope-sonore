@@ -458,3 +458,39 @@ h2.sec .more { color:var(--dom); }
 #bottom [data-nav="finance"].on { color:#169c5b; } #bottom [data-nav="finance"].on span { background:color-mix(in srgb,#169c5b 15%,transparent); }
 :root[data-dom] .chip.on:not(.hero-chip) { background:linear-gradient(135deg,color-mix(in srgb,var(--dom) 80%,#fff),var(--dom)); border-color:var(--dom); color:#fff; box-shadow:0 4px 12px color-mix(in srgb,var(--dom) 35%,transparent); }
 :root[data-dom] .hero .chip.on { background:#fff; color:#0b2646; box-shadow:none; }
+
+/* =====================================================================
+   Design v2 — ordinateur (étape 8)
+   ===================================================================== */
+kbd { font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace; padding:3px 6px; border-radius:6px; background:var(--card2); border:1px solid var(--line); border-bottom-width:2px; color:inherit; }
+#side kbd { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.25); color:#fff; margin-left:4px; }
+.keys h3 { font-size:13px; margin:14px 0 6px; color:var(--mut); text-transform:uppercase; letter-spacing:.05em; }
+.keys > div { display:flex; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid var(--line); }
+.keys > div span { margin-left:auto; }
+@media (min-width:1024px) {
+  /* denser lists */
+  .item { padding:9px 14px; gap:11px; } .item .avatar { width:36px; height:36px; font-size:13px; }
+  /* hover actions: small round buttons over the right edge instead of sliding the row */
+  .swr:hover > .item { transform:none; }
+  .swr .swa { z-index:2; right:10px; top:50%; bottom:auto; transform:translateY(-50%); gap:6px; opacity:0; pointer-events:none; transition:opacity .15s; }
+  .swr:hover .swa, .swr:focus-within .swa { opacity:1; pointer-events:auto; }
+  .swr:hover > .item .end { opacity:0; }
+  .swa .sw { width:36px; height:36px; border-radius:50%; font-size:0; padding:0; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  .swa .sw span { font-size:17px; }
+  .swr .item .end { transition:opacity .15s; }
+  .sw[title]:hover { filter:brightness(1.08); }
+}
+@media (min-width:1280px) {
+  #view { max-width:1480px; }
+  .dash { grid-template-columns:1.05fr 1.25fr 1fr; grid-template-areas:"a b d" "a b c"; gap:0 26px; }
+  #clist .list, #ilist .list, #plist .list { grid-template-columns:repeat(3,1fr); }
+  .hero-main { align-items:flex-end; } .hero .spark { max-width:520px; }
+  .kpis { display:grid; grid-template-columns:repeat(2,1fr); overflow:visible; }
+  .kpis .stat { min-width:0; }
+}
+@media (min-width:1700px) { #view { max-width:1700px; } }
+@media print { #side, kbd { display:none !important; } }
+@media (min-width:1280px) {
+  .hero { padding:18px 24px 14px; } .hero-num { font-size:44px; } .hero .spark { height:46px; }
+  #view > .search { max-width:none; }
+}
