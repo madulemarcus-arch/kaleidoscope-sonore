@@ -120,6 +120,12 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Listes (design étape 4a)
+
+- **Clients** : lettres d'**index collantes** (A, B, C…), pastille d'état colorée avec le **délai** (« dans 12 j », « sursis · 3 j », « depuis 63 j »), liseré de couleur à gauche, **ACC en police à chasse fixe**, message d'accueil avec bouton quand la liste est vide.
+- **Glisser une ligne vers la gauche** (téléphone) pour faire apparaître les actions rapides : **📞 Appeler**, **💬 WhatsApp**, **📋 Copier l'ACC**, **🔄 Renouveler** ; sur ordinateur, elles apparaissent au survol. Toucher une ligne ouverte la referme ; la sélection pour supprimer reste inchangée.
+- **Factures** : regroupées par jour (« Aujourd'hui », « Hier », date), pastille et liseré selon l'état, et en glissant : **💰 Encaisser** (si un reste est dû) et **🖨️ Imprimer**.
+
 ## Graphiques (design étape 3)
 
 Une petite boîte à outils de graphiques sans bibliothèque (`js/charts.js`), aux couleurs du thème (clair et sombre) : **anneaux**, **barres** (une ou deux séries) et **barres horizontales**. **Touchez** une barre, une part d'anneau ou une ligne de légende pour lire sa valeur.
