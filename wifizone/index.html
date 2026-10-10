@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="1; url=https://madulemarcus-arch.github.io/wifizone/">
+<title>WiFi Zone Manager a déménagé</title>
+<style>body{font:18px system-ui,sans-serif;background:#0a1f44;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;margin:0;padding:24px}a{color:#8fb8ff}</style>
+</head>
+<body>
+<p>WiFi Zone Manager a une nouvelle adresse.<br><a href="https://madulemarcus-arch.github.io/wifizone/">madulemarcus-arch.github.io/wifizone</a><br><small>Redirection en cours…</small></p>
+<script>
+// Old copy of WiFi Zone: drop its service worker and cache (they would keep serving the old app), then go to the new address.
+(async () => {
+  try { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.filter(r => r.scope.includes('/kaleidoscope-sonore/wifizone/')).map(r => r.unregister())); } catch (e) {}
+  try { const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith('wifizone-')).map(k => caches.delete(k))); } catch (e) {}
+  location.replace('https://madulemarcus-arch.github.io/wifizone/');
+})();
+</script>
+</body>
+</html>

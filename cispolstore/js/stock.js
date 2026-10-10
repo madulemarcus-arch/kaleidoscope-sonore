@@ -9,33 +9,72 @@
   const prodOpts = (only) => App.db.products.filter(p => !only || App.tracked(p)).sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, `${p.name}${App.tracked(p) ? ` (${qtyText(p)})` : ''}`]);
 
   // ---------- Stock list ----------
-  const st = { cat: 'all', q: '' };
+  const st = { cat: 'all', q: '', f: 'all' };
+  const FILT = { all: ['Tous', () => true], stock: ['En stock', p => App.tracked(p) && p.qty > 0], low: ['Stock bas', p => App.tracked(p) && p.qty <= (p.min || 0)], out: ['Épuisés', p => App.tracked(p) && p.qty <= 0], nostock: ['Sans stock', p => !App.tracked(p)] };
   const drawList = () => {
     const q = st.q.toLowerCase();
-    const l = App.db.products.filter(p => (st.cat === 'all' || p.cat === st.cat) && (!q || (p.name + ' ' + p.ref + ' ' + p.cat).toLowerCase().includes(q))).sort((a, b) => a.name.localeCompare(b.name));
+    const l = App.db.products.filter(p => (st.cat === 'all' || p.cat === st.cat) && FILT[st.f][1](p) && (!q || (p.name + ' ' + p.ref + ' ' + p.cat).toLowerCase().includes(q))).sort((a, b) => a.name.localeCompare(b.name));
     $('plist').innerHTML = l.length ? `<div class="list">${l.map(p => {
       const sup = App.supplier(p.supplierId);
-      return `<div class="item"><div class="grow"><b>${esc(p.name)}</b><small>${esc(p.cat)}${p.ref ? ' · ' + esc(p.ref) : ''}${sup ? ' · ' + esc(sup.name) : ''}</small><small>${App.can('costs') ? 'Achat : ' + App.fmt(p.cost) + ' | ' : ''}Vente : ${App.fmt(p.price)}${p.unit === 'm' ? ' / m' : ''}</small></div>
+      return `<div class="item" role="button" tabindex="0" data-act="go" data-v="product" data-id="${p.id}"><div class="grow"><b>${esc(p.name)}</b><small>${esc(p.cat)}${p.ref ? ' · ' + esc(p.ref) : ''}${sup ? ' · ' + esc(sup.name) : ''}</small><small>${App.can('costs') ? 'Achat : ' + App.fmt(p.cost) + ' | ' : ''}Vente : ${App.fmt(p.price)}${p.unit === 'm' ? ' / m' : ''}</small></div>
         <div class="end"><span class="pill ${stClass(p)}" style="font-size:13px">${App.tracked(p) ? 'En stock : ' + qtyText(p) : 'Sans stock'}</span>
         ${App.can('stockedit') ? `<span><button class="btn sm sec" data-act="stin" data-id="${p.id}">＋</button> <button class="btn sm sec" data-act="stout" data-id="${p.id}">－</button> <button class="btn sm sec" data-act="editprod" data-id="${p.id}">✎</button></span>` : ''}</div></div>`;
     }).join('')}</div>` : '<div class="empty">Aucun produit. Ajoutez par exemple « Starlink Mini », « Câble Cat6 (m) », « Routeur »…</div>';
   };
   App.views.stock = p => {
     if (p && p.q != null && p.q !== st.q) st.q = p.q;
+    if (p && p.f && FILT[p.f]) { st.f = p.f; st.cat = 'all'; st.q = ''; }
+    if (p && p.cat) { st.cat = p.cat; st.f = 'all'; st.q = ''; }
     const db = App.db, low = db.products.filter(x => App.tracked(x) && x.qty <= (x.min || 0));
-    const moves = db.moves.slice(-12).reverse();
+    const moves = db.moves.slice(-12).reverse(), val = db.products.filter(x => App.tracked(x)).reduce((a, x) => a + (+x.qty || 0) * (App.can('costs') ? +x.cost || 0 : +x.price || 0), 0);
     return {
       title: 'Stock', sub: `${db.products.length} produit(s)`, nav: 'stock',
-      html: `<div class="search"><input id="pq" placeholder="Rechercher un produit, une référence…" value="${esc(st.q)}" autocomplete="off"></div>
+      html: `<section class="hero shero"><div class="hero-top"><div><small>📦 Valeur du stock${App.can('costs') ? ' (prix d\'achat)' : ' (prix de vente)'}</small><div class="hero-num" data-count="${val}">${App.fmt(val)}</div></div></div>
+          <div class="cstats"><button data-act="stfilt" data-f="all"><b data-count="${db.products.length}" data-int="1">${db.products.length}</b><small>produits</small></button><button class="${low.length ? 'bad' : ''}" data-act="stfilt" data-f="low"><b>${low.length}</b><small>stock bas</small></button><button data-act="stfilt" data-f="stock"><b>${db.products.filter(x => App.tracked(x) && x.qty > 0).length}</b><small>en stock</small></button><button class="${db.products.some(x => App.tracked(x) && x.qty <= 0) ? 'bad' : ''}" data-act="stfilt" data-f="out"><b>${db.products.filter(x => App.tracked(x) && x.qty <= 0).length}</b><small>épuisés</small></button></div></section>
+        <div class="search"><input id="pq" placeholder="Rechercher un produit, une référence…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips"><button class="chip ${st.cat === 'all' ? 'on' : ''}" data-act="stcat" data-c="all">Tous</button>${App.CATS.filter(c => db.products.some(p => p.cat === c)).map(c => `<button class="chip ${st.cat === c ? 'on' : ''}" data-act="stcat" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-        ${low.length ? `<div class="card" style="margin-bottom:10px"><b class="warn">⚠ Stock bas :</b> ${low.map(x => esc(x.name) + ' (' + qtyText(x) + ')').join(', ')}</div>` : ''}
+        <div class="chips" id="stf">${Object.entries(FILT).map(([k, [t]]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="stfilt" data-f="${k}">${t}</button>`).join('')}</div>
+        ${low.length && st.f === 'all' ? `<div class="card" style="margin-bottom:10px"><b class="warn">⚠ Stock bas :</b> ${low.map(x => esc(x.name) + ' (' + qtyText(x) + ')').join(', ')}</div>` : ''}
         <div id="plist"></div>
         <div class="bar" style="margin-top:14px"><button class="btn" data-act="newprod">+ Produit</button><button class="btn sec" data-act="stin">📥 Entrée</button><button class="btn sec" data-act="stout">📤 Sortie</button><button class="btn sec" data-csv="produits">CSV</button></div>
         ${moves.length ? `<h2 class="sec">Mouvements récents</h2><div class="list">${moves.map(m => { const p = App.prod(m.pid), c = App.client(m.clientId), i = App.invoice(m.invoiceId); return `<div class="item"><div class="grow"><b>${esc(p ? p.name : '?')}</b><small>${App.fdate(m.date)}${i ? ' · ' + esc(i.number) : ''}${c ? ' · ' + esc(App.cname(c)) : ''}${m.note ? ' · ' + esc(m.note) : ''}</small></div><b class="${m.qty >= 0 ? 'ok' : 'bad'}">${m.qty > 0 ? '+' : ''}${App.nf(m.qty, 2)}${p && p.unit === 'm' ? ' m' : ''}</b></div>`; }).join('')}</div>` : ''}`,
       after: () => { drawList(); $('pq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
+
+  // ---------- Product report: stock, sales and movements of one product ----------
+  const pr = { tab: 'all' };
+  App.actions.prtab = d => { pr.tab = d.t; App.refresh(); };
+  App.views.product = p => {
+    const x = App.prod(p.id); if (!x) return { title: 'Produit', back: 'stock', nav: 'stock', html: '<div class="empty">Produit introuvable.</div>' };
+    const db = App.db, tr = App.tracked(x), costs = App.can('costs'), u = x.unit === 'm' ? ' m' : '';
+    const sales = []; db.invoices.filter(i => App.live(i)).forEach(i => i.lines.forEach(l => { if (l.pid === x.id) sales.push({ i, l, usd: App.conv(l.qty * l.price, i.currency, 'USD', App.rateOf(i)) }); }));
+    sales.sort((a, b) => b.i.date.localeCompare(a.i.date) || b.i.number.localeCompare(a.i.number));
+    const moves = db.moves.filter(m => m.pid === x.id).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')), qin = moves.filter(m => m.qty > 0).reduce((a, m) => a + m.qty, 0), qout = -moves.filter(m => m.qty < 0).reduce((a, m) => a + m.qty, 0);
+    const sold = sales.reduce((a, s) => a + s.l.qty, 0), rev = sales.reduce((a, s) => a + s.usd, 0), unitM = (+x.price || 0) - (+x.cost || 0);
+    const cls = stClass(x), now = new Date(), months = [], M = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    for (let k = 5; k >= 0; k--) { const d = new Date(now.getFullYear(), now.getMonth() - k, 1), key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; months.push({ key, l: M[d.getMonth()], v: sales.filter(s => s.i.date.startsWith(key)).reduce((a, s) => a + s.l.qty, 0) }); }
+    const supp = App.supplier(x.supplierId);
+    const sRows = sales.map(({ i, l, usd }) => { const c = App.client(i.clientId); return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${App.fdate(i.date)}${c ? ' · ' + esc(App.cname(c)) : ''}</small></div><div class="end"><b>${App.nf(l.qty, 2)}${u || ' ×'}</b><span class="mut">${App.fmt(usd)}</span></div></button>`; });
+    const mRows = moves.map(m => { const c = App.client(m.clientId), i = App.invoice(m.invoiceId), sp = App.supplier(m.supplierId); return `<div class="item"><span class="avatar ${m.qty > 0 ? 'ok' : 'warn'}">${m.qty > 0 ? '＋' : '－'}</span><div class="grow"><b>${m.qty > 0 ? 'Entrée' : 'Sortie'} · ${App.nf(Math.abs(m.qty), 2)}${u}</b><small>${App.fdate(m.date)}${i ? ' · ' + esc(i.number) : ''}${c ? ' · ' + esc(App.cname(c)) : ''}${sp ? ' · ' + esc(sp.name) : ''}${m.note ? ' · ' + esc(m.note) : ''}</small></div></div>`; });
+    const tab = pr.tab, tabs = [['all', 'Résumé'], ['sales', `Ventes (${sales.length})`], ['moves', `Mouvements (${moves.length})`]];
+    return {
+      title: x.name, sub: 'Rapport du produit', back: 'stock', nav: 'stock',
+      html: `<section class="hero shero"><div class="hero-top"><div><small>${esc(x.cat)}${x.ref ? ' · ' + esc(x.ref) : ''}${supp ? ' · ' + esc(supp.name) : ''}</small><div class="hero-date" style="text-transform:none">${esc(x.name)}</div></div>${tr ? `<span class="pill ${cls}">${x.qty <= 0 ? 'Épuisé' : cls === 'warn' ? 'Stock bas' : 'En stock'}</span>` : '<span class="pill">Sans stock</span>'}</div>
+          <div class="hero-num">${tr ? App.nf(x.qty, 2) + (u || '') : '∞'}</div><small>${tr ? `en stock · minimum ${App.nf(x.min || 0, 2)}${u}` : 'ce produit ne se compte pas en stock'}</small>
+          <div class="cstats"><div><b>${App.nf(sold, 2)}${u}</b><small>vendu</small></div><div><b>${App.fmt(rev)}</b><small>chiffre d'affaires</small></div>${costs ? `<div><b>${App.fmt(unitM)}</b><small>marge / ${x.unit === 'm' ? 'mètre' : 'unité'}</small></div>` : `<div><b>${App.fmt(x.price || 0)}</b><small>prix de vente</small></div>`}</div>
+          ${App.can('stockedit') ? `<div class="ctiles"><button data-act="stin" data-id="${x.id}"><span>📥</span>Entrée</button><button data-act="stout" data-id="${x.id}"><span>📤</span>Sortie</button><button data-act="editprod" data-id="${x.id}"><span>✎</span>Modifier</button></div>` : ''}</section>
+        <div class="tabs">${tabs.map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-act="prtab" data-t="${k}">${t}</button>`).join('')}</div>
+        ${tab === 'all' ? `${tr ? `<div class="grid two"><div class="stat"><small>📥 Total entré</small><b>${App.nf(qin, 2)}${u}</b></div><div class="stat"><small>📤 Total sorti</small><b>${App.nf(qout, 2)}${u}</b></div></div>` : ''}
+          ${sold > 0 ? App.chart.bars(months.map(m => ({ l: m.l, v: m.v })), { title: 'Quantités vendues', sub: '6 derniers mois', fmt: v => App.nf(v, 2) + (u || ' ×') }) : ''}
+          <div class="card"><dl class="kv"><dt>Prix de vente</dt><dd>${App.fmt(x.price || 0)}${x.unit === 'm' ? ' / m' : ''}</dd>${costs ? `<dt>Prix d'achat</dt><dd>${App.fmt(x.cost || 0)}</dd><dt>Valeur du stock</dt><dd>${App.fmt((x.qty || 0) * (x.cost || 0))}</dd>` : ''}<dt>Date d'entrée</dt><dd>${App.fdate(x.entry)}</dd><dt>Fournisseur</dt><dd>${supp ? esc(supp.name) : '—'}</dd></dl></div>
+          ${sales.length ? `<h2 class="sec">Dernières ventes<button class="more" data-act="prtab" data-t="sales">Tout voir</button></h2><div class="list">${sRows.slice(0, 5).join('')}</div>` : ''}` : ''}
+        ${tab === 'sales' ? (sRows.length ? `<div class="list">${sRows.join('')}</div>` : '<div class="empty">Aucune vente de ce produit.</div>') : ''}
+        ${tab === 'moves' ? (mRows.length ? `<div class="list">${mRows.join('')}</div>` : '<div class="empty">Aucun mouvement.</div>') : ''}`
+    };
+  };
   App.actions.stcat = d => { st.cat = d.c; App.refresh(); };
+  App.actions.stfilt = d => { st.f = d.f; App.refresh(); const el = $('plist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   App.actions.newprod = () => App.productForm();
   App.actions.editprod = d => App.productForm(App.prod(d.id));
 
@@ -73,7 +112,7 @@
        ${F.sel('f_s', 'Fournisseur', supOpts(), p.supplierId)}${F.date('f_d', 'Date', App.today())}${F.text('f_n', 'Note / n° de bon', '')}`,
       () => {
         const q = App.n('f_q'); if (q <= 0) { App.toast('Quantité invalide'); return false; }
-        App.move({ pid: App.v('f_p'), qty: q, cost: App.n('f_c'), supplierId: App.v('f_s'), date: App.v('f_d'), note: App.v('f_n') || 'Entrée de stock' });
+        App.move({ pid: App.v('f_p'), qty: q, cost: App.n('f_c'), supplierId: App.v('f_s'), date: App.v('f_d'), purchase: true, note: App.v('f_n') || 'Entrée de stock' });
         App.save(); App.toast('Stock mis à jour'); App.refresh();
       }, 'Ajouter au stock');
     $('f_p').onchange = () => { const x = App.prod($('f_p').value); $('f_c').value = x.cost; $('f_s').value = x.supplierId || ''; };
@@ -116,7 +155,7 @@
   };
   App.views.supplier = p => {
     const s = App.supplier(p.id); if (!s) return { title: 'Fournisseur', back: 'suppliers', html: '<div class="empty">Introuvable.</div>' };
-    const buys = App.db.moves.filter(m => m.supplierId === s.id && m.qty > 0).slice().reverse();
+    const buys = App.db.moves.filter(m => m.supplierId === s.id && m.qty > 0).slice().reverse(), others = (App.db.purchases || []).filter(b => b.supplierId === s.id).sort((a, b) => b.date.localeCompare(a.date));
     const total = buys.reduce((a, m) => a + m.qty * m.cost, 0), prods = App.db.products.filter(x => x.supplierId === s.id);
     return {
       title: s.name, sub: 'Fournisseur', back: 'suppliers', nav: 'more',
@@ -124,7 +163,8 @@
         <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editsup" data-id="${s.id}">Modifier</button><button class="btn del" data-act="delsup" data-id="${s.id}">Supprimer</button></div></div>
         ${prods.length ? `<h2 class="sec">Produits</h2><div class="list">${prods.map(x => `<div class="item"><div class="grow"><b>${esc(x.name)}</b></div><span>Achat : ${App.fmt(x.cost)}</span></div>`).join('')}</div>` : ''}
         <h2 class="sec">Historique des achats <span class="more">Total ${App.fmt(total)}</span></h2>
-        ${buys.length ? `<div class="list">${buys.map(m => { const x = App.prod(m.pid); return `<div class="item"><div class="grow"><b>${esc(x ? x.name : '?')}</b><small>${App.fdate(m.date)} · ${App.nf(m.qty, 2)} × ${App.fmt(m.cost)}</small></div><b>${App.fmt(m.qty * m.cost)}</b></div>`; }).join('')}</div>` : '<div class="empty">Aucun achat enregistré. Utilisez « Entrée de stock » en choisissant ce fournisseur.</div>'}`
+        ${buys.length ? `<div class="list">${buys.map(m => { const x = App.prod(m.pid); return `<div class="item"><div class="grow"><b>${esc(x ? x.name : '?')}</b><small>${App.fdate(m.date)} · ${App.nf(m.qty, 2)} × ${App.fmt(m.cost)}</small></div><b>${App.fmt(m.qty * m.cost)}</b></div>`; }).join('')}</div>` : (others.length ? '' : '<div class="empty">Aucun achat enregistré. Utilisez « Entrée de stock » en choisissant ce fournisseur, ou Factures → Achats.</div>')}
+        ${others.length ? `<h2 class="sec">Achats enregistrés (Factures → Achats)</h2><div class="list">${others.map(b => `<button class="item" data-act="go" data-v="purchase" data-id="${b.id}"><div class="grow"><b>${esc(App.purchaseLabel(b).replace(/^Achat · /, ''))}</b><small>${App.fdate(b.date)}</small></div><b>${App.fmt(App.purchaseTotal(b), b.currency)}</b></button>`).join('')}</div>` : ''}`
     };
   };
   App.actions.editsup = d => App.supplierForm(App.supplier(d.id));

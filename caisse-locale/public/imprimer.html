@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impression tickets CISPOLstore</title>
+<style>
+  :root{
+    --ink:#0a1f44; --muted:#5b6478; --line:#c9cfdb; --bg:#eef1f6; --card:#ffffff; --brand:#1b5fc1;
+    --v:#2e7d32; --j:#1b5fc1; --s:#e65100; --m:#6a1b9a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:var(--bg)}
+  .bar{padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;background:var(--card);border-bottom:1px solid var(--line)}
+  .bar h1{margin:0 0 4px;font-size:20px}
+  .bar h1 span{color:var(--brand)}
+  .bar p{margin:0;color:var(--muted);font-size:13px;max-width:60ch;line-height:1.45}
+  .col{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 320px}
+  textarea{width:100%;min-height:120px;font:15px/1.4 "Courier New",monospace;padding:10px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button,.file{font:bold 14px Arial,sans-serif;padding:10px 16px;border-radius:8px;border:1px solid var(--brand);background:var(--card);color:var(--brand);cursor:pointer}
+  button.primary{background:var(--brand);color:#fff}
+  button:focus-visible,.file:focus-within{outline:3px solid #9cc0f5;outline-offset:2px}
+  .file input{display:none}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;font-size:13px}
+  .chip{padding:4px 10px;border-radius:999px;color:#fff;font-weight:bold}
+  .chip.v{background:var(--v)}.chip.j{background:var(--j)}.chip.s{background:var(--s)}.chip.m{background:var(--m)}
+  .chip.tot{background:var(--ink)}
+  .warn{color:#b00020;font-size:13px}
+  .sheet{padding:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;max-width:210mm;margin:16px auto;background:#fff}
+  .t{border:1px dashed #999;padding:5px 6px 6px;text-align:center;break-inside:avoid;page-break-inside:avoid;min-height:25mm;display:flex;flex-direction:column;gap:2px}
+  .t .h{display:flex;justify-content:space-between;color:#fff;font-weight:bold;font-size:9.5px;padding:3px 5px;border-radius:2px}
+  .t .l{font-size:7.5px;color:#555;margin-top:2px}
+  .t .c{font:bold 19px "Courier New",monospace;letter-spacing:1px;color:var(--ink)}
+  .t .d{font-weight:bold;font-size:10px}
+  .t .f{font-size:6.5px;color:#777;margin-top:auto}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;font-size:14px}
+  @media (max-width:600px){.sheet{grid-template-columns:repeat(2,1fr)}}
+  @page{size:A4;margin:8mm}
+  @media print{
+    body{background:#fff}
+    .bar{display:none}
+    .sheet{margin:0;padding:0;max-width:none;grid-template-columns:repeat(4,1fr)}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="col">
+    <h1>CISPOL<span>store</span> · Impression des tickets</h1>
+    <p>Colle les codes (un par ligne ou séparés par des espaces), ou ouvre le fichier <b>dernier-lot.txt</b> du routeur. Le forfait est reconnu par la première lettre : V = Visiteur, J = Jour, S = Semaine, M = Mois. Clique ensuite sur <b>Imprimer</b> (40 tickets par page A4).</p>
+    <div class="stats" id="stats"></div>
+    <div class="warn" id="warn"></div>
+  </div>
+  <div class="col">
+    <textarea id="codes" spellcheck="false" placeholder="VRT4RL&#10;JKP4W7&#10;S7J7XC"></textarea>
+    <div class="row">
+      <a class="file" href="/" style="text-decoration:none">Retour à la caisse</a>
+      <label class="file">Ouvrir un fichier .txt<input type="file" id="file" accept=".txt,.csv,.rsc,text/plain"></label>
+      <button type="button" id="clear">Vider</button>
+      <button type="button" class="primary" id="print">Imprimer</button>
+    </div>
+  </div>
+</div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+const F = {
+  V:{n:"VISITEUR",d:"6 heures",p:"500 FC",c:"var(--v)",k:"v"},
+  J:{n:"JOUR",d:"24 heures",p:"1 000 FC",c:"var(--j)",k:"j"},
+  S:{n:"SEMAINE",d:"7 jours",p:"7 000 FC",c:"var(--s)",k:"s"},
+  M:{n:"MOIS",d:"30 jours",p:"30 000 FC",c:"var(--m)",k:"m"}
+};
+const ta = document.getElementById("codes");
+function parse(txt){
+  const seen = new Set(), out = [];
+  (txt.toUpperCase().match(/\b[VJSM][A-Z0-9]{5}\b/g) || []).forEach(c => {
+    if(!seen.has(c)){ seen.add(c); out.push(c); }
+  });
+  out.sort((a,b)=>"VJSM".indexOf(a[0])-"VJSM".indexOf(b[0]));
+  return out;
+}
+function esc(s){return s.replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));}
+function render(){
+  const codes = parse(ta.value);
+  const sheet = document.getElementById("sheet");
+  if(!codes.length){
+    sheet.innerHTML = '<div class="empty">Aucun code reconnu. Un code fait 6 caractères et commence par V, J, S ou M.</div>';
+  } else {
+    sheet.innerHTML = codes.map(c => {
+      const f = F[c[0]];
+      return '<div class="t"><div class="h" style="background:'+f.c+'"><span>CISPOLstore WiFi</span><span>'+f.n+'</span></div>'+
+        '<div class="l">Code du ticket</div><div class="c">'+esc(c)+'</div>'+
+        '<div class="d" style="color:'+f.c+'">'+f.d+' - '+f.p+'</div>'+
+        '<div class="f">Connectez-vous au WiFi puis tapez le code</div></div>';
+    }).join("");
+  }
+  const count = {V:0,J:0,S:0,M:0}; codes.forEach(c=>count[c[0]]++);
+  const pages = Math.ceil(codes.length/40);
+  document.getElementById("stats").innerHTML =
+    '<span class="chip tot">'+codes.length+' tickets · '+pages+' page'+(pages>1?"s":"")+'</span>'+
+    Object.keys(count).filter(k=>count[k]).map(k=>'<span class="chip '+F[k].k+'">'+count[k]+' '+F[k].n.toLowerCase()+'</span>').join("");
+  const bad = (ta.value.toUpperCase().match(/\b[A-Z0-9]{6}\b/g)||[]).filter(w=>!/^[VJSM]/.test(w) && /\d/.test(w));
+  document.getElementById("warn").textContent = bad.length ? "Ignorés (ne commencent pas par V, J, S ou M) : "+bad.slice(0,8).join(", ") : "";
+}
+ta.addEventListener("input", render);
+document.getElementById("file").addEventListener("change", e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => { ta.value = r.result; render(); };
+  r.readAsText(f);
+  e.target.value = "";
+});
+document.getElementById("clear").addEventListener("click", () => { ta.value=""; render(); ta.focus(); });
+document.getElementById("print").addEventListener("click", () => window.print());
+render();
+(async()=>{
+  try{
+    const e=await (await fetch("/api/etat")).json();
+    for(const f of (e.forfaits||[])) if(F[f.id]) F[f.id].p=Math.round(f.prix).toLocaleString("fr-FR").replace(/\u202f/g," ")+" FC";
+    const lot=new URLSearchParams(location.search).get("lot");
+    if(lot){ const d=await (await fetch("/api/lot?id="+encodeURIComponent(lot))).json(); ta.value=(d.codes||[]).join("\n"); }
+  }catch(err){}
+  render();
+})();
+</script>
+</body>
+</html>

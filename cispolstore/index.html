@@ -7,6 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 <title>CISPOLstore Manager</title>
 </head>
@@ -18,9 +19,12 @@
   <img id="logo" src="logo.png" alt="CISPOLstore">
   <div id="title"></div>
   <button class="ib" id="searchBtn" aria-label="Rechercher">🔎</button>
-  <button class="ib" id="syncBtn" aria-label="Synchronisation">☁️</button>
-  <button class="ib" id="themeBtn" aria-label="Changer de thème">🌙</button>
   <button class="ib" id="lockBtn" aria-label="Verrouiller">🔒</button>
+  <button class="ib" id="menuBtn" aria-label="Plus d'options" aria-haspopup="true">⋯</button>
+  <div id="topmenu" hidden>
+    <button class="ib" id="syncBtn" aria-label="Synchronisation">☁️</button>
+    <button class="ib" id="themeBtn" aria-label="Changer de thème">🌙</button>
+  </div>
 </header>
 <main id="view"></main>
 <nav id="bottom">
@@ -34,22 +38,34 @@
 <dialog id="dlg"></dialog>
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/sheets.js"></script>
 <script src="js/roles.js"></script>
+<script src="js/lists.js"></script>
+<script src="js/effects.js"></script>
 <script src="js/clients.js"></script>
 <script src="js/stock.js"></script>
 <script src="js/techs.js"></script>
 <script src="js/plans.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="js/invoices.js"></script>
+<script src="js/share.js"></script>
+<script src="js/purchases.js"></script>
 <script src="js/delivery.js"></script>
+<script src="js/charts.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/monthly.js"></script>
+<script src="js/finance.js"></script>
+<script src="js/daily.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/importc.js"></script>
+<script src="js/importf.js"></script>
 <script src="js/remind.js"></script>
 <script src="js/penalties.js"></script>
 <script src="js/unpaid.js"></script>
 <script src="js/export.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/keys.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -5,33 +5,58 @@
   const CUR = [['USD', 'Dollar ($)'], ['CDF', 'Franc congolais (CDF)']];
 
   // ---------- Creation (shared with subscription renewal) ----------
+  // stock leaves when the sale is real (at creation, or when a pending invoice is validated)
+  App.invMoves = inv => inv.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: -l.qty, invoiceId: inv.id, clientId: inv.clientId, date: inv.date, note: 'Facture ' + inv.number }); });
+  // subscription renewal + installation record that a sale triggers (kept in inv.fx while the invoice is pending)
+  App.applyFx = (inv, fx) => {
+    const db = App.db, c = App.client(inv.clientId), date = inv.date;
+    if (fx.renewed && c) {
+      inv.renew = { prev: fx.prevSub, ns: fx.renewed.ns, date };
+      if (c.start) (c.subs = c.subs || []).push({ start: c.start, days: c.period || fx.renewed.days, price: c.price || 0, date });
+      Object.assign(c, { start: fx.renewed.ns, period: fx.renewed.days }); App.log(c.id, `Abonnement renouvelé : ${App.fdate(fx.renewed.ns)} → ${App.fdate(fx.renewed.end)}`);
+    }
+    if (fx.inst && inv.clientId) { db.installs.push({ id: App.uid(), clientId: inv.clientId, date, kind: 'Installation Starlink', tech: fx.inst.tech, techId: App.techId(fx.inst.tech), price: App.conv(fx.inst.fee, inv.currency, 'USD', inv.rate), materials: fx.inst.mats, invoiceId: inv.id, obs: fx.inst.obs }); App.log(inv.clientId, 'Installation facturée ' + inv.number); }
+  };
+  App.validateInvoice = id => { const i = App.invoice(id); if (!i || !i.pending) return; const fx = i.fx || {}; delete i.pending; delete i.fx; i.validated = App.today(); App.invMoves(i); App.applyFx(i, fx); App.log(i.clientId, `Vente validée : ${i.number}`); App.save(); };
   App.createInvoice = (inv, paid = 0) => {
     const db = App.db, date = inv.date || App.today();
     Object.assign(inv, { id: App.uid(), number: App.nextInvNumber(date.slice(0, 4)), date, ts: Date.now(), note: inv.note || '', rate: +inv.rate > 0 ? +inv.rate : App.rateOn(date) });
     App.costSubLines(inv);
     db.invoices.push(inv);
-    inv.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: -l.qty, invoiceId: inv.id, clientId: inv.clientId, date, note: 'Facture ' + inv.number }); });
-    if (paid > 0) db.payments.push({ id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: paid, currency: inv.currency, rate: inv.rate, mode: inv.payMode, ref: '', comment: '' });
+    if (!inv.pending) App.invMoves(inv);
+    const pa = +inv.payAmount > 0 ? { amount: +inv.payAmount, cur: inv.payCur || inv.currency, ref: inv.payRef || '' } : paid > 0 ? { amount: paid, cur: inv.currency, ref: '' } : null;
+    delete inv.payAmount; delete inv.payCur; delete inv.payRef;
+    if (pa) db.payments.push({ id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: pa.amount, currency: pa.cur, rate: inv.rate, mode: inv.payMode, ref: pa.ref, comment: '' });
     App.log(inv.clientId, `Facture ${inv.number} : ${App.fmt(App.invTotal(inv), inv.currency)}`);
     return inv;
   };
 
   // ---------- Invoice list ----------
+  // pending invoices left undecided for a few days: the client should either take the product or drop it
+  const PEND_DAYS = 3, pendAge = i => Math.max(0, App.diff(i.date, App.today()));
+  App.stalePending = () => App.db.invoices.filter(i => i.pending && pendAge(i) >= PEND_DAYS).sort((a, b) => a.date.localeCompare(b.date));
+  App.actions.pend_go = () => { st.f = 'pending'; App.go('invoices'); };
   const st = { f: 'all', q: '', sel: false, picked: new Set() };
   const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || App.invStatus(i) === st.f) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
   const drawList = () => {
     const l = visibleInvoices();
     if ($('ibar')) $('ibar').innerHTML = !App.guard('delinvs') ? '' : st.sel ? `<button class="btn sm sec" data-act="inv_all">☑ Tout</button><button class="btn sm del" data-act="delinvs">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="inv_sel">Terminer</button>` : '<button class="btn sm sec" data-act="inv_sel">☑ Sélectionner pour supprimer</button>';
-    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="${st.sel ? 'inv_pick' : 'go'}" data-v="invoice" data-id="${i.id}">${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }).join('')}</div>` : '<div class="empty">Aucune facture.</div>';
+    let lastDay = '';
+    const irow = i => { const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pc = { ok: 'ok', warn: 'warn', bad: 'bad' }[k] || 'mut';
+      const body = `${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<span class="avatar ${pc}" style="width:38px;height:38px;font-size:17px">🧾</span><div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.invTypes[i.type]}${i.pending ? ` · <span class="${pendAge(i) >= PEND_DAYS ? 'bad' : 'warn'}">⏳ ${pendAge(i)} j</span>` : ''}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div>`;
+      if (st.sel) return `<button class="item rw t-${pc}" data-act="inv_pick" data-v="invoice" data-id="${i.id}">${body}</button>`;
+      const acts = []; if (due > 0.004 && !i.pending && App.guard('newpay')) acts.push(`<button class="sw sw-pay" data-act="newpay" data-iid="${i.id}"><span>💰</span>Encaisser</button>`); acts.push(`<button class="sw sw-print" data-act="invprint" data-id="${i.id}"><span>🖨️</span>Imprimer</button>`);
+      return App.rowSwipe(acts.length, acts.join(''), `<div class="item rw t-${pc}" role="button" tabindex="0" data-act="go" data-v="invoice" data-id="${i.id}">${body}</div>`); };
+    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const h = i.date !== lastDay ? `<div class="lh">${App.dayLabel(i.date)}</div>` : ''; lastDay = i.date; return h + irow(i); }).join('')}</div>` : `<div class="empty big"><div class="ei">🧾</div><b>Aucune facture</b><p>Créez votre première facture avec le bouton ci-dessous.</p></div>`;
   };
   App.views.invoices = () => {
-    const db = App.db, tot = db.invoices.reduce((a, i) => a + App.usd(App.invTotal(i), i.currency, i), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
+    const db = App.db, tot = db.invoices.filter(App.live).reduce((a, i) => a + App.usd(App.invAgreed(i), i.currency, i), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
     return {
       title: 'Factures', sub: `${db.invoices.length} facture(s)`, back: 'more', nav: 'more',
       html: `<div class="grid two"><div class="stat"><small>Total facturé</small><b>${App.fmt(tot)}</b></div><div class="stat"><small>Reste à encaisser</small><b class="${due ? 'warn' : ''}">${App.fmt(due)}</b></div></div>
         <div class="search"><input id="iq" placeholder="Rechercher un numéro, un client…" value="${esc(st.q)}" autocomplete="off"></div>
-        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées']].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
-        <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button>`,
+        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées'], ['pending', 'En attente']].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
+        <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button>${App.canView('importf') ? '<button class="btn sec full" data-act="go" data-v="importf" style="margin-top:8px">📥 Importer des factures (Word / PDF)</button>' : ''}`,
       after: () => { drawList(); $('iq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
@@ -53,7 +78,18 @@
     const draw = () => {
       const t = total();
       $('cart').innerHTML = draft.lines.length ? `<div class="list">${draft.lines.map((l, k) => `<div class="item"><div class="grow"><b>${esc(l.desc)}</b><small>${l.qty} ${esc(l.unit || '')} × ${App.fmt(l.price, cur())}</small></div><b>${App.fmt(l.qty * l.price, cur())}</b><button type="button" class="btn sm del" data-act="rmline" data-i="${k}">✕</button></div>`).join('')}<div class="item"><div class="grow"><b>Total</b></div><b>${App.fmt(t, cur())}</b></div></div>` : '<div class="empty" style="padding:10px">Aucune ligne. Ajoutez un article ci-dessous.</div>';
-      if (!draft.paidTouched) $('f_paid').value = t || '';
+      if (!draft.paidTouched) $('f_paid').value = t ? round(App.conv(t, cur(), $('f_pcur').value, frate()), $('f_pcur').value) : '';
+      paySync();
+    };
+    const round = (n, c) => c === 'CDF' ? Math.round(n) : Math.round(n * 100) / 100;
+    const paySync = () => {
+      if (!$('p_sum')) return;
+      const c = cur(), pc = $('f_pcur').value, rate = frate(), tot = total(), given = App.n('f_paid'), gInv = App.conv(given, pc, c, rate);
+      $('p_total').textContent = App.fmt(tot, c) + (pc !== c ? ' ≈ ' + App.fmt(App.conv(tot, c, pc, rate), pc) : '');
+      const el = $('p_sum'); const canNeg = given > 0 && gInv < tot - 0.004; $('p_negw').style.display = canNeg ? '' : 'none'; if (!canNeg) $('f_neg').checked = false;
+      if (!(given > 0)) { el.className = 'warn'; el.textContent = tot ? `Aucun paiement enregistré : la facture restera impayée (reste ${App.fmt(tot, c)}).` : ''; }
+      else if (gInv >= tot - 0.004) { el.className = 'ok'; el.textContent = '✅ Payée en totalité' + (gInv - tot > 0.004 ? ` · À rendre au client : ${App.fmt(round(App.conv(gInv - tot, c, pc, rate), pc), pc)}` : ''); }
+      else { el.className = 'warn'; el.textContent = `Le client a donné ${App.fmt(given, pc)} · Reste à payer : ${App.fmt(tot - gInv, c)}` + ($('f_neg').checked ? ' → sera soldée au prix convenu' : ''); }
     };
     const clientSel = () => App.clientOpts(needsClient(type) ? '— Choisir un client —' : 'Client de passage', type === 'abonnement' ? ['gere'] : null);
     const cl = clientSel();
@@ -70,7 +106,7 @@
     const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.text('f_obs', 'Observations', '')}</div>` : '';
     App.modal('Nouvelle facture · ' + App.invTypes[type],
       `${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
-       <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
+       <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div>
        ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}<p class="mut" style="font-size:12px;margin:2px 0 0">Le taux est enregistré sur cette facture. Si vous le changez ici, il devient le taux du jour.</p>
        <h2 class="sec">Lignes de la facture</h2><div id="cart"></div>
        <div class="card" style="margin-top:10px">
@@ -79,7 +115,16 @@
          <div class="row">${F.num('f_qty', 'Quantité', 1, 'min="0"')}${F.num('f_price', 'Prix unitaire', '')}<div style="flex:none;min-width:auto;align-self:end"><button type="button" class="btn" id="f_add">Ajouter</button></div></div>
          <div class="bar"><button type="button" class="btn sm sec" id="f_addsub">＋ Abonnement</button><button type="button" class="btn sm sec" id="f_addinst">＋ Installation</button></div></div>
        ${renewBlock}${instBlock}
-       ${F.num('f_paid', 'Montant payé maintenant', '')}`,
+       <label class="chk" style="display:block;margin-top:14px;padding:10px;border:2px dashed var(--acc);border-radius:10px"><input type="checkbox" id="f_pend"> <b>⏳ Facture en attente</b> : le client demande seulement la facture et n'a pas encore pris le produit. Rien n'est déduit du stock ni compté dans les ventes jusqu'à la validation.</label>
+       <div class="card" id="paycard" style="margin-top:14px;border:2px solid var(--acc)">
+         <h2 class="sec" style="margin:0 0 6px">💰 Paiement du client</h2>
+         <div class="spread"><span>Total à payer</span><b id="p_total" style="font-size:18px"></b></div>
+         <div class="row">${F.num('f_paid', 'Le client a donné', '')}${F.sel('f_pcur', 'En', CUR, 'USD')}</div>
+         <div class="bar"><button type="button" class="btn sm sec" id="p_all">Tout payé</button><button type="button" class="btn sm sec" id="p_half">La moitié</button><button type="button" class="btn sm sec" id="p_none">Rien pour l'instant</button></div>
+         <div class="row">${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}${F.text('f_ref', 'Référence (n° transaction)', '')}</div>
+         <div id="p_sum" style="margin-top:8px;font-weight:700"></div>
+         <label id="p_negw" class="chk" style="display:none;margin-top:8px"><input type="checkbox" id="f_neg"> Le client a marchandé : ce qu'il a donné est le prix convenu (facture soldée, la facture imprimée reste au prix complet)</label>
+       </div>`,
       () => {
         const cid = App.v('f_cl'), c = App.client(cid);
         if (needsClient(type) && !cid) { App.toast('Choisissez un client'); return false; }
@@ -95,21 +140,23 @@
           const s = App.sub(c); // not renewing: the invoice covers the current period
           lines.forEach(l => { if (/^abonnement/i.test(l.desc) && !l.desc.includes('(')) l.desc += ` (${App.fdate(s.start)} → ${App.fdate(s.end)})`; });
         }
-        const total = lines.reduce((a, l) => a + l.qty * l.price, 0), paid = Math.min(App.n('f_paid'), total);
+        const total = lines.reduce((a, l) => a + l.qty * l.price, 0);
         const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
+        const pc = App.v('f_pcur') || curr, given = App.n('f_paid'), gInv = App.conv(given, pc, curr, rate), payAmount = given > 0 ? (gInv > total ? round(App.conv(total, curr, pc, rate), pc) : given) : 0;
         const prevSub = c ? { start: c.start || '', period: c.period, price: c.price } : null;
-        const inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate }, paid);
-        if (renewed && c) {
-          inv.renew = { prev: prevSub, ns: renewed.ns, date };
-          if (c.start) (c.subs = c.subs || []).push({ start: c.start, days: c.period || renewed.days, price: c.price || 0, date });
-          Object.assign(c, { start: renewed.ns, period: renewed.days }); App.log(c.id, `Abonnement renouvelé : ${App.fdate(renewed.ns)} → ${App.fdate(renewed.end)}`);
-        }
+        const pend = !!($('f_pend') && $('f_pend').checked), inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate, pending: pend || undefined, payAmount: pend ? 0 : payAmount, payCur: pc, payRef: App.v('f_ref') }, 0);
+        const fx = { renewed, prevSub };
         if (['installation', 'complete'].includes(type) && cid) {
           const fee = lines.filter(l => !l.pid && /install/i.test(l.desc)).reduce((a, l) => a + l.qty * l.price, 0);
           const mats = lines.filter(l => l.pid && App.tracked(App.prod(l.pid))).map(l => ({ pid: l.pid, qty: l.qty }));
-          if (fee > 0 || type === 'installation') { db.installs.push({ id: App.uid(), clientId: cid, date, kind: 'Installation Starlink', tech: App.v('f_tech'), techId: App.techId(App.v('f_tech')), price: App.conv(fee, curr, 'USD', inv.rate), materials: mats, invoiceId: inv.id, obs: App.v('f_obs') }); App.log(cid, 'Installation facturée ' + inv.number); }
+          if (fee > 0 || type === 'installation') fx.inst = { fee, mats, tech: App.v('f_tech'), obs: App.v('f_obs') };
         }
-        App.save(); App.toast('Facture ' + inv.number + ' créée'); App.go('invoice', { id: inv.id });
+        if (inv.pending) inv.fx = fx; else App.applyFx(inv, fx);
+        if (!pend && $('f_neg') && $('f_neg').checked && gInv > 0 && gInv < total - 0.004) { inv.agreed = Math.round(gInv * 100) / 100; App.log(cid, `Prix négocié sur ${inv.number} : ${App.fmt(inv.agreed, curr)} au lieu de ${App.fmt(total, curr)}`); }
+        App.save(); App.toast('Facture ' + inv.number + (pend ? ' créée — en attente' : ' créée')); App.go('invoice', { id: inv.id });
+        const np = db.payments.find(x => x.invoiceId === inv.id);
+        if (np) App.undoBar('Paiement enregistré : ' + App.fmt(np.amount, np.currency), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
+        if (np && App.invDue(inv) <= 0.004 && !inv.pending) App.celebrate();
       }, 'Créer la facture');
     // renewal is on by default only when the client already had a subscription invoice
     const syncRenew = () => { const cb = $('f_renew'); if (cb) cb.checked = db.invoices.some(i => i.clientId === App.v('f_cl') && i.lines.some(l => /^abonnement/i.test(l.desc))); };
@@ -143,7 +190,7 @@
       else if (c) $('f_addsub').click();
     };
     $('f_cl').addEventListener('change', () => { autoSub(); draw(); });
-    $('f_cur').onchange = () => { autoSub(); draw(); };
+    $('f_cur').onchange = () => { $('f_pcur').value = cur(); draft.paidTouched = false; autoSub(); draw(); };
     $('f_add').onclick = () => {
       const p = App.prod($('f_prod').value), desc = App.v('f_desc') || (p && p.name), qty = App.n('f_qty');
       if (!desc || qty <= 0) return App.toast('Désignation et quantité requises');
@@ -153,7 +200,11 @@
     };
     $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'Starlink'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur(), frate()) : ''; $('f_price').focus(); };
     $('f_addinst').onclick = () => { $('f_prod').value = ''; $('f_desc').value = 'Installation Starlink'; $('f_qty').value = 1; $('f_price').value = ''; $('f_price').focus(); };
-    $('f_paid').oninput = () => { draft.paidTouched = true; };
+    $('f_pend').onchange = () => { $('paycard').style.display = $('f_pend').checked ? 'none' : ''; }; $('f_neg').onchange = paySync; $('f_paid').oninput = () => { draft.paidTouched = true; paySync(); };
+    $('f_pcur').onchange = () => { draft.paidTouched = false; draw(); };
+    $('p_all').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total(), cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
+    $('p_half').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total() / 2, cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
+    $('p_none').onclick = () => { draft.paidTouched = true; $('f_paid').value = 0; paySync(); };
     if (type === 'abonnement') autoSub();
     if (type === 'installation') $('f_addinst').click();
     draw();
@@ -161,44 +212,104 @@
   App.actions.rmline = d => { draft.lines.splice(+d.i, 1); const ev = new Event('change'); $('f_cur').dispatchEvent(ev); };
 
   // ---------- Invoice document (screen, print, Word) ----------
-  const PAPER_CSS = `body{font:13px/1.4 Arial,sans-serif;color:#111;margin:18px}.paper .hd{display:flex;justify-content:space-between;gap:12px;border-bottom:3px solid #1e3f60;padding-bottom:10px}.paper .hd img{height:56px}.paper .co{text-align:right;font-size:12px}.paper .two{display:flex;gap:12px;margin:12px 0}.paper .box{border:1px solid #1e3f60;flex:1}.paper .box h4{margin:0;padding:4px 8px;background:#1e3f60;color:#fff;font-size:13px}.paper .box dl{margin:0;padding:6px 8px}.paper .box dl div{display:flex !important;gap:8px}.paper .box dt{width:90px;color:#555}.paper .box dd{margin:0}.paper table{width:100%;border-collapse:collapse}.paper th{background:#1e3f60;color:#fff;padding:6px;text-align:left}.paper td{padding:6px;border-bottom:1px solid #ccd}.paper .r{text-align:right}.paper .tot{margin-left:auto;width:300px;margin-top:8px}.paper .tot div{display:flex;justify-content:space-between;padding:3px 0}.paper .tot .g{font-weight:bold;font-size:15px;color:#d5522f;border-top:1px solid #1e3f60}.paper .words{margin-top:12px;font-style:italic}.paper .thx{text-align:center;color:#1e3f60;margin-top:16px;font-weight:bold}`;
-  App.invoiceDoc = (i, logo) => {
-    const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), paid = App.invPaid(i), due = Math.max(0, tot - paid), other = i.currency === 'USD' ? 'CDF' : 'USD';
-    const legal = [co.rccm && 'RCCM : ' + co.rccm, co.idnat && 'ID. Nat. : ' + co.idnat, co.impot && 'N° Impôt : ' + co.impot].filter(Boolean);
-    const dl = (k, v) => `<div style="display:contents"><dt>${k}</dt><dd>${v}</dd></div>`;
-    return `<div class="paper"><div class="hd"><div><img src="${esc(logo || co.logo || 'logo.png')}" alt=""><div><b>${esc(co.name)}</b></div></div>
-      <div class="co"><b>Siège social :</b> ${esc(co.address)}<br>Tél : ${esc(co.phone)}<br>${esc(co.email)}${legal.length ? '<br>' + legal.map(esc).join('<br>') : ''}</div></div>
-      <div class="two"><div class="box"><h4>FACTURE</h4><dl>${dl('Numéro', `<b>${esc(i.number)}</b>`)}${dl('Date', App.fdate(i.date))}${dl('Devise', i.currency === 'CDF' ? 'CDF' : 'USD')}${dl('Payé par', esc(i.payMode))}</dl></div>
-      <div class="box"><h4>CLIENT</h4><dl>${dl('Nom', `<b style="font-size:1.1em">${esc(App.cname(c))}</b>`)}${dl('Code', esc(c ? c.code : '—'))}${dl('Adresse', esc(c ? (c.address || c.installAddr || '—') : '—'))}${dl('Téléphone', esc(c ? (c.phone || '—') : '—'))}</dl></div></div>
-      <table><thead><tr><th>Produit / Description</th><th class="r">Qté</th><th class="r">PU (${i.currency === 'CDF' ? 'CDF' : '$'})</th><th class="r">Montant (${i.currency === 'CDF' ? 'CDF' : '$'})</th></tr></thead><tbody>${i.lines.map(l => `<tr><td>${esc(l.desc)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${App.nf(l.price, 2)}</td><td class="r">${App.nf(l.qty * l.price, 2)}</td></tr>`).join('')}</tbody></table>
-      <div class="tot"><div class="g"><span>Total :</span><span>${App.fmt(tot, i.currency)}</span></div><div><span>Montant payé :</span><span>${App.fmt(paid, i.currency)}</span></div><div><span>Solde :</span><span>${App.fmt(due, i.currency)}</span></div>
-      <div style="font-size:12px;color:#555"><span>Taux appliqué (1 $) :</span><span>${App.nf(App.rateOf(i), 0)} CDF</span></div><div style="font-size:12px;color:#555"><span>Équivalent en ${other} :</span><span>${App.fmt(App.conv(tot, i.currency, other, App.rateOf(i)), other)}</span></div></div>
-      <div class="words">Arrêtée la présente facture à la somme de : <b>${esc(App.amountWords(tot, i.currency))}</b>.</div><div class="thx">MERCI POUR VOTRE CONFIANCE</div></div>`;
+  // payments of an invoice in the order they were received, with the balance left after each one
+  App.invPayments = i => {
+    let left = App.invTotal(i);
+    return App.db.payments.map((p, k) => ({ p, k })).filter(x => x.p.invoiceId === i.id).sort((a, b) => a.p.date.localeCompare(b.p.date) || a.k - b.k).map(({ p }, n) => {
+      const inInv = App.conv(p.amount, p.currency, i.currency, App.rateOf(p)); left = Math.max(0, left - inInv);
+      return { p, n: n + 1, inInv, left, other: p.currency !== i.currency };
+    });
   };
+  // receipt number: invoice number + order of the payment ("FAC-2026-0002-P2")
+  App.receiptNo = p => { const i = App.invoice(p.invoiceId); if (!i) return 'REC-' + (p.date || '').replace(/-/g, '') + '-' + String(p.id).slice(-4).toUpperCase(); const x = App.invPayments(i).find(y => y.p === p); return i.number + '-P' + (x ? x.n : 1); };
+
+  // Invoice / receipt look (modelled on the company's Word invoice): serif, navy #1A365D, orange note, round stamp. Table-based so Word keeps the layout.
+  const PAPER_CSS = `.paper{font:10.5pt/1.45 Cambria,'Times New Roman',Georgia,serif;color:#1a202c;background:#fff}.paper table{width:100%;border-collapse:collapse}.paper td,.paper th{vertical-align:top}.paper .r{text-align:right}.paper .hd td{vertical-align:middle;padding:0}.paper .hd img{height:2.3cm}.paper .nm{font-size:20pt;font-weight:bold;color:#1A365D;letter-spacing:.5px}.paper .sub{font-size:8pt;color:#4A5568;letter-spacing:.8px;margin-top:2px}.paper .legal{margin:10px 0 16px;border-bottom:1px solid #1a202c}.paper .legal td{padding:0 0 9px;font-size:9.5pt;line-height:1.6;width:50%}.paper .two{margin:0 0 18px;border-collapse:separate;border-spacing:0;table-layout:fixed}.paper .box{width:47.5%;border:1px solid #E2E8F0;background:#F7FAFC;padding:10px 12px;line-height:1.6}.paper .gap{width:5%}.paper .bh{font-size:11pt;font-weight:bold;color:#1A365D;margin-bottom:6px}.paper .items{margin:0 0 16px}.paper .items th{background:#1A365D;color:#fff;padding:8px 9px;text-align:left;font-weight:bold}.paper .items th.r{text-align:right}.paper .items td{padding:8px 9px;border-bottom:1px solid #E2E8F0}.paper .tots td{padding:6px 9px;width:50%;text-align:right}.paper .tots .net td{background:#1A365D;color:#fff;font-weight:bold}.paper .rate{font-size:8.5pt;color:#4A5568;text-align:right;margin-top:5px}.paper .wb{margin:16px 0 0;border-left:4px solid #DD6B20;background:#FFFAF0;padding:10px 14px;line-height:1.7}.paper .foot{margin-top:20px;page-break-inside:avoid}.paper .foot td{vertical-align:middle}.paper .foot img{width:4.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)}.paper .foot img.qr{width:2.6cm;transform:none;filter:none}.paper .thx{font-weight:bold;color:#1A365D;letter-spacing:.6px;font-size:11pt}.paper .pay{margin-top:14px}.paper .pay h4{margin:0 0 4px;color:#1A365D}.paper .pay th{background:#1A365D;color:#fff;padding:6px;text-align:left}.paper .pay td{padding:6px;font-size:9.5pt;border-bottom:1px solid #E2E8F0}.paper .sold{display:inline-block;margin-top:10px;padding:3px 10px;border:2px solid #1d8a4f;color:#1d8a4f;font-weight:bold;transform:rotate(-3deg)}.paper .sig{display:flex;gap:30px;margin-top:34px}.paper .sg{margin-top:14px;table-layout:fixed;page-break-inside:avoid}.paper .sg td{padding:0}.paper .sg .ln{border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .sg .gp{width:30px}.paper .sg .s2{height:3.2cm;text-align:center;vertical-align:bottom}.paper .sg .s2 img{height:3cm;width:3cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)}.paper .sig div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .rc{border-left:4px solid #DD6B20;background:#FFFAF0;padding:14px 16px;margin:0 0 16px;font-size:12pt;line-height:1.8}.paper .rc b.big{font-size:15pt;color:#DD6B20}.paper table,.paper tr{page-break-inside:avoid}@media (max-width:640px){.paper .hd td:first-child{width:36%!important}.paper .hd img{height:auto;max-width:100%}.paper .nm{font-size:14pt}.paper .legal td{display:block;width:auto;text-align:left}}`;
+  const DOC_CSS = `body{margin:0;background:#fff}@page{size:A4;margin:1.4cm 1.5cm}` + PAPER_CSS;
+  { const st = document.createElement('style'); st.id = 'paperCss'; st.textContent = PAPER_CSS; document.head.appendChild(st); }
+  // shared pieces of the printed documents
+  const money = (n, cur) => cur === 'CDF' ? App.nf(n, 0) + ' CDF' : App.nf(n, 2) + ' $';
+  const lines = a => a.filter(Boolean).map(([k, v]) => `<div>${k ? `<b>${k} : </b>` : ''}${v}</div>`).join('');
+  const docName = co => /^cispol\s*store$/i.test(co.name || '') ? 'CISPOL STORE' : String(co.name || '').toUpperCase();
+  const paperHead = (co, logo) => {
+    const legal = [co.rccm && ['RCCM', esc(co.rccm)], co.idnat && ['Id. Nat.', esc(co.idnat)], co.impot && ['N° Impôt', esc(co.impot)]];
+    return `<table class="hd"><tr><td style="width:6.2cm"><img src="${esc(logo || co.logo || 'logo.png')}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td></tr></table>
+      <table class="legal"><tr><td>${lines(legal)}</td><td class="r">${lines([['Siège Social', esc(co.address)], ['Contact', esc(co.email)], ['Téléphone', esc(co.phone)]])}</td></tr></table>`;
+  };
+  const twoBoxes = (t1, r1, t2, r2) => `<table class="two"><tr><td class="box"><div class="bh">${t1}</div>${lines(r1)}</td><td class="gap"></td>${t2 ? `<td class="box"><div class="bh">${t2}</div>${lines(r2)}</td>` : '<td class="box" style="border:0;background:none"></td>'}</tr></table>`;
+  // QR code: opens WhatsApp to the company with the invoice number already typed, so the client can send the payment proof
+  const qrCell = (i, cur, tot) => { try { const co = App.db.settings.company, u = co.phone && window.qrcode ? App.waUrl(co.phone, `Bonjour, je règle la facture ${i.number} (${money(tot, cur)}).`) : ''; if (!u) return '';
+    const q = window.qrcode(0, 'M'); q.addData(u); q.make(); return `<td style="width:3.4cm;text-align:center"><img class="qr" src="${q.createDataURL(4, 0)}" alt="QR" style="width:2.6cm;height:2.6cm"><div style="font-size:7pt;color:#4A5568;line-height:1.2">Scannez pour payer<br>ou envoyer la preuve</div></td>`; } catch (e) { return ''; } };
+  const paperFoot = (stamp, bare, qr = '') => `<table class="foot"><tr><td class="thx">MERCI POUR VOTRE CONFIANCE</td>${qr}${bare ? '' : `<td class="r" style="width:4.8cm"><img src="${esc(stamp || 'stamp.png')}" alt=""></td>`}</tr></table>`;
+  App.invoiceDoc = (i, logo, stamp) => {
+    const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), cur = i.currency === 'CDF' ? 'CDF' : 'USD', other = cur === 'USD' ? 'CDF' : 'USD', unit = cur === 'CDF' ? 'CDF' : 'USD';
+    const rows = i.lines.map(l => { const pr = l.pid && App.prod(l.pid); return `<tr><td>${esc(l.ref || (pr && pr.ref) || '—')}</td><td>${esc(l.desc).replace(/ \(/, '<br>(')}</td><td class="r">${money(l.price, cur)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${money(l.qty * l.price, cur)}</td></tr>`; }).join('');
+    return `<div class="paper">${paperHead(co, logo)}
+      ${twoBoxes('FACTURE', [['Numéro', `<b>${esc(i.number)}</b>`], ['Date', App.fdate(i.date)], co.city && ['Lieu', esc(co.city)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], ['Adresse', esc(c ? (c.address || c.installAddr || '—') : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
+      <table class="items"><thead><tr><th style="width:13%">Référence</th><th>Description</th><th class="r" style="width:15%">P.U. (${unit})</th><th class="r" style="width:8%">Qté</th><th class="r" style="width:20%">Montant (${unit})</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="tots"><tr><td><b>Total TTC :</b></td><td>${money(tot, cur)}</td></tr><tr class="net"><td>NET À PAYER :</td><td>${money(tot, cur)}</td></tr></table>
+      <div class="rate">Taux appliqué : 1 $ = ${App.nf(App.rateOf(i), 0)} CDF · équivalent ${money(App.conv(tot, cur, other, App.rateOf(i)), other)}</div>
+      <div class="wb"><b>Arrêtée la présente facture à la somme de : ${esc(App.amountWords(tot, cur))}</b>.<br><b>Mode de règlement : </b>${esc(co.payTerms || '')}</div>
+      ${paperFoot(stamp, false, qrCell(i, cur, tot))}</div>`;
+  };
+  // ---------- Payment receipt ----------
+  App.receiptDoc = (p, logo, stamp) => {
+    const co = App.db.settings.company, c = App.client(p.clientId), i = App.invoice(p.invoiceId);
+    let after = '';
+    if (i) { const x = App.invPayments(i).find(y => y.p === p), tot = App.invTotal(i), paid = App.invPaid(i), due = Math.max(0, tot - paid);
+      after = `${twoBoxes('FACTURE ' + esc(i.number), [['Date', App.fdate(i.date)], ['Total', money(tot, i.currency)], ['Déjà payé', money(paid, i.currency)], ['Reste', `<b>${money(due, i.currency)}</b>`]])}${x && x.left <= 0.004 ? '<div class="sold">FACTURE SOLDÉE</div>' : ''}`; }
+    return `<div class="paper">${paperHead(co, logo)}
+      ${twoBoxes('REÇU DE PAIEMENT', [['N°', `<b>${esc(App.receiptNo(p))}</b>`], ['Date', App.fdate(p.date)], ['Mode', esc(p.mode)], p.ref && ['Référence', esc(p.ref)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
+      <div class="rc">Nous avons reçu de <b>${esc(App.cname(c))}</b> la somme de <b class="big">${App.fmt(p.amount, p.currency)}</b> <i>(${esc(App.amountWords(p.amount, p.currency))})</i>${i ? ` en paiement de la facture <b>${esc(i.number)}</b>` : ''}${p.comment ? ` — ${esc(p.comment)}` : ''}.</div>
+      ${after}<table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${esc(stamp || 'stamp.png')}" alt=""></td></tr><tr><td class="ln">Le client</td><td class="gp"></td><td class="ln">${esc(co.name)}</td></tr></table>${paperFoot(stamp, true)}</div>`;
+  };
+  // print only once the logo and the stamp are decoded (a phone prints a blank spot if it goes too early)
+  const readyThen = (f, go) => Promise.all([...f.contentDocument.images].map(im => im.decode ? im.decode().catch(() => {}) : 0)).then(() => setTimeout(go, 300), () => setTimeout(go, 700));
+  const printRaw = async (title, html) => {
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${DOC_CSS}</style>${html}`;
+    f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
+    document.body.appendChild(f);
+  };
+  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw('Reçu ' + App.receiptNo(p), App.receiptDoc(p, await logoData(), await stampData())); };
+  App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
+    App.download(`Reçu-${no}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Reçu ${esc(no)}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}</body></html>`, 'application/msword'); };
+
+  const stampData = async () => { try { const b = await (await fetch('stamp.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; } };
   const logoData = async () => {
     const co = App.db.settings.company; if ((co.logo || '').startsWith('data:')) return co.logo;
     try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
   };
+  App.docKit = { DOC_CSS: () => PAPER_CSS, logoData, stampData };
   const printDoc = async inv => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${PAPER_CSS}</style>${App.invoiceDoc(inv, await logoData())}`;
-    f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); }, 400);
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;
+    f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
   const wordDoc = async inv => {
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${PAPER_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData())}</body></html>`;
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}</body></html>`;
     App.download(`${inv.number}.doc`, html, 'application/msword');
   };
 
+  // what this invoice is made of: installation (technicians), subscription (Starlink) and CISPOLstore's own revenue
+  const splitCardInv = i => { const s = App.invSplit(i); if (!(s.inst > 0 || s.sub > 0)) return ''; const F = x => App.fmt(x, i.currency);
+    return `<div class="card noprint" style="margin-bottom:10px"><b>🧮 Répartition de cette facture</b><div class="spread"><span>🔧 Installation (techniciens)</span><b>${F(s.inst)}</b></div><div class="spread"><span>📡 Abonnement (Starlink)</span><b>${F(s.sub)}</b></div><div class="spread"><span>✅ Revenu CISPOLstore (kits, matériel)</span><b class="ok">${F(s.own)}</b></div></div>`; };
   App.views.invoice = p => {
     const i = App.invoice(p.id); if (!i) return { title: 'Facture', back: 'invoices', html: '<div class="empty">Facture introuvable.</div>' };
     const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pays = App.db.payments.filter(x => x.invoiceId === i.id);
     return {
       title: 'Facture', sub: i.number, back: 'invoices', nav: 'more',
-      html: `<div class="spread" style="margin-bottom:10px"><span class="pill ${k}">${t}</span><span class="mut">${App.invTypes[i.type]}</span></div>
-        <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button></div>
+      html: `<section class="hero ihero"><div class="hero-top"><div><small>${App.invTypes[i.type]} · ${App.fdate(i.date)}</small><div class="hero-date" style="text-transform:none">${esc(i.number)}</div></div><span class="pill ${k}">${t}</span></div>
+          <div class="hero-num">${App.fmt(App.invTotal(i), i.currency)}</div>
+          ${i.pending ? '' : `<div class="pbar2 w"><i style="width:${Math.min(100, Math.round(App.invPaid(i) / Math.max(0.01, App.invAgreed(i)) * 100))}%"></i></div><div class="ifoot"><span>Reçu ${App.fmt(App.invPaid(i), i.currency)}</span><span>${due > 0.004 ? 'Reste ' + App.fmt(due, i.currency) : '✓ Soldée'}</span></div>`}
+          ${i.clientId && App.client(i.clientId) ? `<button class="chip" data-act="go" data-v="client" data-id="${i.clientId}">👤 ${esc(App.cname(App.client(i.clientId)))} ›</button>` : ''}</section>
+        <div class="card" style="margin-bottom:10px"><div class="spread"><span>Total de la facture imprimée</span><b>${App.fmt(App.invTotal(i), i.currency)}</b></div>${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<div class="spread"><span>Prix convenu (négocié)</span><b>${App.fmt(App.invAgreed(i), i.currency)}</b></div>` : ''}<div class="spread"><span>Reçu du client</span><b class="ok">${App.fmt(App.invPaid(i), i.currency)}</b></div><div class="spread"><span>Reste à payer</span><b class="${due > 0.004 ? 'bad' : 'ok'}">${App.fmt(due, i.currency)}</b></div></div>
+        ${splitCardInv(i)}
+        ${i.pending ? `<div class="card noprint" style="margin-bottom:10px;border:2px solid var(--warn,#e8a317)"><b>⏳ Facture en attente</b><p class="mut" style="margin:6px 0">Le client a la facture mais la vente n'est pas encore faite : le stock n'est pas déduit, rien n'est compté dans les ventes ni dans les impayés.</p><div class="bar"><button class="btn" data-act="invvalid" data-id="${i.id}">✅ Le client prend le produit</button><button class="btn del" data-act="invcancel" data-id="${i.id}">✖ Le client n'en veut plus</button></div></div>` : ''}
+        <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}${due > 0.004 && App.invPaid(i) > 0.004 ? `<button class="btn sec" data-act="invneg" data-id="${i.id}">🤝 Solder au prix négocié</button>` : ''}${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<button class="btn sec" data-act="invunneg" data-id="${i.id}">↩ Annuler le prix négocié</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button><button class="btn sec" data-act="invshare" data-id="${i.id}">📤 Partager en PDF</button></div>
         ${App.invoiceDoc(i)}
-        ${pays.length ? `<h2 class="sec">Paiements reçus</h2><div class="list">${pays.map(x => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(x.ref || x.comment || '')}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`).join('')}</div>` : ''}
+        ${pays.length ? `<h2 class="sec noprint">Paiements reçus</h2><div class="list noprint">${App.invPayments(i).map(({ p: x, n, left }) => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(App.receiptNo(x))}${x.ref ? ' · ' + esc(x.ref) : ''} · reste ${App.fmt(left, i.currency)}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${x.id}" title="Imprimer le reçu">🧾</button><button class="btn sm sec" data-act="recshare" data-id="${x.id}" title="Partager le reçu en PDF">📤</button></div>`).join('')}</div>` : ''}
         <div class="bar" style="margin-top:14px">${i.clientId ? `<button class="btn sec" data-act="go" data-v="client" data-id="${i.clientId}">Voir le client</button>` : ''}<button class="btn del" data-act="delinv" data-id="${i.id}">Supprimer la facture</button></div>`
     };
   };
@@ -211,12 +322,12 @@
     const snap = JSON.parse(JSON.stringify({ invoices: db.invoices, payments: db.payments, installs: db.installs, products: db.products, moves: db.moves, clients: db.clients, deliveries: db.deliveries }));
     const manual = [];
     list.forEach(i => {
-      i.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: l.qty, invoiceId: '', clientId: i.clientId, note: 'Annulation ' + i.number }); });
+      if (!i.pending) i.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: l.qty, invoiceId: '', clientId: i.clientId, note: 'Annulation ' + i.number }); }); // a pending invoice never took stock
       const c = App.client(i.clientId), r = i.renew;
       if (r && c && c.start === r.ns && r.prev) { // this invoice renewed the subscription: give the previous period back
         c.start = r.prev.start; if (r.prev.period) c.period = r.prev.period; if (r.prev.price != null) c.price = r.prev.price;
         const k = (c.subs || []).map(x => x.date + '|' + x.start).lastIndexOf(r.date + '|' + r.prev.start); if (k >= 0) c.subs.splice(k, 1);
-      } else if (/abonnement/i.test(i.type) || i.type === 'complete') manual.push(i.number);
+      } else if (!i.pending && (/abonnement/i.test(i.type) || i.type === 'complete')) manual.push(i.number);
       db.payments = db.payments.filter(p => p.invoiceId !== i.id); db.installs = db.installs.filter(x => x.invoiceId !== i.id);
       (db.deliveries || []).forEach(d => { if (d.invoiceId === i.id) { d.invoiceId = ''; d.collect = false; } });
       db.invoices = db.invoices.filter(x => x !== i); App.log(i.clientId, `Facture ${i.number} supprimée`);
@@ -251,16 +362,33 @@
        ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}
        ${F.text('f_ref', 'Référence (n° transaction)', '')}${F.text('f_com', 'Commentaire', '')}`,
       () => {
-        const amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
+        let amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
         const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
+        if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > App.invDue(i) + 0.004 && App.invDue(i) > 0.004) amt = Math.round(App.conv(App.invDue(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
         if (rate !== App.rate()) App.setRate(rate);
-        db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: i ? i.currency : App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
-        App.log(cid, `Paiement ${App.fmt(amt, i ? i.currency : App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
-        App.save(); App.toast('Paiement enregistré'); App.refresh();
+        db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
+        App.log(cid, `Paiement ${App.fmt(amt, App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
+        if (i && $('f_neg').checked && !$('pp_negw').style.display) { i.agreed = Math.round(App.invPaid(i) * 100) / 100; App.log(cid, `Prix négocié sur ${i.number} : ${App.fmt(i.agreed, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); }
+        const np = db.payments[db.payments.length - 1]; App.save(); App.refresh();
+        App.undoBar('Paiement enregistré : ' + App.fmt(amt, App.v('f_cur')), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
+        if (i && App.invDue(i) <= 0.004) App.celebrate();
       }, 'Enregistrer le paiement');
+    // live balance + quick buttons (works for old invoices too)
+    const box = document.createElement('div'); box.className = 'fld'; box.innerHTML = '<div class="bar"><button class="btn sec sm" type="button" id="pp_all">Tout le reste</button><button class="btn sec sm" type="button" id="pp_half">Moitié</button></div><div id="pp_msg" class="muted" style="margin-top:6px"></div><label id="pp_negw" class="chk" style="display:none;margin-top:6px"><input type="checkbox" id="f_neg"> Le client a marchandé : solder la facture avec ce paiement (prix convenu)</label>';
+    $('f_amt').closest('.row').before(box);
+    const ppSync = () => { const i = App.invoice($('f_inv').value), a = App.n('f_amt'); if (!i) { $('pp_msg').textContent = ''; $('pp_negw').style.display = 'none'; return; } const d = App.invDue(i), g = App.conv(a, App.v('f_cur'), i.currency, App.rateOf(i)), left = d - g; $('pp_negw').style.display = left > 0.004 ? '' : 'none'; if (left <= 0.004) $('f_neg').checked = false; $('pp_msg').textContent = left > 0.004 ? `Reste après ce paiement : ${App.fmt(left, i.currency)}` : left < -0.004 ? `Trop perçu : ${App.fmt(-left, i.currency)} à rendre au client (le solde sera ramené à 0)` : '✅ La facture sera soldée'; };
+    const ppFill = k => { const i = App.invoice($('f_inv').value); if (!i) return App.toast('Choisissez d\'abord une facture'); $('f_cur').value = i.currency; $('f_amt').value = Math.round(App.invDue(i) * k * 100) / 100; ppSync(); };
+    $('pp_all').onclick = () => ppFill(1); $('pp_half').onclick = () => ppFill(.5); $('f_amt').oninput = ppSync; $('f_cur').onchange = ppSync; ppSync();
     $('f_cl').onchange = () => { $('f_inv').innerHTML = App.opts(invOpts($('f_cl').value)); };
-    $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = App.invDue(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } };
+    $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = App.invDue(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } ppSync(); };
   };
+  // negotiated price on an existing invoice: what was already received becomes the agreed price
+  App.actions.invneg = d => { const i = App.invoice(d.id); if (!i) return; const p = Math.round(App.invPaid(i) * 100) / 100;
+    if (!App.confirm(`Le client a marchandé ? Le prix convenu devient ${App.fmt(p, i.currency)} (déjà reçu) et la facture est soldée. La facture imprimée garde son prix complet de ${App.fmt(App.invTotal(i), i.currency)}.`)) return;
+    i.agreed = p; App.log(i.clientId, `Prix négocié sur ${i.number} : ${App.fmt(p, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); App.save(); App.refresh(); App.celebrate(); };
+  App.actions.invunneg = d => { const i = App.invoice(d.id); if (!i) return; delete i.agreed; App.save(); App.refresh(); App.toast('Prix négocié annulé'); };
+  App.actions.invvalid = d => { const i = App.invoice(d.id); if (!i) return; if (!App.confirm(`Valider la vente ${i.number} ? Le stock sera déduit et la facture comptera dans les ventes.`)) return; App.validateInvoice(i.id); App.refresh(); if (App.invDue(i) > 0.004) App.paymentForm({ invoiceId: i.id }); };
+  App.actions.invcancel = d => { const i = App.invoice(d.id); if (!i || !i.pending) return; if (!App.confirm(`Annuler la facture ${i.number} ? Le client ne prend pas le produit : rien n'a été déduit du stock.`)) return; App.removeInvoices([i.id]); App.go('invoices'); };
   App.actions.newpay = d => App.paymentForm({ clientId: d.cid, invoiceId: d.iid });
 
   const pq = { mode: 'all' };
@@ -271,7 +399,7 @@
       title: 'Paiements', sub: `${all.length} paiement(s)`, back: 'more', nav: 'more',
       html: `<div class="bar"><button class="btn" data-act="newpay">+ Paiement</button></div>
         <div class="chips"><button class="chip ${pq.mode === 'all' ? 'on' : ''}" data-act="paymode" data-m="all">Tous</button>${App.PAY_MODES.filter(m => by[m]).map(m => `<button class="chip ${pq.mode === m ? 'on' : ''}" data-act="paymode" data-m="${esc(m)}">${esc(m)} · ${App.fmt(by[m])}</button>`).join('')}</div>
-        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small></div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
+        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small></div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${p.id}" title="Imprimer le reçu">🧾</button><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
     };
   };
   App.actions.paymode = d => { pq.mode = d.m; App.refresh(); };
@@ -282,12 +410,12 @@
     const l = App.db.expenses.slice().sort((a, b) => b.date.localeCompare(a.date)), m = App.today().slice(0, 7), mt = l.filter(e => e.date.startsWith(m)).reduce((a, e) => a + App.usd(e.amount, e.currency, e), 0);
     return {
       title: 'Dépenses', sub: `Ce mois : ${App.fmt(mt)}`, back: 'more', nav: 'more',
-      html: `<div class="bar"><button class="btn" data-act="newexp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>` + (l.length ? `<div class="list">${l.map(e => `<div class="item"><div class="grow"><b>${esc(e.label)}</b><small>${App.fdate(e.date)} · ${esc(e.cat)}</small></div><b>${App.fmt(e.amount, e.currency)}</b><button class="btn sm del" data-act="delexp" data-id="${e.id}">✕</button></div>`).join('')}</div>` : '<div class="empty">Aucune dépense.</div>')
+      html: `<div class="bar"><button class="btn" data-act="newexp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>` + (l.length ? `<div class="list">${l.map(e => `<div class="item"><div class="grow"><b>${esc(e.label)}</b><small>${App.fdate(e.date)} · ${esc(e.cat)}${e.mode ? ' · ' + esc(e.mode) : ''}</small></div><b>${App.fmt(e.amount, e.currency)}</b><button class="btn sm del" data-act="delexp" data-id="${e.id}">✕</button></div>`).join('')}</div>` : '<div class="empty">Aucune dépense.</div>')
     };
   };
-  App.actions.newexp = () => App.modal('Nouvelle dépense', `${F.text('f_label', 'Libellé', '')}${F.sel('f_cat', 'Catégorie', App.EXP_CATS)}<div class="row">${F.num('f_amt', 'Montant', '')}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div>${F.date('f_date', 'Date', App.today())}`, () => {
+  App.actions.newexp = () => App.modal('Nouvelle dépense', `${F.text('f_label', 'Libellé', '')}${F.sel('f_cat', 'Catégorie', App.EXP_CATS)}<div class="row">${F.num('f_amt', 'Montant', '')}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div><div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Payé par', App.PAY_MODES, 'Cash')}</div>`, () => {
     if (!App.v('f_label') || App.n('f_amt') <= 0) { App.toast('Libellé et montant requis'); return false; }
-    App.db.expenses.push({ id: App.uid(), label: App.v('f_label'), cat: App.v('f_cat'), amount: App.n('f_amt'), currency: App.v('f_cur'), date: App.v('f_date') || App.today() }); App.save(); App.refresh();
+    App.db.expenses.push({ id: App.uid(), label: App.v('f_label'), cat: App.v('f_cat'), amount: App.n('f_amt'), currency: App.v('f_cur'), mode: App.v('f_mode'), date: App.v('f_date') || App.today() }); App.save(); App.refresh();
   });
   App.actions.delexp = d => { if (!App.confirm('Supprimer cette dépense ?')) return; App.db.expenses = App.db.expenses.filter(e => e.id !== d.id); App.save(); App.refresh(); };
   document.addEventListener('click', e => {

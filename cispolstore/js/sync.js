@@ -6,8 +6,8 @@
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc;
   const CKEY = 'cispolstore-sync';
-  const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'log'];
-  const SHARED = ['company', 'rate', 'period', 'grace', 'msgs', 'plans', 'users', 'rates']; // PIN, theme and auto-lock stay per device
+  const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'purchases', 'caisse', 'closings', 'log'];
+  const SHARED = ['company', 'rate', 'period', 'grace', 'msgs', 'plans', 'users', 'rates', 'instFromCash', 'subFromCash', 'goal']; // PIN, theme and auto-lock stay per device
   const js = JSON.stringify;
 
   let cfg = null; try { cfg = JSON.parse(localStorage.getItem(CKEY)); } catch (e) {}
@@ -164,9 +164,20 @@
     const row = (t, s, b) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${b || ''}</div>`;
     return `<h2 class="sec">Synchronisation entre appareils</h2><div class="list">
       ${row('État', `<b class="${cls}">${st}</b>${S.error ? ' · ' + esc(S.error) : ''}${cfg ? `<br>Espace « ${esc(cfg.ws)} » · dernière synchronisation : ${when}` : '<br>Utilisez la même application sur plusieurs téléphones ou ordinateurs.'}`, cfg ? '<button class="btn sm" data-act="syncnow">Synchroniser</button>' : '<button class="btn sm" data-act="syncsetup">Configurer</button>')}
-      ${cfg ? row('Réglages', 'Données chiffrées avant l\'envoi. Chaque appareil garde son propre PIN.', '<button class="btn sm del" data-act="syncoff">Déconnecter</button>') : ''}</div>`;
+      ${cfg ? row('Réglages', 'Données chiffrées avant l\'envoi. Chaque appareil garde son propre PIN.', '<button class="btn sm sec" data-act="syncshow">Afficher les paramètres</button><button class="btn sm del" data-act="syncoff">Déconnecter</button>') : ''}</div>`;
   };
   App.actions.syncnow = async () => { App.toast('Synchronisation…'); App.toast(await S.now()); };
+  // show what is needed to connect another device (the passphrase is never stored, so it cannot be shown)
+  App.actions.syncshow = () => {
+    if (!cfg) return;
+    const row = (label, id, v) => `<label class="l" for="${id}">${label}</label><div class="bar"><input id="${id}" value="${esc(v)}" readonly style="flex:1" onclick="this.select()"><button type="button" class="btn sm sec" data-copy="${id}">Copier</button></div>`;
+    App.modal('Paramètres de synchronisation',
+      `<p class="mut" style="font-size:13px;margin-top:0">À saisir à l'identique sur chaque autre appareil (CISPOLstore Manager ou WiFi Zone Manager), avec votre phrase secrète.</p>
+       ${row('URL du projet Supabase', 'sh_url', cfg.url)}${row('Clé publique (anon / publishable)', 'sh_anon', cfg.anon)}${row("Nom de l'espace", 'sh_ws', cfg.ws)}
+       <p class="warn" style="font-size:13px">🔑 La <b>phrase secrète</b> n'est enregistrée nulle part : elle ne peut pas être affichée. Utilisez celle que vous avez notée.</p>
+       <p class="mut" style="font-size:13px">Pour WiFi Zone Manager, gardez la même URL et la même clé, mais utilisez le nom d'espace <b>wifizone</b>.</p>`);
+    document.querySelectorAll('#dlg [data-copy]').forEach(b => { b.onclick = () => { const el = $(b.dataset.copy); el.select(); try { navigator.clipboard.writeText(el.value).then(() => App.toast('Copié'), () => App.toast('Copiez le texte sélectionné')); } catch (e) { App.toast('Copiez le texte sélectionné'); } }; });
+  };
   App.actions.syncoff = () => { if (App.confirm("Déconnecter la synchronisation ? Les données restent sur cet appareil.")) { S.disconnect(); App.refresh(); } };
   App.actions.syncsql = () => { fetch(SQL_URL).then(r => r.text()).then(t => { try { navigator.clipboard.writeText(t); App.toast('Script SQL copié'); } catch (e) { App.toast('Copie impossible'); } }).catch(() => App.toast('Script indisponible')); };
   App.actions.syncsetup = () => {

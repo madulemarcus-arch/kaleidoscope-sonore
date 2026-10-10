@@ -16,7 +16,7 @@
   App.waLink = c => App.waUrl(c.phone, App.reminderText(c));
 
   // ---------- List ----------
-  const st = App.clState = { f: 'all', q: '' };
+  const st = App.clState = { f: 'all', q: '', sel: false, picked: new Set() };
   const FILTERS = [['all', 'Tous'], ['gere', '📡 Gérés'], ['mat', '📦 Matériel'], ['install', '🔧 Installation'], ['actif', '🟢 Actifs'], ['sursis', '🟠 Sursis'], ['inactif', '🔴 Inactifs']];
   const filtered = () => {
     const q = st.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -29,7 +29,20 @@
   };
   const drawList = () => {
     const l = filtered();
-    $('clist').innerHTML = l.length ? `<div class="list">${l.map(c => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${tone(c)}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.acc || c.article || c.code)} · ${esc(c.phone || '')}</small></div><div class="end">${badge(c)}</div></button>`).join('')}</div>` : '<div class="empty">Aucun client pour ce filtre.</div>';
+    if ($('clbar')) $('clbar').innerHTML = !App.guard('delclients') ? '' : st.sel ? `<button class="btn sm sec" data-act="cl_all">☑ Tout (${l.length})</button><button class="btn sm del" data-act="delclients">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="cl_sel">Terminer</button>` : '<button class="btn sm sec" data-act="cl_sel">☑ Sélectionner pour supprimer</button>';
+    const dayTxt = (c, s) => !s ? '' : s.status === 'actif' ? (s.left === 0 ? "aujourd'hui" : `dans ${s.left} j`) : s.status === 'sursis' ? `sursis · ${s.left} j` : `depuis ${-s.left} j`;
+    const row = c => { const s = App.sub(c), t = tone(c);
+      const body = `<span class="avatar ${t}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small><span class="mono">${esc(c.acc || c.article || c.code)}</span>${c.phone ? ' · ' + esc(c.phone) : ''}</small></div><div class="end">${badge(c)}${s ? `<small class="${t}">${dayTxt(c, s)}</small>` : ''}</div>`;
+      if (st.sel) return `<button class="item rw t-${t}" data-act="cl_pick" data-v="client" data-id="${c.id}"><span style="font-size:20px">${st.picked.has(c.id) ? '☑️' : '⬜'}</span>${body}</button>`;
+      const acts = [], tel = String(c.phone || '').replace(/[^+\d]/g, '');
+      if (tel) acts.push(`<a class="sw sw-call" href="tel:${esc(tel)}"><span>📞</span>Appeler</a>`);
+      if (c.phone) acts.push(`<a class="sw sw-wa" href="${esc(c.type === 'gere' ? App.waLink(c) : App.waUrl(c.phone, 'Bonjour'))}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>`);
+      if (c.acc) acts.push(`<button class="sw sw-copy" data-act="copy" data-t="${esc(c.acc)}"><span>📋</span>Copier ACC</button>`);
+      if (c.type === 'gere' && App.guard('renew')) acts.push(`<button class="sw sw-renew" data-act="renew" data-id="${c.id}"><span>🔄</span>Renouveler</button>`);
+      const open = `<div class="item rw t-${t}" role="button" tabindex="0" data-act="go" data-v="client" data-id="${c.id}">${body}</div>`;
+      return acts.length ? App.rowSwipe(acts.length, acts.join(''), open) : open; };
+    let last = '';
+    $('clist').innerHTML = l.length ? `<div class="list">${l.map(c => { const L = App.letterOf(App.cname(c)), h = L !== last ? `<div class="lh">${L}</div>` : ''; last = L; return h + row(c); }).join('')}</div>` : `<div class="empty big"><div class="ei">👥</div><b>${App.db.clients.length ? 'Aucun client pour ce filtre' : 'Aucun client pour le moment'}</b><p>${App.db.clients.length ? 'Essayez un autre filtre ou une autre recherche.' : 'Ajoutez votre premier client, ou importez votre fichier Excel.'}</p>${App.db.clients.length ? '' : '<button class="btn" data-act="newclient">+ Nouveau client</button>'}</div>`;
   };
   App.views.clients = () => {
     const all = App.db.clients, cnt = f => f === 'all' ? all.length : ['gere', 'mat', 'install'].includes(f) ? all.filter(c => c.type === f).length : all.filter(c => (App.sub(c) || {}).status === f).length;
@@ -37,11 +50,25 @@
       title: 'Clients', sub: `${all.length} au total`, nav: 'clients',
       html: `<div class="search"><input id="cq" placeholder="Rechercher un client, ACC, téléphone…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips">${FILTERS.map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="clfilter" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
-        <div id="clist"></div><button class="btn full" data-act="newclient" style="margin-top:14px">+ Nouveau client</button>`,
+        <div class="bar" id="clbar" style="margin-bottom:6px"></div><div id="clist"></div><button class="btn full" data-act="newclient" style="margin-top:14px">+ Nouveau client</button>${App.canView('importc') ? '<button class="btn sec full" data-act="go" data-v="importc" style="margin-top:8px">📥 Importer des clients (Excel)</button>' : ''}`,
       after: () => { drawList(); $('cq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
-  App.actions.clfilter = d => { st.f = d.f; App.refresh(); };
+  App.actions.cl_sel = () => { st.sel = !st.sel; st.picked = new Set(); drawList(); };
+  App.actions.cl_pick = d => { st.picked.has(d.id) ? st.picked.delete(d.id) : st.picked.add(d.id); drawList(); };
+  App.actions.cl_all = () => { const all = filtered(), full = all.every(c => st.picked.has(c.id)); all.forEach(c => full ? st.picked.delete(c.id) : st.picked.add(c.id)); drawList(); };
+  // several clients at once (those with invoices or payments are kept); the "Annuler" bar puts them all back
+  App.actions.delclients = () => {
+    const db = App.db, ids = [...st.picked]; if (!ids.length) return App.toast('Sélectionnez au moins un client');
+    const used = id => db.invoices.some(i => i.clientId === id) || db.payments.some(p => p.clientId === id), del = ids.filter(id => !used(id)), keep = ids.length - del.length;
+    if (!del.length) return App.toast('Ces clients ont des factures ou paiements : suppression impossible');
+    if (!App.confirm(`Supprimer définitivement ${del.length} client(s) ?${keep ? `\n${keep} client(s) avec factures ou paiements seront conservés.` : ''}`)) return;
+    const snap = JSON.parse(JSON.stringify({ clients: db.clients, installs: db.installs, penalties: db.penalties, deliveries: db.deliveries, log: db.log }));
+    db.clients = db.clients.filter(c => !del.includes(c.id)); ['installs', 'penalties', 'deliveries', 'log'].forEach(k => { db[k] = db[k].filter(x => !del.includes(x.clientId)); });
+    st.picked = new Set(); st.sel = false; App.save(); App.refresh();
+    App.undoBar(`${del.length} client(s) supprimé(s)`, () => { Object.assign(db, snap); App.save(); App.refresh(); App.toast('Suppression annulée'); }, 'Annuler');
+  };
+  App.actions.clfilter = d => { st.f = d.f; st.picked = new Set(); App.refresh(); };
   App.actions.newclient = () => App.clientForm();
 
   // ---------- Create / edit ----------
@@ -112,11 +139,20 @@
       ${hist.length ? `<h2 class="sec">Périodes précédentes</h2><div class="list">${hist.map(h => `<div class="item"><div class="grow"><b>${App.fdate(h.start)} → ${App.fdate(App.addDays(h.start, h.days))}</b><small>${h.days} jours</small></div></div>`).join('')}</div>` : ''}`;
   };
   const listOrEmpty = (rows, empty) => rows.length ? `<div class="list">${rows.join('')}</div>` : `<div class="empty">${empty}</div>`;
+  // key figures shown in the client header: subscription time left, total invoiced, balance still due (all in dollars)
+  const cstats = c => {
+    const inv = App.db.invoices.filter(i => i.clientId === c.id && App.live(i)), usd = (n, i) => App.conv(n, i.currency, 'USD', App.rateOf(i)), s = App.sub(c);
+    const tot = inv.reduce((a, i) => a + usd(App.invAgreed(i), i), 0), due = inv.reduce((a, i) => a + usd(App.invDue(i), i), 0);
+    const st = [];
+    if (c.type === 'gere') st.push(s ? [s.status === 'inactif' ? `−${-s.left} j` : `${s.left} j`, s.status === 'inactif' ? 'expiré' : 'restants'] : ['—', 'abonnement']);
+    st.push([App.fmt(tot), `facturé · ${inv.length}`]); st.push([App.fmt(due), 'à payer', due > 0.004 ? 'bad' : '']);
+    return st.map(([v, l, k]) => `<div class="${k || ''}"><b>${v}</b><small>${l}</small></div>`).join('');
+  };
   App.views.client = p => {
     const c = App.client(p.id); if (!c) return { title: 'Client', back: 'clients', html: '<div class="empty">Client introuvable.</div>' };
     const tabs = TABS[c.type], tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
     let body = '';
-    if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd><dt>Type</dt><dd>${App.TYPES[c.type]}</dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Installation</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
+    if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd><dt>Type</dt><dd>${App.TYPES[c.type]}</dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Référence</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
       <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button><button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
     if (tab === 'abo') body = aboTab(c) + App.penaltyBlock(c);
     if (tab === 'pay') body = `<div class="bar"><button class="btn sm" data-act="newpay" data-cid="${c.id}">+ Paiement</button></div>` + listOrEmpty(db.payments.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => { const i = App.invoice(x.invoiceId); return `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${i ? esc(i.number) : 'Sans facture'}${x.ref ? ' · ' + esc(x.ref) : ''}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`; }), 'Aucun paiement enregistré.');
@@ -130,8 +166,9 @@
     const wa = App.waLink(c);
     return {
       title: App.cname(c), sub: 'Fiche client', back: 'clients', nav: 'clients',
-      html: `<div class="card"><div class="row" style="flex-wrap:nowrap;align-items:center"><span class="avatar big ${tone(c)}" style="flex:none;min-width:60px">${esc(App.initials(c))}</span><div style="flex:1;min-width:0"><h2 style="font-size:19px">${esc(App.cname(c))}</h2><div style="margin:4px 0">${badge(c)} <span class="pill">${esc(c.code)}</span></div><div class="mut">${tel(c.phone)}</div></div></div>
-        <div class="bar" style="margin-top:12px">${c.phone ? `<a class="btn sm sec" href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}" style="text-decoration:none">📞 Appeler</a>` : ''}${wa ? `<a class="btn sm sec" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>` : ''}<button class="btn sm" data-act="newinv" data-cid="${c.id}">🧾 Facture</button></div></div>
+      html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span></div>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
+        <div class="cstats">${cstats(c)}</div>
+        <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
         <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`
     };
   };

@@ -1,9 +1,9 @@
-# Publie l'application CISPOLstore (dossier cispolstore/) sur GitHub Pages.
-name: Publier CISPOLstore
+# Publie CISPOLstore Manager (racine du site) et WiFi Zone Manager (/wifizone/) sur GitHub Pages.
+name: Publier CISPOLstore et WiFi Zone
 on:
   push:
     branches: [main]
-    paths: ['cispolstore/**']
+    paths: ['cispolstore/**', 'wifizone/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,8 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Assembler le site
+        run: |
+          mkdir _site
+          cp -r cispolstore/. _site/
+          cp -r wifizone _site/wifizone
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: cispolstore
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

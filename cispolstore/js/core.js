@@ -30,10 +30,10 @@
   const blank = () => ({
     v: 2,
     settings: {
-      company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '' },
+      company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '', tagline: 'SOLUTIONS TECHNOLOGIQUES ET CONNECTIVITE', city: 'Kinshasa', payTerms: 'Virement bancaire ou espèces.' },
       plans: { 'Résidentiel': { price: 70, cost: 64 } }, rate: 2400, rates: [], theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
     },
-    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], log: []
+    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], purchases: [], caisse: [], closings: [], log: []
   });
   App.blank = blank;
   const normalize = o => {
@@ -98,7 +98,7 @@
   App.rateOn = d => { const h = (db.settings.rates || []).filter(x => x.date <= d).sort((a, b) => a.date.localeCompare(b.date) || (a.ts || 0) - (b.ts || 0)); return h.length ? +h[h.length - 1].rate : App.rate(); };
   App.rateOf = r => +r.rate || App.rateOn(r.date || r.paid || App.today());
   // gives every record its own rate (once), so changing the rate later never rewrites the past
-  const STAMPED = [['invoices', 'date'], ['payments', 'date'], ['expenses', 'date'], ['penalties', 'date']];
+  const STAMPED = [['invoices', 'date'], ['payments', 'date'], ['expenses', 'date'], ['purchases', 'date'], ['penalties', 'date']];
   App.stampRates = () => { STAMPED.forEach(([k, f]) => (db[k] || []).forEach(r => { if (!(+r.rate > 0)) r.rate = App.rateOn(r[f] || App.today()); })); };
   App.setRate = r => {
     r = Math.round(+r) || 0; const S = db.settings; if (r < 1 || r === +S.rate) return false;
@@ -141,9 +141,20 @@
   App.invTotal = i => i.lines.reduce((a, l) => a + l.qty * l.price, 0);
   App.invCost = i => i.lines.reduce((a, l) => a + l.qty * (l.cost || 0), 0);
   App.invPaid = i => db.payments.filter(p => p.invoiceId === i.id).reduce((a, p) => a + App.conv(p.amount, p.currency, i.currency, App.rateOf(p)), 0);
-  App.invDue = i => Math.max(0, App.invTotal(i) - App.invPaid(i));
-  App.invStatus = i => { const t = App.invTotal(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
-  App.INV = { paid: ['Payée', 'ok'], part: ['Partielle', 'warn'], unpaid: ['Impayée', 'bad'] };
+  // negotiated price: the printed invoice keeps its full total, but what the client really owes (and what counts as revenue) is i.agreed
+  App.invAgreed = i => +i.agreed > 0 && +i.agreed < App.invTotal(i) ? +i.agreed : App.invTotal(i);
+  // a pending invoice was only handed to the client: no stock out, no revenue, nothing to collect until the sale is validated
+  App.live = i => !i.pending;
+  // What an invoice really contains: the installation fee goes to the technicians, the subscription to Starlink, the rest (kits, hardware, accessories) is CISPOLstore's own revenue
+  const feeOf = (i, re, noPid = true) => (i.lines || []).filter(l => (!noPid || !l.pid) && re(l.desc || '')).reduce((a, l) => a + l.qty * l.price, 0);
+  App.instFee = i => feeOf(i, d => /install/i.test(d));
+  App.subFee = i => feeOf(i, d => /^abonnement/i.test(d) && !/install/i.test(d));
+  App.invSplit = i => { const total = App.invAgreed(i), inst = Math.min(App.instFee(i), total), sub = Math.min(App.subFee(i), total - inst); return { total, inst, sub, own: Math.max(0, total - inst - sub) }; };
+  // the same split applied to one payment (in the currency of that payment)
+  App.payParts = p => { const i = App.invoice(p.invoiceId), s = i && App.invSplit(i); if (!s || !(s.total > 0)) return { inst: 0, sub: 0, own: p.amount }; const rd = x => p.currency === 'CDF' ? Math.round(x) : Math.round(x * 100) / 100, inst = rd(p.amount * s.inst / s.total), sub = rd(p.amount * s.sub / s.total); return { inst, sub, own: Math.max(0, rd(p.amount - inst - sub)) }; };
+  App.invDue = i => i.pending ? 0 : Math.max(0, App.invAgreed(i) - App.invPaid(i));
+  App.invStatus = i => { if (i.pending) return 'pending'; const t = App.invAgreed(i), p = App.invPaid(i); return p >= t - 0.005 ? 'paid' : p > 0 ? 'part' : 'unpaid'; };
+  App.INV = { paid: ['Payée', 'ok'], part: ['Partielle', 'warn'], unpaid: ['Impayée', 'bad'], pending: ['En attente', 'warn'] };
   App.invTypes = { materiel: 'Matériel', abonnement: 'Abonnement', installation: 'Installation', complete: 'Facture complète' };
   App.nextInvNumber = (year, dry) => {
     const prefix = `FAC-${year}-`;
@@ -157,7 +168,7 @@
   // qty > 0 adds to stock, qty < 0 removes it
   App.move = m => {
     const p = App.prod(m.pid); if (!p) return;
-    const mv = { id: App.uid(), date: m.date || App.today(), pid: m.pid, qty: m.qty, type: m.qty >= 0 ? 'in' : 'out', cost: m.cost ?? p.cost, supplierId: m.supplierId || '', invoiceId: m.invoiceId || '', clientId: m.clientId || '', note: m.note || '' };
+    const mv = { id: App.uid(), date: m.date || App.today(), pid: m.pid, qty: m.qty, type: m.qty >= 0 ? 'in' : 'out', cost: m.cost ?? p.cost, supplierId: m.supplierId || '', purchase: !!m.purchase, invoiceId: m.invoiceId || '', clientId: m.clientId || '', note: m.note || '' };
     if (App.tracked(p)) p.qty = Math.round((p.qty + m.qty) * 1000) / 1000;
     if (m.qty > 0 && m.cost != null) p.cost = m.cost;
     if (m.qty > 0 && m.supplierId) p.supplierId = m.supplierId;

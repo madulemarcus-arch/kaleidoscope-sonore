@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caisse WiFi Zone</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--txt:#1b1f24;--mut:#6b7280;--line:#e5e7eb;--ok:#16a34a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--txt:#f1f2f4;--mut:#9aa1ad;--line:#2a2f38}}
+*{box-sizing:border-box}
+body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--txt);padding:12px;max-width:560px;margin:auto}
+h1{font-size:20px;margin:4px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.total{font-size:30px;font-weight:700}
+.mut{color:var(--mut);font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fo{border:0;border-radius:12px;padding:18px 8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+.fo small{display:block;font-weight:400;opacity:.9;margin-top:4px}
+.fo.sel{outline:4px solid var(--txt)}
+input,select{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--txt);margin-top:8px}
+button.main{width:100%;margin-top:10px;padding:16px;font-size:18px;font-weight:700;border:0;border-radius:12px;background:var(--ok);color:#fff;cursor:pointer}
+button.sec{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--txt);cursor:pointer}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tabs button{flex:1}
+.tabs button[aria-pressed=true]{background:var(--txt);color:var(--bg)}
+#msg{min-height:20px;margin-top:8px;font-weight:600}
+#codeVendu{margin-top:10px;padding:14px;border:2px dashed var(--ok);border-radius:12px;text-align:center}
+#codeVendu b{display:block;font:700 34px/1.2 monospace;letter-spacing:4px}
+#planche{display:none}
+#rappel{border-color:#dc2626;color:#dc2626;font-weight:600}
+#rappel button{margin-top:8px}
+@media print{
+  body.imprime>*:not(#planche){display:none!important}
+  body.imprime{background:#fff;color:#000;padding:0;max-width:none}
+  body.imprime #planche{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+  .tk{border:1px dashed #000;padding:6mm 3mm;height:26.5mm;box-sizing:border-box;text-align:center;font:11px sans-serif;break-inside:avoid;overflow:hidden}
+  .tk b{display:block;font:700 18px monospace;letter-spacing:2px;margin:3px 0}
+  @page{size:A4;margin:5mm}
+}
+#lock{position:fixed;inset:0;background:var(--bg);z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#lock[hidden]{display:none}
+#lock input{max-width:240px;text-align:center;font-size:28px;letter-spacing:8px}
+#lock button.main{max-width:240px}
+#lockMsg{min-height:22px;margin-top:10px;font-weight:600;color:#dc2626}
+</style>
+</head>
+<body>
+<div id="lock" hidden>
+  <h1>Caisse WiFi Zone</h1>
+  <p id="lockTitre"></p>
+  <input id="pin1" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN">
+  <input id="pin2" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Répétez le PIN" hidden>
+  <button class="main" id="lockOk">OK</button>
+  <button class="sec" id="lockAnnuler" style="margin-top:10px">Annuler</button>
+  <div id="lockMsg"></div>
+</div>
+<h1>Caisse WiFi Zone</h1>
+<button class="sec" id="ouvrirGerant" style="float:right;margin-top:-40px">🔒 Espace gérant</button>
+
+<div class="card">
+  <div class="grid" id="forfaits"></div>
+  <input id="code" placeholder="Code du ticket (automatique si en stock)" autocapitalize="characters" autocomplete="off">
+  <input id="client" placeholder="Nom du client (facultatif)" autocomplete="off">
+  <button class="main" id="vendre">Enregistrer la vente</button>
+  <div id="msg"></div>
+  <div id="codeVendu" hidden></div>
+</div>
+
+<div id="gerant" hidden>
+<div class="card" id="rappel" hidden></div>
+
+<div class="card">
+  <div class="mut" id="jourLib">Aujourd'hui</div>
+  <div class="total" id="totalJour">0 FC</div>
+  <div class="mut" id="nbJour">0 vente</div>
+</div>
+
+<div class="card">
+  <div class="tabs" id="tabs">
+    <button class="sec" data-p="jour" aria-pressed="true">Jour</button>
+    <button class="sec" data-p="semaine" aria-pressed="false">Semaine</button>
+    <button class="sec" data-p="mois" aria-pressed="false">Mois</button>
+  </div>
+  <div class="mut" id="resume"></div>
+  <div id="liste"></div>
+</div>
+
+<div class="card">
+  <b>Tickets</b>
+  <div class="mut" id="stockInfo"></div>
+  <select id="lotForfait"></select>
+  <input id="lotNombre" type="number" min="1" max="300" value="40" inputmode="numeric">
+  <button class="main" id="genererLot" style="background:#2563eb">Générer le lot</button>
+  <div id="lots"></div>
+</div>
+
+<div class="card">
+  <b>Prix des forfaits</b>
+  <div id="prix"></div>
+  <button class="sec" id="exporter" style="margin-top:10px">Exporter en CSV (Excel)</button>
+  <button class="sec" id="sauver" style="margin-top:10px">Sauvegarder</button>
+  <button class="sec" id="restaurer" style="margin-top:10px">Restaurer</button>
+  <input type="file" id="fichier" accept=".json" hidden>
+  <button class="sec" id="changerPin" style="margin-top:10px">Changer le PIN</button>
+  <button class="sec" id="verrouiller" style="margin-top:10px">Verrouiller</button>
+</div>
+
+</div>
+
+<div id="planche"></div>
+
+<script>
+(() => {
+  // Plans with default prices; prices can be edited and are saved in localStorage
+  const FORFAITS = [
+    { id: 'V', nom: 'Visiteur', profil: 'Visiteur-6H', duree: '6 heures', prix: 500, c: '#16a34a' },
+    { id: 'J', nom: 'Jour', profil: 'Jour-24H', duree: '24 heures', prix: 1000, c: '#2563eb' },
+    { id: 'S', nom: 'Semaine', profil: 'Semaine-7J', duree: '7 jours', prix: 7000, c: '#ea580c' },
+    { id: 'M', nom: 'Mois', profil: 'Mois-30J', duree: '30 jours', prix: 30000, c: '#7c3aed' },
+  ];
+  const SERVEUR = 'hotspot-cispol', SEUIL = 10; // hotspot server name on the router; low-stock warning threshold
+  const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0, O, 1, I
+  const $ = id => document.getElementById(id);
+  const CLE = 'caisse-simple-v1';
+  let data = { prix: {}, ventes: [], stock: [], lots: [] };
+  try { data = { ...data, ...JSON.parse(localStorage.getItem(CLE) || '{}') }; } catch (e) {}
+  let choix = null, periode = 'jour';
+
+  const save = () => { try { localStorage.setItem(CLE, JSON.stringify(data)); } catch (e) { msg('Stockage impossible : sauvegardez vos données.', true); } };
+  const prixDe = f => data.prix[f.id] != null ? data.prix[f.id] : f.prix;
+  const fc = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FC';
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function msg(t, err) { const m = $('msg'); m.textContent = t; m.style.color = err ? '#dc2626' : 'var(--ok)'; }
+  function debut(p) {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    if (p === 'semaine') d.setDate(d.getDate() - 6);
+    if (p === 'mois') d.setDate(1);
+    return d.getTime();
+  }
+  const depuis = p => data.ventes.filter(v => v.t >= debut(p)).sort((a, b) => b.t - a.t);
+
+  // Backup reminder: the date of the last backup lives outside `data` so a restore does not erase it
+  const CLE_SAUV = 'caisse-simple-derniere-sauvegarde';
+  let derniereSauv = 0; try { derniereSauv = Number(localStorage.getItem(CLE_SAUV)) || 0; } catch (e) {}
+  const noterSauvegarde = () => { derniereSauv = Date.now(); try { localStorage.setItem(CLE_SAUV, derniereSauv); } catch (e) {} };
+  const nbStock = id => data.stock.filter(c => c.f === id).length;
+  function rappelSauvegarde() {
+    const rien = !data.ventes.length && !data.lots.length; // nothing worth saving yet
+    const h = (Date.now() - derniereSauv) / 3600e3;
+    const r = $('rappel'); r.hidden = rien || h < 24;
+    if (!r.hidden) r.innerHTML = '⚠ ' + (derniereSauv ? 'Dernière sauvegarde il y a ' + (h < 48 ? Math.floor(h) + ' h' : Math.floor(h / 24) + ' jours') + '.' : 'Aucune sauvegarde faite.') + '<br><button class="sec" id="sauverRappel">Sauvegarder maintenant</button>';
+  }
+  function dessiner() {
+    rappelSauvegarde();
+    $('lotForfait').innerHTML = FORFAITS.map(f => `<option value="${f.id}">${f.nom} (${f.duree})</option>`).join('');
+    $('stockInfo').innerHTML = FORFAITS.map(f => { const n = nbStock(f.id); return `${f.nom} : <b style="color:${n < SEUIL ? '#dc2626' : 'inherit'}">${n}</b>${n < SEUIL ? ' ⚠' : ''}`; }).join(' · ');
+    $('lots').innerHTML = data.lots.slice().reverse().slice(0, 10).map(l => {
+      const f = FORFAITS.find(x => x.id === l.f);
+      return `<div class="row"><div><b>${f ? f.nom : l.f}</b> × ${l.codes.length}<div class="mut">${new Date(l.t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div><div><button class="sec" data-rsc="${l.id}">.rsc</button> <button class="sec" data-imp="${l.id}">🖨</button></div></div>`;
+    }).join('');
+    $('forfaits').innerHTML = FORFAITS.map(f =>
+      `<button class="fo${choix === f.id ? ' sel' : ''}" data-id="${f.id}" style="background:${f.c}">${f.nom}<small>${f.duree} · ${fc(prixDe(f))}</small><small>${nbStock(f.id)} en stock</small></button>`).join('');
+    const jour = depuis('jour');
+    $('totalJour').textContent = fc(jour.reduce((s, v) => s + v.prix, 0));
+    $('nbJour').textContent = jour.length + (jour.length > 1 ? ' ventes' : ' vente');
+    const l = depuis(periode);
+    $('resume').textContent = l.length + ' vente(s) · ' + fc(l.reduce((s, v) => s + v.prix, 0));
+    $('liste').innerHTML = l.slice(0, 100).map(v => {
+      const f = FORFAITS.find(x => x.id === v.f);
+      const h = new Date(v.t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return `<div class="row"><div><b>${f ? f.nom : v.f}</b> ${esc(v.code || '')}<div class="mut">${h}${v.client ? ' · ' + esc(v.client) : ''}</div></div><div>${fc(v.prix)} <button class="sec" data-del="${v.t}">✕</button></div></div>`;
+    }).join('') || '<div class="mut">Aucune vente.</div>';
+    $('prix').innerHTML = FORFAITS.map(f => `<div class="row"><span>${f.nom}</span><input type="number" min="0" step="100" data-prix="${f.id}" value="${prixDe(f)}" style="width:130px;margin:0"></div>`).join('');
+  }
+
+  $('forfaits').onclick = e => { const b = e.target.closest('.fo'); if (!b) return; choix = b.dataset.id; dessiner(); };
+  $('vendre').onclick = () => {
+    if (!choix) return msg('Choisissez d\'abord un forfait.', true);
+    const f = FORFAITS.find(x => x.id === choix);
+    let code = $('code').value.toUpperCase().replace(/\s+/g, '');
+    if (code && data.ventes.some(v => v.code === code)) return msg(code + ' est déjà vendu.', true);
+    if (code) data.stock = data.stock.filter(c => c.code !== code); // typed code that was in stock
+    else { // take the oldest ticket in stock for this plan
+      const i = data.stock.findIndex(c => c.f === f.id);
+      if (i < 0) return msg('Plus de ticket ' + f.nom + ' en stock. Le gérant doit générer un lot.', true);
+      code = data.stock.splice(i, 1)[0].code;
+    }
+    data.ventes.push({ t: Date.now(), f: f.id, prix: prixDe(f), code, client: $('client').value.trim().slice(0, 80) });
+    save(); $('code').value = ''; $('client').value = ''; choix = null;
+    msg('Vente enregistrée : ' + f.nom + ' ' + fc(prixDe(f)));
+    $('codeVendu').hidden = false; $('codeVendu').innerHTML = 'Code à donner au client<b>' + esc(code) + '</b>' + f.nom + ' · ' + f.duree;
+    dessiner();
+  };
+  // ---------- Ticket generation ----------
+  function nouveauCode(prefixe) {
+    const b = crypto.getRandomValues(new Uint8Array(5));
+    return prefixe + [...b].map(x => ALPHA[x % ALPHA.length]).join('');
+  }
+  $('genererLot').onclick = () => {
+    const f = FORFAITS.find(x => x.id === $('lotForfait').value);
+    const n = Math.min(300, Math.max(1, parseInt($('lotNombre').value, 10) || 0));
+    const pris = new Set([...data.lots.flatMap(l => l.codes), ...data.ventes.map(v => v.code)]);
+    const codes = [];
+    while (codes.length < n) { const c = nouveauCode(f.id); if (!pris.has(c)) { pris.add(c); codes.push(c); } }
+    const lot = { id: 'L' + Date.now(), f: f.id, t: Date.now(), codes };
+    data.lots.push(lot); codes.forEach(code => data.stock.push({ code, f: f.id }));
+    save(); dessiner(); msg(n + ' tickets ' + f.nom + ' générés. Importez le fichier .rsc dans le routeur puis imprimez.');
+    telechargerRsc(lot);
+  };
+  function telechargerRsc(lot) {
+    const f = FORFAITS.find(x => x.id === lot.f);
+    // one plain line per ticket; comment is left empty on purpose (the router script writes the expiry there)
+    const l = ['# Lot ' + lot.id + ' - ' + f.nom + ' - ' + lot.codes.length + ' tickets', ...lot.codes.map(c => `/ip hotspot user add name=${c} password=${c} profile=${f.profil} server=${SERVEUR}`)];
+    telecharger('tickets-' + f.nom + '-' + lot.id + '.rsc', 'text/plain;charset=utf-8', l.join('\n') + '\n');
+  }
+  function imprimerLot(lot) {
+    const f = FORFAITS.find(x => x.id === lot.f);
+    $('planche').innerHTML = lot.codes.map(c => `<div class="tk">CISPOLstore WiFi Zone<b>${esc(c)}</b>${f.nom} · ${f.duree} · ${fc(prixDe(f))}</div>`).join('');
+    document.body.classList.add('imprime'); window.print(); document.body.classList.remove('imprime');
+  }
+  $('lots').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const lot = data.lots.find(l => l.id === (b.dataset.rsc || b.dataset.imp)); if (!lot) return;
+    if (b.dataset.rsc) telechargerRsc(lot); else imprimerLot(lot);
+  };
+  $('tabs').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return; periode = b.dataset.p;
+    document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    dessiner();
+  };
+  $('liste').onclick = e => {
+    const b = e.target.closest('[data-del]'); if (!b) return;
+    if (!confirm('Annuler cette vente ?')) return;
+    data.ventes = data.ventes.filter(v => String(v.t) !== b.dataset.del); save(); dessiner();
+  };
+  $('prix').onchange = e => {
+    const i = e.target.dataset.prix; const v = parseInt(e.target.value, 10);
+    if (i && Number.isFinite(v) && v >= 0) { data.prix[i] = v; save(); dessiner(); }
+  };
+  function telecharger(nom, type, contenu) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([contenu], { type }));
+    a.download = nom; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  $('exporter').onclick = () => {
+    const l = ['Date;Heure;Forfait;Code;Client;Prix FC'];
+    for (const v of depuis(periode).reverse()) {
+      const d = new Date(v.t), f = FORFAITS.find(x => x.id === v.f);
+      l.push([d.toLocaleDateString('fr-FR'), d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), f ? f.nom : v.f, v.code || '', (v.client || '').replace(/;/g, ','), v.prix].join(';'));
+    }
+    telecharger('ventes-' + periode + '.csv', 'text/csv;charset=utf-8', '﻿' + l.join('\r\n'));
+  };
+  $('sauver').onclick = faireSauvegarde;
+  $('gerant').addEventListener('click', e => { if (e.target.id === 'sauverRappel') faireSauvegarde(); });
+  function faireSauvegarde() { noterSauvegarde(); dessiner(); telecharger('sauvegarde-caisse-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json', JSON.stringify(data)); }
+  $('restaurer').onclick = () => $('fichier').click();
+  $('fichier').onchange = async e => {
+    try {
+      const d = JSON.parse(await e.target.files[0].text());
+      if (!Array.isArray(d.ventes)) throw 0;
+      if (!confirm('Remplacer les données actuelles par la sauvegarde ?')) return;
+      data = { prix: d.prix || {}, ventes: d.ventes, stock: d.stock || [], lots: d.lots || [] }; save(); noterSauvegarde(); dessiner(); msg('Sauvegarde restaurée.');
+    } catch (err) { msg('Fichier de sauvegarde invalide.', true); }
+    e.target.value = '';
+  };
+  dessiner();
+
+  // ---------- PIN ----------
+  // The PIN is a local lock for the device: stored as a salted hash, not real server-side security
+  const CLE_PIN = 'caisse-simple-pin';
+  let pinSauve = null, essais = 0, bloqueJusque = 0, modePin = 'saisie', ancienOk = false, dernierPin = '';
+  try { pinSauve = JSON.parse(localStorage.getItem(CLE_PIN) || 'null'); } catch (e) {}
+  async function hacher(pin, sel) {
+    const texte = sel + ':' + pin;
+    if (window.crypto && crypto.subtle) {
+      const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texte));
+      return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let x = 5381; for (let i = 0; i < texte.length; i++) x = ((x << 5) + x + texte.charCodeAt(i)) >>> 0; // fallback when crypto.subtle is unavailable (http)
+    return 'f' + x;
+  }
+  function ecranPin(mode, titre) {
+    modePin = mode; $('lockTitre').textContent = titre;
+    $('pin1').value = ''; $('pin2').value = ''; $('pin2').hidden = mode !== 'creer'; $('lockMsg').textContent = '';
+    $('lock').hidden = false; setTimeout(() => $('pin1').focus(), 50);
+  }
+  // The sales form is open to sellers; everything else is behind the manager PIN
+  function verrouiller() { $('lock').hidden = true; $('gerant').hidden = true; $('ouvrirGerant').hidden = false; ancienOk = false; }
+  function ouvrirGerant() { $('lock').hidden = true; $('gerant').hidden = false; $('ouvrirGerant').hidden = true; dessiner(); }
+  function demanderPin() {
+    if (!pinSauve) return ecranPin('creer', 'Première fois : le gérant choisit son code PIN (4 à 8 chiffres).');
+    ecranPin('saisie', 'Code PIN du gérant.');
+  }
+  async function validerPin() {
+    const a = $('pin1').value, err = t => { $('lockMsg').textContent = t; $('pin1').value = ''; $('pin2').value = ''; };
+    if (Date.now() < bloqueJusque) return err('Trop d\'essais. Patientez ' + Math.ceil((bloqueJusque - Date.now()) / 1000) + ' s.');
+    if (modePin === 'creer') {
+      if (!/^\d{4,8}$/.test(a)) return err('Le PIN doit avoir 4 à 8 chiffres.');
+      if (a !== $('pin2').value) return err('Les deux PIN sont différents.');
+      const sel = Math.random().toString(36).slice(2);
+      pinSauve = { sel, h: await hacher(a, sel) };
+      try { localStorage.setItem(CLE_PIN, JSON.stringify(pinSauve)); } catch (e) {}
+      ouvrirGerant(); if (ancienOk) msg('PIN changé.'); ancienOk = false; return;
+    }
+    if (await hacher(a, pinSauve.sel) !== pinSauve.h) {
+      if (++essais >= 5) { essais = 0; bloqueJusque = Date.now() + 30e3; return err('Trop d\'essais. Patientez 30 s.'); }
+      return err('PIN incorrect.');
+    }
+    essais = 0;
+    if (modePin === 'ancien') { ancienOk = true; return ecranPin('creer', 'Choisissez le nouveau PIN.'); }
+    ouvrirGerant();
+  }
+  $('lockOk').onclick = validerPin;
+  $('lock').onkeydown = e => { if (e.key === 'Enter') validerPin(); };
+  $('verrouiller').onclick = verrouiller;
+  $('ouvrirGerant').onclick = demanderPin;
+  $('lockAnnuler').onclick = verrouiller;
+  $('changerPin').onclick = () => ecranPin('ancien', 'Entrez le PIN actuel.');
+  let veille; const reveil = () => { clearTimeout(veille); veille = setTimeout(verrouiller, 5 * 60e3); }; // auto-lock after 5 min idle
+  ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, reveil, true));
+  reveil(); verrouiller();
+})();
+</script>
+</body>
+</html>

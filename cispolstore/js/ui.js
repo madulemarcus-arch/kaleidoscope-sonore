@@ -48,6 +48,8 @@
     const r = fn(App.state.params) || {};
     $('title').innerHTML = r.sub ? `${esc(r.title)}<small>${esc(r.sub)}</small>` : esc(r.title || '');
     $('view').innerHTML = r.html || '';
+    const dom = { client: 'clients', clients: 'clients', importc: 'clients', finance: 'finance', daily: 'finance', payments: 'finance', expenses: 'finance', impayes: 'finance', reports: 'finance', rapportmois: 'finance', stock: 'stock', product: 'stock', suppliers: 'stock', supplier: 'stock', purchase: 'stock', installs: 'stock', subs: 'subs', rappels: 'subs', invoices: 'invoices', invoice: 'invoices', importf: 'invoices' }[App.state.view];
+    if (dom) document.documentElement.dataset.dom = dom; else delete document.documentElement.dataset.dom;
     $('backBtn').hidden = !r.back; $('backBtn').dataset.to = r.back || '';
     $('logo').hidden = !!r.back;
     document.querySelectorAll('#bottom [data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === (r.nav || App.state.view)));
@@ -67,9 +69,9 @@
 
   // ---------- "Annuler" bar after a deletion ----------
   let undoTimer = null;
-  App.undoBar = (msg, fn) => {
+  App.undoBar = (msg, fn, btn = 'Annuler') => {
     const old = $('undo'); if (old) old.remove(); clearTimeout(undoTimer);
-    const d = document.createElement('div'); d.id = 'undo'; d.innerHTML = `<span>${esc(msg)}</span><button class="btn sm" id="undogo">Annuler</button><button class="ib" id="undox" aria-label="Fermer">✕</button>`;
+    const d = document.createElement('div'); d.id = 'undo'; d.innerHTML = `<span>${esc(msg)}</span><button class="btn sm" id="undogo">${esc(btn)}</button><button class="ib" id="undox" aria-label="Fermer">✕</button>`;
     document.body.appendChild(d); const close = () => { d.remove(); clearTimeout(undoTimer); };
     $('undogo').onclick = () => { close(); fn(); }; $('undox').onclick = close; undoTimer = setTimeout(close, 12000);
   };
@@ -85,11 +87,11 @@
   };
 
   // ---------- Side menu (wide screens; hidden on phones by CSS) ----------
-  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['impayes', '⏳', 'Impayés'], ['suppliers', '🏭', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['settings', '⚙️', 'Paramètres']];
+  const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['finance', '🏦', 'Finance'], ['impayes', '⏳', 'Impayés'], ['suppliers', '🏭', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['settings', '⚙️', 'Paramètres']];
   $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
     <button class="btn full" data-act="quick">＋ Action rapide</button>
     <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${i}</span>${t}</button>`).join('')}</nav>
-    <div class="sfoot"><button data-act="shareapp">📤 Partager l'application</button></div>`;
+    <div class="sfoot"><button data-act="keys">⌨ Raccourcis clavier <kbd>?</kbd></button><button data-act="shareapp">📤 Partager l'application</button></div>`;
 
   // ---------- Click delegation ----------
   document.addEventListener('click', e => {
@@ -100,10 +102,13 @@
   App.actions.go = d => { App.close(); App.go(d.v, d.p ? JSON.parse(d.p) : d.id ? { id: d.id } : {}); };
 
   // ---------- Theme ----------
-  const darkNow = () => dbs().theme === 'dark' || (dbs().theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const darkNow = () => dbs().theme === 'dark' || dbs().theme === 'black' || (dbs().theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   App.applyTheme = () => {
     const dark = darkNow();
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    const de = document.documentElement, th = dbs().theme, ac = dbs().accent;
+    de.dataset.theme = dark ? 'dark' : 'light'; if (th === 'black') de.dataset.black = '1'; else delete de.dataset.black;
+    if (ac && ac !== 'orange') de.dataset.accent = ac; else delete de.dataset.accent;
+    const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = th === 'black' ? '#05101c' : dark ? '#0c2542' : '#12365d';
     $('themeBtn').textContent = dark ? '☀️' : '🌙';
     const co = dbs().company; $('logo').src = co.logo || 'logo.png'; if ($('slogo')) $('slogo').src = co.logo || 'logo.png';
   };
@@ -236,8 +241,12 @@
     setTimeout(() => $('gq').focus(), 50);
   };
   App.actions.search = () => App.search();
+  App.actions.keys = () => App.shortcutsHelp();
   App.actions.sgo = d => { App.close(); App.go(d.v === 'stock' ? 'stock' : d.v, { id: d.id, q: d.v === 'stock' ? $('gq')?.value : undefined }); };
   $('searchBtn').onclick = () => App.search();
+  // the ⋯ menu holds the secondary actions (synchronisation, theme)
+  $('menuBtn').onclick = e => { e.stopPropagation(); $('topmenu').hidden = !$('topmenu').hidden; };
+  document.addEventListener('click', () => { $('topmenu').hidden = true; });
 
   // ---------- Quick actions (+) ----------
   const q = (act, ico, t, s) => `<button class="opt" data-act="${act}"><span class="ico">${ico}</span><span><b>${t}</b><small>${s}</small></span></button>`;
@@ -247,6 +256,7 @@
     q('q_invoice', '🧾', 'Nouvelle facture', 'Matériel, abonnement, installation…') +
     q('q_sale', '🛒', 'Nouvelle vente', 'Facture de matériel') +
     q('q_stockin', '📥', 'Entrée de stock', 'Réception de matériel') +
+    (App.can('costs') ? q('q_buy', '🛍️', 'Nouvel achat', 'Ce que vous avez acheté, chez qui, à combien') : '') +
     q('q_install', '🔧', 'Installation', 'Enregistrer une intervention'));
   const after = fn => () => { App.close(); setTimeout(fn, 30); };
   App.actions.q_client = after(() => App.clientForm());
@@ -255,17 +265,19 @@
   App.actions.q_sale = after(() => App.invoiceForm('materiel'));
   App.actions.q_stockin = after(() => App.stockInForm());
   App.actions.q_install = after(() => App.installForm());
+  App.actions.q_buy = after(() => App.actions.newbuy());
 
   // ---------- "Plus" menu ----------
-  const item = (v, ico, t, s) => !App.canView(v) ? '' : `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:var(--navy)">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
+  const DOM = { subs: '#7c5cff', invoices: '#e4572e', payments: '#1f9d55', impayes: '#e5a11f', importc: '#2f7de1', importf: '#2f7de1', livraisons: '#0ea5a4', installs: '#6366f1', technicians: '#0ea5a4', suppliers: '#b45309', finance: '#1f9d55', daily: '#4f46e5', expenses: '#d64545', reports: '#7c5cff', rapportmois: '#7c5cff', settings: '#64748b', users: '#64748b' };
+  const item = (v, ico, t, s) => !App.canView(v) ? '' : `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:linear-gradient(135deg,${DOM[v] || 'var(--navy)'},color-mix(in srgb,${DOM[v] || 'var(--navy)'} 65%,#fff))">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
   App.views.more = () => {
     const grp = (t, items) => { const h = items.join(''); return h ? `<h2 class="sec">${t}</h2><div class="list">${h}</div>` : ''; };
     const share = `<button class="item" data-act="shareapp"><span class="ico avatar" style="background:var(--navy)">📤</span><div class="grow"><b>Partager l'application</b><small>Envoyer le lien par WhatsApp, SMS…</small></div><span class="mut">›</span></button>`;
     return {
       title: 'Plus', nav: 'more',
-      html: grp('Ventes et clients', [item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements'), item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter'), item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement'), item('impayes', '⏳', 'Impayés', 'Factures à encaisser et relances')])
+      html: App.profileHero(true) + grp('Ventes et clients', [item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements'), item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter'), item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement'), item('impayes', '⏳', 'Impayés', 'Factures à encaisser et relances'), item('importc', '📥', 'Importer des clients', 'Depuis un fichier Excel ou CSV'), item('importf', '📥', 'Importer des factures', 'Depuis des fichiers Word ou PDF')])
         + grp('Terrain et stock', [item('livraisons', '🚚', 'Livraisons', 'Livraisons à effectuer et suivi'), item('installs', '🔧', 'Installations', 'Historique des interventions'), item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink'), item('suppliers', '🏭', 'Fournisseurs', 'Gérer vos fournisseurs')])
-        + grp('Gestion', [item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
+        + grp('Gestion', [item('finance', '🏦', 'Finance', 'Entrées, sorties et caisse'), item('daily', '🌙', 'Clôture du jour', 'Récapitulatif et caisse de la journée'), item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
         + grp('Application', [App.multi() ? item('profile', '👤', 'Mon profil', (App.user ? App.user.name : '') + ' · code PIN, changer de profil') : '', share])
         + `<p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0</p>`
     };
