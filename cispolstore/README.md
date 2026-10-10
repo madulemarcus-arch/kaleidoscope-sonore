@@ -281,3 +281,9 @@ Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la
 ## Couleurs par domaine (design étape 6)
 
 Chaque rubrique prend sa couleur : **Clients** en bleu, **Finance** en vert (entrées/sorties, caisse, clôture, paiements, dépenses, impayés, rapports), **Stock** en ambre (fournisseurs, achats, installations), **Abonnements** en violet (rappels), **Factures** en orange. Cette couleur teinte la lueur de l'en-tête, la barre des titres de section, le filtre actif, le liseré des cartes de chiffres, le fond de page (très léger) et l'onglet actif du bas. L'accueil et le menu Plus gardent la couleur d'accent choisie dans les paramètres ; les boutons d'action suivent toujours cette couleur d'accent. Les vues sont associées à leur domaine dans `render()` de `js/ui.js`.
+
+## Documents imprimés (design étape 7)
+
+- **QR code sur la facture** (en bas, à côté du cachet) : le client le scanne, WhatsApp s'ouvre vers le numéro de l'entreprise avec « Bonjour, je règle la facture FAC-… (montant) » déjà écrit, pour payer ou envoyer sa preuve. Il n'apparaît que si le téléphone de l'entreprise est renseigné (Paramètres). Générateur embarqué : `vendor/qrcode.js` (qrcode-generator, licence MIT).
+- **Cachet plus marqué** : légèrement incliné, contraste et couleurs renforcés, sur la facture et le reçu.
+- **📤 Partager en PDF** : bouton sur la facture et sur chaque paiement (reçu). Il crée un vrai fichier PDF et ouvre le partage du téléphone (WhatsApp, e-mail…) ; sur ordinateur, le fichier est téléchargé. Code dans `js/share.js` (sans bibliothèque : le document est dessiné en image puis placé dans un PDF A4, donc le texte du PDF n'est pas sélectionnable). Les boutons Imprimer et Word restent inchangés.
