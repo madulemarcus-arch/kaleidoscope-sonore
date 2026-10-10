@@ -120,6 +120,13 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Formulaires en feuille (design étape 4b)
+
+Les formulaires s'ouvrent comme des **feuilles** montant du bas de l'écran : **poignée** (tirez-la vers le bas pour fermer), bouton **✕**, titre plus grand, champs plus hauts et arrondis, boutons **Annuler / Enregistrer** toujours visibles en bas.
+- **Dates rapides** sous chaque champ date : **Aujourd'hui**, **Hier**, **−7 j** (le bouton actif est surligné).
+- **− / +** autour des quantités (facture, entrée de stock, achat), sans descendre sous 0.
+- Les montants ouvrent le clavier numérique du téléphone.
+
 ## Listes (design étape 4a)
 
 - **Clients** : lettres d'**index collantes** (A, B, C…), pastille d'état colorée avec le **délai** (« dans 12 j », « sursis · 3 j », « depuis 63 j »), liseré de couleur à gauche, **ACC en police à chasse fixe**, message d'accueil avec bouton quand la liste est vide.
