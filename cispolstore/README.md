@@ -277,3 +277,7 @@ Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la
 - **Thème Noir** (écrans OLED) en plus d'Automatique, Clair et Sombre : fond noir pur, cartes très sombres.
 - **Couleur de l'application** : orange (par défaut), bleu, vert, violet, rose ou or. Elle colore les boutons, le bouton ＋ et les éléments actifs. L'aperçu est immédiat dans la fenêtre ; « Annuler » rétablit la couleur précédente.
 - Réglages dans **Plus › Paramètres › Application › Modifier**. Thème et couleur restent propres à chaque appareil (ils ne sont pas synchronisés).
+
+## Couleurs par domaine (design étape 6)
+
+Chaque rubrique prend sa couleur : **Clients** en bleu, **Finance** en vert (entrées/sorties, caisse, clôture, paiements, dépenses, impayés, rapports), **Stock** en ambre (fournisseurs, achats, installations), **Abonnements** en violet (rappels), **Factures** en orange. Cette couleur teinte la lueur de l'en-tête, la barre des titres de section, le filtre actif, le liseré des cartes de chiffres, le fond de page (très léger) et l'onglet actif du bas. L'accueil et le menu Plus gardent la couleur d'accent choisie dans les paramètres ; les boutons d'action suivent toujours cette couleur d'accent. Les vues sont associées à leur domaine dans `render()` de `js/ui.js`.
