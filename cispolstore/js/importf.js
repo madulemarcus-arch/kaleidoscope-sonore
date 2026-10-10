@@ -139,6 +139,6 @@
     });
     App.stampRates(); App.save(); const had = fi.docs.length; fi.docs = []; fi.ov = new Map(); fi.pay = new Map();
     App.undoBar(`${created} facture(s) importée(s)${newClients ? `, ${newClients} client(s) créé(s)` : ''}`, () => { db.clients = snap.clients; db.invoices = snap.invoices; db.payments = snap.payments; db.log = snap.log; S.invSeq = snap.invSeq; S.clientSeq = snap.seq; App.save(); App.refresh(); App.toast('Import annulé'); }, 'Annuler l\'import');
-    App.go('invoices');
+    App.go('invoices'); App.celebrate();
   };
 })();

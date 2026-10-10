@@ -413,3 +413,12 @@ dialog form > .end .btn.sec { flex:0 0 38%; }
 .stp button:active { background:var(--acc); color:#fff; border-color:var(--acc); }
 @media (max-width:640px) { dialog { border-radius:26px 26px 0 0; } }
 @media (prefers-reduced-motion:reduce) { dialog[open] { animation:none; } }
+
+/* Design v2 — petits effets (étape 4c) */
+#confetti { position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; }
+.badges { display:flex; gap:8px; overflow-x:auto; margin:0 0 14px; padding:2px 0 4px; scrollbar-width:none; }
+.badges::-webkit-scrollbar { display:none; }
+.bdg { flex:none; display:inline-flex; align-items:center; gap:6px; padding:6px 12px 6px 6px; border-radius:99px; font-size:12.5px; font-weight:600; border:1px dashed var(--line); color:var(--mut); background:transparent; }
+.bdg i { font-style:normal; width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--line); filter:grayscale(1); opacity:.7; }
+.bdg.on { border:1px solid transparent; color:#5a3a00; background:linear-gradient(135deg,#ffe8a3,#f6c453); box-shadow:0 2px 8px rgba(246,196,83,.35); }
+.bdg.on i { background:rgba(255,255,255,.65); filter:none; opacity:1; }

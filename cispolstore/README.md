@@ -263,3 +263,11 @@ Limites : l'application ne voit que les fichiers qu'elle a créés (`drive.file`
 ## Prévu plus tard
 
 Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), profils utilisateurs (comptable, technicien, vendeur).
+
+## Petits effets (design étape 4c)
+
+- **Confettis** 🎉 quand une facture est soldée (paiement complet, prix négocié), après un import réussi (clients ou factures), quand l'objectif du mois est atteint et quand une réussite est débloquée. Ils sont désactivés si l'appareil demande de réduire les animations.
+- **Salutation selon l'heure** : Bonjour ☀️ / Bon après-midi 🌤️ / Bonsoir 🌙 dans l'en-tête de l'accueil.
+- **Réussites** 🏆 : pastilles « 10 / 50 / 100 / 250 clients » et « … factures » sur l'accueil (la prochaine à débloquer est en grisé). Les réussites déjà atteintes à l'ouverture ne déclenchent pas de confettis.
+- **Compteurs animés** : le chiffre d'affaires et les indicateurs de l'accueil montent jusqu'à leur valeur (attribut `data-count`, géré par `js/effects.js`).
+- **Vibration légère** (8 ms) sur la barre du bas et le bouton +, si le téléphone le permet.
