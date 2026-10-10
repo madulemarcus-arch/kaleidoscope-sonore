@@ -120,6 +120,20 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Importer des clients (Excel ou CSV)
+
+**Paramètres → Données → Importer des clients** (administrateur). Choisissez un fichier **.xlsx** (ou .csv) : il est lu dans l'appareil, rien n'est envoyé sur internet.
+- L'application reconnaît les colonnes d'après leur titre (nom, ACC, téléphone, abonnement, date de paiement, date d'expiration, solde dû, référence, observation, n°) ; vous pouvez corriger l'association dans « Colonnes reconnues ».
+- **Comparaison avec vos clients** : le compte **ACC** identifie un kit. Même ACC déjà dans l'application = « déjà présent » (jamais ajouté deux fois). **Même nom mais ACC différent = un autre kit : il est gardé** (le client est ajouté une deuxième fois avec son propre ACC). Un client saisi à la main avec le même nom mais **sans ACC** est signalé « à vérifier » : vous choisissez *Ne pas ajouter*, *Ajouter* ou *Compléter la fiche existante* (ajoute l'ACC, la formule et les dates sans créer de doublon).
+- **Liste à valider** : tous les clients du fichier, avec filtres (Tous, Nouveaux, Déjà présents, À vérifier, Même nom) ; chaque ligne a un choix *Ajouter / Ne pas ajouter*, et deux boutons pour tout ajouter ou ne rien ajouter. Rien n'est créé avant « Ajouter N clients ».
+- Chaque ligne ajoutée devient un **client géré** : prénom / nom, téléphone (0 ajouté devant les numéros à 9 chiffres), **ACC (aussi dans le champ « Référence / adresse d'installation »)**, formule, **date de début = date de paiement**, **durée = date d'expiration − date de paiement**. Sans dates, le client est « sans abonnement ». Les formules inconnues (ex. Illimité, 250 Go) sont créées avec un prix proposé d'après les soldes dus (modifiable avant l'import ; coût Starlink à 0, à régler dans Paramètres → formules).
+- La colonne « Référence » du fichier (la personne qui amène le client) est notée dans la **note** (« Référent »), avec les observations « désactivé / bloqué », les **soldes dus** (aucune facture créée), les dates à vérifier et le n° du fichier.
+- Après l'import, une barre **Annuler l'import** remet tout comme avant. Réimporter le même fichier n'ajoute rien.
+
+## Supprimer plusieurs clients
+
+**Clients → ☑ Sélectionner pour supprimer** (administrateur) : cochez les clients, **Tout** coche ceux du filtre affiché, puis **🗑 Supprimer (N)**. Les clients qui ont des factures ou des paiements sont conservés ; une barre **Annuler** remet les clients supprimés.
+
 ## Abonnements : compteurs cliquables
 
 Dans **Abonnements**, touchez **Actifs**, **En sursis** ou **Inactifs** : la liste des clients de cette catégorie s'affiche juste en dessous (nom, formule, téléphone, date de fin ; « dans N jours » pour les actifs, « jusqu'au… » pour le sursis, « fin le… » pour les inactifs). Touchez un client pour ouvrir sa fiche, retouchez le compteur pour fermer la liste.
