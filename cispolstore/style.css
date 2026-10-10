@@ -356,3 +356,32 @@ dialog { border-radius:22px; }
 .hb small { color:var(--mut); font-size:12px; }
 @media (prefers-reduced-motion:reduce) { .cbs i, .htr i, .dwrap .seg { animation:none; } }
 @media (min-width:1024px) { .cplot { height:210px; } }
+
+/* =====================================================================
+   Design v2 — listes (étape 4a)
+   ===================================================================== */
+.list > .lh { position:sticky; top:62px; z-index:2; padding:6px 16px; font-size:12px; font-weight:800; letter-spacing:.06em; color:var(--mut); background:color-mix(in srgb,var(--card2) 92%,transparent); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); }
+.item.rw { position:relative; cursor:pointer; }
+.item.rw::before { content:''; position:absolute; left:0; top:12px; bottom:12px; width:4px; border-radius:0 4px 4px 0; background:transparent; }
+.item.rw.t-ok::before { background:var(--ok); } .item.rw.t-warn::before { background:var(--warn); } .item.rw.t-bad::before { background:var(--bad); }
+.item.rw:active { background:var(--card2); }
+.item .grow small .mono, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; letter-spacing:-.02em; }
+.item .end small.ok { color:var(--ok); } .item .end small.warn { color:var(--warn); } .item .end small.bad { color:var(--bad); } .item .end small.mut { color:var(--mut); }
+.empty.big { padding:38px 18px; } .empty.big .ei { font-size:46px; margin-bottom:6px; } .empty.big b { display:block; font-size:17px; color:var(--txt); } .empty.big p { margin:6px 0 14px; }
+
+/* lignes qu'on fait glisser : appeler, WhatsApp, copier l'ACC, renouveler, encaisser */
+.swr { position:relative; overflow:hidden; border-bottom:1px solid var(--line); --w:calc(var(--n,2) * -64px); background:var(--card); }
+.swr:last-child { border-bottom:0; }
+.swr > .item { background:var(--card); border-bottom:0; transition:transform .22s cubic-bezier(.2,.8,.2,1); touch-action:pan-y; }
+.swr.open > .item { transform:translateX(var(--w)); }
+.swa { position:absolute; top:0; bottom:0; right:0; display:flex; }
+.sw { width:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border:0; color:#fff; font-size:11px; font-weight:700; text-decoration:none; padding:0 2px; text-align:center; line-height:1.1; }
+.sw span { font-size:21px; line-height:1; }
+.sw-call { background:linear-gradient(135deg,#1f9d55,#33b86e); } .sw-wa { background:linear-gradient(135deg,#1fb857,#25d366); } .sw-copy { background:linear-gradient(135deg,#64788f,#8296ad); } .sw-renew { background:linear-gradient(135deg,#7c5cff,#9a82ff); } .sw-pay { background:linear-gradient(135deg,#1f9d55,#33b86e); } .sw-print { background:linear-gradient(135deg,#3b6ea8,#5b93d0); }
+@media (hover:hover) and (min-width:1024px) { .swr:hover > .item { transform:translateX(var(--w)); } }
+@media (min-width:1024px) {
+  #clist .list > .lh, #ilist .list > .lh, #plist .list > .lh { grid-column:1/-1; top:0; }
+  #clist .list > .swr, #ilist .list > .swr, #clist .list > .item, #ilist .list > .item { border-right:1px solid var(--line); }
+}
+/* overflow:clip keeps the rounded corners without turning the list into a scroll container (letter headers stay sticky to the page) */
+#clist .list, #ilist .list { overflow:clip; }
