@@ -1,7 +1,7 @@
 /* CISPOLstore Manager — palette from the logo: navy #1E3F60, orange #D5522F, yellow #E5B044 */
 :root {
   --bg:#e8f3fb; --card:#ffffff; --card2:#f3f8fc; --line:#d3e3f1; --txt:#10304d; --mut:#5d7690;
-  --navy:#12365d; --blue:#1e5aa8; --acc:#d5522f; --acc-hi:#ec6a40; --acc2:#e5b044; --on-acc:#fff;
+  --navy:#12365d; --blue:#1e5aa8; --acc:#d5522f; --acc-hi:#ec6a40; --dom:var(--acc); --acc2:#e5b044; --on-acc:#fff;
   --ok:#1f9d55; --warn:#d9822b; --bad:#d64545; --shadow:0 2px 10px rgba(18,54,93,.10);
   color-scheme: light;
 }
@@ -206,9 +206,9 @@ details.fold[open] > summary::after { transform:rotate(90deg); }
   --navy2:#1a4f8c; --r:16px; --r-sm:12px;
   --sh1:0 1px 2px rgba(13,43,78,.06), 0 8px 24px rgba(13,43,78,.08);
   --sh-acc:0 6px 16px color-mix(in srgb,var(--acc) 30%,transparent);
-  --hdr:radial-gradient(260px 130px at 94% -35%, rgba(229,176,68,.40), transparent 70%), radial-gradient(280px 150px at 4% 135%, rgba(213,82,47,.30), transparent 70%), linear-gradient(135deg,#0b2646 0%,#154780 100%);
+  --hdr:radial-gradient(260px 130px at 94% -35%, rgba(229,176,68,.40), transparent 70%), radial-gradient(280px 150px at 4% 135%, color-mix(in srgb,var(--dom) 55%,transparent), transparent 70%), linear-gradient(135deg,#0b2646 0%,#154780 100%);
 }
-:root[data-theme="dark"] { --navy2:#143b66; --sh1:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35); --hdr:radial-gradient(260px 130px at 94% -35%, rgba(229,176,68,.22), transparent 70%), radial-gradient(280px 150px at 4% 135%, rgba(213,82,47,.22), transparent 70%), linear-gradient(135deg,#071a30 0%,#0e335d 100%); }
+:root[data-theme="dark"] { --navy2:#143b66; --sh1:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35); --hdr:radial-gradient(260px 130px at 94% -35%, rgba(229,176,68,.22), transparent 70%), radial-gradient(280px 150px at 4% 135%, color-mix(in srgb,var(--dom) 42%,transparent), transparent 70%), linear-gradient(135deg,#071a30 0%,#0e335d 100%); }
 body { font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; font-size:15px; letter-spacing:-.005em; font-feature-settings:'cv11','ss01'; }
 .stat b, .num, .item .end b, .total, td, th, .kv dd { font-variant-numeric:tabular-nums; }
 
@@ -434,3 +434,27 @@ dialog form > .end .btn.sec { flex:0 0 38%; }
 .swatches { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
 .swatches button { width:38px; height:38px; border-radius:50%; border:3px solid transparent; background:var(--c); box-shadow:0 0 0 1px var(--line); padding:0; }
 .swatches button[aria-pressed="true"] { border-color:var(--card); box-shadow:0 0 0 3px var(--c); }
+
+/* Design v2 — une couleur par domaine (étape 6) */
+:root[data-dom="clients"] { --dom:#2f7de1; }
+:root[data-dom="finance"] { --dom:#169c5b; }
+:root[data-dom="stock"] { --dom:#d9822b; }
+:root[data-dom="subs"] { --dom:#7c5cff; }
+:root[data-dom="invoices"] { --dom:#e4572e; }
+:root[data-theme="dark"][data-dom="clients"] { --dom:#5b9bf0; }
+:root[data-theme="dark"][data-dom="finance"] { --dom:#3ecf8e; }
+:root[data-theme="dark"][data-dom="stock"] { --dom:#f0a53a; }
+:root[data-theme="dark"][data-dom="subs"] { --dom:#9d85ff; }
+:root[data-theme="dark"][data-dom="invoices"] { --dom:#ff7a52; }
+body { background:color-mix(in srgb,var(--dom) 5%,var(--bg)); transition:background .3s; }
+:root[data-black] body { background:#000; }
+h2.sec::before { background:linear-gradient(color-mix(in srgb,var(--dom) 55%,#fff),var(--dom)); }
+h2.sec .more { color:var(--dom); }
+.dash .stat, .kpis .stat { border-top:3px solid color-mix(in srgb,var(--dom) 70%,transparent); }
+#bottom [data-nav="clients"].on { color:#2f7de1; } #bottom [data-nav="clients"].on span { background:color-mix(in srgb,#2f7de1 15%,transparent); }
+#bottom [data-nav="stock"].on { color:#d9822b; } #bottom [data-nav="stock"].on span { background:color-mix(in srgb,#d9822b 15%,transparent); }
+.bar-dom { height:3px; }
+@media (prefers-reduced-motion:reduce) { body { transition:none; } }
+#bottom [data-nav="finance"].on { color:#169c5b; } #bottom [data-nav="finance"].on span { background:color-mix(in srgb,#169c5b 15%,transparent); }
+:root[data-dom] .chip.on:not(.hero-chip) { background:linear-gradient(135deg,color-mix(in srgb,var(--dom) 80%,#fff),var(--dom)); border-color:var(--dom); color:#fff; box-shadow:0 4px 12px color-mix(in srgb,var(--dom) 35%,transparent); }
+:root[data-dom] .hero .chip.on { background:#fff; color:#0b2646; box-shadow:none; }
