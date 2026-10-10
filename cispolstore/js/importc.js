@@ -153,6 +153,8 @@
   App.actions.imp_allnew = () => { analyse().recs.filter(r => r.status === 'new').forEach(r => im.ov.set(r.key, 'add')); App.refresh(); };
   App.actions.imp_nonenew = () => { analyse().recs.filter(r => r.status === 'new').forEach(r => im.ov.set(r.key, 'skip')); App.refresh(); };
 
+  App.impTools = { unzip, xml, norm, fixName };
+
   // ---------- the import itself ----------
   App.actions.imp_go = () => {
     const a = analyse(), db = App.db, S = db.settings; if (!a.todo.length && !a.merge.length && !a.update.length) return;
