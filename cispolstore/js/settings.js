@@ -3,6 +3,14 @@
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
   const ACC = [['orange', '#d5522f', 'Orange'], ['blue', '#2f7de1', 'Bleu'], ['green', '#169c5b', 'Vert'], ['violet', '#7c5cff', 'Violet'], ['pink', '#e0457b', 'Rose'], ['gold', '#c98a0a', 'Or']];
+  // header of the Plus and Settings screens: company, who is signed in, and three status badges (PIN, backup, synchronisation)
+  App.profileHero = (withVersion) => {
+    const S = App.db.settings, co = S.company, me = App.me(), lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, App.today()) : null;
+    const b = (cls, ico, txt, act) => `<${act && App.guard(act) ? `button data-act="${act}"` : 'span'} class="sbadge ${cls}"><i>${ico}</i>${txt}</${act && App.guard(act) ? 'button' : 'span'}>`;
+    const sy = App.sync && App.sync.status !== 'off';
+    return `<section class="hero phero"><div class="chead"><img src="${esc(co.logo || 'logo.png')}" alt=""><div><h2>${esc(co.name)}</h2><small>${me.name && me.name !== App.role().label ? esc(me.name) + ' · ' : ''}${esc(App.role().label)}${withVersion ? ' · version 2.0' : ''}</small></div></div>
+      <div class="sbadges">${b(App.hasPin() ? 'ok' : 'warn', '🔐', App.hasPin() ? 'Protégé par PIN' : 'Sans PIN', App.hasPin() ? '' : 'pinset')}${b(age !== null && age <= 7 ? 'ok' : 'warn', '💾', age === null ? 'Aucune sauvegarde' : age === 0 ? 'Sauvegardé aujourd\'hui' : `Sauvegarde il y a ${age} j`, 'backup')}${b(sy ? 'ok' : '', '🔄', sy ? 'Synchronisé' : 'Hors synchronisation')}</div></section>`;
+  };
   App.persisted = null;
 
   const row = (t, s, btn) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${btn || ''}</div>`;
@@ -12,7 +20,7 @@
     const warn = App.hasData(App.db) && (age === null || age > 7);
     return {
       title: 'Paramètres', back: 'more', nav: 'more',
-      html: `<h2 class="sec">Entreprise</h2><div class="list">
+      html: `${App.profileHero()}<h2 class="sec">Entreprise</h2><div class="list">
           <div class="item"><img src="${esc(co.logo || 'logo.png')}" alt="" style="height:48px;background:#fff;border-radius:8px;padding:2px"><div class="grow"><b>${esc(co.name)}</b><small>${esc(co.address)}</small><small>${esc(co.phone)} · ${esc(co.email)}</small><small>RCCM : ${esc(co.rccm || '—')} · ID. Nat. : ${esc(co.idnat || '—')} · N° Impôt : ${esc(co.impot || '—')}</small></div><button class="btn sm sec" data-act="setco">Modifier</button></div></div>
         <h2 class="sec">Application</h2><div class="list">
           ${row('Taux USD / CDF', `1 $ = ${App.nf(S.rate, 0)} CDF (taux actuel : chaque facture et chaque paiement garde son propre taux)`, '<button class="btn sm sec" data-act="setapp">Modifier</button>')}

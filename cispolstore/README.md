@@ -306,3 +306,7 @@ Chaque rubrique prend sa couleur : **Clients** en bleu, **Finance** en vert (ent
 - **Stock** : en-tête avec la valeur du stock (prix d'achat, ou prix de vente pour les profils sans accès aux coûts), le nombre de produits, de produits en stock bas et de produits suivis.
 - **Indicateur de chargement** (`App.busy`) pendant la lecture des fichiers d'import et la création d'un PDF.
 - **Effet au toucher** sur les cartes cliquables, les puces, les onglets et les étapes (désactivé si l'appareil demande de réduire les animations).
+
+## Plus et Paramètres (design étape 10)
+
+Les écrans **Plus** et **Paramètres** commencent par un en-tête : logo et nom de l'entreprise, profil connecté avec son rôle, et trois pastilles d'état : **PIN** (protégé ou non), **sauvegarde** (récente en vert, ancienne ou absente en jaune) et **synchronisation**. Un toucher sur « Sans PIN » ou sur la sauvegarde lance directement l'action (réservé à l'administrateur). Code : `App.profileHero` dans `js/settings.js`.
