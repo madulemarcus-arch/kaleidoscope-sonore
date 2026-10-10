@@ -37,8 +37,8 @@
     const r = role(), m = App.me();
     document.body.classList.toggle('solo', !!r.solo);
     const btn = v => `<button data-act="go" data-v="${v}" data-nav="${v}"><span>${NAVI[v][0]}</span>${NAVI[v][1]}</button>`;
-    $('bottom').innerHTML = r.fab ? r.nav.slice(0, 2).map(btn).join('') + '<i></i>' + r.nav.slice(2).map(btn).join('') : r.nav.map(btn).join('');
-    $('bottom').style.gridTemplateColumns = `repeat(${r.nav.length + (r.fab ? 1 : 0)},1fr)`;
+    $('bottom').innerHTML = r.nav.map(btn).join('');
+    $('bottom').style.gridTemplateColumns = `repeat(${r.nav.length},1fr)`;
     $('fab').hidden = !r.fab; $('syncBtn').hidden = !(r === ROLES.admin);
     $('searchBtn').hidden = !r.views.includes('clients');
     if (r.solo) { $('searchBtn').hidden = true; $('syncBtn').hidden = true; }

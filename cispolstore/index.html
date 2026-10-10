@@ -7,6 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 <title>CISPOLstore Manager</title>
 </head>
@@ -18,9 +19,12 @@
   <img id="logo" src="logo.png" alt="CISPOLstore">
   <div id="title"></div>
   <button class="ib" id="searchBtn" aria-label="Rechercher">🔎</button>
-  <button class="ib" id="syncBtn" aria-label="Synchronisation">☁️</button>
-  <button class="ib" id="themeBtn" aria-label="Changer de thème">🌙</button>
   <button class="ib" id="lockBtn" aria-label="Verrouiller">🔒</button>
+  <button class="ib" id="menuBtn" aria-label="Plus d'options" aria-haspopup="true">⋯</button>
+  <div id="topmenu" hidden>
+    <button class="ib" id="syncBtn" aria-label="Synchronisation">☁️</button>
+    <button class="ib" id="themeBtn" aria-label="Changer de thème">🌙</button>
+  </div>
 </header>
 <main id="view"></main>
 <nav id="bottom">
