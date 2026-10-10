@@ -93,7 +93,7 @@
   // ---------- screen ----------
   const bind = () => {
     const f = $('if_file'); if (f) f.onchange = async () => {
-      fi.err = ''; const list = [...f.files], docs = [];
+      fi.err = ''; const list = [...f.files], docs = [], done = App.busy(`Lecture de ${list.length} fichier(s)…`);
       for (const file of list) {
         try {
           if (/\.pdf$/i.test(file.name)) docs.push(await parsePdf(file));
@@ -101,7 +101,7 @@
           else throw new Error(`« ${file.name} » : seuls les fichiers Word (.docx) et PDF sont lus.`);
         } catch (e) { fi.err += (fi.err ? '\n' : '') + (e.message || 'Fichier illisible.'); }
       }
-      if (docs.length) { fi.docs = fi.docs.concat(docs); } App.refresh();
+      if (docs.length) { fi.docs = fi.docs.concat(docs); } done(); App.refresh();
     };
     document.querySelectorAll('[data-ifa]').forEach(el => el.onchange = () => { fi.ov.set(+el.dataset.ifa, el.value); App.refresh(); });
     document.querySelectorAll('[data-ifp]').forEach(el => el.onchange = () => { fi.pay.set(+el.dataset.ifp, el.value); App.refresh(); });

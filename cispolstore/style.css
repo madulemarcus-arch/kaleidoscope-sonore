@@ -494,3 +494,39 @@ kbd { font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace; padding:3px 6
   .hero { padding:18px 24px 14px; } .hero-num { font-size:44px; } .hero .spark { height:46px; }
   #view > .search { max-width:none; }
 }
+
+/* =====================================================================
+   Design v2 — étape 9 : pastilles à icône, chargement, fiches
+   ===================================================================== */
+.pill.ok::before { content:'✓ '; } .pill.warn::before { content:'⏳ '; font-size:11px; } .pill.bad::before { content:'✕ '; }
+.busy { position:fixed; top:calc(14px + env(safe-area-inset-top,0px)); left:50%; transform:translateX(-50%); z-index:9998; display:flex; align-items:center; gap:10px; padding:10px 18px; border-radius:99px; background:var(--navy); color:#fff; font-weight:600; font-size:14px; box-shadow:0 8px 24px rgba(0,0,0,.3); animation:rise .2s ease-out; }
+.busy i { width:16px; height:16px; border-radius:50%; border:3px solid rgba(255,255,255,.3); border-top-color:#fff; animation:spin .7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .busy i { animation-duration:2s; } }
+/* touch feedback on cards, chips and tabs */
+button.item, .card[data-act], .chip, .tabs button, .stat.tap, .step, .ring, .opt { transition:transform .12s, background .15s, box-shadow .15s; }
+button.item:active, .card[data-act]:active, .chip:active, .tabs button:active, .stat.tap:active, .step:active, .ring:active, .opt:active { transform:scale(.97); }
+@media (prefers-reduced-motion:reduce) { button.item:active, .card[data-act]:active, .chip:active, .tabs button:active, .stat.tap:active, .step:active, .ring:active, .opt:active { transform:none; } }
+/* client / invoice / stock headers */
+.chead { display:flex; gap:14px; align-items:center; }
+.chead h2 { font-size:21px; font-weight:800; letter-spacing:-.01em; word-break:break-word; }
+.chead .avatar.big { box-shadow:0 0 0 3px rgba(255,255,255,.35); flex:none; }
+.cbadges { display:flex; gap:6px; flex-wrap:wrap; margin:5px 0 4px; }
+.hero .pill { background:rgba(255,255,255,.18); color:#fff; }
+.acc { background:rgba(255,255,255,.14); color:#fff; border:0; border-radius:8px; padding:3px 9px; font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:-.02em; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cstats { display:grid; grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); gap:8px; margin:14px 0 4px; }
+.cstats > div { background:rgba(255,255,255,.12); border-radius:14px; padding:9px 12px; }
+.cstats b { display:block; font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.cstats small { opacity:.8; font-size:12px; }
+.cstats .bad b { color:#ffb4a8; }
+.ctiles { display:flex; gap:8px; margin-top:12px; }
+.ctiles > * { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px; border-radius:14px; background:rgba(255,255,255,.16); color:#fff; border:0; font:700 12px inherit; text-decoration:none; }
+.ctiles span { font-size:21px; line-height:1; }
+.ctiles > *:active { background:rgba(255,255,255,.3); }
+.ihero .hero-num { margin:6px 0 10px; }
+.pbar2.w { background:rgba(255,255,255,.2); } .pbar2.w i { background:#f6c453; }
+.ifoot { display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-top:6px; opacity:.95; }
+.ihero .chip { margin-top:12px; }
+.shero .hero-num { margin-top:2px; }
+.chead > div { flex:1; min-width:0; text-align:left; }
+.cstats .bad small { color:inherit; }

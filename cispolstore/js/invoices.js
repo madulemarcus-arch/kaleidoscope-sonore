@@ -300,7 +300,10 @@
     const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pays = App.db.payments.filter(x => x.invoiceId === i.id);
     return {
       title: 'Facture', sub: i.number, back: 'invoices', nav: 'more',
-      html: `<div class="spread" style="margin-bottom:10px"><span class="pill ${k}">${t}</span><span class="mut">${App.invTypes[i.type]}</span></div>
+      html: `<section class="hero ihero"><div class="hero-top"><div><small>${App.invTypes[i.type]} · ${App.fdate(i.date)}</small><div class="hero-date" style="text-transform:none">${esc(i.number)}</div></div><span class="pill ${k}">${t}</span></div>
+          <div class="hero-num">${App.fmt(App.invTotal(i), i.currency)}</div>
+          ${i.pending ? '' : `<div class="pbar2 w"><i style="width:${Math.min(100, Math.round(App.invPaid(i) / Math.max(0.01, App.invAgreed(i)) * 100))}%"></i></div><div class="ifoot"><span>Reçu ${App.fmt(App.invPaid(i), i.currency)}</span><span>${due > 0.004 ? 'Reste ' + App.fmt(due, i.currency) : '✓ Soldée'}</span></div>`}
+          ${i.clientId && App.client(i.clientId) ? `<button class="chip" data-act="go" data-v="client" data-id="${i.clientId}">👤 ${esc(App.cname(App.client(i.clientId)))} ›</button>` : ''}</section>
         <div class="card" style="margin-bottom:10px"><div class="spread"><span>Total de la facture imprimée</span><b>${App.fmt(App.invTotal(i), i.currency)}</b></div>${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<div class="spread"><span>Prix convenu (négocié)</span><b>${App.fmt(App.invAgreed(i), i.currency)}</b></div>` : ''}<div class="spread"><span>Reçu du client</span><b class="ok">${App.fmt(App.invPaid(i), i.currency)}</b></div><div class="spread"><span>Reste à payer</span><b class="${due > 0.004 ? 'bad' : 'ok'}">${App.fmt(due, i.currency)}</b></div></div>
         ${splitCardInv(i)}
         ${i.pending ? `<div class="card noprint" style="margin-bottom:10px;border:2px solid var(--warn,#e8a317)"><b>⏳ Facture en attente</b><p class="mut" style="margin:6px 0">Le client a la facture mais la vente n'est pas encore faite : le stock n'est pas déduit, rien n'est compté dans les ventes ni dans les impayés.</p><div class="bar"><button class="btn" data-act="invvalid" data-id="${i.id}">✅ Le client prend le produit</button><button class="btn del" data-act="invcancel" data-id="${i.id}">✖ Le client n'en veut plus</button></div></div>` : ''}

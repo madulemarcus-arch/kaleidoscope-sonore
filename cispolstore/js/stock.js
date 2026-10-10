@@ -23,10 +23,12 @@
   App.views.stock = p => {
     if (p && p.q != null && p.q !== st.q) st.q = p.q;
     const db = App.db, low = db.products.filter(x => App.tracked(x) && x.qty <= (x.min || 0));
-    const moves = db.moves.slice(-12).reverse();
+    const moves = db.moves.slice(-12).reverse(), val = db.products.filter(x => App.tracked(x)).reduce((a, x) => a + (+x.qty || 0) * (App.can('costs') ? +x.cost || 0 : +x.price || 0), 0);
     return {
       title: 'Stock', sub: `${db.products.length} produit(s)`, nav: 'stock',
-      html: `<div class="search"><input id="pq" placeholder="Rechercher un produit, une référence…" value="${esc(st.q)}" autocomplete="off"></div>
+      html: `<section class="hero shero"><div class="hero-top"><div><small>📦 Valeur du stock${App.can('costs') ? ' (prix d\'achat)' : ' (prix de vente)'}</small><div class="hero-num" data-count="${val}">${App.fmt(val)}</div></div></div>
+          <div class="cstats"><div><b data-count="${db.products.length}" data-int="1">${db.products.length}</b><small>produits</small></div><div class="${low.length ? 'bad' : ''}"><b>${low.length}</b><small>stock bas</small></div><div><b>${db.products.filter(x => App.tracked(x)).length}</b><small>suivis</small></div></div></section>
+        <div class="search"><input id="pq" placeholder="Rechercher un produit, une référence…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips"><button class="chip ${st.cat === 'all' ? 'on' : ''}" data-act="stcat" data-c="all">Tous</button>${App.CATS.filter(c => db.products.some(p => p.cat === c)).map(c => `<button class="chip ${st.cat === c ? 'on' : ''}" data-act="stcat" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
         ${low.length ? `<div class="card" style="margin-bottom:10px"><b class="warn">⚠ Stock bas :</b> ${low.map(x => esc(x.name) + ' (' + qtyText(x) + ')').join(', ')}</div>` : ''}
         <div id="plist"></div>

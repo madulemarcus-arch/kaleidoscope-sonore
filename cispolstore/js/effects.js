@@ -21,6 +21,8 @@
     };
     requestAnimationFrame(step);
   };
+  // loading pill with a spinner for slow work (reading a file, building a PDF); returns the function that hides it
+  App.busy = msg => { const el = document.createElement('div'); el.className = 'busy'; el.setAttribute('role', 'status'); el.innerHTML = `<i></i>${App.esc(msg || 'Un instant…')}`; document.body.appendChild(el); return () => el.remove(); };
   App.greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Bonjour ☀️' : h < 18 ? 'Bon après-midi 🌤️' : 'Bonsoir 🌙'; };
 
   // achievements: [id, icon, label, reached]
