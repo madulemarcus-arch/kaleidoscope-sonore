@@ -16,7 +16,7 @@
   App.waLink = c => App.waUrl(c.phone, App.reminderText(c));
 
   // ---------- List ----------
-  const st = App.clState = { f: 'all', q: '' };
+  const st = App.clState = { f: 'all', q: '', sel: false, picked: new Set() };
   const FILTERS = [['all', 'Tous'], ['gere', '📡 Gérés'], ['mat', '📦 Matériel'], ['install', '🔧 Installation'], ['actif', '🟢 Actifs'], ['sursis', '🟠 Sursis'], ['inactif', '🔴 Inactifs']];
   const filtered = () => {
     const q = st.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -29,7 +29,8 @@
   };
   const drawList = () => {
     const l = filtered();
-    $('clist').innerHTML = l.length ? `<div class="list">${l.map(c => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${tone(c)}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.acc || c.article || c.code)} · ${esc(c.phone || '')}</small></div><div class="end">${badge(c)}</div></button>`).join('')}</div>` : '<div class="empty">Aucun client pour ce filtre.</div>';
+    if ($('clbar')) $('clbar').innerHTML = !App.guard('delclients') ? '' : st.sel ? `<button class="btn sm sec" data-act="cl_all">☑ Tout (${l.length})</button><button class="btn sm del" data-act="delclients">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="cl_sel">Terminer</button>` : '<button class="btn sm sec" data-act="cl_sel">☑ Sélectionner pour supprimer</button>';
+    $('clist').innerHTML = l.length ? `<div class="list">${l.map(c => `<button class="item" data-act="${st.sel ? 'cl_pick' : 'go'}" data-v="client" data-id="${c.id}">${st.sel ? `<span style="font-size:20px">${st.picked.has(c.id) ? '☑️' : '⬜'}</span>` : ''}<span class="avatar ${tone(c)}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.acc || c.article || c.code)} · ${esc(c.phone || '')}</small></div><div class="end">${badge(c)}</div></button>`).join('')}</div>` : '<div class="empty">Aucun client pour ce filtre.</div>';
   };
   App.views.clients = () => {
     const all = App.db.clients, cnt = f => f === 'all' ? all.length : ['gere', 'mat', 'install'].includes(f) ? all.filter(c => c.type === f).length : all.filter(c => (App.sub(c) || {}).status === f).length;
@@ -37,11 +38,25 @@
       title: 'Clients', sub: `${all.length} au total`, nav: 'clients',
       html: `<div class="search"><input id="cq" placeholder="Rechercher un client, ACC, téléphone…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips">${FILTERS.map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="clfilter" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
-        <div id="clist"></div><button class="btn full" data-act="newclient" style="margin-top:14px">+ Nouveau client</button>`,
+        <div class="bar" id="clbar" style="margin-bottom:6px"></div><div id="clist"></div><button class="btn full" data-act="newclient" style="margin-top:14px">+ Nouveau client</button>`,
       after: () => { drawList(); $('cq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
-  App.actions.clfilter = d => { st.f = d.f; App.refresh(); };
+  App.actions.cl_sel = () => { st.sel = !st.sel; st.picked = new Set(); drawList(); };
+  App.actions.cl_pick = d => { st.picked.has(d.id) ? st.picked.delete(d.id) : st.picked.add(d.id); drawList(); };
+  App.actions.cl_all = () => { const all = filtered(), full = all.every(c => st.picked.has(c.id)); all.forEach(c => full ? st.picked.delete(c.id) : st.picked.add(c.id)); drawList(); };
+  // several clients at once (those with invoices or payments are kept); the "Annuler" bar puts them all back
+  App.actions.delclients = () => {
+    const db = App.db, ids = [...st.picked]; if (!ids.length) return App.toast('Sélectionnez au moins un client');
+    const used = id => db.invoices.some(i => i.clientId === id) || db.payments.some(p => p.clientId === id), del = ids.filter(id => !used(id)), keep = ids.length - del.length;
+    if (!del.length) return App.toast('Ces clients ont des factures ou paiements : suppression impossible');
+    if (!App.confirm(`Supprimer définitivement ${del.length} client(s) ?${keep ? `\n${keep} client(s) avec factures ou paiements seront conservés.` : ''}`)) return;
+    const snap = JSON.parse(JSON.stringify({ clients: db.clients, installs: db.installs, penalties: db.penalties, deliveries: db.deliveries, log: db.log }));
+    db.clients = db.clients.filter(c => !del.includes(c.id)); ['installs', 'penalties', 'deliveries', 'log'].forEach(k => { db[k] = db[k].filter(x => !del.includes(x.clientId)); });
+    st.picked = new Set(); st.sel = false; App.save(); App.refresh();
+    App.undoBar(`${del.length} client(s) supprimé(s)`, () => { Object.assign(db, snap); App.save(); App.refresh(); App.toast('Suppression annulée'); }, 'Annuler');
+  };
+  App.actions.clfilter = d => { st.f = d.f; st.picked = new Set(); App.refresh(); };
   App.actions.newclient = () => App.clientForm();
 
   // ---------- Create / edit ----------
