@@ -271,3 +271,9 @@ Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la
 - **Réussites** 🏆 : pastilles « 10 / 50 / 100 / 250 clients » et « … factures » sur l'accueil (la prochaine à débloquer est en grisé). Les réussites déjà atteintes à l'ouverture ne déclenchent pas de confettis.
 - **Compteurs animés** : le chiffre d'affaires et les indicateurs de l'accueil montent jusqu'à leur valeur (attribut `data-count`, géré par `js/effects.js`).
 - **Vibration légère** (8 ms) sur la barre du bas et le bouton +, si le téléphone le permet.
+
+## Thèmes et couleurs (design étape 5)
+
+- **Thème Noir** (écrans OLED) en plus d'Automatique, Clair et Sombre : fond noir pur, cartes très sombres.
+- **Couleur de l'application** : orange (par défaut), bleu, vert, violet, rose ou or. Elle colore les boutons, le bouton ＋ et les éléments actifs. L'aperçu est immédiat dans la fenêtre ; « Annuler » rétablit la couleur précédente.
+- Réglages dans **Plus › Paramètres › Application › Modifier**. Thème et couleur restent propres à chaque appareil (ils ne sont pas synchronisés).
