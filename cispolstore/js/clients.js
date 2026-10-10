@@ -139,6 +139,15 @@
       ${hist.length ? `<h2 class="sec">Périodes précédentes</h2><div class="list">${hist.map(h => `<div class="item"><div class="grow"><b>${App.fdate(h.start)} → ${App.fdate(App.addDays(h.start, h.days))}</b><small>${h.days} jours</small></div></div>`).join('')}</div>` : ''}`;
   };
   const listOrEmpty = (rows, empty) => rows.length ? `<div class="list">${rows.join('')}</div>` : `<div class="empty">${empty}</div>`;
+  // key figures shown in the client header: subscription time left, total invoiced, balance still due (all in dollars)
+  const cstats = c => {
+    const inv = App.db.invoices.filter(i => i.clientId === c.id && App.live(i)), usd = (n, i) => App.conv(n, i.currency, 'USD', App.rateOf(i)), s = App.sub(c);
+    const tot = inv.reduce((a, i) => a + usd(App.invAgreed(i), i), 0), due = inv.reduce((a, i) => a + usd(App.invDue(i), i), 0);
+    const st = [];
+    if (c.type === 'gere') st.push(s ? [s.status === 'inactif' ? `−${-s.left} j` : `${s.left} j`, s.status === 'inactif' ? 'expiré' : 'restants'] : ['—', 'abonnement']);
+    st.push([App.fmt(tot), `facturé · ${inv.length}`]); st.push([App.fmt(due), 'à payer', due > 0.004 ? 'bad' : '']);
+    return st.map(([v, l, k]) => `<div class="${k || ''}"><b>${v}</b><small>${l}</small></div>`).join('');
+  };
   App.views.client = p => {
     const c = App.client(p.id); if (!c) return { title: 'Client', back: 'clients', html: '<div class="empty">Client introuvable.</div>' };
     const tabs = TABS[c.type], tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
@@ -157,8 +166,9 @@
     const wa = App.waLink(c);
     return {
       title: App.cname(c), sub: 'Fiche client', back: 'clients', nav: 'clients',
-      html: `<div class="card"><div class="row" style="flex-wrap:nowrap;align-items:center"><span class="avatar big ${tone(c)}" style="flex:none;min-width:60px">${esc(App.initials(c))}</span><div style="flex:1;min-width:0"><h2 style="font-size:19px">${esc(App.cname(c))}</h2><div style="margin:4px 0">${badge(c)} <span class="pill">${esc(c.code)}</span></div><div class="mut">${tel(c.phone)}</div></div></div>
-        <div class="bar" style="margin-top:12px">${c.phone ? `<a class="btn sm sec" href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}" style="text-decoration:none">📞 Appeler</a>` : ''}${wa ? `<a class="btn sm sec" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>` : ''}<button class="btn sm" data-act="newinv" data-cid="${c.id}">🧾 Facture</button></div></div>
+      html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span></div>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
+        <div class="cstats">${cstats(c)}</div>
+        <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
         <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`
     };
   };

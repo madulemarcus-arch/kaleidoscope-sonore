@@ -297,3 +297,12 @@ Chaque rubrique prend sa couleur : **Clients** en bleu, **Finance** en vert (ent
   - `F` nouvelle facture · `C` nouveau client · `P` encaisser · `R` renouveler · `N` menu d'action rapide
   - `G` puis `H` accueil, `C` clients, `A` abonnements, `S` stock, `F` factures, `P` paiements, `B` finance, `I` impayés
   - L'aide est aussi dans le menu de gauche (« Raccourcis clavier »). Code : `js/keys.js`.
+
+## Fiches et finitions (design étape 9)
+
+- **Pastilles d'état avec icône** : ✓ (actif, payée), ⏳ (en sursis, partielle, en attente), ✕ (inactif, impayée), partout dans l'application.
+- **Fiche client** : en-tête en dégradé avec avatar, statut, code, ACC à copier d'un toucher, trois chiffres clés (jours d'abonnement restants, total facturé, reste à payer) et tuiles Appeler / WhatsApp / Facture / Renouveler.
+- **Détail d'une facture** : en-tête avec le total, une barre de progression des paiements reçus, le reste à payer et un lien vers le client.
+- **Stock** : en-tête avec la valeur du stock (prix d'achat, ou prix de vente pour les profils sans accès aux coûts), le nombre de produits, de produits en stock bas et de produits suivis.
+- **Indicateur de chargement** (`App.busy`) pendant la lecture des fichiers d'import et la création d'un PDF.
+- **Effet au toucher** sur les cartes cliquables, les puces, les onglets et les étapes (désactivé si l'appareil demande de réduire les animations).

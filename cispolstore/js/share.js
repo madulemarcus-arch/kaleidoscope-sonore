@@ -41,8 +41,8 @@
   };
   App.sharePdf = async (name, html) => {
     try {
-      App.toast('Préparation du PDF…');
-      const bytes = await render(html), file = new File([bytes], name, { type: 'application/pdf' });
+      const done = App.busy('Préparation du PDF…');
+      let bytes; try { bytes = await render(html); } finally { done(); } const file = new File([bytes], name, { type: 'application/pdf' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
       const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       App.toast('PDF enregistré : ' + name);

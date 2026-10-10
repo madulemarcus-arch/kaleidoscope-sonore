@@ -138,7 +138,7 @@
   };
   const bind = () => {
     const f = $('im_file'); if (f) f.onchange = async () => {
-      const file = f.files[0]; if (!file) return; im.err = '';
+      const file = f.files[0]; if (!file) return; im.err = ''; const done = App.busy('Lecture du fichier…');
       try {
         if (/\.xls$/i.test(file.name)) throw new Error("Ce format ancien (.xls) n'est pas lu : enregistrez-le en .xlsx (Excel → Enregistrer sous).");
         if (/\.csv$|\.txt$/i.test(file.name)) im.sheets = readCsv(await file.text()); else { if (typeof DecompressionStream === 'undefined') throw new Error("Ce navigateur ne sait pas lire les fichiers Excel : exportez le fichier en CSV."); im.sheets = await readXlsx(await file.arrayBuffer()); }
@@ -146,7 +146,7 @@
         im.name = file.name; const best = im.sheets.findIndex(x => /client/i.test(x.name)); setSheet(best >= 0 ? best : im.sheets.map(x => x.rows.length).indexOf(Math.max(...im.sheets.map(x => x.rows.length))));
         if (im.map.name == null) im.err = "La colonne des noms n'a pas été reconnue : choisissez-la dans « Colonnes reconnues ».";
       } catch (e) { im.sheets = null; im.err = e.message || 'Fichier illisible.'; }
-      App.refresh();
+      done(); App.refresh();
     };
     const sh = $('im_sheet'); if (sh) sh.onchange = () => { setSheet(+sh.value); App.refresh(); };
     document.querySelectorAll('[data-imk]').forEach(el => el.onchange = () => { im.map[el.dataset.imk] = el.value === '' ? null : +el.value; im.ov = new Map(); App.refresh(); });
