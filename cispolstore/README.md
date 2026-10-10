@@ -120,6 +120,15 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Nouvel accueil (design étape 2)
+
+- **Carte principale** : le **CA réel** de la période (kits et matériel, sans abonnements ni installations), qui s'anime à l'ouverture, avec la **comparaison au même moment de la période précédente** (« ▲ 12 % vs le mois dernier »), une **courbe** des ventes et les filtres Aujourd'hui / Semaine / Mois / Année. Le taux du jour est en haut à droite.
+- **Objectif du mois** : sur « Ce mois », un **anneau** montre l'avancement vers l'objectif (touchez-le pour le fixer ou le changer ; l'objectif est partagé entre les appareils).
+- **Quatre tuiles d'action** : Facture, Encaisser, Client, Renouveler (seulement celles permises par le profil).
+- **Abonnements** : une barre colorée actifs / sursis / inactifs avec les expirations proches (touchez pour ouvrir la liste).
+- **Bien démarrer** (administrateur) : liste à cocher (code PIN, sauvegarde, infos légales, clients et stock) avec barre de progression, qui disparaît quand tout est fait ; **À faire** regroupe alertes d'abonnements, factures en attente et impayés.
+- Les chiffres de Finances (total facturé, bénéfice net, dépenses, marge) défilent en cartes, puis le graphique des ventes, le stock et les renouvellements. Un profil sans accès à la finance voit ses clients actifs à la place du CA.
+
 ## Design (étape 1 : identité)
 
 Police **Inter** embarquée (`fonts/`, licence OFL, fonctionne hors connexion), en-tête en dégradé marine aux reflets orange et jaune du logo, titres entiers (la recherche et le cadenas restent visibles, la **synchronisation** et le **thème** sont dans le menu **⋯**), barre du bas à cinq places égales avec l'onglet actif en pastille, bouton **＋ flottant à droite** (il ne masque plus « Finance »), cartes et boutons plus arrondis avec ombres douces, filtres et pastilles plus lisibles, icônes du menu **Plus** colorées par domaine, apparition douce des écrans, mode sombre assorti. Le libellé « Installation » de la fiche client devient « Référence ».
