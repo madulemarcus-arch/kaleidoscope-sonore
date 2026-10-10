@@ -120,6 +120,10 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Abonnements : compteurs cliquables
+
+Dans **Abonnements**, touchez **Actifs**, **En sursis** ou **Inactifs** : la liste des clients de cette catégorie s'affiche juste en dessous (nom, formule, téléphone, date de fin ; « dans N jours » pour les actifs, « jusqu'au… » pour le sursis, « fin le… » pour les inactifs). Touchez un client pour ouvrir sa fiche, retouchez le compteur pour fermer la liste.
+
 ## Voir tous les mouvements (Finance)
 
 Dans **Finance**, touchez la case **⬇ Entrées**, **⬆ Sorties** ou **Solde** : la liste des **Mouvements** s'affiche directement, filtrée sur les entrées, les sorties ou tout (jusqu'à 1 000 lignes, jour par jour). La case choisie est encadrée ; retouchez **Solde** pour tout revoir.

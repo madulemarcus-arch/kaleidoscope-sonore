@@ -90,6 +90,9 @@
       if (App.addDays(s.gEnd, 1) === day) ev.push({ c, k: 'bad', t: 'Devient inactif' }); });
     return ev;
   };
+  // the clients behind one of the three counters (Actifs / En sursis / Inactifs)
+  const statusList = (subs, k) => { const l = subs.filter(x => x.s.status === k).sort((a, b) => k === 'inactif' ? b.s.end.localeCompare(a.s.end) : k === 'sursis' ? a.s.gEnd.localeCompare(b.s.gEnd) : a.s.left - b.s.left), T = { actif: 'Clients actifs', sursis: 'Clients en sursis', inactif: 'Clients inactifs' }[k], col = { actif: 'ok', sursis: 'warn', inactif: 'bad' }[k];
+    return `<h2 class="sec" id="sub_list">${T} <span class="more">${l.length}</span></h2>${l.length ? `<div class="list">${l.map(({ c, s }) => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${col}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.plan || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</small></div><div class="end"><b>${k === 'sursis' ? 'jusqu\'au ' + App.fdate(s.gEnd) : (k === 'inactif' ? 'fin le ' : '') + App.fdate(s.end)}</b>${k === 'actif' ? `<span class="mut">dans ${s.left} j</span>` : ''}</div></button>`).join('')}</div>` : '<div class="empty">Aucun client dans cette catégorie.</div>'}`; };
   App.views.subs = () => {
     const g = gere(), subs = g.map(c => ({ c, s: App.sub(c) })).filter(x => x.s), n = k => subs.filter(x => x.s.status === k).length;
     const first = new Date(cal.y, cal.m, 1), lead = (first.getDay() + 6) % 7, days = new Date(cal.y, cal.m + 1, 0).getDate(), t = App.today();
@@ -102,7 +105,8 @@
     const upcoming = subs.filter(x => x.s.status === 'actif' && x.s.left <= 30).sort((a, b) => a.s.left - b.s.left);
     return {
       title: 'Abonnements', back: 'more', nav: 'more',
-      html: `<div class="grid"><div class="stat"><small><span class="dot" style="background:var(--ok)"></span>Actifs</small><b>${n('actif')}</b></div><div class="stat"><small><span class="dot" style="background:var(--warn)"></span>En sursis</small><b>${n('sursis')}</b></div><div class="stat"><small><span class="dot" style="background:var(--bad)"></span>Inactifs</small><b>${n('inactif')}</b></div></div>
+      html: `<div class="grid" style="grid-template-columns:repeat(3,1fr)">${[['actif', 'ok', 'Actifs'], ['sursis', 'warn', 'En sursis'], ['inactif', 'bad', 'Inactifs']].map(([k, col, t]) => `<button class="stat tap ${cal.f === k ? 'on' : ''}" data-act="subshow" data-v="${k}"><small><span class="dot" style="background:var(--${col})"></span>${t}</small><b>${n(k)}</b><small>${cal.f === k ? 'fermer ✕' : 'voir la liste ›'}</small></button>`).join('')}</div>
+        ${cal.f ? statusList(subs, cal.f) : ''}
         <div class="bar" style="margin-bottom:12px"><button class="btn" data-act="go" data-v="rappels">📲 Rappels WhatsApp</button></div>
         <div class="card"><div class="spread" style="margin-bottom:8px"><button class="btn sm sec" data-act="calnav" data-n="-1">‹</button><b>${first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</b><button class="btn sm sec" data-act="calnav" data-n="1">›</button></div><div class="cal">${cells}</div>
           <div class="legend"><span><i style="background:var(--ok)"></i>Fin d'abonnement</span><span><i style="background:var(--warn)"></i>Période de sursis</span><span><i style="background:var(--bad)"></i>Passage à inactif</span></div></div>
@@ -110,6 +114,7 @@
         <h2 class="sec">Renouvellements à venir (30 jours)</h2>${upcoming.length ? `<div class="list">${upcoming.map(({ c, s }) => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ok">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.plan || '')}</small></div><div class="end"><b>${App.fdate(s.end)}</b><span class="mut">dans ${s.left} j</span></div></button>`).join('')}</div>` : '<div class="empty">Aucun renouvellement dans les 30 prochains jours.</div>'}`
     };
   };
+  App.actions.subshow = d => { cal.f = cal.f === d.v ? '' : d.v; App.refresh(); const el = document.getElementById('sub_list'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   App.actions.calday = d => { cal.sel = d.d; App.refresh(); };
   App.actions.calnav = d => { const x = new Date(cal.y, cal.m + +d.n, 1); cal.y = x.getFullYear(); cal.m = x.getMonth(); App.refresh(); };
 
