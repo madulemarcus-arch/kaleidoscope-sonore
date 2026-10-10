@@ -29,11 +29,53 @@
       break;
     }
     const tm = text.match(/Total\s*TTC\s*:?\s*([\d\s .,]+?)\s*(?:\$|USD|CDF)/i); d.total = tm ? money(tm[1]) : 0;
+    return finish(d);
+  };
+  // checks shared by Word and PDF
+  const finish = d => {
     d.calc = d.lines.reduce((a, l) => a + l.qty * l.price, 0);
     if (!d.number) d.issues.push('numéro non trouvé'); if (!d.date) d.issues.push('date non trouvée'); if (!d.client) d.issues.push('client non trouvé'); if (!d.lines.length) d.issues.push('aucune ligne de produit');
     if (d.total && Math.abs(d.total - d.calc) > 0.5) d.issues.push(`total du document ${App.fmt(d.total, d.currency)} ≠ somme des lignes ${App.fmt(d.calc, d.currency)}`);
     d.lines.forEach(l => { if (Math.abs(l.qty * l.price - l.amt) > 0.5) d.issues.push(`ligne « ${l.desc} » : montant ${l.amt} ≠ ${l.qty} × ${l.price}`); });
     return d;
+  };
+
+  // ---------- reading a PDF (pdf.js, loaded only when a PDF is chosen) ----------
+  const loadPdfjs = () => window.pdfjsLib ? Promise.resolve(window.pdfjsLib) : new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'vendor/pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js'; res(window.pdfjsLib); };
+    s.onerror = () => rej(new Error('Le lecteur de PDF ne s\'est pas chargé (connexion nécessaire la première fois).')); document.head.appendChild(s);
+  });
+  // the text of the PDF as lines: items sharing the same height are joined from left to right
+  const pdfLines = async buf => {
+    const lib = await loadPdfjs(), pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise, out = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const items = (await (await pdf.getPage(n)).getTextContent()).items.filter(i => i.str && i.str.trim()).map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5], w: i.width })).sort((a, b) => b.y - a.y || a.x - b.x), rows = [];
+      items.forEach(i => { const r = rows.find(r => Math.abs(r.y - i.y) < 3); if (r) r.it.push(i); else rows.push({ y: i.y, it: [i] }); });
+      rows.sort((a, b) => b.y - a.y).forEach(r => { r.it.sort((a, b) => a.x - b.x); let t = ''; r.it.forEach((i, k) => { const p = r.it[k - 1]; t += (k && i.x - (p.x + p.w) > 1.5 ? ' ' : '') + i.s; }); out.push(t.replace(/\s+/g, ' ').trim()); });
+    }
+    return out;
+  };
+  const dateIso = s => { const m = String(s || '').match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/); return m ? isoDate(m[1], m[2], m[3]) : ''; };
+  const parsePdf = async file => {
+    const lines = await pdfLines(await file.arrayBuffer()), text = lines.join('\n'), d = { name: file.name, issues: [], lines: [] };
+    if (!text.trim()) throw new Error(`« ${file.name} » : PDF sans texte (image scannée) : non lisible.`);
+    d.number = (text.match(/(?:FACTURE\s*N°|Num[ée]ro\s*:?)\s*([A-Za-z]*\d+)/i) || [])[1] || '';
+    d.date = dateIso((text.match(/\bDate\s*:\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})/) || [])[1]);
+    d.client = ((text.match(/\bNom\s*:\s*(.+?)(?=\s+Code\s*[Cc]lient|\s+Adresse|$)/m) || text.match(/\bA\s*:\s*(\S.*)$/m) || [])[1] || '').trim();
+    d.code = ((text.match(/Code\s*[Cc]lient\s*:?\s*([0-9A-Za-z-]+)/) || [])[1] || '').trim();
+    d.address = ((text.match(/Adresse\s*:\s*(.+)$/m) || [])[1] || '').trim();
+    d.currency = /\bCDF\b/.test(lines.filter(l => /total|montant/i.test(l)).join(' ')) && !/\$|USD/.test(lines.filter(l => /total/i.test(l)).join(' ')) ? 'CDF' : 'USD';
+    const num = s => money(s), norm = l => l.replace(/(\d)\s*,\s*(\d)/g, '$1,$2').replace(/(\d)\s+(\$|USD)/g, '$1$2');
+    lines.forEach(raw => {
+      const l = norm(raw); let m;
+      if ((m = l.match(/^(P\d+)\s+(.+?)\s+(\d[\d\s.,]*?)\s*(?:\$|USD)\s+(\d+(?:[.,]\d+)?)\s+(\d[\d\s.,]*?)\s*(?:\$|USD)?$/i))) d.lines.push({ ref: m[1], desc: m[2].trim(), price: num(m[3]), qty: num(m[4]) || 1, amt: num(m[5]) });
+      // invoice with one row per Starlink account: holder | ACC | plan | start | end | amount
+      else if ((m = l.match(/^(.+?)\s+(ACC-[A-Z0-9-]+)\s+(.+?)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d[\d\s.,]*?)\s*(?:\$|USD)/))) { const a = num(m[6]); d.lines.push({ ref: '', desc: `${m[3].trim()} — ${m[1].trim()} (${m[2]}) ${m[4]} → ${m[5]}`, price: a, qty: 1, amt: a, acc: m[2], start: dateIso(m[4]), end: dateIso(m[5]) }); }
+    });
+    const tot = [...norm(text).matchAll(/\bTotal\s*(?:TTC)?\s*:?\s*(\d[\d\s.,]*?)\s*(\$|USD|CDF)/gi)].pop(); d.total = tot ? num(tot[1]) : 0;
+    const pm = norm(text).match(/MONTANT\s*PAY[ÉE]\s*:?\s*(\d[\d\s.,]*?)\s*(?:\$|USD|CDF)/i); if (pm) { d.paid = num(pm[1]); const mode = (text.match(/Pay[ée]\s*par\s*:?\s*(.+)/i) || [])[1] || ''; d.mode = /esp/i.test(mode) ? 'Cash' : /m-?pesa/i.test(mode) ? 'M-Pesa' : /airtel/i.test(mode) ? 'Airtel Money' : /orange/i.test(mode) ? 'Orange Money' : /banque|virement/i.test(mode) ? 'Banque' : 'Cash'; }
+    return finish(d);
   };
 
   // ---------- comparison with the application ----------
@@ -45,7 +87,7 @@
     const same = App.db.invoices.filter(x => c && x.clientId === c.id && Math.abs(App.invTotal(x) - d.calc) < 0.01 && x.date !== d.date).length + fi.docs.filter((o, j) => j < i && T.norm(o.client) === T.norm(d.client) && Math.abs(o.calc - d.calc) < 0.01).length;
     const num = fi.docs.filter(o => o.number && o.number === d.number).length;
     const bad = d.issues.some(x => /non trouv|aucune ligne/.test(x)), act = fi.ov.get(i) || (known || bad ? 'skip' : 'import');
-    return { i, d, key, c, known, maybe: same > 0, dupNum: num > 1, type: typeOf(d.lines), act: known || bad ? 'skip' : act, pay: fi.pay.get(i) || '' };
+    return { i, d, key, c, known, maybe: same > 0, dupNum: num > 1, type: typeOf(d.lines), act: known || bad ? 'skip' : act, pay: fi.pay.get(i) || (d.paid && d.paid >= d.calc - 0.01 ? d.mode || 'Cash' : '') };
   });
 
   // ---------- screen ----------
@@ -54,10 +96,9 @@
       fi.err = ''; const list = [...f.files], docs = [];
       for (const file of list) {
         try {
-          if (/\.pdf$/i.test(file.name)) throw new Error(`« ${file.name} » : les PDF ne sont pas lus. Ouvrez la facture au format Word (.docx) et choisissez ce fichier.`);
-          if (!/\.docx$/i.test(file.name)) throw new Error(`« ${file.name} » : seul le format Word (.docx) est lu.`);
-          if (typeof DecompressionStream === 'undefined') throw new Error('Ce navigateur ne sait pas lire les fichiers Word.');
-          docs.push(await parseDocx(file));
+          if (/\.pdf$/i.test(file.name)) docs.push(await parsePdf(file));
+          else if (/\.docx$/i.test(file.name)) { if (typeof DecompressionStream === 'undefined') throw new Error('Ce navigateur ne sait pas lire les fichiers Word.'); docs.push(await parseDocx(file)); }
+          else throw new Error(`« ${file.name} » : seuls les fichiers Word (.docx) et PDF sont lus.`);
         } catch (e) { fi.err += (fi.err ? '\n' : '') + (e.message || 'Fichier illisible.'); }
       }
       if (docs.length) { fi.docs = fi.docs.concat(docs); } App.refresh();
@@ -66,17 +107,17 @@
     document.querySelectorAll('[data-ifp]').forEach(el => el.onchange = () => { fi.pay.set(+el.dataset.ifp, el.value); App.refresh(); });
   };
   App.views.importf = () => {
-    const back = { title: 'Importer des factures', sub: 'Fichiers Word (.docx)', back: 'settings', nav: 'more' };
-    const pick = `<label class="btn" style="cursor:pointer;display:inline-block">📄 Choisir les factures (Word)<input type="file" id="if_file" accept=".docx" multiple hidden></label>`;
+    const back = { title: 'Importer des factures', sub: 'Word (.docx) ou PDF', back: 'settings', nav: 'more' };
+    const pick = `<label class="btn" style="cursor:pointer;display:inline-block">📄 Choisir les factures (Word ou PDF)<input type="file" id="if_file" accept=".docx,.pdf" multiple hidden></label>`;
     const err = fi.err ? `<p class="bad" style="white-space:pre-line">${esc(fi.err)}</p>` : '';
-    if (!fi.docs.length) return { ...back, html: `<div class="card"><p style="margin-top:0">Choisissez une ou plusieurs <b>factures Word (.docx)</b> : l'application lit le numéro, la date, le client, les lignes et le total, les compare avec ce qui existe déjà, puis vous montre un aperçu. Rien n'est créé avant votre confirmation, et vous pourrez annuler juste après.</p>${pick}${err}<p class="mut" style="font-size:13px;margin-bottom:0">Les PDF ne peuvent pas être lus : utilisez le fichier Word d'origine.</p></div>`, after: bind };
+    if (!fi.docs.length) return { ...back, html: `<div class="card"><p style="margin-top:0">Choisissez une ou plusieurs <b>factures Word (.docx) ou PDF</b> : l'application lit le numéro, la date, le client, les lignes et le total, les compare avec ce qui existe déjà, puis vous montre un aperçu. Rien n'est créé avant votre confirmation, et vous pourrez annuler juste après.</p>${pick}${err}<p class="mut" style="font-size:13px;margin-bottom:0">Les PDF ne peuvent pas être lus : utilisez le fichier Word d'origine.</p></div>`, after: bind };
     const a = analyse(), todo = a.filter(x => x.act === 'import'), missing = todo.filter(x => !x.pay).length;
     const PAYOPTS = x => `<option value="" ${!x.pay ? 'selected' : ''}>Paiement ?</option><option value="unpaid" ${x.pay === 'unpaid' ? 'selected' : ''}>Impayée</option>${App.PAY_MODES.map(m => `<option value="${esc(m)}" ${x.pay === m ? 'selected' : ''}>Payée · ${esc(m)}</option>`).join('')}`;
     const card = x => { const d = x.d; return `<div class="card" style="margin-bottom:10px${x.act === 'skip' ? ';opacity:.6' : ''}"><div class="spread"><b>${esc(d.client || '?')}</b><b>${App.fmt(d.calc, d.currency || 'USD')}</b></div>
       <small class="mut">${esc(d.name)} · n° d'origine ${esc(d.number || '?')}${x.dupNum ? ' <span class="warn">(même numéro que d\'autres fichiers)</span>' : ''} · ${d.date ? App.fdate(d.date) : 'sans date'} · ${App.invTypes[x.type]}</small>
       <small class="${x.c ? 'ok' : 'warn'}" style="display:block">${x.c ? 'Client existant : ' + esc(App.cname(x.c)) + ' (' + esc(x.c.code) + ')' : 'Nouveau client créé : ' + esc(d.client) + (d.code ? ' (code d\'origine ' + esc(d.code) + ')' : '')}</small>
       <div style="margin:6px 0">${d.lines.map(l => `<small style="display:block">• ${esc(l.desc)} — ${App.nf(l.qty, 2)} × ${App.fmt(l.price, d.currency)}</small>`).join('')}</div>
-      ${x.known ? '<small class="warn" style="display:block">Déjà importée.</small>' : ''}${x.maybe ? '<small class="warn" style="display:block">Même client et même montant qu\'une autre facture : doublon possible.</small>' : ''}${d.issues.map(m => `<small class="warn" style="display:block">⚠ ${esc(m)}</small>`).join('')}
+      ${d.paid ? `<small class="ok" style="display:block">Le document indique un montant payé de ${App.fmt(d.paid, d.currency)}.</small>` : ''}${x.known ? '<small class="warn" style="display:block">Déjà importée.</small>' : ''}${x.maybe ? '<small class="warn" style="display:block">Même client et même montant qu\'une autre facture : doublon possible.</small>' : ''}${d.issues.map(m => `<small class="warn" style="display:block">⚠ ${esc(m)}</small>`).join('')}
       <div class="row" style="margin-top:8px"><div class="fld"><select data-ifa="${x.i}" ${x.known ? 'disabled' : ''}><option value="import" ${x.act === 'import' ? 'selected' : ''}>Importer</option><option value="skip" ${x.act === 'skip' ? 'selected' : ''}>Ne pas importer</option></select></div>${x.act === 'import' ? `<div class="fld"><select data-ifp="${x.i}">${PAYOPTS(x)}</select></div>` : ''}</div></div>`; };
     return { ...back, html: `<div class="card"><div class="spread"><b>${a.length} facture(s) lue(s)</b><span>${pick}</span></div>${err}</div>
       <div class="bar" style="margin:8px 0"><button class="btn sm sec" data-act="imp_fall" data-v="Cash">☑ Tout marquer payé (Cash)</button><button class="btn sm sec" data-act="imp_fall" data-v="unpaid">Tout marquer impayé</button><button class="btn sm sec" data-act="imp_fclear">Vider la liste</button></div>
