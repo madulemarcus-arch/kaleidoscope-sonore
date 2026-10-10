@@ -35,6 +35,7 @@
           ${row('Sauvegarde', `Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${lastB ? App.fdate(lastB) : 'jamais'}</b>${warn ? ' — pensez à en faire une.' : ''}`, '<button class="btn sm" data-act="backup">Sauvegarder</button>')}
           ${row('Restaurer / importer', 'Recharger un fichier de sauvegarde (.json), y compris de l\'ancienne version.', '<label class="btn sm sec" style="cursor:pointer">Restaurer<input type="file" id="s_restore" accept=".json,application/json" hidden></label>')}
           ${row('Importer des clients', 'Ajouter d\'un coup les clients d\'un fichier Excel (.xlsx) ou CSV.', '<button class="btn sm sec" data-act="go" data-v="importc">Importer</button>')}
+          ${row('Importer des factures', 'Ajouter d\'anciennes factures depuis des fichiers Word (.docx) : aperçu, client trouvé ou créé, payée ou non.', '<button class="btn sm sec" data-act="go" data-v="importf">Importer</button>')}
           ${row('Exporter en CSV', 'Un tableau à la fois (Excel, Google Sheets).', '<button class="btn sm sec" data-act="exportcsv">Choisir…</button>')}
           ${row('Exporter en Excel', 'Un classeur .xlsx avec une feuille par thème.', '<button class="btn sm sec" data-act="xlsx">Excel</button>')}</div>`)}
         <div class="bar" style="margin-top:16px"><button class="btn blue" data-act="lockNow">🔒 Verrouiller maintenant</button></div>`,

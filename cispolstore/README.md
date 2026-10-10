@@ -125,6 +125,7 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 **Paramètres → Données → Importer des clients** (administrateur). Choisissez un fichier **.xlsx** (ou .csv) : il est lu dans l'appareil, rien n'est envoyé sur internet.
 - L'application reconnaît les colonnes d'après leur titre (nom, ACC, téléphone, abonnement, date de paiement, date d'expiration, solde dû, référence, observation, n°) ; vous pouvez corriger l'association dans « Colonnes reconnues ».
 - **Comparaison avec vos clients** : le compte **ACC** identifie un kit. Même ACC déjà dans l'application = « déjà présent » (jamais ajouté deux fois). **Même nom mais ACC différent = un autre kit : il est gardé** (le client est ajouté une deuxième fois avec son propre ACC). Un client saisi à la main avec le même nom mais **sans ACC** est signalé « à vérifier » : vous choisissez *Ne pas ajouter*, *Ajouter* ou *Compléter la fiche existante* (ajoute l'ACC, la formule et les dates sans créer de doublon).
+- **Mise à jour des dates** : un client déjà présent (même ACC) dont le fichier contient un paiement **plus récent** voit ses dates mises à jour (« Mettre à jour les dates », proposé par défaut) : la période précédente est gardée dans l'historique de l'abonnement comme pour un renouvellement, sans créer de facture. Dates identiques ou plus anciennes dans le fichier : rien n'est changé (« Ne rien changer »). Le choix se fait ligne par ligne.
 - **Liste à valider** : tous les clients du fichier, avec filtres (Tous, Nouveaux, Déjà présents, À vérifier, Même nom) ; chaque ligne a un choix *Ajouter / Ne pas ajouter*, et deux boutons pour tout ajouter ou ne rien ajouter. Rien n'est créé avant « Ajouter N clients ».
 - Chaque ligne ajoutée devient un **client géré** : prénom / nom, téléphone (0 ajouté devant les numéros à 9 chiffres), **ACC (aussi dans le champ « Référence / adresse d'installation »)**, formule, **date de début = date de paiement**, **durée = date d'expiration − date de paiement**. Sans dates, le client est « sans abonnement ». Les formules inconnues sont créées avec leur prix (**Illimité 70 $, 250 Go 40 $** ; pour une autre formule, prix déduit des soldes dus), modifiable avant l'import ; coût Starlink à 0, à régler dans Paramètres → formules).
 - La colonne « Référence » du fichier (la personne qui amène le client) est notée dans la **note** (« Référent »), avec les observations « désactivé / bloqué », les **soldes dus** (aucune facture créée), les dates à vérifier et le n° du fichier.
@@ -133,6 +134,15 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 ## Supprimer plusieurs clients
 
 **Clients → ☑ Sélectionner pour supprimer** (administrateur) : cochez les clients, **Tout** coche ceux du filtre affiché, puis **🗑 Supprimer (N)**. Les clients qui ont des factures ou des paiements sont conservés ; une barre **Annuler** remet les clients supprimés.
+
+## Importer des factures (Word)
+
+**Paramètres → Données → Importer des factures** (administrateur). Choisissez un ou plusieurs fichiers **Word (.docx)** de factures : l'application lit le **numéro**, la **date**, le **client** (nom, code, adresse), les **lignes** (référence, description, prix, quantité) et le **total**, vérifie les calculs, puis affiche un aperçu par facture. Les **PDF ne sont pas lus** : utilisez le fichier Word d'origine.
+- **Numéro** : chaque facture reçoit un **nouveau numéro de l'application** (dans l'ordre des dates) ; le numéro d'origine (même s'il est répété sur plusieurs fichiers) et le code client d'origine sont notés dans la note de la facture.
+- **Client** : retrouvé par son code d'origine ou par son nom ; sinon **créé automatiquement** (client géré, matériel ou installation selon le contenu, code d'origine noté dans la fiche).
+- **Paiement** : à chaque import, vous choisissez pour chaque facture *Impayée* ou *Payée* avec le mode (Cash, M-Pesa…), ou « Tout marquer payé / impayé ». Une facture payée crée un paiement du total à la date de la facture.
+- **Type** déduit des lignes (matériel, abonnement, installation ou facture complète) ; les lignes d'installation et d'abonnement alimentent la **répartition** et le **CA réel**. Le stock n'est pas touché, le coût des marchandises est à 0.
+- Une facture déjà importée (même numéro, date, client et total) est ignorée ; même client et même montant à une autre date : « doublon possible ». Barre **Annuler l'import** après l'ajout.
 
 ## Abonnements : compteurs cliquables
 

@@ -89,18 +89,20 @@
       if (acc && seen.has(acc)) { const o = seen.get(acc); if (rec.hasSub && !o.hasSub) { out.recs[out.recs.indexOf(o)] = rec; seen.set(acc, rec); } out.merged++; return; }
       if (acc) seen.set(acc, rec);
       // comparison with what is already in the application: same ACC = same kit, same name without ACC = maybe the same person typed by hand
-      if (acc && have.has(acc)) { rec.status = 'known'; rec.with = have.get(acc); }
+      if (acc && have.has(acc)) { rec.status = 'known'; const e = rec.with = have.get(acc);
+        // same kit already in the application: does the file carry a newer payment?
+        rec.upd = !rec.hasSub ? 'none' : !e.start ? 'new' : rec.start > e.start ? 'newer' : rec.start === e.start && (e.period || S.period) === rec.period ? 'same' : rec.start === e.start ? 'newer' : 'older'; }
       else if (noAcc.has(norm(name))) { rec.status = 'maybe'; rec.with = noAcc.get(norm(name)); }
       else rec.status = 'new';
       out.recs.push(rec);
     });
     const names = new Map(); out.recs.forEach(r => { const k = norm(r.name); names.set(k, (names.get(k) || 0) + 1); }); out.recs.forEach(r => { r.same = names.get(norm(r.name)) > 1; });
     const choice = r => im.ov.has(r.key) ? im.ov.get(r.key) : r.status === 'new' ? 'add' : 'skip';
-    out.recs.forEach(r => { r.choice = r.status === 'known' ? 'skip' : choice(r); });
-    out.todo = out.recs.filter(r => r.choice === 'add'); out.merge = out.recs.filter(r => r.choice === 'merge');
+    out.recs.forEach(r => { r.choice = r.status === 'known' ? (im.ov.has(r.key) ? im.ov.get(r.key) : (r.upd === 'new' || r.upd === 'newer') ? 'update' : 'skip') : choice(r); if (r.status === 'known' && r.choice === 'merge') r.choice = 'skip'; });
+    out.todo = out.recs.filter(r => r.choice === 'add'); out.merge = out.recs.filter(r => r.choice === 'merge'); out.update = out.recs.filter(r => r.status === 'known' && r.choice === 'update');
     out.known = out.recs.filter(r => r.status === 'known').length; out.maybe = out.recs.filter(r => r.status === 'maybe').length; out.sameName = out.recs.filter(r => r.same).length;
     out.recs.forEach(r => { if (!r.hasSub) out.noSub++; if (r.odd) out.oddDates++; if (r.bal > 0) out.balances++; });
-    out.todo.concat(out.merge).forEach(r => { if (r.plan) { const p = out.plans[r.plan] = out.plans[r.plan] || { n: 0, bal: [] }; p.n++; if (r.bal > 0) p.bal.push(r.bal); } });
+    out.todo.concat(out.merge, out.update).forEach(r => { if (r.plan) { const p = out.plans[r.plan] = out.plans[r.plan] || { n: 0, bal: [] }; p.n++; if (r.bal > 0) p.bal.push(r.bal); } });
     const rate = App.rate();
     Object.entries(out.plans).forEach(([k, p]) => { const ex = (S.plans || {})[k]; p.exists = !!ex; const m = p.bal.slice().sort((a, b) => a - b)[Math.floor(p.bal.length / 2)]; p.guess = ex ? ex.price : KNOWN_PRICES[k] != null ? KNOWN_PRICES[k] : m ? Math.round(m / rate * 2) / 2 : 0; });
     return out;
@@ -118,17 +120,17 @@
     const plans = Object.entries(a.plans).map(([k, p]) => `<div class="item"><div class="grow"><b>${esc(k)}</b><small>${p.n} client(s)${p.exists ? ' · formule déjà dans l\'application' : ' · nouvelle formule'}</small></div><div style="width:130px"><label class="l" style="margin:0">Prix ($/mois)</label><input type="number" inputmode="decimal" min="0" step="any" data-imp="${esc(k)}" value="${im.prices[k] != null ? im.prices[k] : p.guess || ''}" ${p.exists ? 'disabled' : ''}></div></div>`).join('');
     const FL = [['all', `Tous (${a.recs.length})`], ['new', `Nouveaux (${a.recs.filter(r => r.status === 'new').length})`], ['known', `Déjà présents (${a.known})`], ['maybe', `À vérifier (${a.maybe})`], ['same', `Même nom (${a.sameName})`]];
     const shown = a.recs.filter(r => im.cf === 'all' || (im.cf === 'same' ? r.same : r.status === im.cf));
-    const rowUi = r => `<div class="item" style="align-items:flex-start;flex-wrap:wrap"><div class="grow" style="min-width:55%"><b>${esc(r.name)}</b><small>${esc(r.acc || 'sans ACC')} · ${esc(r.phone || 'sans téléphone')}${r.plan ? ' · ' + esc(r.plan) : ''}</small><small>${r.hasSub ? App.fdate(r.start) + ' → ' + App.fdate(App.addDays(r.start, r.period)) : 'sans abonnement en cours'}</small><small class="${TAG[r.status][1]}">${TAG[r.status][0]}${r.status !== 'new' ? ' : ' + esc(App.cname(r.with)) + ' (' + esc(r.with.code) + ')' : ''}${r.same && r.status === 'new' ? ' · même nom qu\'un autre, ACC différent : gardé' : ''}</small></div>
-      <select data-imr="${esc(r.key)}" ${r.status === 'known' ? 'disabled' : ''} style="width:auto;max-width:48%"><option value="add" ${r.choice === 'add' ? 'selected' : ''}>Ajouter</option><option value="skip" ${r.choice === 'skip' ? 'selected' : ''}>Ne pas ajouter</option>${r.status === 'maybe' ? `<option value="merge" ${r.choice === 'merge' ? 'selected' : ''}>Compléter la fiche existante</option>` : ''}</select></div>`;
+    const rowUi = r => `<div class="item" style="align-items:flex-start;flex-wrap:wrap"><div class="grow" style="min-width:55%"><b>${esc(r.name)}</b><small>${esc(r.acc || 'sans ACC')} · ${esc(r.phone || 'sans téléphone')}${r.plan ? ' · ' + esc(r.plan) : ''}</small><small>${r.hasSub ? App.fdate(r.start) + ' → ' + App.fdate(App.addDays(r.start, r.period)) : 'sans abonnement en cours'}</small><small class="${TAG[r.status][1]}">${TAG[r.status][0]}${r.status !== 'new' ? ' : ' + esc(App.cname(r.with)) + ' (' + esc(r.with.code) + ')' : ''}${r.status === 'known' ? ' · ' + ({ none: 'pas de dates dans le fichier', same: 'mêmes dates', new: 'dates absentes de la fiche', newer: 'début ' + (r.with.start ? App.fdate(r.with.start) : '—') + ' → ' + App.fdate(r.start) + ' dans le fichier', older: 'dates du fichier plus anciennes' }[r.upd]) : ''}${r.same && r.status === 'new' ? ' · même nom qu\'un autre, ACC différent : gardé' : ''}</small></div>
+      <select data-imr="${esc(r.key)}" ${r.status === 'known' && (r.upd === 'none' || r.upd === 'same') ? 'disabled' : ''} style="width:auto;max-width:48%">${r.status === 'known' ? `<option value="update" ${r.choice === 'update' ? 'selected' : ''}>Mettre à jour les dates</option><option value="skip" ${r.choice === 'skip' ? 'selected' : ''}>Ne rien changer</option>` : `<option value="add" ${r.choice === 'add' ? 'selected' : ''}>Ajouter</option><option value="skip" ${r.choice === 'skip' ? 'selected' : ''}>Ne pas ajouter</option>`}${r.status === 'maybe' ? `<option value="merge" ${r.choice === 'merge' ? 'selected' : ''}>Compléter la fiche existante</option>` : ''}</select></div>`;
     return { ...back, html: `<div class="card"><div class="spread"><b>${esc(im.name)}</b><label class="btn sm sec" style="cursor:pointer">Changer<input type="file" id="im_file" accept=".xlsx,.csv,.txt" hidden></label></div>${im.sheets.length > 1 ? `<div class="fld"><label class="l">Feuille</label><select id="im_sheet">${im.sheets.map((x, i) => `<option value="${i}" ${i === im.si ? 'selected' : ''}>${esc(x.name)} (${x.rows.length} lignes)</option>`).join('')}</select></div>` : ''}</div>
       <h2 class="sec">Comparaison avec vos clients</h2><div class="grid" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><small>Clients lus</small><b>${a.n}</b></div><div class="stat"><small>Nouveaux</small><b class="ok">${a.recs.filter(r => r.status === 'new').length}</b></div><div class="stat"><small>Déjà présents</small><b>${a.known}</b></div></div>
-      <div class="list" style="margin-top:10px">${a.maybe ? `<div class="item"><div class="grow"><b class="warn">À vérifier</b><small>même nom qu'un client saisi à la main, sans ACC : choisissez ci-dessous</small></div><b>${a.maybe}</b></div>` : ''}<div class="item"><div class="grow"><b>Même nom, ACC différents</b><small>ce sont des kits différents : tous gardés</small></div><b>${a.sameName}</b></div>${a.merged ? `<div class="item"><div class="grow"><b>Lignes en double (même ACC dans le fichier)</b><small>fusionnées</small></div><b>${a.merged}</b></div>` : ''}${a.oddDates ? `<div class="item"><div class="grow"><b class="warn">Dates à vérifier</b><small>notées dans la fiche du client</small></div><b>${a.oddDates}</b></div>` : ''}${a.noName ? `<div class="item"><div class="grow"><b>Lignes sans nom</b><small>ignorées</small></div><b>${a.noName}</b></div>` : ''}</div>
+      <div class="list" style="margin-top:10px">${a.update.length ? `<div class="item"><div class="grow"><b class="ok">Dates à mettre à jour</b><small>clients déjà présents dont le fichier a un paiement plus récent</small></div><b>${a.update.length}</b></div>` : ''}${a.maybe ? `<div class="item"><div class="grow"><b class="warn">À vérifier</b><small>même nom qu'un client saisi à la main, sans ACC : choisissez ci-dessous</small></div><b>${a.maybe}</b></div>` : ''}<div class="item"><div class="grow"><b>Même nom, ACC différents</b><small>ce sont des kits différents : tous gardés</small></div><b>${a.sameName}</b></div>${a.merged ? `<div class="item"><div class="grow"><b>Lignes en double (même ACC dans le fichier)</b><small>fusionnées</small></div><b>${a.merged}</b></div>` : ''}${a.oddDates ? `<div class="item"><div class="grow"><b class="warn">Dates à vérifier</b><small>notées dans la fiche du client</small></div><b>${a.oddDates}</b></div>` : ''}${a.noName ? `<div class="item"><div class="grow"><b>Lignes sans nom</b><small>ignorées</small></div><b>${a.noName}</b></div>` : ''}</div>
       ${Object.keys(a.plans).length ? `<h2 class="sec">Formules d'abonnement</h2><div class="list">${plans}</div><p class="mut" style="font-size:13px">Prix des formules : Illimité 70 $ et 250 Go 40 $ ; pour une autre formule, prix déduit des soldes dus du fichier (en CDF au taux du jour). Corrigez-le si besoin. Le coût Starlink se règle ensuite dans Paramètres → formules.</p>` : ''}
       <h2 class="sec">Liste à valider</h2><div class="chips">${FL.map(([k, t]) => `<button class="chip ${im.cf === k ? 'on' : ''}" data-act="imp_cf" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="bar" style="margin-bottom:8px"><button class="btn sm sec" data-act="imp_allnew">☑ Tout ajouter (nouveaux)</button><button class="btn sm sec" data-act="imp_nonenew">☐ Ne rien ajouter</button></div>
       <div class="list">${shown.length ? shown.map(rowUi).join('') : '<div class="empty">Aucun client dans ce filtre.</div>'}</div>
       ${App.fold('immap', 'Colonnes reconnues (modifier si besoin)', mapUi)}
-      <div class="bar" style="margin-top:14px;position:sticky;bottom:78px"><button class="btn" data-act="imp_go" ${a.todo.length || a.merge.length ? '' : 'disabled style="opacity:.5"'}>✔ Ajouter ${a.todo.length} client(s)${a.merge.length ? ` et compléter ${a.merge.length}` : ''}</button></div>`, after: bind };
+      <div class="bar" style="margin-top:14px;position:sticky;bottom:78px"><button class="btn" data-act="imp_go" ${a.todo.length || a.merge.length || a.update.length ? '' : 'disabled style="opacity:.5"'}>✔ Ajouter ${a.todo.length} client(s)${a.merge.length ? `, compléter ${a.merge.length}` : ''}${a.update.length ? `, mettre à jour ${a.update.length} date(s)` : ''}</button></div>`, after: bind };
   };
   const bind = () => {
     const f = $('im_file'); if (f) f.onchange = async () => {
@@ -151,9 +153,11 @@
   App.actions.imp_allnew = () => { analyse().recs.filter(r => r.status === 'new').forEach(r => im.ov.set(r.key, 'add')); App.refresh(); };
   App.actions.imp_nonenew = () => { analyse().recs.filter(r => r.status === 'new').forEach(r => im.ov.set(r.key, 'skip')); App.refresh(); };
 
+  App.impTools = { unzip, xml, norm, fixName };
+
   // ---------- the import itself ----------
   App.actions.imp_go = () => {
-    const a = analyse(), db = App.db, S = db.settings; if (!a.todo.length && !a.merge.length) return;
+    const a = analyse(), db = App.db, S = db.settings; if (!a.todo.length && !a.merge.length && !a.update.length) return;
     const snap = JSON.parse(JSON.stringify({ clients: db.clients, log: db.log, plans: S.plans || {}, seq: S.clientSeq })), today = App.today();
     S.plans = S.plans || {}; Object.entries(a.plans).forEach(([k, p]) => { if (!S.plans[k]) S.plans[k] = { price: Math.max(0, +(im.prices[k] != null ? im.prices[k] : p.guess) || 0), cost: 0 }; });
     const priceOf = r => r.plan ? (S.plans[r.plan] || {}).price || 0 : 0;
@@ -165,8 +169,13 @@
     a.merge.forEach(r => { const e = r.with;
       if (e.type === 'gere') { if (!e.acc) e.acc = r.acc; if (!e.installAddr) e.installAddr = r.acc; if (!e.start && r.hasSub) Object.assign(e, { plan: e.plan || r.plan, price: e.price || priceOf(r), start: r.start, period: r.period }); }
       if (!e.phone) e.phone = r.phone; e.note = [e.note, 'Complété depuis Excel'].concat(r.notes).filter(Boolean).join('\n'); App.log(e.id, 'Fiche complétée (import Excel)'); });
+    // known kit with a newer payment in the file: the previous period goes to the history, like a renewal, and the new dates replace it (no invoice is created)
+    a.update.forEach(r => { const e = r.with;
+      if (e.start) (e.subs = e.subs || []).push({ start: e.start, days: e.period || S.period, price: e.price || 0, date: today });
+      Object.assign(e, { start: r.start, period: r.period }); if (!e.plan && r.plan) Object.assign(e, { plan: r.plan, price: e.price || priceOf(r) }); if (!e.phone) e.phone = r.phone; if (!e.installAddr) e.installAddr = r.acc;
+      e.note = [e.note, `Dates mises à jour depuis Excel (${App.fdate(r.start)} → ${App.fdate(App.addDays(r.start, r.period))})`].filter(Boolean).join('\n'); App.log(e.id, 'Dates mises à jour (import Excel)'); });
     App.save(); im.sheets = null; im.name = ''; im.ov = new Map();
-    App.undoBar(`${a.todo.length} client(s) ajouté(s)${a.merge.length ? `, ${a.merge.length} complété(s)` : ''}`, () => { db.clients = snap.clients; db.log = snap.log; S.clientSeq = snap.seq; S.plans = snap.plans; App.save(); App.refresh(); App.toast('Import annulé'); }, 'Annuler l\'import');
+    App.undoBar(`${a.todo.length} client(s) ajouté(s)${a.merge.length ? `, ${a.merge.length} complété(s)` : ''}${a.update.length ? `, ${a.update.length} date(s) mise(s) à jour` : ''}`, () => { db.clients = snap.clients; db.log = snap.log; S.clientSeq = snap.seq; S.plans = snap.plans; App.save(); App.refresh(); App.toast('Import annulé'); }, 'Annuler l\'import');
     App.go('clients');
   };
 })();
