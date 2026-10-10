@@ -67,6 +67,8 @@
   const num = c => { if (typeof c === 'number') return c; const s = String(c == null ? '' : c).replace(/[\s ]/g, '').replace(/[A-Za-z$]+/g, '').replace(',', '.'); const n = parseFloat(s); return Number.isFinite(n) ? n : 0; };
   const fixName = s => { s = s.replace(/\s+/g, ' ').trim(); return s === s.toUpperCase() || s === s.toLowerCase() ? s.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : s; };
   const fixPhone = c => { let d = String(c == null ? '' : c).replace(/\D/g, ''); if (d.length === 12 && d.startsWith('243')) d = '0' + d.slice(3); else if (d.length === 9 && /^[89]/.test(d)) d = '0' + d; return d; };
+  // prices of the plans CISPOLstore sells today ($ per month); any other plan gets a price guessed from the balances of the file
+  const KNOWN_PRICES = { 'Illimité': 70, '250 Go': 40 };
   const planName = s => { const n = norm(s); if (!n) return ''; if (/^(illimite|ilimite|illimited|unlimited)/.test(n)) return 'Illimité'; if (/^bloqu/.test(n)) return ''; const m = n.match(/^(\d+) ?(go|gb)$/); if (m) return m[1] + ' Go'; return s.trim().replace(/^./, x => x.toUpperCase()); };
 
   // everything the preview and the import need, computed from the current sheet and mapping
@@ -100,7 +102,7 @@
     out.recs.forEach(r => { if (!r.hasSub) out.noSub++; if (r.odd) out.oddDates++; if (r.bal > 0) out.balances++; });
     out.todo.concat(out.merge).forEach(r => { if (r.plan) { const p = out.plans[r.plan] = out.plans[r.plan] || { n: 0, bal: [] }; p.n++; if (r.bal > 0) p.bal.push(r.bal); } });
     const rate = App.rate();
-    Object.entries(out.plans).forEach(([k, p]) => { const ex = (S.plans || {})[k]; p.exists = !!ex; const m = p.bal.slice().sort((a, b) => a - b)[Math.floor(p.bal.length / 2)]; p.guess = ex ? ex.price : m ? Math.round(m / rate * 2) / 2 : 0; });
+    Object.entries(out.plans).forEach(([k, p]) => { const ex = (S.plans || {})[k]; p.exists = !!ex; const m = p.bal.slice().sort((a, b) => a - b)[Math.floor(p.bal.length / 2)]; p.guess = ex ? ex.price : KNOWN_PRICES[k] != null ? KNOWN_PRICES[k] : m ? Math.round(m / rate * 2) / 2 : 0; });
     return out;
   };
 
@@ -121,7 +123,7 @@
     return { ...back, html: `<div class="card"><div class="spread"><b>${esc(im.name)}</b><label class="btn sm sec" style="cursor:pointer">Changer<input type="file" id="im_file" accept=".xlsx,.csv,.txt" hidden></label></div>${im.sheets.length > 1 ? `<div class="fld"><label class="l">Feuille</label><select id="im_sheet">${im.sheets.map((x, i) => `<option value="${i}" ${i === im.si ? 'selected' : ''}>${esc(x.name)} (${x.rows.length} lignes)</option>`).join('')}</select></div>` : ''}</div>
       <h2 class="sec">Comparaison avec vos clients</h2><div class="grid" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><small>Clients lus</small><b>${a.n}</b></div><div class="stat"><small>Nouveaux</small><b class="ok">${a.recs.filter(r => r.status === 'new').length}</b></div><div class="stat"><small>Déjà présents</small><b>${a.known}</b></div></div>
       <div class="list" style="margin-top:10px">${a.maybe ? `<div class="item"><div class="grow"><b class="warn">À vérifier</b><small>même nom qu'un client saisi à la main, sans ACC : choisissez ci-dessous</small></div><b>${a.maybe}</b></div>` : ''}<div class="item"><div class="grow"><b>Même nom, ACC différents</b><small>ce sont des kits différents : tous gardés</small></div><b>${a.sameName}</b></div>${a.merged ? `<div class="item"><div class="grow"><b>Lignes en double (même ACC dans le fichier)</b><small>fusionnées</small></div><b>${a.merged}</b></div>` : ''}${a.oddDates ? `<div class="item"><div class="grow"><b class="warn">Dates à vérifier</b><small>notées dans la fiche du client</small></div><b>${a.oddDates}</b></div>` : ''}${a.noName ? `<div class="item"><div class="grow"><b>Lignes sans nom</b><small>ignorées</small></div><b>${a.noName}</b></div>` : ''}</div>
-      ${Object.keys(a.plans).length ? `<h2 class="sec">Formules d'abonnement</h2><div class="list">${plans}</div><p class="mut" style="font-size:13px">Prix proposé d'après les soldes dus du fichier (en CDF au taux du jour) : corrigez-le si besoin. Le coût Starlink se règle ensuite dans Paramètres → formules.</p>` : ''}
+      ${Object.keys(a.plans).length ? `<h2 class="sec">Formules d'abonnement</h2><div class="list">${plans}</div><p class="mut" style="font-size:13px">Prix des formules : Illimité 70 $ et 250 Go 40 $ ; pour une autre formule, prix déduit des soldes dus du fichier (en CDF au taux du jour). Corrigez-le si besoin. Le coût Starlink se règle ensuite dans Paramètres → formules.</p>` : ''}
       <h2 class="sec">Liste à valider</h2><div class="chips">${FL.map(([k, t]) => `<button class="chip ${im.cf === k ? 'on' : ''}" data-act="imp_cf" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="bar" style="margin-bottom:8px"><button class="btn sm sec" data-act="imp_allnew">☑ Tout ajouter (nouveaux)</button><button class="btn sm sec" data-act="imp_nonenew">☐ Ne rien ajouter</button></div>
       <div class="list">${shown.length ? shown.map(rowUi).join('') : '<div class="empty">Aucun client dans ce filtre.</div>'}</div>
