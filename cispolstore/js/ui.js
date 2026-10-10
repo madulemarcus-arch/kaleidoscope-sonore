@@ -238,6 +238,9 @@
   App.actions.search = () => App.search();
   App.actions.sgo = d => { App.close(); App.go(d.v === 'stock' ? 'stock' : d.v, { id: d.id, q: d.v === 'stock' ? $('gq')?.value : undefined }); };
   $('searchBtn').onclick = () => App.search();
+  // the ⋯ menu holds the secondary actions (synchronisation, theme)
+  $('menuBtn').onclick = e => { e.stopPropagation(); $('topmenu').hidden = !$('topmenu').hidden; };
+  document.addEventListener('click', () => { $('topmenu').hidden = true; });
 
   // ---------- Quick actions (+) ----------
   const q = (act, ico, t, s) => `<button class="opt" data-act="${act}"><span class="ico">${ico}</span><span><b>${t}</b><small>${s}</small></span></button>`;
@@ -259,7 +262,8 @@
   App.actions.q_buy = after(() => App.actions.newbuy());
 
   // ---------- "Plus" menu ----------
-  const item = (v, ico, t, s) => !App.canView(v) ? '' : `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:var(--navy)">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
+  const DOM = { subs: '#7c5cff', invoices: '#e4572e', payments: '#1f9d55', impayes: '#e5a11f', importc: '#2f7de1', importf: '#2f7de1', livraisons: '#0ea5a4', installs: '#6366f1', technicians: '#0ea5a4', suppliers: '#b45309', finance: '#1f9d55', daily: '#4f46e5', expenses: '#d64545', reports: '#7c5cff', rapportmois: '#7c5cff', settings: '#64748b', users: '#64748b' };
+  const item = (v, ico, t, s) => !App.canView(v) ? '' : `<button class="item" data-act="go" data-v="${v}"><span class="ico avatar" style="background:linear-gradient(135deg,${DOM[v] || 'var(--navy)'},color-mix(in srgb,${DOM[v] || 'var(--navy)'} 65%,#fff))">${ico}</span><div class="grow"><b>${t}</b><small>${s}</small></div><span class="mut">›</span></button>`;
   App.views.more = () => {
     const grp = (t, items) => { const h = items.join(''); return h ? `<h2 class="sec">${t}</h2><div class="list">${h}</div>` : ''; };
     const share = `<button class="item" data-act="shareapp"><span class="ico avatar" style="background:var(--navy)">📤</span><div class="grow"><b>Partager l'application</b><small>Envoyer le lien par WhatsApp, SMS…</small></div><span class="mut">›</span></button>`;

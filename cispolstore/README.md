@@ -120,6 +120,10 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Design (étape 1 : identité)
+
+Police **Inter** embarquée (`fonts/`, licence OFL, fonctionne hors connexion), en-tête en dégradé marine aux reflets orange et jaune du logo, titres entiers (la recherche et le cadenas restent visibles, la **synchronisation** et le **thème** sont dans le menu **⋯**), barre du bas à cinq places égales avec l'onglet actif en pastille, bouton **＋ flottant à droite** (il ne masque plus « Finance »), cartes et boutons plus arrondis avec ombres douces, filtres et pastilles plus lisibles, icônes du menu **Plus** colorées par domaine, apparition douce des écrans, mode sombre assorti. Le libellé « Installation » de la fiche client devient « Référence ».
+
 ## Importer des clients (Excel ou CSV)
 
 **Plus → Importer des clients**, ou le bouton **📥 Importer des clients (Excel)** en bas de l'onglet Clients, ou Paramètres → Données (administrateur). Choisissez un fichier **.xlsx** (ou .csv) : il est lu dans l'appareil, rien n'est envoyé sur internet.
