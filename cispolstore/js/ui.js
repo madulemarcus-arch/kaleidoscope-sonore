@@ -100,10 +100,13 @@
   App.actions.go = d => { App.close(); App.go(d.v, d.p ? JSON.parse(d.p) : d.id ? { id: d.id } : {}); };
 
   // ---------- Theme ----------
-  const darkNow = () => dbs().theme === 'dark' || (dbs().theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const darkNow = () => dbs().theme === 'dark' || dbs().theme === 'black' || (dbs().theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   App.applyTheme = () => {
     const dark = darkNow();
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    const de = document.documentElement, th = dbs().theme, ac = dbs().accent;
+    de.dataset.theme = dark ? 'dark' : 'light'; if (th === 'black') de.dataset.black = '1'; else delete de.dataset.black;
+    if (ac && ac !== 'orange') de.dataset.accent = ac; else delete de.dataset.accent;
+    const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = th === 'black' ? '#05101c' : dark ? '#0c2542' : '#12365d';
     $('themeBtn').textContent = dark ? '☀️' : '🌙';
     const co = dbs().company; $('logo').src = co.logo || 'logo.png'; if ($('slogo')) $('slogo').src = co.logo || 'logo.png';
   };
