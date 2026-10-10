@@ -28,10 +28,10 @@
     const t = App.today(), r = App.range(per), inv = App.db.invoices.filter(i => App.live(i) && App.inRange(i.date, r));
     const val = i => App.usd(App.invAgreed(i), i.currency, i);
     let buckets;
-    if (per === 'day') { buckets = Array.from({ length: 24 }, (_, h) => ({ l: h % 3 === 0 ? h + 'h' : '', v: 0 })); inv.forEach(i => { buckets[i.ts ? new Date(i.ts).getHours() : 12].v += val(i); }); }
-    else if (per === 'week') { buckets = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(l => ({ l, v: 0 })); inv.forEach(i => { buckets[App.diff(r[0], i.date)].v += val(i); }); }
-    else if (per === 'month') { const n = App.diff(r[0], r[1]) + 1; buckets = Array.from({ length: n }, (_, d) => ({ l: (d + 1) % 5 === 1 ? String(d + 1) : '', v: 0 })); inv.forEach(i => { buckets[+i.date.slice(8) - 1].v += val(i); }); }
-    else { buckets = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map(l => ({ l, v: 0 })); inv.forEach(i => { buckets[+i.date.slice(5, 7) - 1].v += val(i); }); }
+    if (per === 'day') { buckets = Array.from({ length: 24 }, (_, h) => ({ l: h % 3 === 0 ? h + 'h' : '', t: h + ' h', v: 0 })); inv.forEach(i => { buckets[i.ts ? new Date(i.ts).getHours() : 12].v += val(i); }); }
+    else if (per === 'week') { buckets = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => ({ l, t: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'][i], v: 0 })); inv.forEach(i => { buckets[App.diff(r[0], i.date)].v += val(i); }); }
+    else if (per === 'month') { const n = App.diff(r[0], r[1]) + 1; buckets = Array.from({ length: n }, (_, d) => ({ l: (d + 1) % 5 === 1 ? String(d + 1) : '', t: App.fdate(App.addDays(r[0], d)), v: 0 })); inv.forEach(i => { buckets[+i.date.slice(8) - 1].v += val(i); }); }
+    else { buckets = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((l, i) => ({ l, t: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][i], v: 0 })); inv.forEach(i => { buckets[+i.date.slice(5, 7) - 1].v += val(i); }); }
     return buckets;
   };
   App.views.home = () => {
@@ -84,7 +84,7 @@
         <div class="dash"><div style="grid-area:a">${startCard}${todo ? `<h2 class="sec">À faire</h2><div class="list">${alerts.join('')}${pendHtml}${unpaidHtml}</div>` : ''}</div>
         <div style="grid-area:b"${fin ? '' : ' hidden'}><h2 class="sec">Finances · ${PN}</h2>
         <div class="kpis"><div class="stat"><small>💰 Total facturé</small><b>${App.fmt(f.ca)}</b></div><div class="stat"><small>📈 Bénéfice net</small><b class="${f.net >= 0 ? 'ok' : 'bad'}">${App.fmt(f.net)}</b></div><div class="stat"><small>💸 Dépenses</small><b>${App.fmt(f.exp)}</b></div><div class="stat"><small>Marge brute</small><b>${App.fmt(f.margin)}</b></div></div>
-        <div class="card"><b>Ventes</b><div class="chart">${bars.map(b => `<div title="${App.fmt(b.v)}"><i style="height:${Math.round(b.v / max * 100)}%"></i><small>${b.l}</small></div>`).join('')}</div></div>
+        ${App.chart.bars(bars, { title: 'Ventes facturées', sub: PN })}
         </div><div style="grid-area:c"><h2 class="sec">Stock</h2><div class="grid two"><button class="stat" data-act="go" data-v="stock" style="text-align:left;font:inherit;color:inherit;cursor:pointer"><small>📦 Produits</small><b>${db.products.length}</b>${low ? `<small class="warn">${low} en stock bas</small>` : ''}</button><div class="stat"><small>📏 Câble restant</small><b>${App.nf(cable, 2)} m</b></div></div>
         </div><div style="grid-area:d">${urgent.length ? `<h2 class="sec">Renouvellements à traiter<button class="more" data-act="go" data-v="subs">Tout voir</button></h2><div class="list">${urgent.map(({ c, s }) => `<button class="item" data-act="go" data-v="client" data-id="${c.id}"><span class="avatar ${{ actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status]}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>Fin ${App.fdate(s.end)}${s.status === 'sursis' ? ' · sursis → ' + App.fdate(s.gEnd) : ''}</small></div><div class="end">${App.pill(s.status)}</div></button>`).join('')}</div>` : ''}
         </div></div>
@@ -159,6 +159,17 @@
       return { cards: [['Clients', c.length], ['Gérés', c.filter(x => x.type === 'gere').length], ['Matériel / Installation', `${c.filter(x => x.type === 'mat').length} / ${c.filter(x => x.type === 'install').length}`], ['Nouveaux (période)', c.filter(x => App.inRange(x.created || '', r)).length]], head: ['Client', 'Type', 'Statut', 'Total facturé ($)'], fmt: [3], rows: c.map(x => [App.cname(x), App.TYPES[x.type], App.sub(x) ? App.STATUS[App.sub(x).status][0] : '—', tot[x.id] || 0]).sort((a, b) => b[3] - a[3]) }; }
   };
   const lastReport = { head: [], rows: [] };
+  // a picture for each report tab
+  const chartFor = (tab, r) => {
+    const db = App.db, C = App.chart;
+    if (tab === 'ventes') { const rows = db.invoices.filter(i => App.live(i) && App.inRange(i.date, r)).map(i => ({ date: i.date, v: App.usd(App.invAgreed(i), i.currency, i) })), it = C.series(r, rows); return rows.length ? C.bars(it, { title: 'Ventes facturées', hl: false }) : ''; }
+    if (tab === 'dep') { const by = {}; db.expenses.filter(e => App.inRange(e.date, r)).forEach(e => { by[e.cat] = (by[e.cat] || 0) + App.usd(e.amount, e.currency, e); }); return C.donut(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value })), { sub: 'dépenses' }); }
+    if (tab === 'benef') { const f = finance(r); return C.donut([{ label: 'Bénéfice net', value: Math.max(0, f.net), color: 'var(--ok)' }, { label: 'Coût des marchandises', value: f.cost, color: 'var(--bad)' }, { label: 'Dépenses', value: f.exp, color: 'var(--warn)' }], { top: App.fmt(f.ca), sub: 'chiffre d\'affaires' }); }
+    if (tab === 'abos') { const s = gere().map(c => App.sub(c)).filter(Boolean), k = x => s.filter(y => y.status === x).length; return C.donut([{ label: 'Actifs', value: k('actif'), color: 'var(--ok)' }, { label: 'En sursis', value: k('sursis'), color: 'var(--warn)' }, { label: 'Inactifs', value: k('inactif'), color: 'var(--bad)' }], { top: String(s.length), sub: 'abonnements', fmt: v => String(v) }); }
+    if (tab === 'clients') { const by = {}; db.clients.forEach(c => { by[c.type] = (by[c.type] || 0) + 1; }); return C.donut(Object.entries(by).map(([t, value]) => ({ label: App.TYPES[t] || t, value })), { top: String(db.clients.length), sub: 'clients', fmt: v => String(v) }); }
+    if (tab === 'stock') { const l = db.products.filter(p => App.tracked(p)).map(p => ({ p, ratio: p.qty / Math.max(p.min || 1, 1) })).sort((a, b) => a.ratio - b.ratio).slice(0, 8); return l.length ? `<h2 class="sec">Stock le plus bas</h2>` + C.hbars(l.map(({ p }) => ({ label: p.name, v: p.qty, max: Math.max(p.qty, (p.min || 1) * 3), note: `seuil d'alerte : ${App.nf(p.min || 0, 0)}`, color: p.qty <= (p.min || 0) ? 'linear-gradient(90deg,#f59a9a,var(--bad))' : 'linear-gradient(90deg,#5fd89b,var(--ok))' })), { fmt: v => App.nf(v, 2) }) : ''; }
+    return '';
+  };
   App.views.reports = () => {
     const r = rng(), rep = REP[rs.tab](r), noPer = rs.tab === 'stock';
     Object.assign(lastReport, rep);
@@ -168,6 +179,7 @@
       html: `<div class="tabs">${TABS.map(([k, t]) => `<button class="${rs.tab === k ? 'on' : ''}" data-act="reptab" data-t="${k}">${t}</button>`).join('')}</div>
         ${noPer ? '' : `${periodChips('repper', rs.per, `<button class="chip ${rs.per === 'custom' ? 'on' : ''}" data-act="repper" data-p="custom">Personnalisée</button>`)}${rs.per === 'custom' ? `<div class="row"><div><label class="l">Du</label><input type="date" id="r_from" value="${rs.from}"></div><div><label class="l">Au</label><input type="date" id="r_to" value="${rs.to}"></div></div>` : ''}<div class="mut" style="margin:6px 0">Période : ${App.fdate(r[0])} → ${App.fdate(r[1])}</div>`}
         <div class="grid">${rep.cards.map(([l, v, m]) => `<div class="stat"><small>${esc(l)}</small><b>${m ? App.fmt(v) : esc(v)}</b></div>`).join('')}</div>
+        ${chartFor(rs.tab, r)}
         <div class="bar"><button class="btn sec" data-act="repcsv">⬇ Exporter CSV</button></div>
         ${rep.rows.length ? `<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr>${rep.head.map(h => `<th style="text-align:left;padding:9px 10px;color:var(--mut);font-size:12px;white-space:nowrap">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rep.rows.slice(0, 300).map(row => `<tr>${row.map((v, i) => `<td style="padding:8px 10px;border-top:1px solid var(--line);${rep.fmt && rep.fmt.includes(i) ? 'text-align:right;white-space:nowrap' : ''}">${show(v, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '<div class="empty">Aucune donnée sur cette période.</div>'}`,
       after: () => { ['r_from', 'r_to'].forEach(id => { if ($(id)) $(id).onchange = () => { rs.from = $('r_from').value || rs.from; rs.to = $('r_to').value || rs.to; App.refresh(); }; }); }

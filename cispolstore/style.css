@@ -321,3 +321,38 @@ dialog { border-radius:22px; }
 .kpis::-webkit-scrollbar { display:none; } .kpis .stat { flex:0 0 auto; min-width:140px; scroll-snap-align:start; }
 .kpis + .card { margin-top:6px; }
 @media (min-width:1024px) { .hero { padding:22px 26px 16px; } .hero-num { font-size:48px; } .spark { height:60px; } .qa { max-width:640px; } .kpis { flex-wrap:wrap; overflow:visible; } }
+
+/* =====================================================================
+   Design v2 — graphiques
+   ===================================================================== */
+.cwrap { background:var(--card); border:1px solid color-mix(in srgb,var(--line) 70%,transparent); border-radius:var(--r); padding:14px; box-shadow:var(--sh1); }
+.cwrap + .cwrap, .cwrap + .card, .card + .cwrap { margin-top:12px; }
+.chead { display:flex; justify-content:space-between; align-items:baseline; gap:8px; } .chead small { color:var(--mut); }
+.cread { min-height:20px; font-size:13px; font-weight:700; color:var(--mut); margin:4px 0 2px; } .cread.on { color:var(--txt); }
+.cplot { position:relative; display:flex; gap:6px; height:150px; margin-top:6px; }
+.cgrid { display:flex; flex-direction:column; justify-content:space-between; font-size:10px; color:var(--mut); width:26px; text-align:right; padding-bottom:16px; flex:none; font-variant-numeric:tabular-nums; }
+.ccols { flex:1; display:flex; align-items:stretch; gap:3px; min-width:0; background:linear-gradient(var(--line),var(--line)) 0 0/100% 1px no-repeat, linear-gradient(var(--line),var(--line)) 0 calc(50% - 8px)/100% 1px no-repeat; }
+.ccol { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-end; cursor:pointer; }
+.cbs { flex:1; display:flex; align-items:flex-end; justify-content:center; gap:2px; border-bottom:1px solid var(--line); }
+.cbs i { display:block; flex:1; max-width:22px; min-height:2px; border-radius:6px 6px 0 0; transform-origin:bottom; animation:grow .6s cubic-bezier(.2,.8,.2,1) both; }
+.cbs .b1 { background:linear-gradient(var(--acc2),var(--acc)); opacity:.55; } .cbs .b1.hl, .ccol.pick .b1, .ccol:hover .b1 { opacity:1; }
+.two .cbs .b1 { background:linear-gradient(#5fd89b,var(--ok)); opacity:.9; } .two .cbs .b2 { background:linear-gradient(#f59a9a,var(--bad)); opacity:.9; }
+.ccol small { height:16px; line-height:16px; font-size:10px; color:var(--mut); text-align:center; white-space:nowrap; overflow:visible; margin:0 -12px; }
+@keyframes grow { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+.donut { display:flex; flex-wrap:wrap; align-items:center; gap:14px 18px; }
+.dwrap { position:relative; width:150px; height:150px; flex:none; margin:0 auto; } .dwrap svg { width:100%; height:100%; }
+.dwrap .seg { transition:stroke-width .15s; cursor:pointer; animation:dfade .7s ease both; } .dwrap .seg.pick { stroke-width:18; }
+@keyframes dfade { from { opacity:0; } to { opacity:1; } }
+.dcen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none; }
+.dcen b { font-size:18px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; } .dcen small { color:var(--mut); font-size:11px; }
+.dleg { flex:1; min-width:200px; display:flex; flex-direction:column; gap:2px; }
+.dl { display:flex; align-items:center; gap:10px; padding:7px 4px; border-radius:10px; cursor:pointer; } .dl.pick { background:var(--card2); }
+.dl i { width:12px; height:12px; border-radius:4px; flex:none; } .dl .grow { min-width:0; } .dl b { display:block; font-size:14px; } .dl small { display:block; color:var(--mut); font-size:12px; }
+.dl .dv { text-align:right; font-weight:800; font-variant-numeric:tabular-nums; } .dl .dv small { font-weight:500; }
+.donut .cread { flex-basis:100%; text-align:center; }
+.hb .hrow { padding:7px 0; cursor:pointer; } .hb .hl2 { display:flex; justify-content:space-between; font-size:14px; margin-bottom:5px; } .hb .hl2 b { font-variant-numeric:tabular-nums; }
+.htr { height:10px; border-radius:99px; background:var(--card2); overflow:hidden; } .htr i { display:block; height:100%; border-radius:99px; animation:growx .7s cubic-bezier(.2,.8,.2,1) both; transform-origin:left; }
+@keyframes growx { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+.hb small { color:var(--mut); font-size:12px; }
+@media (prefers-reduced-motion:reduce) { .cbs i, .htr i, .dwrap .seg { animation:none; } }
+@media (min-width:1024px) { .cplot { height:210px; } }

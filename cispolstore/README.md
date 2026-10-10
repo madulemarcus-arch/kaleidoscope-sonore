@@ -120,6 +120,13 @@ Sur une facture, l'argent n'est pas tout à CISPOLstore : les **frais d'installa
 - **Caisse** : l'installation et l'abonnement sont des **sorties** (« Installation » au nom du technicien, « Abonnement » Starlink) qui réduisent la caisse estimée et le cash attendu de la clôture du jour. Deux cases (Finance → En caisse) permettent de les retirer ou non de la caisse ; réglages partagés entre appareils.
 - **Accueil, rapport du mois, Rapports** : « Total facturé » (comme avant) et **« CA réel »** (sans abonnements ni installations). Le bénéfice net garde son calcul habituel.
 
+## Graphiques (design étape 3)
+
+Une petite boîte à outils de graphiques sans bibliothèque (`js/charts.js`), aux couleurs du thème (clair et sombre) : **anneaux**, **barres** (une ou deux séries) et **barres horizontales**. **Touchez** une barre, une part d'anneau ou une ligne de légende pour lire sa valeur.
+- **Accueil** : barres des ventes facturées de la période (la dernière barre en couleur pleine).
+- **Finance** : barres **entrées / sorties** par jour (par mois si la période est longue), anneau **« Où va l'argent encaissé »** (CA CISPOLstore, installations, abonnements) et anneau des **entrées par mode de paiement**.
+- **Rapports** : barres des ventes (Ventes), anneau des dépenses par catégorie (Dépenses), anneau coût / dépenses / bénéfice net (Bénéfices), anneau actifs / sursis / inactifs (Abonnements), anneau des types de clients (Clients) et barres horizontales des **produits au stock le plus bas** (Stock).
+
 ## Nouvel accueil (design étape 2)
 
 - **Carte principale** : le **CA réel** de la période (kits et matériel, sans abonnements ni installations), qui s'anime à l'ouverture, avec la **comparaison au même moment de la période précédente** (« ▲ 12 % vs le mois dernier »), une **courbe** des ventes et les filtres Aujourd'hui / Semaine / Mois / Année. Le taux du jour est en haut à droite.
