@@ -287,3 +287,13 @@ Chaque rubrique prend sa couleur : **Clients** en bleu, **Finance** en vert (ent
 - **QR code sur la facture** (en bas, à côté du cachet) : le client le scanne, WhatsApp s'ouvre vers le numéro de l'entreprise avec « Bonjour, je règle la facture FAC-… (montant) » déjà écrit, pour payer ou envoyer sa preuve. Il n'apparaît que si le téléphone de l'entreprise est renseigné (Paramètres). Générateur embarqué : `vendor/qrcode.js` (qrcode-generator, licence MIT).
 - **Cachet plus marqué** : légèrement incliné, contraste et couleurs renforcés, sur la facture et le reçu.
 - **📤 Partager en PDF** : bouton sur la facture et sur chaque paiement (reçu). Il crée un vrai fichier PDF et ouvre le partage du téléphone (WhatsApp, e-mail…) ; sur ordinateur, le fichier est téléchargé. Code dans `js/share.js` (sans bibliothèque : le document est dessiné en image puis placé dans un PDF A4, donc le texte du PDF n'est pas sélectionnable). Les boutons Imprimer et Word restent inchangés.
+
+## Ordinateur (design étape 8)
+
+- **Accueil sur trois colonnes** (écrans de 1280 px et plus) : à faire / bien démarrer · finances · renouvellements et stock. Les listes de clients, de factures et de paiements passent sur trois colonnes, avec des lignes plus compactes.
+- **Actions au survol** : sur ordinateur, les actions rapides d'un client (Appeler, WhatsApp, Copier l'ACC, Renouveler) apparaissent en petits boutons ronds quand la souris passe sur la ligne (info-bulle au survol), au lieu de faire glisser la ligne.
+- **Raccourcis clavier** (ignorés quand on écrit dans un champ, dans une fenêtre ouverte ou sur l'écran verrouillé, et limités aux droits du profil) :
+  - `/` ou `Ctrl`+`K` : rechercher · `?` : aide · `Échap` : fermer
+  - `F` nouvelle facture · `C` nouveau client · `P` encaisser · `R` renouveler · `N` menu d'action rapide
+  - `G` puis `H` accueil, `C` clients, `A` abonnements, `S` stock, `F` factures, `P` paiements, `B` finance, `I` impayés
+  - L'aide est aussi dans le menu de gauche (« Raccourcis clavier »). Code : `js/keys.js`.
