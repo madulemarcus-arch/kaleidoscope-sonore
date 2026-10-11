@@ -17,11 +17,12 @@
 
   // ---------- List ----------
   const st = App.clState = { f: 'all', q: '', sel: false, picked: new Set() };
-  const FILTERS = [['all', 'Tous'], ['gere', '📡 Gérés'], ['mat', '📦 Matériel'], ['install', '🔧 Installation'], ['actif', '🟢 Actifs'], ['sursis', '🟠 Sursis'], ['inactif', '🔴 Inactifs']];
+  const FILTERS = [['all', 'Tous'], ['gere', '📡 Gérés'], ['abo', '📶 Abonnement seul'], ['mat', '📦 Kit / matériel'], ['install', '🔧 Installation'], ['actif', '🟢 Actifs'], ['sursis', '🟠 Sursis'], ['inactif', '🔴 Inactifs']];
   const filtered = () => {
     const q = st.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
     return App.db.clients.filter(c => {
       if (['gere', 'mat', 'install'].includes(st.f) && c.type !== st.f) return false;
+      if (st.f === 'abo' && !(c.type === 'gere' && c.aboOnly)) return false;
       if (['actif', 'sursis', 'inactif'].includes(st.f)) { const s = App.sub(c); if (!s || s.status !== st.f) return false; }
       if (!q) return true;
       return [App.cname(c), c.code, c.acc, c.phone, c.phone2, c.address, c.city, c.quarter, c.installAddr, c.serial, c.kit, c.article].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q);
@@ -45,7 +46,7 @@
     $('clist').innerHTML = l.length ? `<div class="list">${l.map(c => { const L = App.letterOf(App.cname(c)), h = L !== last ? `<div class="lh">${L}</div>` : ''; last = L; return h + row(c); }).join('')}</div>` : `<div class="empty big"><div class="ei">👥</div><b>${App.db.clients.length ? 'Aucun client pour ce filtre' : 'Aucun client pour le moment'}</b><p>${App.db.clients.length ? 'Essayez un autre filtre ou une autre recherche.' : 'Ajoutez votre premier client, ou importez votre fichier Excel.'}</p>${App.db.clients.length ? '' : '<button class="btn" data-act="newclient">+ Nouveau client</button>'}</div>`;
   };
   App.views.clients = () => {
-    const all = App.db.clients, cnt = f => f === 'all' ? all.length : ['gere', 'mat', 'install'].includes(f) ? all.filter(c => c.type === f).length : all.filter(c => (App.sub(c) || {}).status === f).length;
+    const all = App.db.clients, cnt = f => f === 'all' ? all.length : f === 'abo' ? all.filter(c => c.type === 'gere' && c.aboOnly).length : ['gere', 'mat', 'install'].includes(f) ? all.filter(c => c.type === f).length : all.filter(c => (App.sub(c) || {}).status === f).length;
     return {
       title: 'Clients', sub: `${all.length} au total`, nav: 'clients',
       html: `<div class="search"><input id="cq" placeholder="Rechercher un client, ACC, téléphone…" value="${esc(st.q)}" autocomplete="off"></div>
@@ -73,17 +74,18 @@
 
   // ---------- Create / edit ----------
   const typeChooser = () => App.modal('Nouveau client',
-    `<p class="mut">Choisissez le type de client : les champs adaptés s'afficheront ensuite. Le type ne pourra plus être modifié.</p>
+    `<p class="mut">Choisissez le type de client : les champs adaptés s'afficheront ensuite. Vous pourrez le changer plus tard depuis la fiche du client.</p>
      <button class="opt" data-act="cf_type" data-t="gere"><span class="ico">📡</span><span><b>Client géré par CISPOLstore</b><small>Vente matériel + gestion abonnement (ACC, dates, sursis…)</small></span></button>
-     <button class="opt" data-act="cf_type" data-t="mat"><span class="ico">📦</span><span><b>Matériel uniquement</b><small>Achat de matériel sans gestion d'abonnement</small></span></button>
+     <button class="opt" data-act="cf_type" data-t="abo"><span class="ico">📶</span><span><b>Abonnement seulement</b><small>Gestion de l'abonnement (ACC, dates, sursis) : le client a déjà son kit</small></span></button>
+     <button class="opt" data-act="cf_type" data-t="mat"><span class="ico">📦</span><span><b>Kit / matériel seulement</b><small>Achat de matériel sans gestion d'abonnement</small></span></button>
      <button class="opt" data-act="cf_type" data-t="install"><span class="ico">🔧</span><span><b>Installation uniquement</b><small>Le client possède déjà son matériel</small></span></button>`);
-  App.actions.cf_type = d => App.clientForm(null, d.t);
-  App.clientForm = (c, type) => {
+  App.actions.cf_type = d => d.t === 'abo' ? App.clientForm(null, 'gere', true) : App.clientForm(null, d.t);
+  App.clientForm = (c, type, aboOnly) => {
     if (!c && !type) return typeChooser();
     const S = App.db.settings, isNew = !c;
-    c = c || { type, first: '', last: '', phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: '', payMode: 'Cash', start: App.today(), period: S.period, grace: S.grace, note: '', article: '', subs: [] };
+    c = c || { type, first: '', last: '', phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: '', payMode: 'Cash', start: App.today(), period: S.period, grace: S.grace, note: '', article: '', subs: [], aboOnly: !!aboOnly };
     const g = c.type === 'gere';
-    App.modal((isNew ? 'Nouveau client · ' : 'Modifier · ') + App.TYPES[c.type],
+    App.modal((isNew ? 'Nouveau client · ' : 'Modifier · ') + App.typeName(c),
       `<div class="row">${F.text('f_first', 'Prénom', c.first)}${F.text('f_last', 'Nom', c.last)}</div>
        <div class="row">${F.text('f_phone', 'Téléphone', c.phone, 'type="tel" inputmode="tel"')}${F.text('f_phone2', 'Deuxième téléphone', c.phone2, 'type="tel" inputmode="tel"')}</div>
        ${F.text('f_address', 'Adresse', c.address)}
@@ -91,7 +93,7 @@
        ${c.type !== 'mat' ? F.text('f_inst', "Référence / adresse d'installation", c.installAddr) : ''}
        ${c.type === 'mat' ? F.text('f_article', 'Matériel acheté (note)', c.article, 'list="dl_k"') + F.list('dl_k', App.KITS) : ''}
        ${g ? `<h2 class="sec">Compte Starlink</h2>${F.text('f_acc', 'ACC', c.acc, 'autocapitalize="characters"')}
-         <div class="row">${F.text('f_serial', 'Numéro de série', c.serial)}${F.text('f_kit', 'Modèle du kit', c.kit, 'list="dl_k"')}</div>${F.list('dl_k', App.KITS)}
+         ${c.aboOnly ? '' : `<div class="row">${F.text('f_serial', 'Numéro de série', c.serial)}${F.text('f_kit', 'Modèle du kit', c.kit, 'list="dl_k"')}</div>${F.list('dl_k', App.KITS)}`}
          <h2 class="sec">Abonnement</h2>
          <div class="row">${F.text('f_plan', "Type d'abonnement", c.plan, 'list="dl_p"')}${F.num('f_price', "Prix de l'abonnement ($)", c.price)}</div>${F.list('dl_p', App.PLANS)}
          ${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, c.payMode)}
@@ -105,7 +107,7 @@
         o.name = (o.first + ' ' + o.last).trim();
         if (c.type !== 'mat') o.installAddr = App.v('f_inst');
         if (c.type === 'mat') { o.article = App.v('f_article'); o.serial = App.v('f_serial'); }
-        if (g) Object.assign(o, { acc: App.v('f_acc'), serial: App.v('f_serial'), kit: App.v('f_kit'), plan: App.v('f_plan'), price: App.n('f_price'), payMode: App.v('f_pay'), start: App.v('f_start') || App.today(), period: Math.max(1, Math.round(App.n('f_period')) || S.period), grace: Math.max(0, Math.round(App.n('f_grace'))) });
+        if (g) Object.assign(o, { acc: App.v('f_acc'), serial: $('f_serial') ? App.v('f_serial') : c.serial, kit: $('f_kit') ? App.v('f_kit') : c.kit, plan: App.v('f_plan'), price: App.n('f_price'), payMode: App.v('f_pay'), start: App.v('f_start') || App.today(), period: Math.max(1, Math.round(App.n('f_period')) || S.period), grace: Math.max(0, Math.round(App.n('f_grace'))) });
         Object.assign(c, o);
         if (isNew) { c.id = App.uid(); c.code = App.nextClientCode(); c.created = App.today(); c.subs = []; App.db.clients.push(c); App.log(c.id, 'Client créé (' + App.TYPES[c.type] + ')'); App.save(); App.toast('Client enregistré'); App.go('client', { id: c.id }); return; }
         App.log(c.id, 'Fiche modifiée'); App.save(); App.toast('Modifications enregistrées'); App.refresh();
@@ -152,7 +154,7 @@
     const c = App.client(p.id); if (!c) return { title: 'Client', back: 'clients', html: '<div class="empty">Client introuvable.</div>' };
     const tabs = TABS[c.type], tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
     let body = '';
-    if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd><dt>Type</dt><dd>${App.TYPES[c.type]}</dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Référence</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
+    if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd><dt>Type</dt><dd>${esc(App.typeName(c))} <button class="btn sm sec" data-act="cl_type" data-id="${c.id}" style="margin-left:6px">Changer</button></dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Référence</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
       <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button><button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
     if (tab === 'abo') body = aboTab(c) + App.penaltyBlock(c);
     if (tab === 'pay') body = `<div class="bar"><button class="btn sm" data-act="newpay" data-cid="${c.id}">+ Paiement</button></div>` + listOrEmpty(db.payments.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => { const i = App.invoice(x.invoiceId); return `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${i ? esc(i.number) : 'Sans facture'}${x.ref ? ' · ' + esc(x.ref) : ''}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`; }), 'Aucun paiement enregistré.');
@@ -171,6 +173,16 @@
         <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
         <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`
     };
+  };
+  // change the kind of client: everything entered (ACC, dates, kit…) is kept, only what is shown and counted changes
+  App.actions.cl_type = d => {
+    const c = App.client(d.id); if (!c) return; const cur = c.type === 'gere' ? (c.aboOnly ? 'abo' : 'gere') : c.type;
+    App.modal('Changer le type de client', `<p class="mut" style="margin-top:0">${esc(App.cname(c))} est actuellement : <b>${esc(App.typeName(c))}</b>. Les informations déjà saisies (ACC, dates d'abonnement, kit) sont conservées ; les factures et paiements ne changent pas.</p>
+      <div class="fld"><label class="l" for="f_ct">Nouveau type</label><select id="f_ct">${App.opts([['gere', '📡 Client géré (kit + abonnement)'], ['abo', '📶 Abonnement seulement'], ['mat', '📦 Kit / matériel seulement'], ['install', '🔧 Installation uniquement']], cur)}</select></div>`,
+      () => { const v = App.v('f_ct'); if (v === cur) return;
+        const was = App.typeName(c); c.type = v === 'abo' ? 'gere' : v; c.aboOnly = v === 'abo';
+        App.log(c.id, `Type modifié : ${was} → ${App.typeName(c)}`); App.save(); App.toast('Type modifié : ' + App.typeName(c)); App.refresh();
+        if (c.type === 'gere' && (!c.acc || !c.start)) setTimeout(() => App.clientForm(c), 60); }, 'Changer');
   };
   App.actions.editclient = d => App.clientForm(App.client(d.id));
   App.actions.delclient = d => {

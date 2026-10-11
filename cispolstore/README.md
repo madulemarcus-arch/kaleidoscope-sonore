@@ -43,7 +43,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 
 ## Règles métier
 
-- **Type de client** choisi à la création, non modifiable : *géré*, *matériel uniquement*, *installation uniquement*.
+- **Type de client** : *géré* (kit + abonnement), *abonnement seulement*, *kit / matériel seulement*, *installation uniquement*. Il se choisit à la création et **se change ensuite** depuis la fiche du client (Infos → **Changer**), sans rien perdre : l'ACC, les dates d'abonnement et le kit restent enregistrés (cachés quand ils ne s'appliquent pas) et les factures et paiements ne bougent pas. « Abonnement seulement » est un client géré (ACC, dates, sursis, rappels) dont on ne vend pas le kit : le champ du kit n'est pas demandé. La liste des clients a un filtre **📶 Abonnement seul**.
 - **Abonnement** : fin = début + durée (30 jours par défaut) ; sursis = du lendemain de la fin à fin + sursis (15 jours par défaut, réglable par client). Statut automatique : actif → en sursis → inactif.
 - **Renouvellement** : nouvelle période à partir de la fin actuelle (ou d'aujourd'hui si le client est inactif), avec facture et paiement optionnels.
 - **Factures** : numéro `FAC-AAAA-0001` automatique et sans doublon ; les lignes du stock font sortir le stock (câble en mètres). Montant en lettres et équivalent CDF (taux réglable). Export PDF (via l'impression du navigateur), Word (.doc) et impression.
