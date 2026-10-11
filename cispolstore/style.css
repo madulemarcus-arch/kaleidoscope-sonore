@@ -556,3 +556,24 @@ button.sbadge:active { transform:scale(.96); }
 .typebtn:active { transform:scale(.97); }
 .typebtn.on-light { background:color-mix(in srgb,var(--blue) 12%,transparent); color:var(--txt); margin:0 0 12px; }
 .sw-type { background:linear-gradient(135deg,#6d5df5,#8d82ff); }
+
+/* Design v2 — icônes colorées et animées (barre du bas et menu de gauche) */
+.ic { width:26px; height:26px; display:block; overflow:visible; }
+.ic .s { stroke:var(--ic,currentColor); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.ic .f { fill:color-mix(in srgb,var(--ic,currentColor) 22%,transparent); }
+[data-nav="home"], #side [data-v="home"] { --ic:#e4572e; } [data-nav="clients"], #side [data-v="clients"] { --ic:#2f7de1; }
+[data-nav="finance"], #side [data-v="finance"] { --ic:#169c5b; } [data-nav="stock"], #side [data-v="stock"] { --ic:#d9822b; }
+[data-nav="more"] { --ic:#7c5cff; } [data-nav="installs"] { --ic:#6366f1; } [data-nav="livraisons"] { --ic:#0ea5a4; }
+#bottom button span { padding:4px 16px; display:grid; place-items:center; }
+#bottom button:not(.on) .ic { opacity:.8; transform:scale(.94); transition:transform .2s, opacity .2s; }
+#bottom button.on .ic { animation:icpop .55s cubic-bezier(.2,.9,.3,1.4); }
+#bottom button.on .ic .s { stroke-dasharray:80; animation:icdraw .7s ease-out; }
+#bottom button.on .ic .f { animation:icfill .7s ease-out; }
+#bottom button.on span { background:color-mix(in srgb,var(--ic,var(--acc)) 16%,transparent) !important; }
+#bottom button.on { color:var(--ic,var(--acc)) !important; }
+#bottom button:active .ic { transform:scale(.85); }
+@keyframes icpop { 0% { transform:scale(.7) rotate(-12deg); } 55% { transform:scale(1.22) rotate(6deg); } 100% { transform:scale(1) rotate(0); } }
+@keyframes icdraw { from { stroke-dashoffset:80; } to { stroke-dashoffset:0; } }
+@keyframes icfill { from { fill-opacity:0; } to { fill-opacity:1; } }
+#side nav button span .ic { width:22px; height:22px; }
+@media (prefers-reduced-motion:reduce) { #bottom button.on .ic, #bottom button.on .ic .s, #bottom button.on .ic .f { animation:none; } }
