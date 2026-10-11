@@ -23,6 +23,7 @@
   App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Commission technicien', 'Internet / Abonnement', 'Marketing', 'Autre'];
   App.PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   App.KITS = ['Starlink Mini', 'Starlink Standard'];
+  App.typeName = c => c.type === 'gere' && c.aboOnly ? 'Abonnement seulement' : App.TYPES[c.type];
   App.TYPES = { gere: 'Client géré', mat: 'Matériel uniquement', install: 'Installation uniquement' };
 
   // ---------- Data ----------

@@ -218,7 +218,7 @@
     const g = [];
     const cl = db.clients.filter(c => match([App.cname(c), c.first, c.last, c.code, c.acc, c.phone, c.phone2, c.address, c.city, c.quarter, c.installAddr, c.serial, c.kit, c.plan, c.article].join(' '), q));
     const ok = v => !App.canView || App.canView(v);
-    if (cl.length && ok('clients')) g.push(['Clients', cl.slice(0, 8).map(c => ({ v: 'client', id: c.id, t: App.cname(c), s: [App.TYPES[c.type], c.acc, c.phone].filter(Boolean).join(' · ') }))]);
+    if (cl.length && ok('clients')) g.push(['Clients', cl.slice(0, 8).map(c => ({ v: 'client', id: c.id, t: App.cname(c), s: [App.typeName(c), c.acc, c.phone].filter(Boolean).join(' · ') }))]);
     const inv = db.invoices.filter(i => match([i.number, App.cname(App.client(i.clientId)), i.lines.map(l => l.desc).join(' ')].join(' '), q));
     if (inv.length && ok('invoices')) g.push(['Factures', inv.slice(-8).reverse().map(i => ({ v: 'invoice', id: i.id, t: i.number, s: `${App.cname(App.client(i.clientId))} · ${App.fmt(App.invTotal(i), i.currency)}` }))]);
     const pr = db.products.filter(p => match([p.name, p.ref, p.cat].join(' '), q));
