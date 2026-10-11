@@ -280,7 +280,7 @@
         + grp('Gestion', [item('finance', '🏦', 'Finance', 'Entrées, sorties et caisse'), item('daily', '🌙', 'Clôture du jour', 'Récapitulatif et caisse de la journée'), item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde')])
         + App.appearanceCard()
         + grp('Application', [App.multi() ? item('profile', '👤', 'Mon profil', (App.user ? App.user.name : '') + ' · code PIN, changer de profil') : '', share])
-        + `<p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0</p>`
+        + `<p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0 · build ${App.BUILD}</p>`
     };
   };
 })();

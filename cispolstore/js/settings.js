@@ -8,7 +8,7 @@
     const S = App.db.settings, co = S.company, me = App.me(), lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, App.today()) : null;
     const b = (cls, ico, txt, act) => `<${act && App.guard(act) ? `button data-act="${act}"` : 'span'} class="sbadge ${cls}"><i>${ico}</i>${txt}</${act && App.guard(act) ? 'button' : 'span'}>`;
     const sy = App.sync && App.sync.status !== 'off';
-    return `<section class="hero phero"><div class="chead"><img src="${esc(co.logo || 'logo.png')}" alt=""><div><h2>${esc(co.name)}</h2><small>${me.name && me.name !== App.role().label ? esc(me.name) + ' · ' : ''}${esc(App.role().label)}${withVersion ? ' · version 2.0' : ''}</small></div></div>
+    return `<section class="hero phero"><div class="chead"><img src="${esc(co.logo || 'logo.png')}" alt=""><div><h2>${esc(co.name)}</h2><small>${me.name && me.name !== App.role().label ? esc(me.name) + ' · ' : ''}${esc(App.role().label)}${withVersion ? ' · version 2.0' : ''} · build ${App.BUILD}</small></div></div>
       <div class="sbadges">${b(App.hasPin() ? 'ok' : 'warn', '🔐', App.hasPin() ? 'Protégé par PIN' : 'Sans PIN', App.hasPin() ? '' : 'pinset')}${b(age !== null && age <= 7 ? 'ok' : 'warn', '💾', age === null ? 'Aucune sauvegarde' : age === 0 ? 'Sauvegardé aujourd\'hui' : `Sauvegarde il y a ${age} j`, 'backup')}${b(sy ? 'ok' : '', '🔄', sy ? 'Synchronisé' : 'Hors synchronisation')}</div></section>`;
   };
   // "Apparence" card (Plus and Settings): the four modes and the accent colour, applied at once and kept on this device
