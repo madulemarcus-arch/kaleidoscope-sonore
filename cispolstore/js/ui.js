@@ -90,7 +90,7 @@
   const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['stock', '📦', 'Stock'], ['invoices', '🧾', 'Factures'], ['payments', '💰', 'Paiements'], ['finance', '🏦', 'Finance'], ['impayes', '⏳', 'Impayés'], ['suppliers', '🏭', 'Fournisseurs'], ['technicians', '🧰', 'Techniciens'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['settings', '⚙️', 'Paramètres']];
   $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
     <button class="btn full" data-act="quick">＋ Action rapide</button>
-    <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${i}</span>${t}</button>`).join('')}</nav>
+    <nav>${SIDE.map(([v, i, t]) => `<button data-act="go" data-v="${v}"><span>${App.icon(v) || i}</span>${t}</button>`).join('')}</nav>
     <div class="sfoot"><button data-act="keys">⌨ Raccourcis clavier <kbd>?</kbd></button><button data-act="shareapp">📤 Partager l'application</button></div>`;
 
   // ---------- Click delegation ----------
