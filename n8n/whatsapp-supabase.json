@@ -1,0 +1,172 @@
+{
+  "name": "WhatsApp → Supabase : journal des messages et accusé de réception",
+  "nodes": [
+    {
+      "id": "af136007-ede5-437a-84cb-d911eef399e1",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "updates": [
+          "messages"
+        ]
+      }
+    },
+    {
+      "id": "6a5bc42d-5b6f-4a57-ab8c-13bf8a800f28",
+      "name": "Message texte ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "16b37c86-33af-4ba2-afe9-8d13f3fc975e",
+              "leftValue": "={{ $json.messages?.[0]?.type }}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9c941f02-f215-4f9d-9071-c21a0427d39a",
+      "name": "Enregistrer dans Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        -80
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "whatsapp_messages",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "wa_id",
+              "fieldValue": "={{ $json.messages[0].from }}"
+            },
+            {
+              "fieldId": "nom",
+              "fieldValue": "={{ $json.contacts?.[0]?.profile?.name ?? '' }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $json.messages[0].text.body }}"
+            },
+            {
+              "fieldId": "recu_le",
+              "fieldValue": "={{ new Date(Number($json.messages[0].timestamp) * 1000).toISOString() }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c54bad40-c536-4b3b-bfb5-02fcac525e62",
+      "name": "Accusé de réception WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -80
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "A_CHOISIR",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}",
+        "textBody": "Merci, votre message a bien été reçu. Nous vous répondons rapidement. — CISPOLstore",
+        "additionalFields": {}
+      }
+    },
+    {
+      "id": "083c4f89-567d-4c24-a695-8f4eef0a1d7e",
+      "name": "Échec Supabase",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "errorMessage": "={{ 'Supabase : échec enregistrement message de ' + $('WhatsApp Trigger').item.json.messages[0].from }}"
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Message texte ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message texte ?": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer dans Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Enregistrer dans Supabase": {
+      "main": [
+        [
+          {
+            "node": "Accusé de réception WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Échec Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
