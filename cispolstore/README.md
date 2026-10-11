@@ -316,3 +316,7 @@ Les écrans **Plus** et **Paramètres** commencent par un en-tête : logo et nom
 - **Résumé du Stock cliquable** : les pastilles Produits, Stock bas, En stock et Épuisés filtrent la liste en dessous (comme Actifs / Sursis / Inactifs dans Abonnements). Une rangée de filtres (Tous, En stock, Stock bas, Épuisés, Sans stock) permet de changer ensuite.
 - **Accueil** : les cartes Produits, Stock bas et Câble restant ouvrent le Stock déjà filtré.
 - **Rapport du produit** : un toucher sur un produit (Starlink Mini, câble…) ouvre sa fiche : stock actuel et minimum, quantités vendues, chiffre d'affaires, marge (profils autorisés), entrées/sorties, graphique des 6 derniers mois, liste des ventes (chaque ligne ouvre la facture) et historique des mouvements, avec les boutons Entrée / Sortie / Modifier. Les boutons ＋ － ✎ de la liste restent utilisables.
+
+## Apparence : Auto, Clair, Sombre, Noir
+
+Une carte **Apparence** est affichée dans **Plus** et dans **Paramètres** : quatre puces (🌓 Auto, ☀️ Clair, 🌙 Sombre, ⚫ Noir) et les couleurs d'accent. Le choix s'applique tout de suite et reste propre à l'appareil. « Auto » suit le réglage du téléphone ; « Noir » donne un fond noir pur (écrans OLED). Tous les profils (vendeur, comptable…) peuvent la modifier ; le bouton ☀️/🌙 du menu ⋯ reste disponible pour basculer vite entre clair et sombre.

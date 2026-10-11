@@ -6,7 +6,7 @@
   const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'stock', 'product', 'invoices', 'invoice', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'purchase', 'reports', 'settings', 'livraisons', 'users', 'importc', 'importf', 'rapportmois', 'daily', 'finance', 'more', 'profile'];
   // actions only the administrator may run
   const ADMIN = /^(del[a-z]+|pen_del|backup|plansfix|setco|setapp|pin[a-z]+|sync[a-z]+|drive_[a-z]+|msgreset|users_[a-z]+|imp_[a-z]+|dl_del|restore)$/;
-  const COMMON = /^(go|copy|calday|calnav|cltab|clfilter|search|sgo|stcat|invfilter|dper|repper|reptab|paymode|lockNow|me_[a-z]+|shareapp|cf_type|dl_filter|dl_view)$/;
+  const COMMON = /^(go|copy|calday|calnav|cltab|clfilter|search|sgo|stcat|invfilter|dper|repper|reptab|paymode|lockNow|me_[a-z]+|shareapp|cf_type|dl_filter|dl_view|theme_set|accent_set)$/;
   const ROLES = {
     admin: { label: 'Administrateur', icon: '🛡️', views: ALL, home: 'home', nav: ['home', 'clients', 'finance', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Voit et modifie tout, gère les profils et les réglages.' },
     comptable: { label: 'Comptable', icon: '📒', views: ALL.filter(v => !['settings', 'users', 'importc', 'importf'].includes(v)), home: 'home', nav: ['home', 'clients', 'finance', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Factures, paiements, dépenses, rapports et stock. Ne supprime pas, pas de réglages.' },
