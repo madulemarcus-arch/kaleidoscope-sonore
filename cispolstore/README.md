@@ -323,7 +323,7 @@ Une carte **Apparence** est affichée dans **Plus** et dans **Paramètres** : qu
 
 ### Où changer le type d'un client (visible partout)
 
-Un bouton jaune **« Changer ▾ »** est affiché sous le nom du client dans l'en-tête de sa fiche, en haut du formulaire « Modifier », et dans la liste des clients : sous le statut de chaque ligne s'affiche le type (si le client n'a pas d'abonnement), et l'action **🔁 Type** apparaît en glissant la ligne (au survol sur ordinateur). Le numéro de version de l'application (« build v74 ») est affiché en bas de l'écran Plus et dans l'en-tête de Paramètres : il permet de vérifier que la dernière version est bien chargée (`App.BUILD` dans `js/core.js`, à garder égal à `CACHE` de `sw.js`).
+Un bouton jaune **« Changer ▾ »** est affiché sous le nom du client dans l'en-tête de sa fiche, en haut du formulaire « Modifier », et dans la liste des clients : sous le statut de chaque ligne s'affiche le type (si le client n'a pas d'abonnement). Il n'y a pas de bouton « Type » dans les actions qui apparaissent en glissant la ligne. Le numéro de version de l'application (« build v74 ») est affiché en bas de l'écran Plus et dans l'en-tête de Paramètres : il permet de vérifier que la dernière version est bien chargée (`App.BUILD` dans `js/core.js`, à garder égal à `CACHE` de `sw.js`).
 
 ## Icônes colorées et animées (barre du bas et menu de gauche)
 
