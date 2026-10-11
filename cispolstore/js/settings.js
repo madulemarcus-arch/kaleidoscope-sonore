@@ -11,6 +11,14 @@
     return `<section class="hero phero"><div class="chead"><img src="${esc(co.logo || 'logo.png')}" alt=""><div><h2>${esc(co.name)}</h2><small>${me.name && me.name !== App.role().label ? esc(me.name) + ' · ' : ''}${esc(App.role().label)}${withVersion ? ' · version 2.0' : ''}</small></div></div>
       <div class="sbadges">${b(App.hasPin() ? 'ok' : 'warn', '🔐', App.hasPin() ? 'Protégé par PIN' : 'Sans PIN', App.hasPin() ? '' : 'pinset')}${b(age !== null && age <= 7 ? 'ok' : 'warn', '💾', age === null ? 'Aucune sauvegarde' : age === 0 ? 'Sauvegardé aujourd\'hui' : `Sauvegarde il y a ${age} j`, 'backup')}${b(sy ? 'ok' : '', '🔄', sy ? 'Synchronisé' : 'Hors synchronisation')}</div></section>`;
   };
+  // "Apparence" card (Plus and Settings): the four modes and the accent colour, applied at once and kept on this device
+  App.appearanceCard = () => { const S = App.db.settings, cur = ['light', 'dark', 'black'].includes(S.theme) ? S.theme : 'auto', ac = S.accent || 'orange';
+    return `<h2 class="sec">Apparence</h2><div class="card"><div class="chips" role="group" aria-label="Thème">${[['auto', '🌓 Auto'], ['light', '☀️ Clair'], ['dark', '🌙 Sombre'], ['black', '⚫ Noir']].map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-act="theme_set" data-t="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>
+      <p class="mut" style="margin:4px 0 10px">« Auto » suit le réglage du téléphone ; « Noir » économise la batterie sur écran OLED.</p>
+      <div class="swatches" role="group" aria-label="Couleur">${ACC.map(([k, c, n]) => `<button type="button" data-act="accent_set" data-a="${k}" style="--c:${c}" aria-label="${n}" aria-pressed="${ac === k}"></button>`).join('')}</div>
+      <p class="mut" style="margin:10px 0 0">Ces choix sont propres à cet appareil.</p></div>`; };
+  App.actions.theme_set = d => { App.db.settings.theme = d.t; App.save(); App.applyTheme(); App.refresh(); };
+  App.actions.accent_set = d => { App.db.settings.accent = d.a; App.save(); App.applyTheme(); App.refresh(); };
   App.persisted = null;
 
   const row = (t, s, btn) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${btn || ''}</div>`;
@@ -27,6 +35,7 @@
           ${row('Abonnements', `Durée par défaut : ${S.period} jours · Sursis par défaut : ${S.grace} jours`)}
           ${row('Thème', ({ auto: 'Automatique (suit le téléphone)', light: 'Clair', dark: 'Sombre', black: 'Noir' }[S.theme] || 'Automatique') + ' · couleur ' + (ACC.find(a => a[0] === (S.accent || 'orange')) || ACC[0])[2].toLowerCase() + ' · bouton ☀️/🌙 en haut de l\'écran')}
           ${row('Notifications', 'Les alertes d\'expiration (7, 3, 1 jour avant et le jour même) s\'affichent sur l\'écran d\'accueil.')}</div>
+        ${App.appearanceCard()}
         ${App.fold('share', 'Partager', `<div class="list">
           ${row("Partager l'application", `Lien à envoyer : <b style="word-break:break-all">${esc(new URL('./', location.href).href)}</b><br>Chaque personne installe l'application depuis ce lien ; ses données restent sur son appareil, sauf si elle active la synchronisation avec les mêmes réglages.`, '<button class="btn sm" data-act="shareapp">Partager</button>')}</div>`)}
         <h2 class="sec">Sécurité</h2><div class="list">
