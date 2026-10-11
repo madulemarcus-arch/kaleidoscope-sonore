@@ -40,7 +40,6 @@
       if (c.phone) acts.push(`<a class="sw sw-wa" href="${esc(c.type === 'gere' ? App.waLink(c) : App.waUrl(c.phone, 'Bonjour'))}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>`);
       if (c.acc) acts.push(`<button class="sw sw-copy" data-act="copy" data-t="${esc(c.acc)}"><span>📋</span>Copier ACC</button>`);
       if (c.type === 'gere' && App.guard('renew')) acts.push(`<button class="sw sw-renew" data-act="renew" data-id="${c.id}"><span>🔄</span>Renouveler</button>`);
-      acts.push(`<button class="sw sw-type" data-act="cl_type" data-id="${c.id}"><span>🔁</span>Type</button>`);
       const open = `<div class="item rw t-${t}" role="button" tabindex="0" data-act="go" data-v="client" data-id="${c.id}">${body}</div>`;
       return acts.length ? App.rowSwipe(acts.length, acts.join(''), open) : open; };
     let last = '';
