@@ -577,3 +577,6 @@ button.sbadge:active { transform:scale(.96); }
 @keyframes icfill { from { fill-opacity:0; } to { fill-opacity:1; } }
 #side nav button span .ic { width:22px; height:22px; }
 @media (prefers-reduced-motion:reduce) { #bottom button.on .ic, #bottom button.on .ic .s, #bottom button.on .ic .f { animation:none; } }
+
+/* fonds en attente */
+.dhero .cstats { margin-top:12px; }

@@ -123,8 +123,8 @@
   };
 
   // ---------- Client file ----------
-  const TABS = { gere: ['infos', 'abo', 'pay', 'fac', 'inst', 'mat', 'hist'], mat: ['infos', 'pay', 'fac', 'mat', 'hist'], install: ['infos', 'pay', 'fac', 'inst', 'hist'] };
-  const TAB_NAMES = { infos: 'Infos', abo: 'Abonnement', pay: 'Paiements', fac: 'Factures', inst: 'Installations', mat: 'Matériel', hist: 'Historique' };
+  const TABS = { gere: ['infos', 'abo', 'pay', 'dep', 'fac', 'inst', 'mat', 'hist'], mat: ['infos', 'pay', 'dep', 'fac', 'mat', 'hist'], install: ['infos', 'pay', 'dep', 'fac', 'inst', 'hist'] };
+  const TAB_NAMES = { infos: 'Infos', abo: 'Abonnement', pay: 'Paiements', fac: 'Factures', inst: 'Installations', mat: 'Matériel', hist: 'Historique', dep: 'Dépôts' };
   const copyBtn = t => `<button class="btn sm sec" data-act="copy" data-t="${esc(t)}">Copier</button>`;
   App.actions.copy = d => { const done = () => App.toast('Copié'); try { navigator.clipboard.writeText(d.t).then(done, () => window.prompt('Copiez :', d.t)); } catch (e) { window.prompt('Copiez :', d.t); } };
   App.actions.cltab = d => App.go('client', { id: d.id, tab: d.tab }, true);
@@ -149,11 +149,12 @@
     const st = [];
     if (c.type === 'gere') st.push(s ? [s.status === 'inactif' ? `−${-s.left} j` : `${s.left} j`, s.status === 'inactif' ? 'expiré' : 'restants'] : ['—', 'abonnement']);
     st.push([App.fmt(tot), `facturé · ${inv.length}`]); st.push([App.fmt(due), 'à payer', due > 0.004 ? 'bad' : '']);
+    const hd = App.can('finance') && App.depHeldBy ? App.depHeldBy(c.id) : 0; if (hd > 0.004) st.push([App.fmt(hd), 'dépôt en attente']);
     return st.map(([v, l, k]) => `<div class="${k || ''}"><b>${v}</b><small>${l}</small></div>`).join('');
   };
   App.views.client = p => {
     const c = App.client(p.id); if (!c) return { title: 'Client', back: 'clients', html: '<div class="empty">Client introuvable.</div>' };
-    const tabs = TABS[c.type], tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
+    const tabs = TABS[c.type].filter(t => t !== 'dep' || App.can('finance')), tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
     let body = '';
     if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd><dt>Type</dt><dd>${esc(App.typeName(c))} <button class="btn sm sec" data-act="cl_type" data-id="${c.id}" style="margin-left:6px">Changer</button></dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Référence</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
       <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button><button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
@@ -165,6 +166,7 @@
       const rows = []; db.invoices.filter(i => i.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).forEach(i => i.lines.forEach(l => { if (l.pid && App.tracked(App.prod(l.pid))) rows.push(`<div class="item"><div class="grow"><b>${esc(l.desc)}</b><small>${App.fdate(i.date)} · ${esc(i.number)}</small></div><div class="end"><b>${l.qty} ${esc(l.unit || '')}</b><span class="mut">${App.fmt(l.qty * l.price, i.currency)}</span></div></div>`); }));
       body = (c.serial ? `<div class="card"><span class="mut">Numéro de série</span><br><b>${esc(c.serial)}</b></div><div style="height:10px"></div>` : '') + listOrEmpty(rows, 'Aucun matériel vendu à ce client.');
     }
+    if (tab === 'dep') body = App.clientDepTab(c);
     if (tab === 'hist') body = listOrEmpty(db.log.filter(x => x.clientId === c.id).slice().reverse().map(x => `<div class="item"><div class="grow"><b>${esc(x.text)}</b><small>${App.fdate(x.date)}</small></div></div>`), 'Aucune opération.');
     const wa = App.waLink(c);
     return {
