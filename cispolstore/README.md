@@ -328,3 +328,13 @@ Un bouton jaune **« Changer ▾ »** est affiché sous le nom du client dans l'
 ## Icônes colorées et animées (barre du bas et menu de gauche)
 
 Accueil, Clients, Finance, Stock, Plus (et Installations, Livraisons pour les profils concernés) ont des icônes SVG à deux tons, chacune dans la couleur de sa rubrique (`js/icons.js`). L'onglet actif a un petit rebond et l'icône se redessine ; sans animation si l'appareil demande de réduire les animations. Le menu de gauche de l'ordinateur reprend les mêmes icônes pour Accueil, Clients, Finance et Stock.
+
+## Fonds en attente (dépôts des clients)
+
+Pour l'argent qu'un client a **déjà versé** et que vous **gardez en attendant de payer pour lui** (abonnement Starlink, commande, installation…).
+
+- **Où** : Plus → **💼 Fonds en attente** (réservé à l'administrateur et au comptable) ; bouton ＋ → **Nouveau dépôt client** ; onglet **Dépôts** de la fiche d'un client ; carte « Fonds en attente » dans « À faire » sur l'accueil quand il y a de l'argent à payer.
+- **Un dépôt** : client, montant (dollars ou francs), pour payer quoi (Abonnement Starlink, Kit / matériel, Installation, Commande en cours, Autre), reçu par quel mode, date, référence, note. États : *En attente*, *Partiel*, *Payé*, *Remboursé*.
+- **Payer pour le client** : enregistre le paiement (total ou partiel, avec le mode, la date, la note, la référence) ; le reste diminue. Pour un abonnement d'un client géré, on peut ouvrir ensuite le renouvellement. **Rendre au client** : même chose pour un remboursement. On ne peut pas payer plus que le reste.
+- **Compta** : un dépôt est de l'argent des clients, **pas du chiffre d'affaires ni du bénéfice**. Il entre dans la caisse (Finance, caisse estimée, clôture du jour : entrée « Dépôt client ») quand il est reçu, et sort (« Dépôt payé » ou « Dépôt remboursé ») quand vous payez ou rendez. La carte de l'accueil et l'en-tête de la page donnent le total encore à payer (en dollars, les francs étant convertis au taux du dépôt).
+- Les dépôts sont synchronisés entre appareils et inclus dans la sauvegarde. Code : `js/deposits.js`.

@@ -69,8 +69,9 @@
     const steps = App.role() === App.ROLES.admin ? [[App.hasPin(), '🔐', 'Code PIN', "Protégez l'application"], [age2 !== null && age2 <= 7, '💾', 'Sauvegarde', age2 === null ? 'Aucune sauvegarde faite' : `Dernière il y a ${age2} j`], [!!(co2.rccm || co2.idnat || co2.impot), '📄', 'Infos légales', 'RCCM, ID Nat., N° Impôt sur les factures'], [db.clients.length > 0 && db.products.length > 0, '📦', 'Clients et stock', 'Ajoutez vos clients et vos produits']] : [];
     const doneN = steps.filter(x => x[0]).length;
     const startCard = steps.length && doneN < steps.length ? `<div class="card start"><div class="spread"><b>🚀 Bien démarrer</b><span class="mut">${doneN}/${steps.length}</span></div><div class="pbar2"><i style="width:${Math.round(doneN / steps.length * 100)}%"></i></div>${steps.map(([ok2, ico, t1, t2]) => `<button class="step ${ok2 ? 'done' : ''}" data-act="go" data-v="${t1 === 'Clients et stock' ? 'clients' : 'settings'}"><span class="chk">${ok2 ? '✓' : ico}</span><div class="grow"><b>${t1}</b><small>${t2}</small></div></button>`).join('')}</div>` : '';
+    const depHtml = App.can('finance') && App.depCount && App.depCount() ? `<button class="item" data-act="go" data-v="deposits" style="margin-bottom:12px"><span class="avatar warn">💼</span><div class="grow"><b>Fonds en attente : ${App.fmt(App.depHeldUsd())}</b><small>${App.depCount()} dépôt(s) de clients à payer pour eux</small></div><span class="mut">›</span></button>` : '';
     const QA = [['q_invoice', '🧾', 'Facture', '#e4572e'], ['newpay', '💰', 'Encaisser', '#1f9d55'], ['q_client', '👤', 'Client', '#2f7de1'], ['q_renew', '📡', 'Renouveler', '#7c5cff']].filter(x => App.guard(x[0]));
-    const todo = alerts.length || pendHtml || unpaidHtml;
+    const todo = alerts.length || pendHtml || unpaidHtml || depHtml;
     return {
       title: 'Accueil', nav: 'home',
       html: `<section class="hero">
@@ -82,7 +83,7 @@
         ${QA.length ? `<div class="qa">${QA.map(([act, ico, t1, col]) => `<button data-act="${act}" style="--qc:${col}"><span>${ico}</span>${t1}</button>`).join('')}</div>` : ''}
         ${tot ? `<button class="card pulse" data-act="go" data-v="subs"><div class="spread"><b>📡 Abonnements</b><span class="mut">${db.clients.length} clients · voir ›</span></div><div class="pbar">${n('actif') ? `<i class="a" style="flex:${n('actif')}"></i>` : ''}${n('sursis') ? `<i class="s" style="flex:${n('sursis')}"></i>` : ''}${n('inactif') ? `<i class="x" style="flex:${n('inactif')}"></i>` : ''}</div><div class="plegend"><span><i class="a"></i>${n('actif')} actifs</span><span><i class="s"></i>${n('sursis')} en sursis</span><span><i class="x"></i>${n('inactif')} inactifs</span>${soon.length ? `<span class="warn">⏰ ${soon.length} expirent bientôt</span>` : ''}${today.length ? `<span class="bad">⚠️ ${today.length} aujourd'hui</span>` : ''}</div></button>` : ''}
         ${App.badgesHtml()}
-        <div class="dash"><div style="grid-area:a">${startCard}${todo ? `<h2 class="sec">À faire</h2><div class="list">${alerts.join('')}${pendHtml}${unpaidHtml}</div>` : ''}</div>
+        <div class="dash"><div style="grid-area:a">${startCard}${todo ? `<h2 class="sec">À faire</h2><div class="list">${alerts.join('')}${pendHtml}${unpaidHtml}${depHtml}</div>` : ''}</div>
         <div style="grid-area:b"${fin ? '' : ' hidden'}><h2 class="sec">Finances · ${PN}</h2>
         <div class="kpis"><div class="stat"><small>💰 Total facturé</small><b data-count="${f.ca}">${App.fmt(f.ca)}</b></div><div class="stat"><small>📈 Bénéfice net</small><b class="${f.net >= 0 ? 'ok' : 'bad'}" data-count="${f.net}">${App.fmt(f.net)}</b></div><div class="stat"><small>💸 Dépenses</small><b data-count="${f.exp}">${App.fmt(f.exp)}</b></div><div class="stat"><small>Marge brute</small><b data-count="${f.margin}">${App.fmt(f.margin)}</b></div></div>
         ${App.chart.bars(bars, { title: 'Ventes facturées', sub: PN })}
