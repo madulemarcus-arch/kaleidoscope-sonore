@@ -320,3 +320,7 @@ Les écrans **Plus** et **Paramètres** commencent par un en-tête : logo et nom
 ## Apparence : Auto, Clair, Sombre, Noir
 
 Une carte **Apparence** est affichée dans **Plus** et dans **Paramètres** : quatre puces (🌓 Auto, ☀️ Clair, 🌙 Sombre, ⚫ Noir) et les couleurs d'accent. Le choix s'applique tout de suite et reste propre à l'appareil. « Auto » suit le réglage du téléphone ; « Noir » donne un fond noir pur (écrans OLED). Tous les profils (vendeur, comptable…) peuvent la modifier ; le bouton ☀️/🌙 du menu ⋯ reste disponible pour basculer vite entre clair et sombre.
+
+### Où changer le type d'un client (visible partout)
+
+Un bouton jaune **« Changer ▾ »** est affiché sous le nom du client dans l'en-tête de sa fiche, en haut du formulaire « Modifier », et dans la liste des clients : sous le statut de chaque ligne s'affiche le type (si le client n'a pas d'abonnement), et l'action **🔁 Type** apparaît en glissant la ligne (au survol sur ordinateur). Le numéro de version de l'application (« build v74 ») est affiché en bas de l'écran Plus et dans l'en-tête de Paramètres : il permet de vérifier que la dernière version est bien chargée (`App.BUILD` dans `js/core.js`, à garder égal à `CACHE` de `sw.js`).

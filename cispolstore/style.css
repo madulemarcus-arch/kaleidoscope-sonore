@@ -549,3 +549,10 @@ button.sbadge:active { transform:scale(.96); }
 .cstats > button small { opacity:.8; font-size:12px; } .cstats > button.bad b { color:#ffb4a8; } .cstats > button.bad small { color:inherit; }
 .item[data-act="go"][role="button"] { cursor:pointer; } .item[role="button"]:active { background:var(--card2); }
 .stat.tap small.mut { margin-top:2px; }
+
+/* type de client : bouton visible dans la fiche, le formulaire et la liste */
+.typebtn { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:6px 6px 6px 12px; border:0; border-radius:99px; background:rgba(255,255,255,.18); color:#fff; font:700 13px inherit; cursor:pointer; max-width:100%; }
+.typebtn i { font-style:normal; font-weight:700; font-size:12px; padding:3px 10px; border-radius:99px; background:#f6c453; color:#3a2800; }
+.typebtn:active { transform:scale(.97); }
+.typebtn.on-light { background:color-mix(in srgb,var(--blue) 12%,transparent); color:var(--txt); margin:0 0 12px; }
+.sw-type { background:linear-gradient(135deg,#6d5df5,#8d82ff); }

@@ -33,13 +33,14 @@
     if ($('clbar')) $('clbar').innerHTML = !App.guard('delclients') ? '' : st.sel ? `<button class="btn sm sec" data-act="cl_all">☑ Tout (${l.length})</button><button class="btn sm del" data-act="delclients">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="cl_sel">Terminer</button>` : '<button class="btn sm sec" data-act="cl_sel">☑ Sélectionner pour supprimer</button>';
     const dayTxt = (c, s) => !s ? '' : s.status === 'actif' ? (s.left === 0 ? "aujourd'hui" : `dans ${s.left} j`) : s.status === 'sursis' ? `sursis · ${s.left} j` : `depuis ${-s.left} j`;
     const row = c => { const s = App.sub(c), t = tone(c);
-      const body = `<span class="avatar ${t}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small><span class="mono">${esc(c.acc || c.article || c.code)}</span>${c.phone ? ' · ' + esc(c.phone) : ''}</small></div><div class="end">${badge(c)}${s ? `<small class="${t}">${dayTxt(c, s)}</small>` : ''}</div>`;
+      const body = `<span class="avatar ${t}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small><span class="mono">${esc(c.acc || c.article || c.code)}</span>${c.phone ? ' · ' + esc(c.phone) : ''}</small></div><div class="end">${badge(c)}${s ? `<small class="${t}">${dayTxt(c, s)}</small>` : `<small>${esc(App.typeName(c))}</small>`}</div>`;
       if (st.sel) return `<button class="item rw t-${t}" data-act="cl_pick" data-v="client" data-id="${c.id}"><span style="font-size:20px">${st.picked.has(c.id) ? '☑️' : '⬜'}</span>${body}</button>`;
       const acts = [], tel = String(c.phone || '').replace(/[^+\d]/g, '');
       if (tel) acts.push(`<a class="sw sw-call" href="tel:${esc(tel)}"><span>📞</span>Appeler</a>`);
       if (c.phone) acts.push(`<a class="sw sw-wa" href="${esc(c.type === 'gere' ? App.waLink(c) : App.waUrl(c.phone, 'Bonjour'))}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>`);
       if (c.acc) acts.push(`<button class="sw sw-copy" data-act="copy" data-t="${esc(c.acc)}"><span>📋</span>Copier ACC</button>`);
       if (c.type === 'gere' && App.guard('renew')) acts.push(`<button class="sw sw-renew" data-act="renew" data-id="${c.id}"><span>🔄</span>Renouveler</button>`);
+      acts.push(`<button class="sw sw-type" data-act="cl_type" data-id="${c.id}"><span>🔁</span>Type</button>`);
       const open = `<div class="item rw t-${t}" role="button" tabindex="0" data-act="go" data-v="client" data-id="${c.id}">${body}</div>`;
       return acts.length ? App.rowSwipe(acts.length, acts.join(''), open) : open; };
     let last = '';
@@ -86,7 +87,7 @@
     c = c || { type, first: '', last: '', phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: '', payMode: 'Cash', start: App.today(), period: S.period, grace: S.grace, note: '', article: '', subs: [], aboOnly: !!aboOnly };
     const g = c.type === 'gere';
     App.modal((isNew ? 'Nouveau client · ' : 'Modifier · ') + App.typeName(c),
-      `<div class="row">${F.text('f_first', 'Prénom', c.first)}${F.text('f_last', 'Nom', c.last)}</div>
+      `${isNew ? '' : `<button type="button" class="typebtn on-light" data-act="cl_type" data-id="${c.id}">Type : ${esc(App.typeName(c))} <i>Changer ▾</i></button>`}<div class="row">${F.text('f_first', 'Prénom', c.first)}${F.text('f_last', 'Nom', c.last)}</div>
        <div class="row">${F.text('f_phone', 'Téléphone', c.phone, 'type="tel" inputmode="tel"')}${F.text('f_phone2', 'Deuxième téléphone', c.phone2, 'type="tel" inputmode="tel"')}</div>
        ${F.text('f_address', 'Adresse', c.address)}
        <div class="row">${F.text('f_city', 'Ville', c.city)}${F.text('f_quarter', 'Quartier', c.quarter)}</div>
@@ -168,7 +169,7 @@
     const wa = App.waLink(c);
     return {
       title: App.cname(c), sub: 'Fiche client', back: 'clients', nav: 'clients',
-      html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span></div>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
+      html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span></div><button class="typebtn" data-act="cl_type" data-id="${c.id}">${esc(App.typeName(c))} <i>Changer ▾</i></button>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
         <div class="cstats">${cstats(c)}</div>
         <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
         <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`
