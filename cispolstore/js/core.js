@@ -23,7 +23,7 @@
   App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Commission technicien', 'Internet / Abonnement', 'Marketing', 'Autre'];
   App.PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   App.KITS = ['Starlink Mini', 'Starlink Standard'];
-  App.BUILD = 'v79'; // keep equal to CACHE in sw.js
+  App.BUILD = 'v80'; // keep equal to CACHE in sw.js
   App.typeName = c => c.type === 'gere' && c.aboOnly ? 'Abonnement seulement' : App.TYPES[c.type];
   App.TYPES = { gere: 'Client géré', mat: 'Matériel uniquement', install: 'Installation uniquement' };
 
@@ -35,7 +35,7 @@
       company: { name: 'CISPOLstore', address: 'Kinshasa, RDC', phone: '+243 814 048 480', email: 'contact@cispolstore.com', rccm: '', idnat: '', impot: '', logo: '', tagline: 'SOLUTIONS TECHNOLOGIQUES ET CONNECTIVITE', city: 'Kinshasa', payTerms: 'Virement bancaire ou espèces.' },
       plans: { 'Résidentiel': { price: 70, cost: 64 } }, rate: 2400, rates: [], theme: 'auto', lockMin: 2, period: 30, grace: 15, pin: null, invSeq: {}, clientSeq: 0
     },
-    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], purchases: [], deposits: [], caisse: [], closings: [], log: []
+    clients: [], products: [], moves: [], suppliers: [], technicians: [], penalties: [], deliveries: [], invoices: [], payments: [], installs: [], expenses: [], purchases: [], deposits: [], slpays: [], caisse: [], closings: [], log: []
   });
   App.blank = blank;
   const normalize = o => {
