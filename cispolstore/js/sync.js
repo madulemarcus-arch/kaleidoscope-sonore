@@ -82,7 +82,7 @@
     o.settings.invSeq = { ...(r.settings.invSeq || {}) }; Object.entries(l.settings.invSeq || {}).forEach(([y, n]) => { o.settings.invSeq[y] = Math.max(n, o.settings.invSeq[y] || 0); });
     return o;
   };
-  const apply = m => { const db = App.db; COLL.forEach(k => { db[k] = m[k]; }); Object.assign(db.settings, m.settings); };
+  const apply = m => { const db = App.db; COLL.forEach(k => { db[k] = m[k]; }); Object.assign(db.settings, m.settings); if (App.auditReset) App.auditReset(); };
 
   // Two devices can issue the same invoice number / client code while offline: renumber the later one
   const fixDuplicates = () => {
