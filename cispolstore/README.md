@@ -453,3 +453,10 @@ Pour chaque contrat intégré (abonnement, fourniture Starlink, matériel, manda
 - Sur un contrat : **⇄ Utiliser mon propre texte / Utiliser le texte proposé** bascule d'un texte à l'autre sans rien perdre ; le texte en vigueur est indiqué, c'est lui qui est imprimé, envoyé en PDF et par WhatsApp.
 - « Renouveler » garde le texte en vigueur (le vôtre ou le proposé) et prépare un texte proposé à jour de l'autre côté.
 - Les contrats libres et vos propres modèles sont déjà « votre texte » : pas de bascule.
+
+### Contrat d'installation et de maintenance
+
+Contrats → Nouveau contrat → **Installation et maintenance** (13 articles, deux textes comme les autres contrats intégrés).
+- Prestations au choix : **installation et maintenance**, installation seule ou maintenance seule : les articles s'adaptent (acompte et réception pour l'installation ; redevance, délai de dépannage et visites préventives pour la maintenance).
+- Valeurs par défaut modifiables : acompte 50 %, dépannage sous 48 heures ouvrables, garantie des travaux 3 mois, 1 visite préventive par an, préavis de maintenance 30 jours.
+- Le site d'installation se préremplit depuis la fiche du client. Le prix de l'installation (ou la redevance, pour une maintenance seule) est obligatoire.
