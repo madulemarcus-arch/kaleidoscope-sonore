@@ -35,6 +35,8 @@
   const synth = m => ({ label: m.name, icon: m.icon || '📄', title: m.title || String(m.name || 'CONTRAT').toUpperCase(), a: [m.a || 'PARTIE 1', (m.a || 'la première partie').toLowerCase()], b: [m.b || 'PARTIE 2', (m.b || 'la seconde partie').toLowerCase()], term: m.months || 0, who: 'client', fields: MODEL_FIELDS });
   const tdef = key => TYPES[key] || (/^m:/.test(key) ? (m => m && synth(m))(models().find(x => 'm:' + x.id === key)) : null);
   const T = c => TYPES[c.type] || synth(c.mt || { name: 'Contrat', title: 'CONTRAT' });
+  const SKEL = 'Article 1 – Objet\n\nArticle 2 – Prix\n\nArticle 3 – Durée\n\nArticle 4 – Litiges';
+  const twoTexts = type => type !== 'libre' && !/^m:/.test(type); // built-in types keep two texts: the proposed one and your own
   const bodyFor = c => c.type === 'libre' ? (c.f || {}).body || '' : /^m:/.test(c.type) ? (models().find(x => 'm:' + x.id === c.type) || c.mt || {}).body || c.body || '' : gen(c);
 
   const partyOf = c => { const cl = c.clientId ? App.client(c.clientId) : null, p = c.party || {};
@@ -160,9 +162,10 @@
     const render = type => { const t = tdef(type), ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('ct_cl') || c.clientId);
       if (cl) { if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.acc === undefined) ex.acc = cl.acc || ''; if ((type === 'abonnement' || type === 'fournisseur') && cl.type === 'gere') { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.amount === undefined && cl.price) ex.amount = cl.price; } }
       if (type === 'travail' && ex.place === undefined) ex.place = S.company.city || ''; if (type === 'abonnement' && ex.grace === undefined) ex.grace = S.grace || 15;
-      $('ct_f').innerHTML = fieldHtml(t, null, ex); if (t.noTerm) $('ct_termrow').style.display = 'none'; else $('ct_termrow').style.display = ''; $('ct_clrow').style.display = t.who === 'person' ? 'none' : ''; $('ct_months').value = type === c.type ? c.months : t.term; };
+      $('ct_f').innerHTML = fieldHtml(t, null, ex); if (t.noTerm) $('ct_termrow').style.display = 'none'; else $('ct_termrow').style.display = ''; $('ct_clrow').style.display = t.who === 'person' ? 'none' : ''; if ($('ct_srcrow')) $('ct_srcrow').style.display = twoTexts(type) ? '' : 'none'; $('ct_months').value = type === c.type ? c.months : t.term; };
     App.modal(isNew ? 'Nouveau contrat' : 'Modifier ' + c.no,
       `${isNew ? F.sel('ct_type', 'Type de contrat', [...Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), ...models().map(m => ['m:' + m.id, (m.icon || '📄') + ' ' + m.name + ' (mon modèle)'])], c.type) : `<p class="mut" style="margin-top:0">${T(c).icon} ${esc(T(c).label)}</p>`}
+       ${isNew ? `<div id="ct_srcrow">${F.sel('ct_src', 'Texte du contrat', [['auto', 'Texte proposé (déjà rédigé, modifiable)'], ['perso', 'Mon propre texte (je le rédige moi-même)']], 'auto')}</div>` : ''}
        <div id="ct_clrow">${F.sel('ct_cl', 'Client', App.clientOpts('— Autre (saisir ci-dessous) —'), c.clientId)}</div>
        <div id="ct_party" ${cl0 ? 'hidden' : ''}>${F.text('ct_pname', 'Nom complet', (c.party || {}).name || '')}${F.text('ct_pidno', 'N° pièce d\'identité (facultatif)', (c.party || {}).idno || '')}<div class="row">${F.text('ct_pphone', 'Téléphone', (c.party || {}).phone || '')}${F.text('ct_paddr', 'Adresse', (c.party || {}).address || '')}</div></div>
        <div class="row">${F.date('ct_date', 'Date de signature', c.date)}${F.date('ct_start', 'Début', c.start)}</div>
@@ -178,9 +181,9 @@
         if ((type === 'materiel' || type === 'travail' || type === 'abonnement' || type === 'fournisseur' || type === 'mandat') && !(f.amount > 0)) { App.toast(type === 'travail' ? 'Saisissez le salaire' : 'Saisissez le montant'); return false; }
         const date = App.v('ct_date') || t0, start = App.v('ct_start') || date, months = t.noTerm ? 0 : Math.max(0, Math.round(App.n('ct_months')));
         const o = { type, clientId: cl, party: cl ? {} : p, date, start, months, end: endOf(start, months), currency: App.v('ct_cur') || 'USD', rep: App.v('ct_rep').trim(), f };
-        if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date), status: 'draft' }); if (/^m:/.test(type)) { const m = models().find(x => 'm:' + x.id === type); c.mt = { name: m.name, icon: m.icon, title: m.title, a: m.a, b: m.b, body: m.body }; } c.body = bodyFor(c); list().push(c); if (cl) App.log(cl, `Contrat ${c.no} : ${t.label}`); }
-        else { Object.assign(c, o); if ($('ct_regen') && $('ct_regen').checked) c.body = bodyFor(c); else if (type === 'libre') c.body = f.body; }
-        App.save(); App.toast(isNew ? 'Contrat créé : ' + c.no : 'Contrat modifié'); App.refresh(); if (isNew) setTimeout(() => App.actions.ct_open({ id: c.id }), 80); },
+        if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date), status: 'draft' }); if (/^m:/.test(type)) { const m = models().find(x => 'm:' + x.id === type); c.mt = { name: m.name, icon: m.icon, title: m.title, a: m.a, b: m.b, body: m.body }; } c.body = bodyFor(c); if (twoTexts(type)) { const own = $('ct_src') && $('ct_src').value === 'perso'; c.src = own ? 'perso' : 'auto'; if (own) { c.alt = c.body; c.body = SKEL; } else c.alt = SKEL; } list().push(c); if (cl) App.log(cl, `Contrat ${c.no} : ${t.label}`); }
+        else { Object.assign(c, o); if ($('ct_regen') && $('ct_regen').checked) { if (twoTexts(type) && c.src === 'perso') c.alt = bodyFor(c); else c.body = bodyFor(c); } else if (type === 'libre') c.body = f.body; }
+        App.save(); App.toast(isNew ? 'Contrat créé : ' + c.no : 'Contrat modifié'); App.refresh(); if (isNew) setTimeout(() => App.actions[c.src === 'perso' ? 'ct_text' : 'ct_open']({ id: c.id }), 80); },
       isNew ? 'Créer le contrat' : 'Enregistrer');
     render(c.type);
     if ($('ct_type')) $('ct_type').onchange = () => render($('ct_type').value);
@@ -213,13 +216,18 @@
         <div class="mut">${esc(p.name)}${p.phone ? ' · ' + esc(p.phone) : ''}</div><div class="mut">Signé le ${App.fdate(c.date)} · du ${App.fdate(c.start)}${c.end ? ' au ' + App.fdate(c.end) : ' (durée indéterminée)'}</div>
         ${c.f && c.f.amount ? `<div class="spread" style="margin-top:8px"><span>Montant</span><b style="font-size:18px">${App.fmt(c.f.amount, c.currency)}</b></div>` : ''}</div>
        <div class="bar noprint"><button type="button" class="btn sec" data-act="ct_print" data-id="${c.id}">🖨️ Imprimer</button><button type="button" class="btn sec" data-act="ct_pdf" data-id="${c.id}">📤 PDF</button><button type="button" class="btn sec" data-act="ct_wa" data-id="${c.id}">💬 WhatsApp</button></div>
-       <div class="bar"><button type="button" class="btn sec" data-act="ct_text" data-id="${c.id}">📝 Articles : lire, ajouter, modifier</button></div>
+       ${twoTexts(c.type) ? `<div class="spread" style="margin:0 0 8px"><span class="mut">Texte en vigueur : <b>${c.src === 'perso' ? 'mon propre texte' : 'texte proposé'}</b></span><button type="button" class="btn sm sec" data-act="ct_swap" data-id="${c.id}">⇄ ${c.src === 'perso' ? 'Utiliser le texte proposé' : 'Utiliser mon propre texte'}</button></div>` : ''}<div class="bar"><button type="button" class="btn sec" data-act="ct_text" data-id="${c.id}">📝 Articles : lire, ajouter, modifier</button></div>
        ${c.status === 'draft' ? `<div class="bar"><button type="button" class="btn" data-act="ct_set" data-id="${c.id}" data-s="active">✅ Signé : mettre en cours</button></div>` : ''}
        ${c.status === 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="ended">🏁 Terminé</button><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="cancelled">⛔ Résilié</button>${c.end ? `<button type="button" class="btn" data-act="ct_renew" data-id="${c.id}">🔁 Renouveler</button>` : ''}</div>` : ''}
        ${c.status !== 'draft' && c.status !== 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="active">↺ Remettre en cours</button></div>` : ''}
        <div class="bar"><button type="button" class="btn sm sec" data-act="ct_edit" data-id="${c.id}">✏️ Modifier</button><button type="button" class="btn sm sec" data-act="ct_dup" data-id="${c.id}">⎘ Dupliquer</button><button type="button" class="btn sm sec" data-act="ct_tomodel" data-id="${c.id}">📚 Enregistrer comme modèle</button>${c.clientId ? `<button type="button" class="btn sm sec" data-act="go" data-v="client" data-id="${c.clientId}">👤 Client</button>` : ''}<button type="button" class="btn sm sec" data-act="ct_del" data-id="${c.id}">🗑 Supprimer</button></div>`);
   };
   App.actions.ct_set = x => { const c = list().find(y => y.id === x.id); if (!c) return; c.status = x.s; if (c.clientId) App.log(c.clientId, `Contrat ${c.no} : ${STAT[x.s][0].toLowerCase()}`); App.save(); App.close(); App.refresh(); App.toast(STAT[x.s][0]); };
+  // every built-in contract keeps two texts: the proposed one and your own; this swaps which one is in force
+  App.actions.ct_swap = x => { const c = list().find(y => y.id === x.id); if (!c || !twoTexts(c.type)) return;
+    const cur = c.body; c.body = c.alt || SKEL; c.alt = cur; c.src = c.src === 'perso' ? 'auto' : 'perso'; App.save(); App.close(); App.refresh();
+    App.toast(c.src === 'perso' ? 'Mon propre texte en vigueur' : 'Texte proposé en vigueur');
+    setTimeout(() => App.actions[c.src === 'perso' && c.body === SKEL ? 'ct_text' : 'ct_open']({ id: c.id }), 80); };
   App.actions.ct_edit = x => { const c = list().find(y => y.id === x.id); if (c) { App.close(); setTimeout(() => App.contractForm(c), 30); } };
   // ---------- article editor: add / remove / move articles, numbering is automatic ----------
   const LIB = [
@@ -277,7 +285,7 @@
     App.toast('Remplacez les noms et montants par {{client}}, {{montant}}… puis enregistrez'); cmForm(m, true); };
   const copyOf = (c, over) => { const n = { ...c, party: { ...(c.party || {}) }, f: { ...(c.f || {}) }, id: App.uid(), ts: Date.now(), status: 'draft', ...over }; n.no = nextNo(n.date); return n; };
   App.actions.ct_dup = x => { const c = list().find(y => y.id === x.id); if (!c) return; const t = App.today(), n = copyOf(c, { date: t, start: t, end: endOf(t, c.months) }); list().push(n); App.save(); App.close(); App.refresh(); App.toast('Contrat dupliqué : ' + n.no); };
-  App.actions.ct_renew = x => { const c = list().find(y => y.id === x.id); if (!c || !c.end) return; const start = App.addDays(c.end, 1), n = copyOf(c, { date: App.today(), start, end: endOf(start, c.months) }); n.body = c.type === 'libre' || /^m:/.test(c.type) ? c.body : gen(n);
+  App.actions.ct_renew = x => { const c = list().find(y => y.id === x.id); if (!c || !c.end) return; const start = App.addDays(c.end, 1), n = copyOf(c, { date: App.today(), start, end: endOf(start, c.months) }); if (!twoTexts(c.type)) n.body = c.body; else if (c.src === 'perso') { n.body = c.body; n.alt = gen(n); } else { n.body = gen(n); n.alt = c.alt || SKEL; }
     c.status = 'ended'; list().push(n); if (c.clientId) App.log(c.clientId, `Contrat ${c.no} renouvelé : ${n.no}`); App.save(); App.close(); App.refresh(); App.toast('Contrat renouvelé : ' + n.no); setTimeout(() => App.actions.ct_open({ id: n.id }), 80); };
   App.actions.ct_del = x => { const c = list().find(y => y.id === x.id); if (!c) return; if (!App.confirm(`Supprimer le contrat ${c.no} ?`)) return; App.db.contracts = list().filter(y => y !== c); App.save(); App.close(); App.refresh(); };
 })();

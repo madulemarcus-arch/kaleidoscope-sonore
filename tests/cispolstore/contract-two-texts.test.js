@@ -1,0 +1,35 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'K',name:'Jean K',phone:'0991',address:'Av. Test 1',acc:'ACC-1',plan:'Illimité',price:70,created:t,subs:[]});App.save();App.go('contracts')});await p.waitForTimeout(500);
+await p.click('[data-act=ct_new]');await p.waitForTimeout(400);
+ok('text source choice visible for built-in types',await p.isVisible('#ct_src'));
+await p.selectOption('#ct_type','libre');await p.waitForTimeout(200);ok('hidden for free contracts',!(await p.isVisible('#ct_src')));
+await p.selectOption('#ct_type','abonnement');await p.waitForTimeout(200);ok('visible again',await p.isVisible('#ct_src'));
+await p.selectOption('#ct_cl','c1');await p.selectOption('#ct_src','perso');
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(900);
+const c=await p.evaluate(()=>{const c=App.db.contracts[0];return {src:c.src,body:c.body,alt:c.alt}});
+ok('own text chosen: body is an empty skeleton, proposed text kept aside',c.src==='perso'&&/^Article 1 – Objet\n\nArticle 2/.test(c.body)&&/Illimité/.test(c.alt)&&/70\s\$/.test(c.alt),JSON.stringify(c).slice(0,160));
+ok('editor opens right after creation',await p.evaluate(()=>!!document.querySelector('#ct_arts')));
+await p.evaluate(()=>{const ts=[...document.querySelectorAll('#ct_arts input[data-af=t]')],xs=[...document.querySelectorAll('#ct_arts textarea')];ts[0].value='Mon objet';xs[0].value='TEXTE PERSO de Jean K.'});
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(800);
+ok('own text saved and printed',await p.evaluate(()=>/TEXTE PERSO/.test(App.db.contracts[0].body)&&/TEXTE PERSO/.test(App.contractDoc(App.db.contracts[0],'','s'))&&!/Illimité/.test(App.contractDoc(App.db.contracts[0],'','s'))));
+ok('detail says own text is in force',/mon propre texte/.test(await p.innerText('dialog')));
+await p.click('[data-act=ct_swap]');await p.waitForTimeout(900);
+ok('swap to proposed text',await p.evaluate(()=>{const c=App.db.contracts[0];return c.src==='auto'&&/Illimité/.test(c.body)&&/TEXTE PERSO/.test(c.alt)}));
+await p.evaluate(()=>App.actions.ct_open({id:App.db.contracts[0].id}));await p.waitForTimeout(400);
+ok('detail says proposed text is in force',/texte proposé/.test(await p.innerText('dialog')));
+await p.click('[data-act=ct_swap]');await p.waitForTimeout(900);
+ok('swap back keeps own text intact',await p.evaluate(()=>{const c=App.db.contracts[0];return c.src==='perso'&&/TEXTE PERSO/.test(c.body)&&/Illimité/.test(c.alt)}));
+await p.keyboard.press('Escape');await p.waitForTimeout(300);
+// a contract created with the proposed text can later switch to its own text
+await p.evaluate(()=>{const t=App.today(),o=App.db.contracts[0];App.db.contracts.push({...o,id:'z2',no:'CTR-Z',src:'auto',body:o.alt,alt:'Article 1 – Objet\n\nArticle 2 – Prix\n\nArticle 3 – Durée\n\nArticle 4 – Litiges'});App.save();App.actions.ct_open({id:'z2'})});await p.waitForTimeout(500);
+await p.click('[data-act=ct_swap]');await p.waitForTimeout(900);
+ok('first switch to own text opens the editor on an empty skeleton',await p.evaluate(()=>App.db.contracts.find(c=>c.id==='z2').src==='perso'&&!!document.querySelector('#ct_arts')&&document.querySelectorAll('#ct_arts textarea').length===4));
+await p.keyboard.press('Escape');await p.waitForTimeout(300);
+// renewal of a contract in force with own text keeps it
+await p.evaluate(()=>{const c=App.db.contracts[0];c.status='active';c.start=App.addDays(App.today(),-350);c.months=12;c.end=App.addDays(App.today(),10);App.save();App.actions.ct_open({id:c.id})});await p.waitForTimeout(400);
+await p.click('[data-act=ct_renew]');await p.waitForTimeout(900);
+ok('renewal keeps own text in force and a fresh proposed text aside',await p.evaluate(()=>{const n=App.db.contracts[App.db.contracts.length-1];return n.src==='perso'&&/TEXTE PERSO/.test(n.body)&&/Article 1 – /.test(n.alt)&&!/TEXTE PERSO/.test(n.alt)}));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
