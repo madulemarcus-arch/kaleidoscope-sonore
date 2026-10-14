@@ -445,3 +445,11 @@ Contrats → **📚 Mes modèles** (ou, sur un contrat existant, **Enregistrer c
 - Champs automatiques dans le texte : `{{client}}`, `{{societe}}`, `{{date}}`, `{{montant}}`, `{{adresse}}`, `{{telephone}}`, `{{debut}}`, `{{fin}}`, `{{duree}}`, `{{objet}}`.
 - Vos modèles apparaissent dans « Type de contrat » (« … (mon modèle) ») ; le contrat créé garde une copie du texte : modifier ou supprimer le modèle ne change pas les contrats déjà faits.
 - Les modèles sont dans la sauvegarde, la synchronisation et le journal d'activité.
+
+### Deux textes pour chaque contrat
+
+Pour chaque contrat intégré (abonnement, fourniture Starlink, matériel, mandat, travail), l'application garde **toujours deux textes** : le **texte proposé** (déjà rédigé) et **mon propre texte** (que vous rédigez).
+- À la création : choix « Texte du contrat » → *Texte proposé* ou *Mon propre texte* (l'éditeur d'articles s'ouvre alors tout de suite sur un plan vide : Objet, Prix, Durée, Litiges).
+- Sur un contrat : **⇄ Utiliser mon propre texte / Utiliser le texte proposé** bascule d'un texte à l'autre sans rien perdre ; le texte en vigueur est indiqué, c'est lui qui est imprimé, envoyé en PDF et par WhatsApp.
+- « Renouveler » garde le texte en vigueur (le vôtre ou le proposé) et prépare un texte proposé à jour de l'autre côté.
+- Les contrats libres et vos propres modèles sont déjà « votre texte » : pas de bascule.
