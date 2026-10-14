@@ -1,0 +1,896 @@
+{
+  "caisse-locale/config.exemple.json": {
+    "mtime": 1791618514.1283996,
+    "seen": 1791989525.1290815,
+    "ast_hash": "886363cb3ef3f6cee1a0495473ccd1c7",
+    "semantic_hash": ""
+  },
+  "caisse-locale/server.js": {
+    "mtime": 1791618514.1293337,
+    "seen": 1791989525.1290932,
+    "ast_hash": "2bec792eb98d2d47bf184a8e51909cdb",
+    "semantic_hash": ""
+  },
+  "caisse-locale/tests/config.test.json": {
+    "mtime": 1791618514.1293337,
+    "seen": 1791989525.1290984,
+    "ast_hash": "be81e048807500fad3565b48cf8366ba",
+    "semantic_hash": ""
+  },
+  "caisse-locale/tests/fake-mikrotik.js": {
+    "mtime": 1791618514.1299996,
+    "seen": 1791989525.1291022,
+    "ast_hash": "6ce1df99b5717d5428824dc24284dfa1",
+    "semantic_hash": ""
+  },
+  "caisse-locale/tests/test-api.js": {
+    "mtime": 1791618514.1299996,
+    "seen": 1791989525.1291058,
+    "ast_hash": "88de46764badefbf766ee9eb9b4cc6ab",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/accounting.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129109,
+    "ast_hash": "151814bf6ec9a97d9d6a2658f22b07f9",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/audit.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291192,
+    "ast_hash": "112c4fd79afb16b1b03db8b82567ba62",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/backup.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291244,
+    "ast_hash": "9bfecde82a38c4451e83eff025d06e23",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/charts.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291275,
+    "ast_hash": "e238e6bef424cecccadbc9321671ec71",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/clients.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129131,
+    "ast_hash": "06e86406fa703ccbee1ab3e9b0e581d6",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/clientstats.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129134,
+    "ast_hash": "aaaf26d7ff4d7c3bf87b1a9339d24c6d",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/contracts.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129138,
+    "ast_hash": "2999f2cb6b6a4bc68783680cf0b68302",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/core.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291409,
+    "ast_hash": "368e428700c22443ecf28ef1d0b8fe67",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/daily.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1291437,
+    "ast_hash": "02b0a6fe4c2d766395eb468553cd9914",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/delivery.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1291468,
+    "ast_hash": "9add57c531024e8529d2fffafa7e562c",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/deposits.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.12915,
+    "ast_hash": "30934dd82813d201727b95f315c68ce4",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/drive.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.129153,
+    "ast_hash": "7b00d9ceb415e249e50240c34d2f3143",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/effects.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291559,
+    "ast_hash": "35f3c5ac4b697c9e0c17c4481e0c2fbd",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/export.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129159,
+    "ast_hash": "fbf86e04ef38eee825b317bfbdae0047",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/finance.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291623,
+    "ast_hash": "82680e0646985f797683b9e63dfe6a3e",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/icons.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291654,
+    "ast_hash": "190e97e4e8665428524f8d22ffbce89f",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/importc.js": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.1291687,
+    "ast_hash": "bac9051cdc70b8ca9b4b1d991d95bde5",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/importf.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291726,
+    "ast_hash": "481320c80cd69a1c231733f5d00fefaa",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/inventory.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291757,
+    "ast_hash": "323596c179413616843a085471dd87d9",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/invoices.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291783,
+    "ast_hash": "e518976e22f5550447ea815285a893ba",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/keys.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291814,
+    "ast_hash": "3b85e738a6c0375ae136fc06f3f499c9",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/lists.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291847,
+    "ast_hash": "1f773a1e417ec371c5d5e9db0b620308",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/main.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291876,
+    "ast_hash": "2179afaee9b5c29117c9ea931a80e44b",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/monthly.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1291907,
+    "ast_hash": "c7c713432dbbe03aa4bf4616ed860f1d",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/penalties.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1291935,
+    "ast_hash": "2e44c0d53866ccae17bd3775b528d3e2",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/plans.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.129197,
+    "ast_hash": "2b07ad740a7dd6bc14ce7d082c9504c5",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/purchases.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1291995,
+    "ast_hash": "5c94f92280099b4766bbf2d1cf6979d3",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/quotes.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1292028,
+    "ast_hash": "f58cfb59643ef7bd8c6ae2d7d9ea0963",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/remind.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1292057,
+    "ast_hash": "69044a8fca828d12e0a1f744e92cd25b",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/reports.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.129209,
+    "ast_hash": "a599da1bf9ab063cd105abf3b0b7f4fd",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/roles.js": {
+    "mtime": 1791989348.6470497,
+    "seen": 1791989525.1292124,
+    "ast_hash": "c4b63aeab89abce163872f963d1cba30",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/settings.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292155,
+    "ast_hash": "ed6b29e2b4cc9ae73df9b0a2a81f9a11",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/share.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292188,
+    "ast_hash": "e6e73f751fbd212db94d0def9ab29368",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/sheets.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292217,
+    "ast_hash": "882c523f2758807018560bec9d146e9a",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/starlink.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292245,
+    "ast_hash": "0f31d7534bb5681620337ab6c2d8ca84",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/stock.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292276,
+    "ast_hash": "7663157d257f76f03142ff0384e0f4c8",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/sync.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292305,
+    "ast_hash": "4edcf1011bb2804cb5b823b88f085ba0",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/techs.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1292336,
+    "ast_hash": "c6101be61ff285f43ac4c6489130a1e1",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/ui.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292424,
+    "ast_hash": "8fca8bd5989e8b4220273774c93eb07f",
+    "semantic_hash": ""
+  },
+  "cispolstore/js/unpaid.js": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1292458,
+    "ast_hash": "7d3dccc48063e36dcef9afc244de0cef",
+    "semantic_hash": ""
+  },
+  "cispolstore/sw.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.129249,
+    "ast_hash": "9488dab0895095d6e326669e9fb3c481",
+    "semantic_hash": ""
+  },
+  "cispolstore/vendor/pdf.min.js": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1292522,
+    "ast_hash": "96de323330f8b8336f637a0051835e00",
+    "semantic_hash": ""
+  },
+  "cispolstore/vendor/pdf.worker.min.js": {
+    "mtime": 1791989348.6670496,
+    "seen": 1791989525.129255,
+    "ast_hash": "a53a71a2a5d618ed0f86ebf099db032a",
+    "semantic_hash": ""
+  },
+  "cispolstore/vendor/qrcode.js": {
+    "mtime": 1791989348.6670496,
+    "seen": 1791989525.129258,
+    "ast_hash": "6e6189e2b177b3d014321edad68fd73c",
+    "semantic_hash": ""
+  },
+  "play/generer-captures.js": {
+    "mtime": 1791989348.7430496,
+    "seen": 1791989525.129261,
+    "ast_hash": "3b1a585bf667b7d3f435b3bd712786a2",
+    "semantic_hash": ""
+  },
+  "skills-lock.json": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.129264,
+    "ast_hash": "8545a14ece744a533a452f03d68a68d8",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/00-static.test.js": {
+    "mtime": 1791989348.7494311,
+    "seen": 1791989525.1292672,
+    "ast_hash": "53cd42ae10a3fd93557bb03417a1a704",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/accounting.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1292703,
+    "ast_hash": "13b87afa15519e93be9c66525d75a60f",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/activity-journal.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1292803,
+    "ast_hash": "434e40507ffffe7fd15881798559a9aa",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/appearance.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1292837,
+    "ast_hash": "342df9c2d97a4571c359df51cb973021",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/backup.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129287,
+    "ast_hash": "d3dc34594748032189b94feec59cbc65",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/caisse.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1292899,
+    "ast_hash": "8a1f17f55a0bc84f3204e20fe51bd4d8",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/charts.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129293,
+    "ast_hash": "e1d71b09f61f9d1b4fc95d3d5a859412",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/client-delete.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129296,
+    "ast_hash": "27bf70e8d9a55b4ed71e93b68412c356",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/client-hero.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129299,
+    "ast_hash": "c7392f1362dae6bf91f3b9ee0f97efa1",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/client-lists.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129302,
+    "ast_hash": "82c83e86d052fcd515fb72ba094513e3",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/client-stats.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293051,
+    "ast_hash": "d0a03f4648eb2b547f03ae1c41f187b3",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/client-type-button.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293082,
+    "ast_hash": "6cf0be234f2a3d758339c84cb1634446",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/client-type.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293113,
+    "ast_hash": "293002f830760e698d14c4b4992a981f",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/contracts.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129314,
+    "ast_hash": "6a8459281da073a4ba80301eb113b24e",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/daily-close.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293173,
+    "ast_hash": "1d9fdf87db0a6f48a25b40ab9e7df5d4",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/deposit-receipt.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293206,
+    "ast_hash": "2212ca468f23c42bba89359c1a70c479",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/deposit-search.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293235,
+    "ast_hash": "103e9f9266af9da00d2c3f8b483b86da",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/deposits.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293266,
+    "ast_hash": "6bbf3bbad2e178b5397805fcc74edbd8",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/documents-pdf.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293297,
+    "ast_hash": "eb0a0b75ac92d9e08111f5a2a2178ac7",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/domain-colours.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293325,
+    "ast_hash": "bf66ac0bea08b61cec87b99517e06db7",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/dunning-series.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293354,
+    "ast_hash": "dd081f68854748efe89e4008c51eb2f7",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/effects.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293383,
+    "ast_hash": "b84bce90345de9d96041b11431827c31",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/exchange-rate.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293411,
+    "ast_hash": "21bead1bfed2c301c3db710bf44de96d",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/finance-screens.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293442,
+    "ast_hash": "110a0e15f5f336ba04b9daa124930ea1",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/finance.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293473,
+    "ast_hash": "48ef4e31ff06be9c42129b5835bbead3",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/home.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129351,
+    "ast_hash": "0ea130f88e5c16ee7eed21d4bbe70ac4",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/icons.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293535,
+    "ast_hash": "34dc6290e2ebd8491baa047bb9bcc130",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/import-clients.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293566,
+    "ast_hash": "f7faf5a8936151d4944a1a5192d7f1d8",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/import-navigation.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293592,
+    "ast_hash": "d0d1f2fe402174e30b206195fcfdcae7",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/inventory-orders.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293623,
+    "ast_hash": "f77b047e54fa3facab38469d98f7edc9",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/invoice-delete.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293652,
+    "ast_hash": "cfb602663aa4146cf2b8d229cddf9be7",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/invoice-split.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293683,
+    "ast_hash": "83a93aadb32cfd0aeee972ff60a8d13d",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/keyboard-shortcuts.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293712,
+    "ast_hash": "eb317fc1b758074753db4d31b22f3e9f",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/launch-shortcuts.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129374,
+    "ast_hash": "76757f678ca15b36662fbcad090a1dc8",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/menu.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293764,
+    "ast_hash": "d7df27f829016910111b55afe03743cc",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/monthly-report.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293805,
+    "ast_hash": "085240ac63fc127f25a6d70be4b829c7",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/more-menu-hero.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293826,
+    "ast_hash": "4e00effde02f2dbe02e8d185f806fb4e",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/negotiated-price-partial.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293848,
+    "ast_hash": "d9f044a83bfc747fa6fe89da5b32bd2e",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/negotiated-price.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293874,
+    "ast_hash": "df03d782944010558cb7ff53915daeb5",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/payments.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293898,
+    "ast_hash": "87459d6e68e43249717152ce094cfdfc",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/penalties.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293917,
+    "ast_hash": "45202a8e8506cfbb315cb0409f1741fb",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/pending-alerts.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1293938,
+    "ast_hash": "74e1e6f4a3e4c6bc8abfdc96d65b214b",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/pending-invoices.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129396,
+    "ast_hash": "6debac635b2b20f2fd20713c5b59ff1f",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/plans.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129398,
+    "ast_hash": "187ced1293e8c3f6145604e847d21d17",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/purchases-quick.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294,
+    "ast_hash": "adf83b8ec558912f5d9547eb76cc81a9",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/purchases.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294022,
+    "ast_hash": "7746953ad8397792d9b3b641c6d93f6e",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/quotes.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129404,
+    "ast_hash": "af83c60e489410f34f75a06b3c44271f",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/relances.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294065,
+    "ast_hash": "791ac624589b9fbf2b69124230f97d48",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/reminders.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294086,
+    "ast_hash": "f1c3f89f322cf3b3c806e50c3c38a590",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/roles.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294107,
+    "ast_hash": "d6c4069e75e159db5be8ee710e2970a4",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/sheets.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294131,
+    "ast_hash": "d11bdd9b4f7568b2ebdb2650e7c1199a",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/starlink-due.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294153,
+    "ast_hash": "74807a3ad15688d4bfc8e52730a157b9",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/stock.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294174,
+    "ast_hash": "70e635f453fa73ea98c258a94fabd0cc",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/subscriptions.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294198,
+    "ast_hash": "4dac208a61482b17118331773d11378e",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/technicians.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294224,
+    "ast_hash": "cebdbdfe6fbf97c92f1dd0735d4e3e65",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/themes.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294243,
+    "ast_hash": "2ffc433a86c2f52c135348279e103e26",
+    "semantic_hash": ""
+  },
+  "tests/cispolstore/unpaid.test.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129427,
+    "ast_hash": "f25f130d65d01b85ca424c53bfc4f54b",
+    "semantic_hash": ""
+  },
+  "tests/fixtures.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129434,
+    "ast_hash": "5346af227624f009ad3ddb54884381b6",
+    "semantic_hash": ""
+  },
+  "tests/package.json": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.1294415,
+    "ast_hash": "81498a37c37989fb001c85ea6ebcb24f",
+    "semantic_hash": ""
+  },
+  "tests/run.js": {
+    "mtime": 1791989348.7500474,
+    "seen": 1791989525.129449,
+    "ast_hash": "e556ebbf8f0400f364a0835bdfd9d031",
+    "semantic_hash": ""
+  },
+  "wifizone/sw.js": {
+    "mtime": 1791618514.139246,
+    "seen": 1791989525.1294665,
+    "ast_hash": "5ffc6cb4a094c6de4c8895bb70040072",
+    "semantic_hash": ""
+  },
+  ".agents/skills/find-skills/SKILL.md": {
+    "mtime": 1791618514.1276038,
+    "seen": 1791989525.1294749,
+    "ast_hash": "62b297abdee9aea84c577ab2e04e1974",
+    "semantic_hash": ""
+  },
+  ".github/workflows/pages.yml": {
+    "mtime": 1791618514.128121,
+    "seen": 1791989525.1294827,
+    "ast_hash": "cc93fbbcf303fc050497446bedf65ada",
+    "semantic_hash": ""
+  },
+  ".github/workflows/tests.yml": {
+    "mtime": 1791989348.6390495,
+    "seen": 1791989525.1294897,
+    "ast_hash": "bb9b80965de2a34fb49e0b368288dff5",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1791989348.6390495,
+    "seen": 1791989525.1294975,
+    "ast_hash": "3a801ce2a7f3103130838d246bc6bfe2",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1791618514.128121,
+    "seen": 1791989525.1295056,
+    "ast_hash": "c6633212a6a28b0e8e96e3419a51f184",
+    "semantic_hash": ""
+  },
+  "caisse-locale/CLAUDE.md": {
+    "mtime": 1791618514.1283996,
+    "seen": 1791989525.1295123,
+    "ast_hash": "d5f5d4799a6f3cce01a1429cf4178afa",
+    "semantic_hash": ""
+  },
+  "caisse-locale/LISEZ-MOI.txt": {
+    "mtime": 1791618514.1283996,
+    "seen": 1791989525.1295183,
+    "ast_hash": "b3d5d540f4af518fffa16b736754237f",
+    "semantic_hash": ""
+  },
+  "caisse-locale/MESSAGE-POUR-CLAUDE-CODE.txt": {
+    "mtime": 1791618514.1283996,
+    "seen": 1791989525.1295264,
+    "ast_hash": "1d7e6cbf17f7239f250d4790b745619d",
+    "semantic_hash": ""
+  },
+  "caisse-locale/public/imprimer.html": {
+    "mtime": 1791618514.1283996,
+    "seen": 1791989525.1295347,
+    "ast_hash": "08233dea6601789b5615e44e01fa1d5e",
+    "semantic_hash": ""
+  },
+  "caisse-locale/public/index.html": {
+    "mtime": 1791618514.1293337,
+    "seen": 1791989525.1295426,
+    "ast_hash": "074d59b482c3853ad9ed04165fba3676",
+    "semantic_hash": ""
+  },
+  "caisse-simple/index.html": {
+    "mtime": 1791618514.1299996,
+    "seen": 1791989525.129552,
+    "ast_hash": "0f170644bb3de3bf5dc90988163a8283",
+    "semantic_hash": ""
+  },
+  "cispolstore/README.md": {
+    "mtime": 1791989348.6390495,
+    "seen": 1791989525.1295612,
+    "ast_hash": "660d276c6824241d804e070bd03af9a3",
+    "semantic_hash": ""
+  },
+  "cispolstore/fonts/inter-LICENSE.txt": {
+    "mtime": 1791989348.6390495,
+    "seen": 1791989525.1295705,
+    "ast_hash": "2eeb2b3ada55f38ae966db32bcb1f92a",
+    "semantic_hash": ""
+  },
+  "cispolstore/index.html": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129579,
+    "ast_hash": "2286e5521951ca57bdcc8488291b876f",
+    "semantic_hash": ""
+  },
+  "cispolstore/privacy.html": {
+    "mtime": 1791989348.6550496,
+    "seen": 1791989525.1295888,
+    "ast_hash": "7516953c824a3645f3cbaa9d8bf92ea5",
+    "semantic_hash": ""
+  },
+  "cispolstore/vendor/pdfjs-LICENSE.txt": {
+    "mtime": 1791989348.6670496,
+    "seen": 1791989525.1295965,
+    "ast_hash": "2ee41112a44fe7014dce33e26468ba93",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1296055,
+    "ast_hash": "a8edc110c67e983549fcec53f79c1c9c",
+    "semantic_hash": ""
+  },
+  "play/README.md": {
+    "mtime": 1791989348.6670496,
+    "seen": 1791989525.129673,
+    "ast_hash": "b31a19030ebf82f775a967aca5e363c7",
+    "semantic_hash": ""
+  },
+  "play/fiche-play-store.md": {
+    "mtime": 1791989348.7430496,
+    "seen": 1791989525.1296816,
+    "ast_hash": "511d41461876af09df033d8807785bb0",
+    "semantic_hash": ""
+  },
+  "play/user-site/LISEZMOI.md": {
+    "mtime": 1791989348.7492647,
+    "seen": 1791989525.129687,
+    "ast_hash": "b6e4677359796b42b925473d7057e5fd",
+    "semantic_hash": ""
+  },
+  "play/user-site/index.html": {
+    "mtime": 1791989348.7492647,
+    "seen": 1791989525.1296918,
+    "ast_hash": "3c1ac9c36ffeb091fac1640a5007e511",
+    "semantic_hash": ""
+  },
+  "tests/README.md": {
+    "mtime": 1791989348.7494311,
+    "seen": 1791989525.1297,
+    "ast_hash": "be7cbdbb114e29ecfb62e56becb11d26",
+    "semantic_hash": ""
+  },
+  "wifizone/index.html": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1297083,
+    "ast_hash": "32124aa6a09591795a7bca2f174be683",
+    "semantic_hash": ""
+  },
+  "cispolstore/icon-192.png": {
+    "mtime": 1791618514.1308897,
+    "seen": 1791989525.129716,
+    "ast_hash": "12d417e67585dde4a2ce94ced12fec8e",
+    "semantic_hash": ""
+  },
+  "cispolstore/icon-512.png": {
+    "mtime": 1791618514.1308897,
+    "seen": 1791989525.1297247,
+    "ast_hash": "3e7339a279f640d69dedc6b38984ad86",
+    "semantic_hash": ""
+  },
+  "cispolstore/icon-maskable-512.png": {
+    "mtime": 1791989348.6455564,
+    "seen": 1791989525.129733,
+    "ast_hash": "19cc2e251d5f82209a4a42237b07798f",
+    "semantic_hash": ""
+  },
+  "cispolstore/logo.png": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1297424,
+    "ast_hash": "b422248477d65d12719760f111c2a4c6",
+    "semantic_hash": ""
+  },
+  "cispolstore/stamp.png": {
+    "mtime": 1791618514.132708,
+    "seen": 1791989525.1297455,
+    "ast_hash": "594eca2c00b196b845807670732ce1a8",
+    "semantic_hash": ""
+  },
+  "play/captures/1-accueil.png": {
+    "mtime": 1791989348.6790495,
+    "seen": 1791989525.129749,
+    "ast_hash": "b691bc3cb259dec5ea66fa741e656be9",
+    "semantic_hash": ""
+  },
+  "play/captures/2-clients.png": {
+    "mtime": 1791989348.6790495,
+    "seen": 1791989525.1297526,
+    "ast_hash": "aa321205e4cd864fcaafb5fbdda9fe00",
+    "semantic_hash": ""
+  },
+  "play/captures/3-fiche-client.png": {
+    "mtime": 1791989348.6870496,
+    "seen": 1791989525.129756,
+    "ast_hash": "7b39fa0cf3565e967dddd54cec20eff0",
+    "semantic_hash": ""
+  },
+  "play/captures/4-relances.png": {
+    "mtime": 1791989348.7030497,
+    "seen": 1791989525.1297593,
+    "ast_hash": "2cf1e46e7e8024ff37439954baf3c422",
+    "semantic_hash": ""
+  },
+  "play/captures/5-statistiques.png": {
+    "mtime": 1791989348.7150495,
+    "seen": 1791989525.1297624,
+    "ast_hash": "f77c656ef659e537da4350081651ffb0",
+    "semantic_hash": ""
+  },
+  "play/captures/6-finance.png": {
+    "mtime": 1791989348.7230496,
+    "seen": 1791989525.129765,
+    "ast_hash": "d4c11de3e2068c500145c123475fefe8",
+    "semantic_hash": ""
+  },
+  "play/captures/7-stock.png": {
+    "mtime": 1791989348.7390494,
+    "seen": 1791989525.1297686,
+    "ast_hash": "5d0c7577d1dc2be2052b8fe5509bd058",
+    "semantic_hash": ""
+  },
+  "play/captures/graphique-1024x500.png": {
+    "mtime": 1791989348.7430496,
+    "seen": 1791989525.1297743,
+    "ast_hash": "d92ed202f392cdc664d07e2e3e00dc60",
+    "semantic_hash": ""
+  },
+  "play/captures/icone-512.png": {
+    "mtime": 1791989348.7430496,
+    "seen": 1791989525.1297781,
+    "ast_hash": "3e7339a279f640d69dedc6b38984ad86",
+    "semantic_hash": ""
+  }
+}
