@@ -48,7 +48,7 @@
 
   // ---------- text generation ----------
   const art = (items) => items.map(([t, x], i) => `Article ${i + 1} – ${t}\n${x}`).join('\n\n');
-  const termText = c => c.months > 0 ? `pour une durée de ${c.months} mois, du ${App.fdate(c.start)} au ${App.fdate(c.end)}` : `pour une durée indéterminée à compter du ${App.fdate(c.start)}`;
+  const termText = c => c.months > 0 ? `pour une durée de ${c.months} mois, jusqu'au ${App.fdate(c.end)}` : 'pour une durée indéterminée';
   const gen = c => {
     const co = App.db.settings.company, S = App.db.settings, f = c.f || {}, cu = c.currency, a = T(c).a[1], b = T(c).b[1], A = a[0].toUpperCase() + a.slice(1), B = b[0].toUpperCase() + b.slice(1), city = co.city || 'Kinshasa';
     const law = `Les parties s'efforcent de régler à l'amiable tout différend lié au présent contrat. À défaut, il relève des juridictions compétentes de ${city}, selon le droit en vigueur en République démocratique du Congo.`;
@@ -116,7 +116,7 @@
       const cdd = c.months > 0;
       return art([
         ['Engagement', `${A} engage ${b} en qualité de « ${f.job || '—'} »${f.place ? `, lieu de travail : ${f.place}` : ''}. ${B} exerce ses fonctions sous l'autorité de l'Employeur et selon ses instructions.`],
-        ['Durée', `Le contrat est conclu ${cdd ? 'à durée déterminée' : 'à durée indéterminée'}, ${termText(c)}. ${f.trial > 0 ? `Il comporte une période d'essai de ${f.trial} jours, pendant laquelle chaque partie peut y mettre fin sans indemnité.` : ''}`.trim()],
+        ['Durée', `Le contrat est conclu ${cdd ? 'à durée déterminée, ' + termText(c) : 'à durée indéterminée'} et prend effet le ${App.fdate(c.start)}. ${f.trial > 0 ? `Il comporte une période d'essai de ${f.trial} jours, pendant laquelle chaque partie peut y mettre fin sans indemnité.` : ''}`.trim()],
         ['Rémunération', `${B} perçoit un salaire mensuel de ${money(f.amount, cu)} (${word(f.amount, cu)}), payable à la fin de chaque mois${f.commission ? `. Commission / prime : ${f.commission}` : ''}. Les retenues légales sont opérées conformément à la loi.`],
         ['Horaires', `${f.hours || 'Selon l\'organisation de l\'entreprise'}, dans le respect de la durée légale du travail.`],
         ['Obligations de l\'employé(e)', `${B} exécute ses tâches avec loyauté et sérieux, soigne le matériel et les marchandises qui lui sont confiés, rend compte fidèlement des encaissements et du stock, et respecte la confidentialité des informations de l'entreprise (clients, prix, comptes), y compris après la fin du contrat.`],
