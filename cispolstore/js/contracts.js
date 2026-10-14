@@ -27,6 +27,13 @@
       fields: [['title', 'Titre du contrat', 'text', 'CONTRAT'], ['amount', 'Montant (facultatif)', 'num', ''], ['body', 'Texte du contrat', 'area', 'Article 1 – Objet\n\nArticle 2 – Prix\n\nArticle 3 – Durée\n\nArticle 4 – Litiges']] }
   };
   App.contractTypes = TYPES;
+  // your own models (db.cmodels): a title, party labels, default term and a body of articles with {{fields}}
+  const models = () => (App.db.cmodels = App.db.cmodels || []);
+  const MODEL_FIELDS = [['amount', 'Montant (facultatif)', 'num', ''], ['object', 'Objet / précisions (facultatif)', 'text', '']];
+  const synth = m => ({ label: m.name, icon: m.icon || '📄', title: m.title || String(m.name || 'CONTRAT').toUpperCase(), a: [m.a || 'PARTIE 1', (m.a || 'la première partie').toLowerCase()], b: [m.b || 'PARTIE 2', (m.b || 'la seconde partie').toLowerCase()], term: m.months || 0, who: 'client', fields: MODEL_FIELDS });
+  const tdef = key => TYPES[key] || (/^m:/.test(key) ? (m => m && synth(m))(models().find(x => 'm:' + x.id === key)) : null);
+  const T = c => TYPES[c.type] || synth(c.mt || { name: 'Contrat', title: 'CONTRAT' });
+  const bodyFor = c => c.type === 'libre' ? (c.f || {}).body || '' : /^m:/.test(c.type) ? (models().find(x => 'm:' + x.id === c.type) || c.mt || {}).body || c.body || '' : gen(c);
 
   const partyOf = c => { const cl = c.clientId ? App.client(c.clientId) : null, p = c.party || {};
     return { name: cl ? App.cname(cl) : (p.name || ''), phone: (cl && cl.phone) || p.phone || '', address: (cl && (cl.address || cl.installAddr)) || p.address || '', idno: p.idno || '' }; };
@@ -41,7 +48,7 @@
   const art = (items) => items.map(([t, x], i) => `Article ${i + 1} – ${t}\n${x}`).join('\n\n');
   const termText = c => c.months > 0 ? `pour une durée de ${c.months} mois, du ${App.fdate(c.start)} au ${App.fdate(c.end)}` : `pour une durée indéterminée à compter du ${App.fdate(c.start)}`;
   const gen = c => {
-    const co = App.db.settings.company, S = App.db.settings, f = c.f || {}, cu = c.currency, a = TYPES[c.type].a[1], b = TYPES[c.type].b[1], A = a[0].toUpperCase() + a.slice(1), B = b[0].toUpperCase() + b.slice(1), city = co.city || 'Kinshasa';
+    const co = App.db.settings.company, S = App.db.settings, f = c.f || {}, cu = c.currency, a = T(c).a[1], b = T(c).b[1], A = a[0].toUpperCase() + a.slice(1), B = b[0].toUpperCase() + b.slice(1), city = co.city || 'Kinshasa';
     const law = `Les parties s'efforcent de régler à l'amiable tout différend lié au présent contrat. À défaut, il relève des juridictions compétentes de ${city}, selon le droit en vigueur en République démocratique du Congo.`;
     if (c.type === 'abonnement') {
       const eq = f.equipMode === 'vendu' ? `Le matériel (${f.equip || 'à préciser'}) est vendu au Client et facturé séparément ; il devient sa propriété après paiement intégral.` : f.equipMode === 'loue' ? `Le matériel (${f.equip || 'à préciser'}) est mis à disposition du Client et reste la propriété du Prestataire. Le Client le garde en bon état, ne le prête ni ne le déplace sans accord, rembourse sa valeur en cas de perte ou de dommage qui lui est imputable, et le restitue à la fin du contrat.` : `Le Client utilise son propre matériel (${f.equip || 'à préciser'}). Le Prestataire n'est pas responsable de sa panne ni de son remplacement.`;
@@ -99,19 +106,19 @@
     return '';
   };
   App.contractText = gen;
-  const fill = (txt, c) => { const co = App.db.settings.company, p = partyOf(c); return String(txt || '').replace(/\{\{(\w+)\}\}/g, (m, k) => ({ client: p.name, societe: co.name, date: App.fdate(c.date), montant: c.f && c.f.amount ? money(c.f.amount, c.currency) : '', adresse: p.address, telephone: p.phone, debut: c.start ? App.fdate(c.start) : '', fin: c.end ? App.fdate(c.end) : '' }[k] ?? m)); };
+  const fill = (txt, c) => { const co = App.db.settings.company, p = partyOf(c); return String(txt || '').replace(/\{\{(\w+)\}\}/g, (m, k) => ({ client: p.name, societe: co.name, date: App.fdate(c.date), montant: c.f && c.f.amount ? money(c.f.amount, c.currency) : '', adresse: p.address, telephone: p.phone, debut: c.start ? App.fdate(c.start) : '', fin: c.end ? App.fdate(c.end) : '', objet: (c.f && c.f.object) || '', duree: c.months > 0 ? c.months + ' mois' : 'durée indéterminée' }[k] ?? m)); };
 
   // ---------- list ----------
   App.views.contracts = () => {
     const all = list().slice().sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0)), run = all.filter(c => c.status === 'active'), alerts = App.contractAlerts();
     const shown = all.filter(c => st.f === 'all' || (st.f === 'active' ? c.status === 'active' : st.f === 'soon' ? alerts.includes(c) : st.f === 'draft' ? c.status === 'draft' : c.status === 'ended' || c.status === 'cancelled'));
-    const row = c => { const s = STAT[App.contractStatus(c)], t = TYPES[c.type];
+    const row = c => { const s = STAT[App.contractStatus(c)], t = T(c);
       return `<button class="item" data-act="ct_open" data-id="${c.id}"><span class="avatar ${s[1]}">${t.icon}</span><div class="grow"><b>${esc(c.no)} · ${esc(t.label)}</b><small>${esc(cname(c))} · ${App.fdate(c.date)}${c.end ? ' · jusqu\'au ' + App.fdate(c.end) : ''}</small></div><div class="end">${c.f && c.f.amount ? `<b>${App.fmt(c.f.amount, c.currency)}</b>` : ''}<span class="pill ${s[1]}">${s[0]}</span></div></button>`; };
     return {
       title: 'Contrats', sub: `${run.length} en cours`, back: 'more', nav: 'more',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📄 Contrats en cours</small><div class="hero-num" data-count="${run.length}">${run.length}</div></div></div>
           <div class="cstats"><div><b>${alerts.length}</b><small>à renouveler</small></div><div><b>${all.filter(c => c.status === 'draft').length}</b><small>brouillon(s)</small></div><div><b>${all.length}</b><small>au total</small></div></div></section>
-        <div class="bar"><button class="btn" data-act="ct_new">+ Nouveau contrat</button></div>
+        <div class="bar"><button class="btn" data-act="ct_new">+ Nouveau contrat</button><button class="btn sec" data-act="cm_list">📚 Mes modèles</button></div>
         <div class="chips">${[['all', 'Tous'], ['active', 'En cours'], ['soon', 'À renouveler'], ['draft', 'Brouillons'], ['done', 'Terminés']].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="ct_f" data-f="${k}">${t}</button>`).join('')}</div>
         ${shown.length ? `<div class="list">${shown.map(row).join('')}</div>` : `<div class="empty big"><div class="ei">📄</div><b>Aucun contrat</b><p class="mut">Créez un contrat d'abonnement, de fourniture Starlink, de vente de matériel, de travail ou un contrat libre : le texte est généré, vous le modifiez, puis vous l'imprimez ou l'envoyez en PDF.</p></div>`}`
     };
@@ -119,7 +126,7 @@
   App.actions.ct_f = d => { st.f = d.f; App.refresh(); };
   // block shown on a client sheet
   App.contractsBlock = c => { if (!App.canView('contracts')) return ''; const l = list().filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date));
-    return `<h2 class="sec">Contrats</h2><div class="bar"><button class="btn sm" data-act="ct_new" data-cid="${c.id}">+ Nouveau contrat</button></div>${l.length ? `<div class="list">${l.map(x => { const s = STAT[App.contractStatus(x)]; return `<button class="item" data-act="ct_open" data-id="${x.id}"><span class="avatar ${s[1]}">${TYPES[x.type].icon}</span><div class="grow"><b>${esc(x.no)}</b><small>${esc(TYPES[x.type].label)} · ${App.fdate(x.date)}</small></div><span class="pill ${s[1]}">${s[0]}</span></button>`; }).join('')}</div>` : '<div class="empty">Aucun contrat pour ce client.</div>'}`; };
+    return `<h2 class="sec">Contrats</h2><div class="bar"><button class="btn sm" data-act="ct_new" data-cid="${c.id}">+ Nouveau contrat</button></div>${l.length ? `<div class="list">${l.map(x => { const s = STAT[App.contractStatus(x)]; return `<button class="item" data-act="ct_open" data-id="${x.id}"><span class="avatar ${s[1]}">${T(x).icon}</span><div class="grow"><b>${esc(x.no)}</b><small>${esc(T(x).label)} · ${App.fdate(x.date)}</small></div><span class="pill ${s[1]}">${s[0]}</span></button>`; }).join('')}</div>` : '<div class="empty">Aucun contrat pour ce client.</div>'}`; };
 
   // ---------- create / edit ----------
   const fieldHtml = (t, f, ex) => t.fields.map(([k, l, kind, def, opts]) => { const v = ex && ex[k] !== undefined ? ex[k] : def, id = 'cf_' + k;
@@ -128,12 +135,12 @@
     const isNew = !c, t0 = App.today(), S = App.db.settings;
     c = c || { type: 'abonnement', clientId: cid || '', party: {}, date: t0, start: t0, months: TYPES.abonnement.term, currency: 'USD', rep: '', f: {} };
     const cl0 = c.clientId && App.client(c.clientId);
-    const render = type => { const t = TYPES[type], ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('ct_cl') || c.clientId);
+    const render = type => { const t = tdef(type), ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('ct_cl') || c.clientId);
       if (cl) { if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.acc === undefined) ex.acc = cl.acc || ''; if ((type === 'abonnement' || type === 'fournisseur') && cl.type === 'gere') { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.amount === undefined && cl.price) ex.amount = cl.price; } }
       if (type === 'travail' && ex.place === undefined) ex.place = S.company.city || ''; if (type === 'abonnement' && ex.grace === undefined) ex.grace = S.grace || 15;
       $('ct_f').innerHTML = fieldHtml(t, null, ex); if (t.noTerm) $('ct_termrow').style.display = 'none'; else $('ct_termrow').style.display = ''; $('ct_clrow').style.display = t.who === 'person' ? 'none' : ''; $('ct_months').value = type === c.type ? c.months : t.term; };
     App.modal(isNew ? 'Nouveau contrat' : 'Modifier ' + c.no,
-      `${isNew ? F.sel('ct_type', 'Type de contrat', Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), c.type) : `<p class="mut" style="margin-top:0">${TYPES[c.type].icon} ${esc(TYPES[c.type].label)}</p>`}
+      `${isNew ? F.sel('ct_type', 'Type de contrat', [...Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), ...models().map(m => ['m:' + m.id, (m.icon || '📄') + ' ' + m.name + ' (mon modèle)'])], c.type) : `<p class="mut" style="margin-top:0">${T(c).icon} ${esc(T(c).label)}</p>`}
        <div id="ct_clrow">${F.sel('ct_cl', 'Client', App.clientOpts('— Autre (saisir ci-dessous) —'), c.clientId)}</div>
        <div id="ct_party" ${cl0 ? 'hidden' : ''}>${F.text('ct_pname', 'Nom complet', (c.party || {}).name || '')}${F.text('ct_pidno', 'N° pièce d\'identité (facultatif)', (c.party || {}).idno || '')}<div class="row">${F.text('ct_pphone', 'Téléphone', (c.party || {}).phone || '')}${F.text('ct_paddr', 'Adresse', (c.party || {}).address || '')}</div></div>
        <div class="row">${F.date('ct_date', 'Date de signature', c.date)}${F.date('ct_start', 'Début', c.start)}</div>
@@ -141,7 +148,7 @@
        ${F.text('ct_rep', 'Représenté(e) par (côté société, facultatif)', c.rep || '')}
        <div id="ct_f"></div>
        ${isNew ? '' : `<label class="chk" style="display:block;margin-top:8px"><input type="checkbox" id="ct_regen"> Régénérer le texte du contrat depuis le modèle (efface vos modifications du texte)</label>`}`,
-      () => { const type = isNew ? App.v('ct_type') : c.type, t = TYPES[type], f = {}; let bad = '';
+      () => { const type = isNew ? App.v('ct_type') : c.type, t = tdef(type), f = {};
         t.fields.forEach(([k, l, kind]) => { const raw = $('cf_' + k).value; f[k] = kind === 'num' ? (raw === '' ? '' : Math.max(0, +raw || 0)) : String(raw).trim(); });
         const cl = t.who === 'person' ? '' : App.v('ct_cl'), p = { name: App.v('ct_pname').trim(), idno: App.v('ct_pidno').trim(), phone: App.v('ct_pphone').trim(), address: App.v('ct_paddr').trim() };
         if (!cl && !p.name) { App.toast(t.who === 'person' ? 'Saisissez le nom de l\'employé(e)' : 'Choisissez un client ou saisissez un nom'); return false; }
@@ -149,8 +156,8 @@
         if ((type === 'materiel' || type === 'travail' || type === 'abonnement' || type === 'fournisseur') && !(f.amount > 0)) { App.toast(type === 'travail' ? 'Saisissez le salaire' : 'Saisissez le montant'); return false; }
         const date = App.v('ct_date') || t0, start = App.v('ct_start') || date, months = t.noTerm ? 0 : Math.max(0, Math.round(App.n('ct_months')));
         const o = { type, clientId: cl, party: cl ? {} : p, date, start, months, end: endOf(start, months), currency: App.v('ct_cur') || 'USD', rep: App.v('ct_rep').trim(), f };
-        if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date), status: 'draft' }); c.body = type === 'libre' ? f.body : gen(c); list().push(c); if (cl) App.log(cl, `Contrat ${c.no} : ${t.label}`); }
-        else { Object.assign(c, o); if ($('ct_regen') && $('ct_regen').checked) c.body = type === 'libre' ? f.body : gen(c); else if (type === 'libre') c.body = f.body; }
+        if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date), status: 'draft' }); if (/^m:/.test(type)) { const m = models().find(x => 'm:' + x.id === type); c.mt = { name: m.name, icon: m.icon, title: m.title, a: m.a, b: m.b, body: m.body }; } c.body = bodyFor(c); list().push(c); if (cl) App.log(cl, `Contrat ${c.no} : ${t.label}`); }
+        else { Object.assign(c, o); if ($('ct_regen') && $('ct_regen').checked) c.body = bodyFor(c); else if (type === 'libre') c.body = f.body; }
         App.save(); App.toast(isNew ? 'Contrat créé : ' + c.no : 'Contrat modifié'); App.refresh(); if (isNew) setTimeout(() => App.actions.ct_open({ id: c.id }), 80); },
       isNew ? 'Créer le contrat' : 'Enregistrer');
     render(c.type);
@@ -161,7 +168,7 @@
 
   // ---------- printable document ----------
   App.contractDoc = (c, logo, stamp) => {
-    const K = App.docKit, co = App.db.settings.company, e = esc, t = TYPES[c.type], p = partyOf(c), title = c.type === 'libre' && c.f && c.f.title ? c.f.title.toUpperCase() : t.title;
+    const K = App.docKit, co = App.db.settings.company, e = esc, t = T(c), p = partyOf(c), title = c.type === 'libre' && c.f && c.f.title ? c.f.title.toUpperCase() : t.title;
     const blocks = fill(c.body, c).split(/\n{2,}/).map(b => b.trim()).filter(Boolean).map(b => { const [h, ...r] = b.split('\n'); return /^article\b/i.test(h) ? `<div class="ctt">${e(h)}</div>${r.length ? `<p class="ctp">${e(r.join('\n')).replace(/\n/g, '<br>')}</p>` : ''}` : `<p class="ctp">${e(b).replace(/\n/g, '<br>')}</p>`; }).join('');
     const parties = K.boxes(t.a[0], [['', `<b>${e(co.name)}</b>`], co.address && ['Siège', e(co.address)], co.rccm && ['RCCM', e(co.rccm)], co.idnat && ['Id. Nat.', e(co.idnat)], co.phone && ['Tél.', e(co.phone)], c.rep && ['Représentée par', e(c.rep)]], t.b[0], [['', `<b>${e(p.name)}</b>`], p.idno && ['Pièce d\'identité', e(p.idno)], p.address && ['Adresse', e(p.address)], p.phone && ['Tél.', e(p.phone)]]);
     return `<div class="paper">${K.head(co, logo)}
@@ -172,13 +179,13 @@
       <table class="sg ctsg"><tr><td class="ln">${e(t.b[0])}<br><small>Lu et approuvé, bon pour accord</small></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(t.a[0])}<br><small>${e(co.name)}${c.rep ? ' · ' + e(c.rep) : ''}</small></td></tr></table>${K.foot(stamp, true)}</div>`; };
   App.actions.ct_print = async x => { const c = list().find(y => y.id === x.id); if (c) App.docKit.print('Contrat ' + c.no, App.contractDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.ct_pdf = async x => { const c = list().find(y => y.id === x.id); if (c) App.sharePdf(`Contrat-${c.no}.pdf`, App.contractDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
-  App.actions.ct_wa = x => { const c = list().find(y => y.id === x.id); if (!c) return; const p = partyOf(c), co = App.db.settings.company, t = TYPES[c.type];
+  App.actions.ct_wa = x => { const c = list().find(y => y.id === x.id); if (!c) return; const p = partyOf(c), co = App.db.settings.company, t = T(c);
     const txt = `Bonjour ${p.name},\nVoici votre contrat ${c.no} (${t.label}) du ${App.fdate(c.date)}${c.end ? ', valable jusqu\'au ' + App.fdate(c.end) : ''}.${c.f && c.f.amount ? '\nMontant : ' + App.fmt(c.f.amount, c.currency) : ''}\nMerci de le lire puis de nous confirmer votre accord.\n${co.name}`;
     if (p.phone) window.open(App.waUrl(p.phone, txt), '_blank', 'noopener'); else window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank', 'noopener'); };
 
   // ---------- detail ----------
   App.actions.ct_open = x => {
-    const c = list().find(y => y.id === x.id); if (!c) return; const s = STAT[App.contractStatus(c)], t = TYPES[c.type], p = partyOf(c), live = c.status === 'draft' || c.status === 'active';
+    const c = list().find(y => y.id === x.id); if (!c) return; const s = STAT[App.contractStatus(c)], t = T(c), p = partyOf(c);
     App.modal('Contrat ' + c.no,
       `<div class="card" style="margin:0 0 10px"><div class="spread"><b>${t.icon} ${esc(t.label)}</b><span class="pill ${s[1]}">${s[0]}</span></div>
         <div class="mut">${esc(p.name)}${p.phone ? ' · ' + esc(p.phone) : ''}</div><div class="mut">Signé le ${App.fdate(c.date)} · du ${App.fdate(c.start)}${c.end ? ' au ' + App.fdate(c.end) : ' (durée indéterminée)'}</div>
@@ -188,7 +195,7 @@
        ${c.status === 'draft' ? `<div class="bar"><button type="button" class="btn" data-act="ct_set" data-id="${c.id}" data-s="active">✅ Signé : mettre en cours</button></div>` : ''}
        ${c.status === 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="ended">🏁 Terminé</button><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="cancelled">⛔ Résilié</button>${c.end ? `<button type="button" class="btn" data-act="ct_renew" data-id="${c.id}">🔁 Renouveler</button>` : ''}</div>` : ''}
        ${c.status !== 'draft' && c.status !== 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="active">↺ Remettre en cours</button></div>` : ''}
-       <div class="bar"><button type="button" class="btn sm sec" data-act="ct_edit" data-id="${c.id}">✏️ Modifier</button><button type="button" class="btn sm sec" data-act="ct_dup" data-id="${c.id}">⎘ Dupliquer</button>${c.clientId ? `<button type="button" class="btn sm sec" data-act="go" data-v="client" data-id="${c.clientId}">👤 Client</button>` : ''}<button type="button" class="btn sm sec" data-act="ct_del" data-id="${c.id}">🗑 Supprimer</button></div>`);
+       <div class="bar"><button type="button" class="btn sm sec" data-act="ct_edit" data-id="${c.id}">✏️ Modifier</button><button type="button" class="btn sm sec" data-act="ct_dup" data-id="${c.id}">⎘ Dupliquer</button><button type="button" class="btn sm sec" data-act="ct_tomodel" data-id="${c.id}">📚 Enregistrer comme modèle</button>${c.clientId ? `<button type="button" class="btn sm sec" data-act="go" data-v="client" data-id="${c.clientId}">👤 Client</button>` : ''}<button type="button" class="btn sm sec" data-act="ct_del" data-id="${c.id}">🗑 Supprimer</button></div>`);
   };
   App.actions.ct_set = x => { const c = list().find(y => y.id === x.id); if (!c) return; c.status = x.s; if (c.clientId) App.log(c.clientId, `Contrat ${c.no} : ${STAT[x.s][0].toLowerCase()}`); App.save(); App.close(); App.refresh(); App.toast(STAT[x.s][0]); };
   App.actions.ct_edit = x => { const c = list().find(y => y.id === x.id); if (c) { App.close(); setTimeout(() => App.contractForm(c), 30); } };
@@ -215,17 +222,40 @@
   App.actions.ct_dn = d => edMove(+d.i, 1);
   App.actions.ct_rm = d => { edSync(); ed.items.splice(+d.i, 1); edDraw(); };
   App.actions.ct_add = () => { edSync(); ed.items.push({ t: '', x: '', new: true }); edDraw(); const l = document.querySelectorAll('#ct_arts input[data-af=t]'); if (l.length) l[l.length - 1].focus(); };
-  App.actions.ct_text = x => { const c = list().find(y => y.id === x.id); if (!c) return; App.close(); ed = { items: parseBody(c.body) };
-    setTimeout(() => { App.modal('Articles du contrat ' + c.no,
-      `<p class="mut" style="margin-top:0">Ajoutez, déplacez ou supprimez des articles : la numérotation se refait toute seule. Vous pouvez utiliser les champs {{client}}, {{societe}}, {{date}}, {{montant}}. Modèle indicatif : faites-le relire par un juriste avant tout engagement important.</p>
-       <div class="bar"><button type="button" class="btn" data-act="ct_add">+ Nouvel article</button></div>
+  const openArticles = (title, head, body, onSave) => { ed = { items: parseBody(body) };
+    App.modal(title, `${head}<div class="bar"><button type="button" class="btn" data-act="ct_add">+ Nouvel article</button></div>
        ${F.sel('ct_lib', 'Ou ajouter un article type', [['', '— Choisir —'], ...LIB.map((a, i) => [String(i), a[0]])], '')}
-       <div id="ct_arts" style="margin-top:10px"></div>`,
-      () => { edSync(); c.body = buildBody(ed.items); if (c.type === 'libre') c.f = { ...c.f, body: c.body }; App.save(); App.toast('Articles enregistrés'); App.refresh(); setTimeout(() => App.actions.ct_open({ id: c.id }), 80); }, 'Enregistrer');
-      edDraw(); $('ct_lib').onchange = () => { const a = LIB[+$('ct_lib').value]; if (!a) return; edSync(); ed.items.push({ t: a[0], x: a[1] }); $('ct_lib').value = ''; edDraw(); App.toast('Article ajouté : ' + a[0]); }; }, 40); };
+       <div id="ct_arts" style="margin-top:10px"></div>`, () => { edSync(); return onSave(buildBody(ed.items)); }, 'Enregistrer');
+    edDraw(); $('ct_lib').onchange = () => { const a = LIB[+$('ct_lib').value]; if (!a) return; edSync(); ed.items.push({ t: a[0], x: a[1] }); $('ct_lib').value = ''; edDraw(); App.toast('Article ajouté : ' + a[0]); }; };
+  const HELP = 'Champs automatiques : {{client}}, {{societe}}, {{date}}, {{montant}}, {{adresse}}, {{telephone}}, {{debut}}, {{fin}}, {{duree}}, {{objet}}.';
+  App.actions.ct_text = x => { const c = list().find(y => y.id === x.id); if (!c) return; App.close();
+    setTimeout(() => openArticles('Articles du contrat ' + c.no, `<p class="mut" style="margin-top:0">Ajoutez, déplacez ou supprimez des articles : la numérotation se refait toute seule. ${HELP} Modèle indicatif : faites-le relire par un juriste avant tout engagement important.</p>`, c.body,
+      body => { c.body = body; if (c.type === 'libre') c.f = { ...c.f, body }; App.save(); App.toast('Articles enregistrés'); App.refresh(); setTimeout(() => App.actions.ct_open({ id: c.id }), 80); }), 40); };
+
+  // ---------- my own models ----------
+  const ICONS = ['📄', '🏠', '🤝', '🛠️', '🚚', '🛒', '💼', '🔒', '📡', '🧾', '👔', '🎓'];
+  const cmList = () => App.modal('Mes modèles de contrat',
+    `<p class="mut" style="margin-top:0">Vos modèles apparaissent dans « Type de contrat » quand vous créez un contrat. Astuce : sur un contrat existant, « Enregistrer comme modèle ».</p>
+     <div class="bar"><button type="button" class="btn" data-act="cm_new">+ Nouveau modèle</button></div>
+     ${models().length ? `<div class="list">${models().map(m => `<div class="item"><span class="avatar">${esc(m.icon || '📄')}</span><div class="grow"><b>${esc(m.name)}</b><small>${parseBody(m.body).filter(i => i.t).length} article(s) · ${esc(m.title || '')}</small></div><button type="button" class="btn sm sec" data-act="cm_edit" data-id="${m.id}">✏️</button> <button type="button" class="btn sm sec" data-act="cm_del" data-id="${m.id}">🗑</button></div>`).join('')}</div>` : '<div class="empty">Aucun modèle pour le moment.</div>'}`);
+  App.actions.cm_list = () => { App.close(); setTimeout(cmList, 40); };
+  const cmForm = (m, isNew) => { App.close();
+    setTimeout(() => openArticles(isNew ? 'Nouveau modèle' : 'Modèle : ' + m.name,
+      `${F.text('cm_name', 'Nom du modèle', m.name)}${F.sel('cm_icon', 'Icône', ICONS.map(i => [i, i]), m.icon || '📄')}${F.text('cm_title', 'Titre sur le document (ex. CONTRAT DE LOCATION)', m.title || '')}
+       <div class="row">${F.text('cm_a', 'Partie 1 (ex. LE BAILLEUR)', m.a || '')}${F.text('cm_b', 'Partie 2 (ex. LE LOCATAIRE)', m.b || '')}</div>${F.num('cm_months', 'Durée par défaut (mois, 0 = indéterminée)', m.months || 0, 'min="0"')}
+       <p class="mut">${HELP}</p>`, m.body,
+      body => { const name = App.v('cm_name').trim(); if (!name) { App.toast('Donnez un nom au modèle'); return false; }
+        Object.assign(m, { name, icon: App.v('cm_icon') || '📄', title: App.v('cm_title').trim(), a: App.v('cm_a').trim().toUpperCase(), b: App.v('cm_b').trim().toUpperCase(), months: Math.max(0, Math.round(App.n('cm_months'))), body });
+        if (isNew) models().push(m); App.save(); App.toast('Modèle enregistré : ' + name); setTimeout(cmList, 80); }), 40); };
+  App.actions.cm_new = () => cmForm({ id: App.uid(), ts: Date.now(), name: '', icon: '📄', title: '', a: 'LE PRESTATAIRE', b: 'LE CLIENT', months: 0, body: 'Article 1 – Objet\n\nArticle 2 – Prix\n\nArticle 3 – Durée\n\nArticle 4 – Litiges' }, true);
+  App.actions.cm_edit = x => { const m = models().find(y => y.id === x.id); if (m) cmForm(m, false); };
+  App.actions.cm_del = x => { const m = models().find(y => y.id === x.id); if (!m || !App.confirm(`Supprimer le modèle « ${m.name} » ? Les contrats déjà créés avec ce modèle sont conservés.`)) return; App.db.cmodels = models().filter(y => y !== m); App.save(); App.close(); setTimeout(cmList, 40); };
+  App.actions.ct_tomodel = x => { const c = list().find(y => y.id === x.id); if (!c) return; const t = T(c);
+    const m = { id: App.uid(), ts: Date.now(), name: t.label + ' (modèle)', icon: t.icon, title: c.type === 'libre' && c.f && c.f.title ? c.f.title : t.title, a: t.a[0], b: t.b[0], months: c.months || 0, body: c.body };
+    App.toast('Remplacez les noms et montants par {{client}}, {{montant}}… puis enregistrez'); cmForm(m, true); };
   const copyOf = (c, over) => { const n = { ...c, party: { ...(c.party || {}) }, f: { ...(c.f || {}) }, id: App.uid(), ts: Date.now(), status: 'draft', ...over }; n.no = nextNo(n.date); return n; };
   App.actions.ct_dup = x => { const c = list().find(y => y.id === x.id); if (!c) return; const t = App.today(), n = copyOf(c, { date: t, start: t, end: endOf(t, c.months) }); list().push(n); App.save(); App.close(); App.refresh(); App.toast('Contrat dupliqué : ' + n.no); };
-  App.actions.ct_renew = x => { const c = list().find(y => y.id === x.id); if (!c || !c.end) return; const start = App.addDays(c.end, 1), n = copyOf(c, { date: App.today(), start, end: endOf(start, c.months) }); n.body = c.type === 'libre' ? c.body : gen(n);
+  App.actions.ct_renew = x => { const c = list().find(y => y.id === x.id); if (!c || !c.end) return; const start = App.addDays(c.end, 1), n = copyOf(c, { date: App.today(), start, end: endOf(start, c.months) }); n.body = c.type === 'libre' || /^m:/.test(c.type) ? c.body : gen(n);
     c.status = 'ended'; list().push(n); if (c.clientId) App.log(c.clientId, `Contrat ${c.no} renouvelé : ${n.no}`); App.save(); App.close(); App.refresh(); App.toast('Contrat renouvelé : ' + n.no); setTimeout(() => App.actions.ct_open({ id: n.id }), 80); };
   App.actions.ct_del = x => { const c = list().find(y => y.id === x.id); if (!c) return; if (!App.confirm(`Supprimer le contrat ${c.no} ?`)) return; App.db.contracts = list().filter(y => y !== c); App.save(); App.close(); App.refresh(); };
 })();

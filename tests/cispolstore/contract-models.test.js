@@ -1,0 +1,45 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'mat',first:'Jean',last:'K',name:'Jean K',phone:'0991',address:'Av. Test 1',created:t,subs:[]});App.save();App.go('contracts')});await p.waitForTimeout(500);
+ok('list has Mes modèles button',/Mes modèles/.test(await p.innerText('#view')));
+await p.click('[data-act=cm_list]');await p.waitForTimeout(400);ok('empty models list',/Aucun modèle/.test(await p.innerText('dialog')));
+await p.click('[data-act=cm_new]');await p.waitForTimeout(500);
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(300);
+ok('refuses a model without name',await p.evaluate(()=>(App.db.cmodels||[]).length===0));
+await p.fill('#cm_name','Location de local');await p.selectOption('#cm_icon','🏠');await p.fill('#cm_title','CONTRAT DE LOCATION');await p.fill('#cm_a','Le bailleur');await p.fill('#cm_b','Le locataire');await p.fill('#cm_months','12');
+await p.evaluate(()=>{const ts=[...document.querySelectorAll('#ct_arts input[data-af=t]')],xs=[...document.querySelectorAll('#ct_arts textarea')];ts[0].value='Objet';xs[0].value='{{societe}} loue à {{client}} le local situé : {{objet}}.';ts[1].value='Loyer';xs[1].value='Le loyer est de {{montant}} par mois pendant {{duree}}.'});
+await p.click('[data-act=ct_add]');await p.waitForTimeout(150);
+await p.evaluate(()=>{const ts=[...document.querySelectorAll('#ct_arts input[data-af=t]')],xs=[...document.querySelectorAll('#ct_arts textarea')];ts[ts.length-1].value='Clause maison';xs[xs.length-1].value='Texte maison.'});
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(700);
+const m=await p.evaluate(()=>App.db.cmodels[0]);
+ok('model saved with labels uppercased and articles',m&&m.name==='Location de local'&&m.a==='LE BAILLEUR'&&m.b==='LE LOCATAIRE'&&m.months===12&&/Article 1 – Objet/.test(m.body)&&/Article 5 – Clause maison/.test(m.body),JSON.stringify(m));
+ok('models list shows it',/Location de local/.test(await p.innerText('dialog')));
+await p.keyboard.press('Escape');await p.waitForTimeout(200);
+// use the model
+await p.click('[data-act=ct_new]');await p.waitForTimeout(400);
+ok('type list includes my model',await p.evaluate(()=>[...document.querySelectorAll('#ct_type option')].some(o=>/Location de local/.test(o.textContent)&&/^m:/.test(o.value))));
+await p.selectOption('#ct_type',await p.evaluate(()=>App.db.cmodels[0]&&'m:'+App.db.cmodels[0].id));await p.waitForTimeout(200);
+ok('model term prefilled and fields are amount/object',await p.inputValue('#ct_months')==='12'&&!!(await p.$('#cf_amount'))&&!!(await p.$('#cf_object')));
+await p.selectOption('#ct_cl','c1');await p.fill('#cf_amount','300');await p.fill('#cf_object','Av. Kasa-Vubu 12');
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(800);
+const c=await p.evaluate(()=>App.db.contracts[0]);
+ok('contract created from my model',c&&/^m:/.test(c.type)&&c.mt&&c.mt.name==='Location de local'&&/Texte maison/.test(c.body),JSON.stringify(c).slice(0,200));
+const doc=await p.evaluate(()=>App.contractDoc(App.db.contracts[0],'','s'));
+ok('document uses my title, labels and resolved fields',/CONTRAT DE LOCATION/.test(doc)&&/LE BAILLEUR/.test(doc)&&/LE LOCATAIRE/.test(doc)&&/CISPOLstore loue à Jean K le local situé : Av\. Kasa-Vubu 12/.test(doc)&&/300\s\$ par mois pendant 12 mois/.test(doc)&&!/\{\{/.test(doc),doc.replace(/<[^>]+>/g,' ').slice(300,900));
+await p.evaluate(()=>App.go('contracts'));await p.waitForTimeout(400);ok('list row shows the model name',/Location de local/.test(await p.innerText('#view')));
+// save an existing contract as model
+await p.evaluate(()=>{const t=App.today();App.db.contracts.push({id:'cx',no:'CTR-X',type:'materiel',clientId:'c1',party:{},date:t,start:t,months:0,end:'',currency:'USD',rep:'',status:'draft',f:{items:'Routeur',amount:50,deposit:0,warranty:6,install:'non',site:'',delivery:''},body:'Article 1 – Objet\nVente de routeur.\n\nArticle 2 – Garantie\n6 mois.'});App.save();App.actions.ct_open({id:'cx'})});await p.waitForTimeout(400);
+await p.click('[data-act=ct_tomodel]');await p.waitForTimeout(600);
+ok('save-as-model opens the editor prefilled',await p.inputValue('#cm_name')==='Vente / installation de matériel (modèle)'&&await p.evaluate(()=>document.querySelectorAll('#ct_arts textarea').length===2));
+await p.fill('#cm_name','Vente de routeur');await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(700);
+ok('second model saved',await p.evaluate(()=>App.db.cmodels.length===2&&App.db.cmodels[1].name==='Vente de routeur'));
+// edit then delete model; contract keeps working
+await p.click('[data-act=cm_edit]');await p.waitForTimeout(500);await p.fill('#cm_name','Location de local V2');
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(700);
+ok('model renamed',await p.evaluate(()=>App.db.cmodels[0].name==='Location de local V2'));
+await p.evaluate(()=>App.actions.cm_del({id:App.db.cmodels[0].id}));await p.waitForTimeout(500);
+ok('model deleted but its contract still prints',await p.evaluate(()=>App.db.cmodels.length===1&&/CONTRAT DE LOCATION/.test(App.contractDoc(App.db.contracts.find(c=>/^m:/.test(c.type)),'','s'))));
+ok('sync and backup include models',await p.evaluate(async()=>/'cmodels'/.test(await (await fetch('js/sync.js')).text())&&/'cmodels'/.test(await (await fetch('js/backup.js')).text())));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();

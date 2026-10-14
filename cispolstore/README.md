@@ -437,3 +437,11 @@ Plus → **Contrats** (administrateur et comptable) ; aussi depuis la fiche d'un
 - Impression, **PDF**, **WhatsApp** ; en-tête, cachet et signatures comme les factures et les devis.
 - Les contrats sont dans la sauvegarde, la synchronisation et le journal d'activité.
 - ⚠️ Les modèles sont **indicatifs** (droit congolais, formulations générales) : faites-les relire par un juriste avant de les utiliser pour un engagement important.
+
+### Mes propres modèles de contrat
+
+Contrats → **📚 Mes modèles** (ou, sur un contrat existant, **Enregistrer comme modèle**) : créez autant de types de contrat que vous voulez (location, partenariat, sous-traitance…).
+- Un modèle = un **nom**, une icône, le **titre** du document, les deux **parties** (ex. LE BAILLEUR / LE LOCATAIRE), une **durée par défaut** et des **articles** (mêmes boutons que pour un contrat : + Nouvel article, articles types, ↑ ↓ ✕, numérotation automatique).
+- Champs automatiques dans le texte : `{{client}}`, `{{societe}}`, `{{date}}`, `{{montant}}`, `{{adresse}}`, `{{telephone}}`, `{{debut}}`, `{{fin}}`, `{{duree}}`, `{{objet}}`.
+- Vos modèles apparaissent dans « Type de contrat » (« … (mon modèle) ») ; le contrat créé garde une copie du texte : modifier ou supprimer le modèle ne change pas les contrats déjà faits.
+- Les modèles sont dans la sauvegarde, la synchronisation et le journal d'activité.
