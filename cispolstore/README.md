@@ -460,3 +460,10 @@ Contrats → Nouveau contrat → **Installation et maintenance** (13 articles, d
 - Prestations au choix : **installation et maintenance**, installation seule ou maintenance seule : les articles s'adaptent (acompte et réception pour l'installation ; redevance, délai de dépannage et visites préventives pour la maintenance).
 - Valeurs par défaut modifiables : acompte 50 %, dépannage sous 48 heures ouvrables, garantie des travaux 3 mois, 1 visite préventive par an, préavis de maintenance 30 jours.
 - Le site d'installation se préremplit depuis la fiche du client. Le prix de l'installation (ou la redevance, pour une maintenance seule) est obligatoire.
+
+### Contrat de travail / vendeur (renforcé)
+
+Contrats → Nouveau contrat → **Contrat de travail / vendeur** (14 articles, deux textes comme les autres contrats intégrés) : engagement, nature et durée, **période d'essai écrite (30 jours par défaut)**, rémunération (**paie le 30** par défaut), commission sur les **ventes réellement encaissées**, horaires, **caisse et encaissements**, stock / tickets / matériel confiés, confidentialité, usage de l'application (PIN personnel, journal d'activité), obligations de l'employeur, congés et absences, fin du contrat, données personnelles et litiges.
+- Durée par défaut **6 mois (CDD)** : un **motif** est alors obligatoire (temps déterminé, ouvrage, remplacement…). Mettre la durée à **0** pour un **CDI** (obligatoire pour un poste permanent).
+- Aucune retenue automatique sur le salaire pour les écarts de caisse.
+- ⚠️ À faire confirmer par un avocat ou l'inspection du travail : durée maximale d'un CDD, durées exactes de la période d'essai et préavis (le texte renvoie au Code du travail sans chiffre).

@@ -46,14 +46,14 @@ const gens=await p.evaluate(()=>Object.keys(App.contractTypes));
 ok('7 contract types',gens.length===7&&['abonnement','fournisseur','materiel','installation','mandat','travail','libre'].every(k=>gens.includes(k)),gens.join(','));
 async function create(type,fill,extra){await p.evaluate(()=>App.go('contracts'));await p.waitForTimeout(300);await p.click('[data-act=ct_new]');await p.waitForTimeout(300);await p.selectOption('#ct_type',type);await p.waitForTimeout(200);
  if(extra&&extra.client)await p.selectOption('#ct_cl',extra.client);else{await p.fill('#ct_pname',extra&&extra.name||'Marie T');}
- for(const [k,v] of Object.entries(fill)){const el=await p.$('#cf_'+k);if(el){const tag=await el.evaluate(e=>e.tagName);if(tag==='SELECT')await p.selectOption('#cf_'+k,v);else await p.fill('#cf_'+k,String(v));}}
+ for(const [k,v] of Object.entries(fill)){if(k==='_months'){await p.fill('#ct_months',String(v));continue}const el=await p.$('#cf_'+k);if(el){const tag=await el.evaluate(e=>e.tagName);if(tag==='SELECT')await p.selectOption('#cf_'+k,v);else await p.fill('#cf_'+k,String(v));}}
  await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(700);
  const r=await p.evaluate(()=>{const c=App.db.contracts[App.db.contracts.length-1];return {no:c.no,type:c.type,body:c.body,months:c.months,end:c.end}});await p.keyboard.press('Escape');await p.waitForTimeout(200);return r;}
 const f1=await create('fournisseur',{plan:'Starlink Standard',usage:'revente',amount:120,advance:2,fee:50,notice:45},{client:'c1'});
 ok('fournisseur: revente clause, advance and notice',/revendre l'accès/.test(f1.body)&&/2 mois d'avance/.test(f1.body)&&/45 jours/.test(f1.body)&&/50\s\$/.test(f1.body),f1.body.slice(0,120));
 const m1=await create('materiel',{items:'Routeur X × 2',amount:300,deposit:100,warranty:6});
 ok('materiel: no term, balance 200 and warranty 6 mois',m1.months===0&&m1.end===''&&/200\s\$/.test(m1.body)&&/garanti 6 mois/.test(m1.body)&&/Routeur X/.test(m1.body),m1.body.slice(0,160));
-const t1=await create('travail',{job:'Vendeur',amount:250,trial:20,hours:'8h-16h',commission:'2 % des ventes'},{name:'Paul M'});
+const t1=await create('travail',{_months:0,job:'Vendeur',amount:250,trial:20,hours:'8h-16h',commission:'2 % des ventes'},{name:'Paul M'});
 ok('travail: poste, salary, trial and commission',/Vendeur/.test(t1.body)&&/250\s\$/.test(t1.body)&&/20 jours/.test(t1.body)&&/2 % des ventes/.test(t1.body)&&/durée indéterminée/.test(t1.body),t1.body.slice(0,120));
 const l1=await create('libre',{title:'Accord de partenariat',amount:500,body:'Article 1 – Objet\nCe contrat lie {{client}} et {{societe}} le {{date}} pour {{montant}}.'},{name:'Zoé B'});
 ok('libre: body kept as written',/\{\{client\}\}/.test(l1.body));
