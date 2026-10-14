@@ -474,3 +474,12 @@ Contrats → Nouveau contrat → **Technicien indépendant / prestataire** (15 a
 - Rémunération au choix : **par intervention** (tarif) ou **forfait mensuel** ; paiement sous **7 jours** après validation du bon d'intervention.
 - Indépendance (aucun lien de subordination), exécution personnelle des missions, bon d'intervention, moyens propres, qualité et sécurité, **reprise des malfaçons sous 30 jours**, obligations sociales et fiscales à sa charge, confidentialité et données des clients, **non-sollicitation 6 mois** après la fin, **préavis 15 jours**.
 - ⚠️ À faire confirmer par un avocat : le champ d'application de la loi 17/001 sur la sous-traitance (débattu pour un prestataire seul), le risque de requalification en contrat de travail si le technicien travaille sous les ordres et horaires de CISPOLstore, et la validité de la non-sollicitation après la fin du contrat.
+
+### Contrat d'apporteur d'affaires / agent commercial
+
+Contrats → Nouveau contrat → **Apporteur d'affaires / agent** (15 articles, deux textes comme les autres contrats intégrés). L'intermédiaire est une **personne seule**.
+- Rôle au choix : **apporteur d'affaires** (par défaut : il recommande et transmet des contacts) ou **agent commercial** (il négocie au nom de CISPOLstore, sans jamais engager l'entreprise sans accord écrit).
+- Commission au choix : **pourcentage** des montants encaissés (par défaut) ou **montant fixe** par vente ; sur le **premier paiement** du client seulement (par défaut), ou aussi sur ses renouvellements pendant N mois.
+- Commission **payée dans les 7 jours après l'encaissement** du client (pas de relevé mensuel), avec le détail envoyé à l'intermédiaire. Aucune commission sur une vente non payée ou annulée.
+- Contrat **non exclusif**, **interdiction d'encaisser** l'argent des clients (sauf mandat écrit), indépendance, confidentialité, préavis de **30 jours** (les commissions des ventes conclues avant la fin restent dues).
+- ⚠️ À faire confirmer par un avocat : les règles de l'Acte uniforme OHADA sur le droit commercial général concernant l'agent commercial (rémunération, fin du contrat, indemnité éventuelle), non vérifiées dans le détail.
