@@ -399,3 +399,12 @@ Menu **Plus → Devis** : créez un devis numéroté `DEV-AAAA-NNNN` pour un cli
 - **Sauvegarde vérifiée** : à chaque sauvegarde, le fichier est relu et comparé aux données de l'écran ; le message confirme « Sauvegarde créée et vérifiée ✔ (N clients, M factures) » ou avertit si elle est incomplète.
 - **Tester une sauvegarde** (Paramètres → Données, administrateur) : on choisit un fichier .json ; l'application dit s'il est lisible, le compare aux données actuelles (clients, factures, paiements… fichier / actuel, total facturé, dernière facture et dernier paiement), signale s'il est plus ancien et repère les liens cassés, **sans rien remplacer**. Un bouton permet ensuite de restaurer ce fichier.
 - **Correction** : l'ancienneté de la dernière sauvegarde était calculée avec le mauvais signe, si bien que l'alerte « sauvegarde ancienne » (Accueil, Paramètres) ne se déclenchait jamais. C'est corrigé.
+
+## Statistiques clients (étape 9 des améliorations)
+
+**Plus → Statistiques clients** (ou le bouton « 📊 Statistiques clients » en bas de l'écran Clients ; administrateur et comptable) : trois périodes au choix (30 jours, 3 mois, 12 mois).
+
+- **Valeur moyenne par client** = chiffre d'affaires de la période ÷ nombre de clients qui ont acheté ; en dessous : panier moyen (par facture), nombre d'acheteurs et part de clients **fidèles** (2 achats ou plus).
+- **Abonnements : qui part, qui reste** : à partir de l'historique des renouvellements, l'application reconstitue qui était abonné (période en cours ou sursis) au début de la période. **Taux de départ** = abonnés perdus ÷ abonnés du début ; sont aussi comptés ceux qui sont restés et les anciens **réactivés**. Un graphique montre, sur 6 mois, les nouveaux clients et les abonnements perdus. La liste des clients perdus et un raccourci vers les relances pour les abonnés **à risque** (sursis ou fin dans 7 jours) complètent le tout.
+- **Meilleurs clients** : top 10 de la période avec leur part du chiffre d'affaires et leur valeur depuis toujours ; part des 5 premiers ; valeur moyenne depuis toujours.
+- **Clients endormis** : sans achat depuis plus de 3 mois (et sans abonnement en cours), classés par valeur, pour les relancer.

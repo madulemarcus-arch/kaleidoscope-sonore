@@ -23,7 +23,7 @@
     const tick = v => v >= 1000 ? Math.round(v / 100) / 10 + ' k' : String(Math.round(v));
     return `<div class="cwrap bars${two ? ' two' : ''}">${o.title ? `<div class="chead"><b>${esc(o.title)}</b>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</div>` : ''}<div class="cread" aria-live="polite">${o.hint === false ? '' : 'Touchez une barre pour voir le détail'}</div>
       <div class="cplot"><div class="cgrid"><span>${tick(mx)}</span><span>${tick(mx / 2)}</span><span>0</span></div><div class="ccols">${items.map((x, i) => {
-        const h1 = Math.round((x.v || 0) / mx * 100), h2 = Math.round((x.v2 || 0) / mx * 100), t = `${esc(x.t || x.l || '')} · ${two ? 'Entrées ' + esc(F(x.v || 0)) + ' · Sorties ' + esc(F(x.v2 || 0)) : esc(F(x.v || 0))}`;
+        const h1 = Math.round((x.v || 0) / mx * 100), h2 = Math.round((x.v2 || 0) / mx * 100), t = `${esc(x.t || x.l || '')} · ${two ? esc((o.names || ['Entrées', 'Sorties'])[0]) + ' ' + esc(F(x.v || 0)) + ' · ' + esc((o.names || ['Entrées', 'Sorties'])[1]) + ' ' + esc(F(x.v2 || 0)) : esc(F(x.v || 0))}`;
         return `<div class="ccol" data-ct="${t}" title="${t}"><div class="cbs">${two ? `<i class="b1" style="height:${h1}%"></i><i class="b2" style="height:${h2}%"></i>` : `<i class="b1${o.hl !== false && i === last ? ' hl' : ''}" style="height:${h1}%"></i>`}</div><small>${esc(x.l || '')}</small></div>`; }).join('')}</div></div></div>`;
   };
 
