@@ -20,7 +20,7 @@
 
   // ---------- read and check a backup ----------
   const parse = text => { const o = JSON.parse(text); return o.v === 2 ? o : (Array.isArray(o.products) || Array.isArray(o.clients)) ? App.migrate(o) : null; };
-  const LINES = [['clients', 'Clients'], ['invoices', 'Factures'], ['payments', 'Paiements'], ['expenses', 'Dépenses'], ['products', 'Produits'], ['moves', 'Mouvements de stock'], ['purchases', 'Achats'], ['deposits', 'Fonds en attente'], ['quotes', 'Devis'], ['penalties', 'Pénalités'], ['installs', 'Installations']];
+  const LINES = [['clients', 'Clients'], ['invoices', 'Factures'], ['payments', 'Paiements'], ['expenses', 'Dépenses'], ['products', 'Produits'], ['moves', 'Mouvements de stock'], ['purchases', 'Achats'], ['deposits', 'Fonds en attente'], ['quotes', 'Devis'], ['contracts', 'Contrats'], ['penalties', 'Pénalités'], ['installs', 'Installations']];
   const n = (d, k) => (d && Array.isArray(d[k]) ? d[k].length : 0);
   const billed = d => (d.invoices || []).filter(i => !i.pending).reduce((a, i) => { try { return a + App.usd(App.invAgreed(i), i.currency, i); } catch (e) { return a; } }, 0);
   const newest = (d, k) => (d[k] || []).reduce((m, x) => x && x.date > m ? x.date : m, '');
