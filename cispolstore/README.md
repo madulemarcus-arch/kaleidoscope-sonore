@@ -360,3 +360,7 @@ Menu **Plus → Dû à Starlink** (administrateur et comptable) : suit l'argent 
 - **Reversements** : le bouton « + Reversement à Starlink » (montant prérempli avec le reste dû) enregistre chaque somme envoyée. Le **reste à reverser** = encaissé − reversé (ou « avance » s'il est négatif).
 - Un reversement peut être modifié ou supprimé. Il apparaît dans le journal de caisse seulement si les abonnements ne sont pas déjà retirés de la caisse (réglage de Finance), pour ne pas compter deux fois.
 - L'accueil affiche « Dû à Starlink : X $ » dans « À faire » tant qu'il reste une somme à reverser.
+
+## Dépôt client : recherche et clients gérés seulement
+
+Dans « Nouveau dépôt client », un champ **Rechercher un client** (nom, compte ACC, téléphone, sans tenir compte des accents) filtre la liste, et seuls les **clients gérés par CISPOLstore** y apparaissent. Quand un seul client correspond, il est choisi automatiquement.
