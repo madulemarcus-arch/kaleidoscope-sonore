@@ -280,7 +280,7 @@
     const co = App.db.settings.company; if ((co.logo || '').startsWith('data:')) return co.logo;
     try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
   };
-  App.docKit = { DOC_CSS: () => PAPER_CSS, logoData, stampData };
+  App.docKit = { DOC_CSS: () => PAPER_CSS, logoData, stampData, head: paperHead, boxes: twoBoxes, foot: paperFoot, money, print: printRaw };
   const printDoc = async inv => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;

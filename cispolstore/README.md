@@ -338,3 +338,7 @@ Pour l'argent qu'un client a **déjà versé** et que vous **gardez en attendant
 - **Payer pour le client** : enregistre le paiement (total ou partiel, avec le mode, la date, la note, la référence) ; le reste diminue. Pour un abonnement d'un client géré, on peut ouvrir ensuite le renouvellement. **Rendre au client** : même chose pour un remboursement. On ne peut pas payer plus que le reste.
 - **Compta** : un dépôt est de l'argent des clients, **pas du chiffre d'affaires ni du bénéfice**. Il entre dans la caisse (Finance, caisse estimée, clôture du jour : entrée « Dépôt client ») quand il est reçu, et sort (« Dépôt payé » ou « Dépôt remboursé ») quand vous payez ou rendez. La carte de l'accueil et l'en-tête de la page donnent le total encore à payer (en dollars, les francs étant convertis au taux du dépôt).
 - Les dépôts sont synchronisés entre appareils et inclus dans la sauvegarde. Code : `js/deposits.js`.
+
+### Reçu de dépôt (étape 1 des améliorations)
+
+Dans le détail d'un dépôt (Plus → Fonds en attente → toucher un dépôt) : **🧾 Reçu** (impression) et **📤 PDF** (partage par WhatsApp, e-mail…). Le document, avec le logo et le cachet, porte un numéro **DEP-AAAA-NNNN** (attribué à la création du dépôt), le client, la somme en chiffres et en lettres, ce qu'elle doit payer, la liste de ce qui a déjà été payé ou rendu pour le client, et le **reste détenu** (ou « tout est réglé »). On peut le remettre au client à la réception de l'argent, puis de nouveau à jour après chaque paiement.

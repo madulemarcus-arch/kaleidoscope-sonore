@@ -24,6 +24,10 @@
   const money = (n, c) => App.fmt(n, c);
   const days = d => Math.max(0, -App.diff(d.date, App.today()));
 
+  // receipt number DEP-2026-0003: one more than the highest of the year
+  const nextNo = date => { const y = (date || App.today()).slice(0, 4); let m = 0; list().forEach(d => { const x = /^DEP-(\d{4})-(\d+)$/.exec(d.no || ''); if (x && x[1] === y) m = Math.max(m, +x[2]); }); return `DEP-${y}-${String(m + 1).padStart(4, '0')}`; };
+  App.depNo = d => { if (!d.no) { d.no = nextNo(d.date); App.save(); } return d.no; };
+
   // ---------- list ----------
   App.views.deposits = () => {
     const all = list().slice().sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0)), H = held(), tot = App.depHeldUsd();
@@ -62,11 +66,24 @@
         const cl = App.v('f_dc'), amt = App.n('f_da'); if (!cl) { App.toast('Choisissez le client'); return false; } if (amt <= 0) { App.toast('Montant invalide'); return false; }
         if (!isNew && (d.uses || []).length && amt < out(d) - 0.004) { App.toast('Le montant ne peut pas être inférieur à ce qui a déjà été payé'); return false; }
         const o = { clientId: cl, amount: amt, currency: App.v('f_dcur'), mode: App.v('f_dm'), purpose: App.v('f_dp'), date: App.v('f_dd') || t, ref: App.v('f_dr'), note: App.v('f_dn') };
-        if (isNew) { Object.assign(d, o, { id: App.uid(), ts: Date.now(), rate: App.rate(), uses: [] }); list().push(d); App.log(cl, `Dépôt reçu : ${money(amt, o.currency)} (${o.purpose})`); }
+        if (isNew) { Object.assign(d, o, { id: App.uid(), ts: Date.now(), rate: App.rate(), uses: [], no: nextNo(o.date) }); list().push(d); App.log(cl, `Dépôt reçu : ${money(amt, o.currency)} (${o.purpose})`); }
         else { if (o.currency !== d.currency) o.rate = App.rate(); Object.assign(d, o); App.log(cl, `Dépôt modifié : ${money(amt, o.currency)}`); }
         App.save(); App.toast(isNew ? 'Dépôt enregistré : ' + money(amt, o.currency) : 'Dépôt modifié'); App.refresh();
       }, isNew ? 'Enregistrer le dépôt' : 'Enregistrer');
   };
+
+  // printed / shared receipt of a deposit, with what has been paid for the client since and what is still held
+  App.depositDoc = (d, logo, stamp) => {
+    const K = App.docKit, co = App.db.settings.company, c = App.client(d.clientId), esc2 = App.esc, b = App.depBalance(d), uses = (d.uses || []).slice().sort((x, y) => x.date.localeCompare(y.date));
+    const rows = uses.map(u => `<tr><td>${App.fdate(u.date)}</td><td>${u.type === 'refund' ? 'Remboursé au client' : 'Payé pour le client'}${u.note ? ' — ' + esc2(u.note) : ''}</td><td>${esc2(u.mode || 'Cash')}</td><td class="r">${K.money(u.amount, d.currency)}</td></tr>`).join('');
+    return `<div class="paper">${K.head(co, logo)}
+      ${K.boxes('REÇU DE DÉPÔT', [['N°', `<b>${esc2(App.depNo(d))}</b>`], ['Date', App.fdate(d.date)], ['Mode', esc2(d.mode || 'Cash')], d.ref && ['Référence', esc2(d.ref)]], 'CLIENT', [['Nom', `<b>${esc2(App.cname(c))}</b>`], ['Code Client', esc2(c ? c.code : '—')], c && c.phone && ['Téléphone', esc2(c.phone)]])}
+      <div class="rc">Nous avons reçu de <b>${esc2(App.cname(c))}</b> la somme de <b class="big">${App.fmt(d.amount, d.currency)}</b> <i>(${esc2(App.amountWords(d.amount, d.currency))})</i>, déposée pour payer : <b>${esc2(d.purpose || 'Autre')}</b>${d.note ? ' — ' + esc2(d.note) : ''}. Cette somme est conservée pour le compte du client jusqu'à son paiement.</div>
+      ${uses.length ? `<table class="items" style="margin-bottom:12px"><thead><tr><th style="width:16%">Date</th><th>Opération</th><th style="width:16%">Mode</th><th class="r" style="width:20%">Montant</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+      <table class="tots"><tr><td><b>Reçu :</b></td><td>${K.money(d.amount, d.currency)}</td></tr><tr class="net"><td>${b > 0.004 ? 'RESTE DÉTENU POUR LE CLIENT :' : 'SOLDE (TOUT EST RÉGLÉ) :'}</td><td>${K.money(b, d.currency)}</td></tr></table>
+      <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${esc2(stamp || 'stamp.png')}" alt=""></td></tr><tr><td class="ln">Le client</td><td class="gp"></td><td class="ln">${esc2(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
+  App.actions.dep_print = async x => { const d = list().find(y => y.id === x.id); if (d) App.docKit.print('Dépôt ' + App.depNo(d), App.depositDoc(d, await App.docKit.logoData(), await App.docKit.stampData())); };
+  App.actions.dep_pdf = async x => { const d = list().find(y => y.id === x.id); if (d) App.sharePdf(`Depot-${App.depNo(d)}.pdf`, App.depositDoc(d, await App.docKit.logoData(), await App.docKit.stampData())); };
 
   // ---------- detail, pay for the client, give back ----------
   const useRows = d => (d.uses || []).map(u => `<div class="item"><span class="avatar ${u.type === 'refund' ? '' : 'ok'}">${u.type === 'refund' ? '↩' : '✓'}</span><div class="grow"><b>${u.type === 'refund' ? 'Remboursé au client' : 'Payé pour le client'}</b><small>${App.fdate(u.date)} · ${esc(u.mode || 'Cash')}${u.note ? ' · ' + esc(u.note) : ''}</small></div><div class="end"><b>${money(u.amount, d.currency)}</b></div></div>`).join('');
@@ -75,6 +92,7 @@
     App.modal('Dépôt · ' + App.cname(c),
       `<div class="card" style="margin:0 0 10px"><div class="spread"><span>Reçu le ${App.fdate(d.date)} (${esc(d.mode || 'Cash')})</span><b>${money(d.amount, d.currency)}</b></div><div class="spread"><span>Pour payer</span><b>${esc(d.purpose || 'Autre')}</b></div><div class="spread"><span>Reste à payer pour lui</span><b class="${b > 0.004 ? 'warn' : 'ok'}">${money(b, d.currency)}</b></div><div class="spread"><span>État</span><span class="pill ${s[1]}">${s[0]}</span></div>${d.note ? `<p class="mut" style="margin:8px 0 0">${esc(d.note)}</p>` : ''}${d.ref ? `<small class="mut">Réf. ${esc(d.ref)}</small>` : ''}</div>
        ${(d.uses || []).length ? `<h2 class="sec">Historique</h2><div class="list">${useRows(d)}</div>` : ''}
+       <div class="bar noprint"><button type="button" class="btn sec" data-act="dep_print" data-id="${d.id}">🧾 Reçu</button><button type="button" class="btn sec" data-act="dep_pdf" data-id="${d.id}">📤 PDF</button></div>
        ${fin ? `<div class="bar">${b > 0.004 ? `<button type="button" class="btn" data-act="dep_use" data-id="${d.id}">✅ Payer pour le client</button><button type="button" class="btn sec" data-act="dep_refund" data-id="${d.id}">↩ Rendre au client</button>` : ''}<button type="button" class="btn sec" data-act="dep_edit" data-id="${d.id}">✎ Modifier</button><button type="button" class="btn del" data-act="dep_del" data-id="${d.id}">Supprimer</button></div>` : ''}${c ? `<div class="bar"><button type="button" class="btn sec" data-act="go" data-v="client" data-id="${c.id}">Voir le client</button></div>` : ''}`);
   };
   App.actions.dep_edit = x => { const d = list().find(y => y.id === x.id); if (d) App.depositForm(d); };
