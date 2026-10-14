@@ -383,3 +383,12 @@ Menu **Plus → Devis** : créez un devis numéroté `DEV-AAAA-NNNN` pour un cli
 - **Historique** : chaque inventaire (numéroté `INV-AAAA-NNNN`) peut être consulté, imprimé ou envoyé en PDF.
 
 **Stock → 🛒 À commander** : les produits dont le stock est au minimum (ou en dessous) sont regroupés par fournisseur, avec une quantité suggérée (2 × le minimum − le stock). Cochez, ajustez, puis « Créer le bon de commande » (`BC-AAAA-NNNN`) : impression, PDF ou WhatsApp au fournisseur, puis « Marquer comme reçu ». Seuls les produits ayant un **stock minimum** défini apparaissent. L'accueil signale les produits à commander.
+
+## Journal d'activité (étape 6 des améliorations)
+
+**Plus → Journal d'activité** (administrateur seulement) : qui a créé, modifié, supprimé ou encaissé quoi, et à quelle heure.
+
+- Le journal compare les données à chaque enregistrement : il couvre donc tous les écrans (clients, factures, paiements, dépenses, produits, achats, dépôts, pénalités, devis, reversements Starlink, inventaires, clôtures…), le taux du jour, les profils et les restaurations de sauvegarde.
+- Chaque ligne indique la personne (profil actif), son rôle, l'heure et le détail : « Marie a supprimé la facture FAC-2026-0003 (Jean K · 120 $) ». Pour une modification, le détail montre l'ancienne et la nouvelle valeur (Prix : 40 → 45).
+- Filtres : type d'action (créations, modifications, suppressions, encaissements, connexions), période (aujourd'hui, 7 / 30 jours, tout), personne, et recherche libre. Le haut de l'écran signale le profil le plus actif et le nombre de suppressions de la semaine.
+- Les changements de stock dus aux ventes ne sont pas comptés comme des modifications de produit (ils ont leur historique de mouvements). Le journal garde les 3 000 dernières actions, reste sur l'appareil et fait partie de la sauvegarde.
