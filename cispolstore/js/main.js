@@ -6,6 +6,8 @@
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', App.applyTheme);
   App.go('home', {}, true);
   App.applyRole();
+  // App shortcuts (long-press menu on Android): ?go=<view> opens that screen when the active profile may see it
+  { const g = new URLSearchParams(location.search).get('go'); if (g && App.views[g] && App.canView(g)) App.go(g, {}, true); }
 
   if (App.hasPin()) App.showLock('enter', 'unlock');
   else if (!App.db.settings.pinAsked) { App.db.settings.pinAsked = true; App.save(); App.showLock('new1', 'setup'); }

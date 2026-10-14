@@ -56,6 +56,7 @@
           ${row('Importer des clients', 'Ajouter d\'un coup les clients d\'un fichier Excel (.xlsx) ou CSV.', '<button class="btn sm sec" data-act="go" data-v="importc">Importer</button>')}
           ${row('Importer des factures', 'Ajouter d\'anciennes factures depuis des fichiers Word (.docx) : aperçu, client trouvé ou créé, payée ou non.', '<button class="btn sm sec" data-act="go" data-v="importf">Importer</button>')}
           ${row('Exporter en CSV', 'Un tableau à la fois (Excel, Google Sheets).', '<button class="btn sm sec" data-act="exportcsv">Choisir…</button>')}
+          ${row('Politique de confidentialité', 'Ce que l\'application fait (et ne fait pas) de vos données : tout reste sur votre appareil.', '<a class="btn sm sec" href="privacy.html" target="_blank" rel="noopener">Lire</a>')}
           ${row('Exporter en Excel', 'Un classeur .xlsx avec une feuille par thème.', '<button class="btn sm sec" data-act="xlsx">Excel</button>')}</div>`)}
         <div class="bar" style="margin-top:16px"><button class="btn blue" data-act="lockNow">🔒 Verrouiller maintenant</button></div>`,
       after: () => {

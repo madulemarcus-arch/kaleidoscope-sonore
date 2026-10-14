@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.cispolstore.manager",
+      "sha256_cert_fingerprints": [
+        "EMPREINTE_SHA256_DE_LA_CLE_DE_SIGNATURE_PLAY_APP_SIGNING",
+        "EMPREINTE_SHA256_DE_LA_CLE_DE_TELEVERSEMENT_SI_DIFFERENTE"
+      ]
+    }
+  }
+]

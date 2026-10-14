@@ -22,6 +22,64 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "business",
+    "productivity",
+    "finance"
+  ],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Relances du jour",
+      "short_name": "Relances",
+      "url": "./index.html?source=shortcut&go=relances",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "short_name": "Clients",
+      "url": "./index.html?source=shortcut&go=clients",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Factures",
+      "short_name": "Factures",
+      "url": "./index.html?source=shortcut&go=invoices",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Devis",
+      "short_name": "Devis",
+      "url": "./index.html?source=shortcut&go=quotes",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
