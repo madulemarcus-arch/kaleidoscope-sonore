@@ -1,0 +1,18 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+const root=a=>p.evaluate(a=>document.documentElement.dataset[a]||'',a);
+await p.evaluate(()=>App.actions.setapp());await p.waitForTimeout(400);
+ok('6 swatches',(await p.$$('.swatches button')).length===6);
+await p.click('.swatches [data-ac=violet]');ok('live preview accent',await root('accent')==='violet');
+await p.keyboard.press('Escape');await p.waitForTimeout(400);ok('cancel restores accent',await root('accent')==='');
+await p.evaluate(()=>App.actions.setapp());await p.waitForTimeout(300);
+await p.click('.swatches [data-ac=green]');await p.selectOption('#f_theme','black');await p.click('#dok');await p.waitForTimeout(400);
+ok('saved accent+black',await root('accent')==='green'&&await root('black')==='1'&&await root('theme')==='dark'&&await p.evaluate(()=>App.db.settings.accent==='green'&&App.db.settings.theme==='black'));
+const bg=await p.evaluate(()=>getComputedStyle(document.body).backgroundColor);ok('black bg',bg==='rgb(0, 0, 0)',bg);
+const bt=await p.evaluate(()=>getComputedStyle(document.querySelector('.btn')||document.body).backgroundImage);
+await p.click('#menuBtn');await p.click('#themeBtn');await p.waitForTimeout(300);ok('toggle to light clears black',await root('theme')==='light'&&await root('black')==='');
+await p.evaluate(()=>{App.go('more')});await p.waitForTimeout(300);await p.evaluate(()=>App.go('settings'));await p.waitForTimeout(400);
+ok('settings shows color',/couleur vert/.test(await p.innerText('#view')));
+console.log(errs);await b.close();process.exit(f?1:0)})();

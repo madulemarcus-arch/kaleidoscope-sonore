@@ -1,0 +1,12 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');
+let f=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'C',type:'mat',first:'A',last:'D',name:'A D',phone:'1',subs:[],created:t});
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',pending:true,date:App.addDays(t,-5),lines:[{pid:'',desc:'K',qty:1,price:50,cost:0}]},0);
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',pending:true,date:t,lines:[{pid:'',desc:'K',qty:1,price:60,cost:0}]},0);App.save();App.go('home')});
+await p.waitForTimeout(300);ok('home alert: 1 facture',/1 facture\(s\) en attente depuis 3 jours/.test(await p.innerText('#view')));
+await p.click('[data-act=pend_go]');await p.waitForTimeout(300);const tx=await p.innerText('#view');
+ok('list filtered pending w/ ages',/⏳ 5 j/.test(tx)&&/⏳ 0 j/.test(tx));
+console.log(errs);await b.close();process.exit(f?1:0)})();

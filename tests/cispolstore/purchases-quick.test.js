@@ -1,0 +1,11 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.click('#fab');ok('quick menu has Nouvel achat',/Nouvel achat/.test(await p.innerText('dialog')));
+await p.click('[data-act=q_buy]');await p.waitForTimeout(200);ok('purchase form opens',/Nouvel achat/.test(await p.innerText('dialog'))&&await p.isVisible('#l_d0'));
+await p.fill('#f_supn','Mercantile');await p.fill('#l_d0','Câble');await p.fill('#l_q0','2');await p.fill('#l_p0','25');await p.click('#dok');await p.waitForTimeout(300);
+ok('saved, lands on Achats list',await p.evaluate(()=>App.db.purchases.length===1&&App.state.view==='invoices')&&/Mercantile/.test(await p.innerText('#view')));
+await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'V',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];});
+await p.evaluate(()=>App.actions.quick());ok('vendeur: no Nouvel achat in quick menu',!/Nouvel achat/.test(await p.innerText('dialog')));
+console.log(errs);await b.close();process.exit(f?1:0)})();

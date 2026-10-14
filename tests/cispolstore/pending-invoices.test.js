@@ -1,0 +1,25 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');
+let f=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'mat',first:'A',last:'D',name:'A D',phone:'1',subs:[],created:t});App.db.products.push({id:'p1',name:'Kit',cat:'Kits Starlink',unit:'pièce',qty:5,cost:30,price:100,min:1});App.save();App.invoiceForm('materiel')});
+await p.selectOption('#f_cl','c1');await p.selectOption('#f_prod','p1').catch(()=>{});
+const hasProd=await p.evaluate(()=>!!document.getElementById('f_prod'));
+await p.fill('#f_desc','Kit');await p.fill('#f_price','100');await p.click('#f_add');
+await p.check('#f_pend');ok('payment card hidden',!(await p.isVisible('#paycard')));await p.click('#dok');await p.waitForTimeout(300);
+const r=await p.evaluate(()=>{const i=App.db.invoices[0];return{pend:i.pending,st:App.invStatus(i),due:App.invDue(i),pays:App.db.payments.length,qty:App.db.products[0].qty,mv:App.db.moves.length,unpaid:App.db.invoices.filter(x=>App.invDue(x)>0).length}});
+ok('pending, no payment, status pending',r.pend===true&&r.st==='pending'&&r.pays===0&&r.due===0);
+ok('not in unpaid list',r.unpaid===0);
+ok('page shows validate/cancel',/Le client prend le produit/.test(await p.innerText('#view')));
+ok('not counted in daily/report',await p.evaluate(()=>{const r=App.range('month');return App.db.invoices.filter(i=>App.live(i)&&App.inRange(i.date,r)).length===0}));
+// stock line test via direct pending w/ product
+await p.evaluate(()=>{const i=App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',pending:true,lines:[{pid:'p1',desc:'Kit',qty:2,price:100,cost:30}]},0);i.fx={};window.__p=i.id;App.save();App.go('invoice',{id:i.id})});
+ok('stock untouched while pending',await p.evaluate(()=>App.db.products[0].qty===5));
+await p.click('[data-act=invvalid]');await p.waitForTimeout(400);
+ok('validated: stock -2, not pending, due 200',await p.evaluate(()=>{const i=App.invoice(window.__p);return !i.pending&&App.db.products[0].qty===3&&App.invDue(i)===200}));
+ok('payment form opened',await p.isVisible('#f_amt'));await p.click('#dcancel').catch(()=>{});
+await p.evaluate(()=>{const i=App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',pending:true,lines:[{pid:'p1',desc:'Kit',qty:1,price:100,cost:30}]},0);window.__c=i.id;App.save();App.go('invoice',{id:i.id})});
+console.log('DBG',await p.evaluate(()=>[document.querySelector('dialog')&&document.querySelector('dialog').open, !!document.querySelector('[data-act=invcancel]')]));await p.click('[data-act=invcancel]');await p.waitForTimeout(300);
+console.log('DBG2',await p.evaluate(()=>[!!App.invoice(window.__c),App.db.products[0].qty,App.db.invoices.length]));ok('cancelled: invoice gone, stock still 3',await p.evaluate(()=>!App.invoice(window.__c)&&App.db.products[0].qty===3));
+console.log(errs);await b.close();process.exit(f?1:0)})();

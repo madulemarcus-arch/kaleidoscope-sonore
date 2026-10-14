@@ -1,0 +1,11 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');
+let f=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'mat',first:'A',last:'D',name:'A D',phone:'1',subs:[],created:t});const i=App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',lines:[{pid:'',desc:'Y',qty:1,price:100,cost:0}]},60);window.__i=i.id;App.save();App.go('invoice',{id:i.id})});
+ok('status partial',await p.evaluate(()=>App.invStatus(App.invoice(window.__i))==='part'));
+await p.click('[data-act=invneg]');await p.waitForTimeout(200);
+ok('old partial invoice now settled at 60',await p.evaluate(()=>{const i=App.invoice(window.__i);return i.agreed===60&&App.invDue(i)===0&&App.invStatus(i)==='paid'}));
+await p.click('[data-act=invunneg]');await p.waitForTimeout(200);ok('undo restores',await p.evaluate(()=>App.invDue(App.invoice(window.__i))===40));
+console.log(errs);await b.close();process.exit(f?1:0)})();

@@ -1,0 +1,13 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');const fs=require('fs');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5'],acceptDownloads:true})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.settings.company.phone='0812345678';App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'Mukendi',name:'Jean Mukendi',phone:'0990000000',acc:'ACC-1',start:t,period:30,grace:15,subs:[],created:t,note:''});App.save();App.go('deposits')});await p.waitForTimeout(400);
+await p.click('[data-act=dep_new]');await p.waitForTimeout(300);await p.selectOption('#f_dc','c1');await p.fill('#f_da','70');await p.click('#dok');await p.waitForTimeout(800);
+ok('deposit got number DEP-YYYY-0001',await p.evaluate(()=>/^DEP-\d{4}-0001$/.test(App.db.deposits[0].no)));
+await p.evaluate(()=>{const d=App.db.deposits[0];d.uses=[{id:'u',date:App.today(),amount:40,type:'paid',mode:'Cash',note:'Starlink'}]});
+await p.click('#view .item:has-text("Jean Mukendi")');await p.waitForTimeout(400);ok('Reçu and PDF buttons',await p.isVisible('[data-act=dep_print]')&&await p.isVisible('[data-act=dep_pdf]'));
+const html=await p.evaluate(()=>App.depositDoc(App.db.deposits[0],'',''));ok('doc has number, client, amount, uses and remaining',/DEP-\d{4}-0001/.test(html)&&/Jean Mukendi/.test(html)&&/70 \$/.test(html)&&/Payé pour le client — Starlink/.test(html)&&/RESTE DÉTENU POUR LE CLIENT/.test(html)&&/30 \$/.test(html));
+const [dl]=await Promise.all([p.waitForEvent('download',{timeout:25000}),p.click('[data-act=dep_pdf]')]);const path=await dl.path();const buf=fs.readFileSync(path);fs.copyFileSync(path,'dep.pdf');ok('PDF downloaded',buf.slice(0,5).toString()==='%PDF-'&&/^Depot-DEP-/.test(dl.suggestedFilename()),dl.suggestedFilename()+' '+buf.length);
+await p.click('[data-act=dep_print]');await p.waitForTimeout(1500);ok('print iframe created',await p.evaluate(()=>!!document.querySelector('iframe')));
+console.log(errs);await b.close();process.exit(f?1:0)})();

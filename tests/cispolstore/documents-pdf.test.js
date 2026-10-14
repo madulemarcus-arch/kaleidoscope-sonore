@@ -1,0 +1,15 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+process.on('unhandledRejection',()=>{});const { chromium, devices } = require('playwright');const fs=require('fs');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5'],acceptDownloads:true});const p=await ctx.newPage();const errs=[];p.on('console',m=>console.log('C:',m.text().slice(0,200)));p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+const id=await p.evaluate(()=>{const t=App.today();App.db.settings.company.phone='0812345678';App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'Mukendi',name:'Jean Mukendi',phone:'0990000000',acc:'X1',start:t,period:30,grace:15,subs:[],created:t,note:''});
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Kit Starlink',qty:1,price:600,cost:0}],payAmount:200},0);App.save();return App.db.invoices[0].id});
+await p.evaluate(id=>App.go('invoice',{id}),id);await p.waitForTimeout(600);
+ok('QR in invoice',(await p.$$('.paper img.qr')).length===1&&await p.evaluate(()=>document.querySelector('img.qr').src.startsWith('data:image/gif')));
+ok('share button',await p.isVisible('[data-act=invshare]'));
+const [dl]=await Promise.all([p.waitForEvent('download',{timeout:20000}),p.click('[data-act=invshare]')]);
+const path=await dl.path();const buf=fs.readFileSync(path);fs.copyFileSync(path,'inv.pdf');
+ok('PDF downloaded',buf.slice(0,5).toString()==='%PDF-'&&buf.length>20000,dl.suggestedFilename()+' '+buf.length);
+const [dl2]=await Promise.all([p.waitForEvent('download',{timeout:20000}),p.click('[data-act=recshare]')]);ok('receipt PDF',/-P1\.pdf$/.test(dl2.suggestedFilename()),dl2.suggestedFilename());fs.copyFileSync(await dl2.path(),'rec.pdf');
+await p.evaluate(()=>App.db.settings.company.phone='');await p.evaluate(id=>App.go('invoice',{id}),id);await p.waitForTimeout(400);ok('no phone: no QR',(await p.$$('.paper img.qr')).length===0);
+console.log(errs);await b.close();process.exit(f?1:0)})();

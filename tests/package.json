@@ -1,0 +1,11 @@
+{
+  "name": "cispolstore-tests",
+  "private": true,
+  "description": "Tests automatiques de CISPOLstore Manager (contrôles statiques + parcours dans un vrai navigateur)",
+  "scripts": {
+    "test": "node run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

@@ -1,0 +1,15 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'',last:'Mpeti',name:'Mpeti',phone:'',address:'',subs:[],created:t});
+App.db.payments.push({id:'p',date:t,clientId:'c1',invoiceId:'',amount:100,currency:'USD',mode:'Cash',ref:'',comment:''});
+App.db.expenses.push({id:'e',date:t,label:'Transport',cat:'Transport',amount:20,currency:'USD',mode:'Cash'});App.save();App.go('finance')});
+await p.waitForTimeout(300);
+await p.click('[data-act=fin_show][data-v=out]');await p.waitForTimeout(1500);
+let v=await p.innerText('#view');ok('sorties only',/Transport/.test(v)&&!/Paiement ·|Mpeti/.test(v)&&/sorties/.test(v));
+ok('list scrolled into view',await p.evaluate(()=>{const r=document.getElementById('fin_list').getBoundingClientRect();return r.top<300&&r.top>-50}));
+await p.click('[data-act=fin_show][data-v=in]');await p.waitForTimeout(500);v=await p.innerText('#view');ok('entrées only',/Mpeti/.test(v)&&!/Transport/.test(v));
+await p.click('[data-act=fin_show][data-v=all]');await p.waitForTimeout(500);v=await p.innerText('#view');ok('all',/Mpeti/.test(v)&&/Transport/.test(v));
+await p.screenshot({path:'finshow.png'});
+console.log(errs);await b.close();process.exit(f?1:0)})();

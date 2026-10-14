@@ -1,0 +1,27 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');
+let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' ' + x : '')); if (!c) fails++; };
+(async () => {
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); const ctx = await b.newContext({ ...devices['Pixel 5'] }); const p = await ctx.newPage(); const errs = [];
+  p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
+  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.evaluate(() => { const t = App.today(); const d = App.db;
+    d.clients.push({ id: 'c1', code: 'CL-1', type: 'mat', first: 'Awa', last: 'D', name: 'Awa D', phone: '0812345678', subs: [], created: t }, { id: 'c2', code: 'CL-2', type: 'mat', first: 'Bob', last: 'K', name: 'Bob K', phone: '', subs: [], created: t });
+    const inv = (id, n, cid, off, price, cur) => ({ id, number: n, type: 'materiel', clientId: cid, date: App.addDays(t, off), currency: cur, lines: [{ desc: 'X', qty: 1, price }], created: t });
+    d.invoices.push(inv('i1', 'FAC-2026-0001', 'c1', -45, 100, 'USD'), inv('i2', 'FAC-2026-0002', 'c2', -5, 240000, 'CDF'), inv('i3', 'FAC-2026-0003', 'c1', -2, 50, 'USD'));
+    d.payments.push({ id: 'p1', date: t, clientId: 'c1', invoiceId: 'i1', amount: 40, currency: 'USD', mode: 'Cash', ref: '', comment: '' }, { id: 'p3', date: t, clientId: 'c1', invoiceId: 'i3', amount: 50, currency: 'USD', mode: 'Cash', ref: '', comment: '' }); App.save(); });
+  await p.click('[data-nav=more]'); await p.click('#view [data-v=impayes]');
+  const tx = (await p.innerText('#view')).replace(/\n/g, ' '); console.log(tx.slice(0, 330));
+  ok('2 unpaid (i1 partial, i2), i3 fully paid excluded', /2 facture/.test(tx) && /FAC-2026-0001/.test(tx) && /FAC-2026-0002/.test(tx) && !/FAC-2026-0003/.test(tx));
+  ok('ages 45 and 5 days, >30 = 60 $', /45 j/.test(tx) && /5 j/.test(tx) && /Plus de 30 jours 60/.test(tx), tx.slice(0,200)); ok('oldest first', tx.indexOf('0001') < tx.indexOf('0002'));
+  ok('total = 60 + 100 = 160 $', await p.evaluate(() => Math.abs(App.unpaidTotal() - 160) < 0.01), await p.evaluate(() => App.unpaidTotal()));
+  ok('no WhatsApp button for client without phone', (await p.$$('[data-act=dun]')).length === 1);
+  const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 3000 }).catch(() => null), p.click('[data-act=dun]')]);
+  ok('whatsapp opened + lastRemind set', !!pop && await p.evaluate(() => App.invoice('i1').lastRemind === App.today()));
+  console.log(decodeURIComponent(await p.evaluate(() => App.waUrl('0812345678', App.unpaidText(App.invoice('i1'), App.client('c1'))))));
+  await p.click('[data-act=newpay][data-iid=i1]'); const pre = await p.evaluate(() => document.getElementById('dlg').innerText.replace(/\n/g, ' ').slice(0, 160)); ok('payment form opens', /Paiement|Encaisser|Montant/i.test(pre), pre); await p.keyboard.press('Escape');
+  await p.evaluate(() => App.go('home')); ok('dashboard shows unpaid', /Impayés : 160 \$/.test(await p.innerText('#view')));
+  await p.evaluate(() => { App.db.payments.push({ id: 'p9', date: App.today(), clientId: 'c1', invoiceId: 'i1', amount: 60, currency: 'USD', mode: 'Cash', ref: '', comment: '' }); App.save(); App.go('impayes'); });
+  ok('paying removes it', !/FAC-2026-0001/.test(await p.innerText('#view')));
+  await p.screenshot({ path: 'unp.png' }); console.log('errors', errs); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close();
+})();

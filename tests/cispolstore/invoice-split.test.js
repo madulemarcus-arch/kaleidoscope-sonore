@@ -1,0 +1,27 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+const r=await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'',last:'Mpeti',name:'Mpeti',phone:'',address:'',subs:[],created:t});
+const L=[{pid:'',desc:'Kit Starlink Mini',qty:1,price:320,cost:0},{pid:'',desc:'Installation Starlink',qty:1,price:50,cost:0},{pid:'',desc:'Abonnement Résidentiel',qty:1,price:50,cost:0}];
+const i1={id:'i1',number:'F1',type:'complete',clientId:'c1',date:t,currency:'USD',lines:JSON.parse(JSON.stringify(L)),created:t};
+const i2={id:'i2',number:'F2',type:'complete',clientId:'c1',date:t,currency:'USD',agreed:400,lines:JSON.parse(JSON.stringify(L)),created:t};
+App.db.invoices.push(i1,i2);
+App.db.payments.push({id:'p1',date:t,clientId:'c1',invoiceId:'i1',amount:420,currency:'USD',mode:'Cash',ref:'',comment:''},{id:'p2',date:t,clientId:'c1',invoiceId:'i2',amount:200,currency:'USD',mode:'Cash',ref:'',comment:''},{id:'p3',date:t,clientId:'c1',invoiceId:'i1',amount:0.01,currency:'USD',mode:'Cash',ref:'',comment:''});
+App.db.payments.pop();App.save();
+return {s1:App.invSplit(i1),s2:App.invSplit(i2),p1:App.payParts(App.db.payments[0]),p2:App.payParts(App.db.payments[1]),led:App.ledger().filter(r=>['Installation','Abonnement'].includes(r.type)).map(r=>[r.type,r.amt]).sort()}});
+ok('split 420 = 320 + 50 + 50',r.s1.inst===50&&r.s1.sub===50&&r.s1.own===320,JSON.stringify(r.s1));
+ok('negotiated 400: fees fixed, discount on own',r.s2.inst===50&&r.s2.sub===50&&r.s2.own===300,JSON.stringify(r.s2));
+ok('payment 420 parts',r.p1.inst===50&&r.p1.sub===50&&r.p1.own===320,JSON.stringify(r.p1));
+ok('partial 200 of 400: 25/25/150',r.p2.inst===25&&r.p2.sub===25&&r.p2.own===150,JSON.stringify(r.p2));
+ok('ledger sorties',r.led.length===4,JSON.stringify(r.led));
+await p.evaluate(()=>App.go('invoice',{id:'i1'}));await p.waitForTimeout(300);let v=await p.innerText('#view');
+ok('invoice card',/Répartition de cette facture/.test(v)&&/Revenu CISPOLstore/.test(v)&&/320/.test(v));
+await p.evaluate(()=>App.go('finance'));await p.waitForTimeout(300);v=await p.innerText('#view');
+ok('finance split card: encaissé 620, own 470',/Où va l'argent encaissé/.test(v)&&/620 \$/.test(v)&&/470 \$/.test(v),v.match(/Où va[\s\S]{0,400}/)?.[0].replace(/\n/g,' | '));
+// toggles
+await p.click('#fin_sub');await p.waitForTimeout(200);ok('sub toggle off: no Abonnement rows',await p.evaluate(()=>App.ledger().filter(r=>r.type==='Abonnement').length===0&&App.ledger().filter(r=>r.type==='Installation').length===2));
+await p.click('#fin_sub');
+await p.evaluate(()=>App.go('home'));await p.waitForTimeout(300);v=await p.innerText('#view');ok('dashboard shows CA réel',/CA réel/.test(v)&&/Total facturé/.test(v));
+await p.evaluate(()=>App.go('daily'));await p.waitForTimeout(300);v=await p.innerText('#view');ok('daily cash expected = 620-150 = 470',/470 \$/.test(v),v.match(/Cash attendu[^\n]*\n?[^\n]*/)?.[0]);
+console.log(errs);await b.close();process.exit(f?1:0)})();

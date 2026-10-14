@@ -30,3 +30,9 @@ Le script est une IIFE découpée en sections commentées `// ---------- X -----
 
 - Textes de l'interface, README et messages de commit en **français** ; commentaires du code en **anglais**.
 - Style JS compact : `const $ = id => document.getElementById(id)`, plusieurs instructions courtes par ligne, aucun framework.
+
+## CISPOLstore Manager (`cispolstore/`) : tests
+
+- Les tests automatiques sont dans `tests/` (voir `tests/README.md`) : `cd tests && npm install && npx playwright install chromium && node run.js`. Ils tournent aussi sur GitHub (`.github/workflows/tests.yml`) à chaque push / pull request.
+- À chaque version : `CACHE` dans `cispolstore/sw.js` et `App.BUILD` dans `cispolstore/js/core.js` doivent rester égaux, et tout nouveau fichier `js/` doit être ajouté à `index.html` ET à la liste `FILES` de `sw.js` (le test statique le vérifie).
+- Pas de données réelles de clients dans les tests : utiliser `tests/fixtures.js`.
