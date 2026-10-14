@@ -184,7 +184,7 @@
         <div class="mut">${esc(p.name)}${p.phone ? ' · ' + esc(p.phone) : ''}</div><div class="mut">Signé le ${App.fdate(c.date)} · du ${App.fdate(c.start)}${c.end ? ' au ' + App.fdate(c.end) : ' (durée indéterminée)'}</div>
         ${c.f && c.f.amount ? `<div class="spread" style="margin-top:8px"><span>Montant</span><b style="font-size:18px">${App.fmt(c.f.amount, c.currency)}</b></div>` : ''}</div>
        <div class="bar noprint"><button type="button" class="btn sec" data-act="ct_print" data-id="${c.id}">🖨️ Imprimer</button><button type="button" class="btn sec" data-act="ct_pdf" data-id="${c.id}">📤 PDF</button><button type="button" class="btn sec" data-act="ct_wa" data-id="${c.id}">💬 WhatsApp</button></div>
-       <div class="bar"><button type="button" class="btn sec" data-act="ct_text" data-id="${c.id}">📝 Lire / modifier le texte</button></div>
+       <div class="bar"><button type="button" class="btn sec" data-act="ct_text" data-id="${c.id}">📝 Articles : lire, ajouter, modifier</button></div>
        ${c.status === 'draft' ? `<div class="bar"><button type="button" class="btn" data-act="ct_set" data-id="${c.id}" data-s="active">✅ Signé : mettre en cours</button></div>` : ''}
        ${c.status === 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="ended">🏁 Terminé</button><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="cancelled">⛔ Résilié</button>${c.end ? `<button type="button" class="btn" data-act="ct_renew" data-id="${c.id}">🔁 Renouveler</button>` : ''}</div>` : ''}
        ${c.status !== 'draft' && c.status !== 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="active">↺ Remettre en cours</button></div>` : ''}
@@ -192,9 +192,37 @@
   };
   App.actions.ct_set = x => { const c = list().find(y => y.id === x.id); if (!c) return; c.status = x.s; if (c.clientId) App.log(c.clientId, `Contrat ${c.no} : ${STAT[x.s][0].toLowerCase()}`); App.save(); App.close(); App.refresh(); App.toast(STAT[x.s][0]); };
   App.actions.ct_edit = x => { const c = list().find(y => y.id === x.id); if (c) { App.close(); setTimeout(() => App.contractForm(c), 30); } };
-  App.actions.ct_text = x => { const c = list().find(y => y.id === x.id); if (!c) return; App.close();
-    setTimeout(() => App.modal('Texte du contrat ' + c.no, `<p class="mut" style="margin-top:0">Chaque article commence par « Article N – Titre ». Séparez les articles par une ligne vide. Modèle indicatif : faites-le relire par un juriste avant de l'utiliser pour un engagement important.</p><textarea id="ct_body" rows="18" style="width:100%">${esc(c.body || '')}</textarea>`,
-      () => { c.body = $('ct_body').value.trim(); if (c.type === 'libre') c.f = { ...c.f, body: c.body }; App.save(); App.toast('Texte enregistré'); App.refresh(); setTimeout(() => App.actions.ct_open({ id: c.id }), 80); }, 'Enregistrer'), 40); };
+  // ---------- article editor: add / remove / move articles, numbering is automatic ----------
+  const LIB = [
+    ['Confidentialité', 'Chaque partie garde confidentielles les informations reçues de l\'autre (clients, prix, comptes, documents) et ne les communique à aucun tiers sans accord écrit, y compris après la fin du contrat.'],
+    ['Force majeure', 'Aucune partie n\'est responsable d\'un retard ou d\'un manquement causé par un événement échappant à son contrôle (catastrophe naturelle, coupure d\'électricité ou de réseau prolongée, troubles, décision des autorités). Les obligations sont suspendues le temps de l\'événement.'],
+    ['Pénalités de retard', 'Tout retard de paiement de plus de 7 jours après l\'échéance peut donner lieu à une pénalité selon le barème communiqué par CISPOLstore, sans mise en demeure préalable, sans préjudice du droit de suspendre le service.'],
+    ['Résiliation pour faute', 'En cas de manquement grave d\'une partie à ses obligations, non réparé dans les 8 jours suivant un avertissement écrit (message compris), l\'autre partie peut résilier le contrat sans préavis.'],
+    ['Modification du contrat', 'Toute modification du présent contrat fait l\'objet d\'un avenant écrit et signé (ou accepté par message) des deux parties.'],
+    ['Notifications', 'Les avis et rappels sont valablement envoyés par message WhatsApp, SMS, e-mail ou remise en main propre aux coordonnées indiquées en tête du contrat. Chaque partie signale tout changement de coordonnées.'],
+    ['Intégralité de l\'accord', 'Le présent contrat exprime l\'accord complet des parties sur son objet et remplace tout engagement oral ou écrit antérieur.'],
+    ['Cession', 'Le contrat est personnel : le Client ne peut le céder ou le transférer à un tiers sans l\'accord écrit de l\'autre partie.']
+  ];
+  let ed = null;
+  const parseBody = body => String(body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean).map(b => { const [h, ...r] = b.split('\n'), m = /^article\s*\d*\s*[–—-]?\s*(.*)$/i.exec(h); return m ? { t: m[1].trim(), x: r.join('\n').trim() } : { t: '', x: b }; });
+  const buildBody = items => { let n = 0; return items.filter(i => i.t.trim() || i.x.trim()).map(i => i.t.trim() ? `Article ${++n} – ${i.t.trim()}${i.x.trim() ? '\n' + i.x.trim() : ''}` : i.x.trim()).join('\n\n'); };
+  const edSync = () => { document.querySelectorAll('#ct_arts [data-ai]').forEach(el => { const it = ed.items[+el.dataset.ai]; if (it) it[el.dataset.af] = el.value; }); };
+  const edDraw = () => { let n = 0;
+    $('ct_arts').innerHTML = ed.items.length ? ed.items.map((it, i) => `<div class="card" style="margin:0 0 8px"><div class="spread"><b>${it.t !== '' || it.new ? `Article ${++n}` : 'Texte libre'}</b><span><button type="button" class="btn sm sec" data-act="ct_up" data-i="${i}" ${i ? '' : 'disabled'}>↑</button> <button type="button" class="btn sm sec" data-act="ct_dn" data-i="${i}" ${i < ed.items.length - 1 ? '' : 'disabled'}>↓</button> <button type="button" class="btn sm del" data-act="ct_rm" data-i="${i}">✕</button></span></div>
+      ${it.t !== '' || it.new ? `<input data-ai="${i}" data-af="t" value="${esc(it.t)}" placeholder="Titre de l'article (ex. Durée)" style="width:100%;margin:6px 0">` : ''}<textarea data-ai="${i}" data-af="x" rows="${Math.min(8, Math.max(3, Math.ceil((it.x || '').length / 55)))}" style="width:100%" placeholder="Texte de l'article">${esc(it.x)}</textarea></div>`).join('') : '<div class="empty">Aucun article : ajoutez-en avec les boutons ci-dessus.</div>'; };
+  const edMove = (i, d) => { edSync(); const j = i + d; if (j < 0 || j >= ed.items.length) return; [ed.items[i], ed.items[j]] = [ed.items[j], ed.items[i]]; edDraw(); };
+  App.actions.ct_up = d => edMove(+d.i, -1);
+  App.actions.ct_dn = d => edMove(+d.i, 1);
+  App.actions.ct_rm = d => { edSync(); ed.items.splice(+d.i, 1); edDraw(); };
+  App.actions.ct_add = () => { edSync(); ed.items.push({ t: '', x: '', new: true }); edDraw(); const l = document.querySelectorAll('#ct_arts input[data-af=t]'); if (l.length) l[l.length - 1].focus(); };
+  App.actions.ct_text = x => { const c = list().find(y => y.id === x.id); if (!c) return; App.close(); ed = { items: parseBody(c.body) };
+    setTimeout(() => { App.modal('Articles du contrat ' + c.no,
+      `<p class="mut" style="margin-top:0">Ajoutez, déplacez ou supprimez des articles : la numérotation se refait toute seule. Vous pouvez utiliser les champs {{client}}, {{societe}}, {{date}}, {{montant}}. Modèle indicatif : faites-le relire par un juriste avant tout engagement important.</p>
+       <div class="bar"><button type="button" class="btn" data-act="ct_add">+ Nouvel article</button></div>
+       ${F.sel('ct_lib', 'Ou ajouter un article type', [['', '— Choisir —'], ...LIB.map((a, i) => [String(i), a[0]])], '')}
+       <div id="ct_arts" style="margin-top:10px"></div>`,
+      () => { edSync(); c.body = buildBody(ed.items); if (c.type === 'libre') c.f = { ...c.f, body: c.body }; App.save(); App.toast('Articles enregistrés'); App.refresh(); setTimeout(() => App.actions.ct_open({ id: c.id }), 80); }, 'Enregistrer');
+      edDraw(); $('ct_lib').onchange = () => { const a = LIB[+$('ct_lib').value]; if (!a) return; edSync(); ed.items.push({ t: a[0], x: a[1] }); $('ct_lib').value = ''; edDraw(); App.toast('Article ajouté : ' + a[0]); }; }, 40); };
   const copyOf = (c, over) => { const n = { ...c, party: { ...(c.party || {}) }, f: { ...(c.f || {}) }, id: App.uid(), ts: Date.now(), status: 'draft', ...over }; n.no = nextNo(n.date); return n; };
   App.actions.ct_dup = x => { const c = list().find(y => y.id === x.id); if (!c) return; const t = App.today(), n = copyOf(c, { date: t, start: t, end: endOf(t, c.months) }); list().push(n); App.save(); App.close(); App.refresh(); App.toast('Contrat dupliqué : ' + n.no); };
   App.actions.ct_renew = x => { const c = list().find(y => y.id === x.id); if (!c || !c.end) return; const start = App.addDays(c.end, 1), n = copyOf(c, { date: App.today(), start, end: endOf(start, c.months) }); n.body = c.type === 'libre' ? c.body : gen(n);

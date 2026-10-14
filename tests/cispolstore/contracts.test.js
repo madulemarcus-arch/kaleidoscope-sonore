@@ -22,11 +22,22 @@ await p.click('[data-act=ct_wa]');ok('WhatsApp link',await p.evaluate(()=>window
 await p.click('[data-act=ct_pdf]');await p.waitForTimeout(1500);
 await p.evaluate(()=>App.actions.ct_open({id:App.db.contracts[0].id}));await p.waitForTimeout(300);
 await p.click('[data-act=ct_set][data-s=active]');await p.waitForTimeout(400);ok('signed -> active',await p.evaluate(()=>App.db.contracts[0].status==='active'&&App.contractCount()===1));
-// edit the text
+// article editor
 await p.evaluate(()=>App.actions.ct_open({id:App.db.contracts[0].id}));await p.waitForTimeout(300);
-await p.click('[data-act=ct_text]');await p.waitForTimeout(500);await p.fill('#ct_body','Article 1 – Objet\nTexte modifié PERSO\n\nArticle 2 – Prix\nGratuit');
+await p.click('[data-act=ct_text]');await p.waitForTimeout(500);
+const n0=await p.evaluate(()=>document.querySelectorAll('#ct_arts textarea').length);ok('editor lists the generated articles',n0===10,String(n0));
+await p.click('[data-act=ct_add]');await p.waitForTimeout(200);
+await p.evaluate(()=>{const t=[...document.querySelectorAll('#ct_arts input[data-af=t]')].pop(),x=[...document.querySelectorAll('#ct_arts textarea')].pop();t.value='Clause spéciale';x.value='Texte PERSO pour {{client}}'});
+await p.selectOption('#ct_lib','1');await p.waitForTimeout(200);
+ok('library article appended',await p.evaluate(()=>[...document.querySelectorAll('#ct_arts input[data-af=t]')].pop().value==='Force majeure'));
+await p.click('[data-act=ct_up][data-i="11"]');await p.waitForTimeout(200);
+ok('move up swaps the last two',await p.evaluate(()=>{const v=[...document.querySelectorAll('#ct_arts input[data-af=t]')].map(i=>i.value);return v[10]==='Force majeure'&&v[11]==='Clause spéciale'}));
+await p.click('[data-act=ct_rm][data-i="0"]');await p.waitForTimeout(200);
+ok('remove drops one article',await p.evaluate(()=>document.querySelectorAll('#ct_arts textarea').length===11));
 await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(600);
-ok('edited text saved and printed',await p.evaluate(()=>/PERSO/.test(App.db.contracts[0].body)&&/PERSO/.test(App.contractDoc(App.db.contracts[0],'','s'))));
+const bd=await p.evaluate(()=>App.db.contracts[0].body);
+ok('saved body is renumbered from 1 to 11 without gaps',[1,2,3,4,5,6,7,8,9,10,11].every(n=>new RegExp('Article '+n+' – ').test(bd))&&!/Article 12 –/.test(bd)&&!/Article 1 – Objet/.test(bd),bd.slice(0,80));
+ok('new article is in the document with the client name',await p.evaluate(()=>/Clause spéciale/.test(App.contractDoc(App.db.contracts[0],'','s'))&&/Texte PERSO pour Jean K/.test(App.contractDoc(App.db.contracts[0],'','s'))));
 await p.keyboard.press('Escape');await p.waitForTimeout(200);
 // client sheet shows the contract
 await p.evaluate(()=>App.go('client',{id:'c1',tab:'fac'}));await p.waitForTimeout(500);ok('client sheet lists the contract',/CTR-/.test(await p.innerText('#view')));
