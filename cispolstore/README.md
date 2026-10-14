@@ -342,3 +342,12 @@ Pour l'argent qu'un client a **déjà versé** et que vous **gardez en attendant
 ### Reçu de dépôt (étape 1 des améliorations)
 
 Dans le détail d'un dépôt (Plus → Fonds en attente → toucher un dépôt) : **🧾 Reçu** (impression) et **📤 PDF** (partage par WhatsApp, e-mail…). Le document, avec le logo et le cachet, porte un numéro **DEP-AAAA-NNNN** (attribué à la création du dépôt), le client, la somme en chiffres et en lettres, ce qu'elle doit payer, la liste de ce qui a déjà été payé ou rendu pour le client, et le **reste détenu** (ou « tout est réglé »). On peut le remettre au client à la réception de l'argent, puis de nouveau à jour après chaque paiement.
+
+## Relances du jour (étape 2 des améliorations)
+
+Menu **Plus → Relances du jour** : un seul écran regroupe les abonnements à renouveler, les factures impayées et les pénalités à relancer. Les filtres Tout / Abonnements / Impayés / Pénalités affichent chacun leur compteur.
+
+- Le bouton 💬 d'une ligne ouvre WhatsApp avec le message déjà écrit (les modèles se modifient dans Paramètres).
+- **Tout relancer en série** déroule les clients un par un (« Relance 2 / 5 ») : Envoyer sur WhatsApp ou Passer.
+- Un client relancé depuis moins de 2 jours est mis de côté. Les clients sans numéro sont comptés à part.
+- L'accueil affiche « N relance(s) à faire aujourd'hui » dans « À faire ».
