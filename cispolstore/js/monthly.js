@@ -57,7 +57,8 @@
         <h2 class="sec">Ventes et services</h2><div class="list">${row('Ventes de matériel', F(d.matSales))}${row('Installations', `${d.inst.n} · ${F(d.inst.amt)}`)}${row('Nouveaux clients', d.newClients)}${row('Livraisons faites', d.deliveries.done)}</div>
         <h2 class="sec">À encaisser</h2><div class="list">${row('Impayés à ce jour', `${F(d.unpaid.total)} · ${d.unpaid.n}`, d.unpaid.total ? 'warn' : 'ok')}${row('dont facturés ce mois', `${F(d.unpaid.month)} · ${d.unpaid.nMonth}`)}${row('Pénalités payées ce mois', `${F(d.pen.paid)} · ${d.pen.n}`)}${row('Pénalités à payer', F(d.pen.due), d.pen.due ? 'bad' : '')}</div>
         ${d.lowStock.length ? `<h2 class="sec">Stock bas</h2><div class="card">${d.lowStock.map(esc).join(' · ')}</div>` : ''}
-        <div class="bar noprint" style="margin-top:16px"><button class="btn" data-act="rm_wa">💬 Partager sur WhatsApp</button><button class="btn sec" data-act="rm_copy">📋 Copier le texte</button><button class="btn sec" data-act="rm_print">🖨️ Imprimer / PDF</button></div>`
+        <div class="bar noprint" style="margin-top:16px"><button class="btn" data-act="rm_wa">💬 Partager sur WhatsApp</button><button class="btn sec" data-act="rm_copy">📋 Copier le texte</button><button class="btn sec" data-act="rm_print">🖨️ Imprimer</button></div>
+        ${App.can('finance') && App.acctButtons ? App.acctButtons() : ''}`
     };
   };
   App.actions.rm_nav = d => { const n = shift(rm.m, +d.n); if (n > App.today().slice(0, 7)) return; rm.m = n; App.refresh(); };
@@ -65,4 +66,5 @@
   App.actions.rm_copy = () => { const t = text(data(rm.m)); const done = () => App.toast('Rapport copié'); try { navigator.clipboard.writeText(t).then(done, () => window.prompt('Copiez :', t)); } catch (e) { window.prompt('Copiez :', t); } };
   App.actions.rm_print = () => window.print();
   App.monthlyText = m => text(data(m || rm.m));
+  App.monthData = data; App.monthLabel = label; App.monthRange = rangeOf; App.monthCurrent = () => rm.m;
 })();
