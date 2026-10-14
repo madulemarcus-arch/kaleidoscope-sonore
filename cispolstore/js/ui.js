@@ -47,7 +47,7 @@
     const y = window.scrollY, fn = App.views[App.state.view] || App.views.home;
     const r = fn(App.state.params) || {};
     $('title').innerHTML = r.sub ? `${esc(r.title)}<small>${esc(r.sub)}</small>` : esc(r.title || '');
-    $('view').innerHTML = r.html || '';
+    $('view').innerHTML = (App.bkBanner ? App.bkBanner(App.state.view) : '') + (r.html || '');
     const dom = { client: 'clients', clients: 'clients', importc: 'clients', finance: 'finance', daily: 'finance', payments: 'finance', expenses: 'finance', impayes: 'finance', reports: 'finance', rapportmois: 'finance', stock: 'stock', product: 'stock', deposits: 'finance', starlink: 'finance', quotes: 'invoices', journal: 'finance', inventory: 'stock', invcount: 'stock', reorder: 'stock', relances: 'subs', rappels: 'subs', suppliers: 'stock', supplier: 'stock', purchase: 'stock', installs: 'stock', subs: 'subs', rappels: 'subs', invoices: 'invoices', invoice: 'invoices', importf: 'invoices' }[App.state.view];
     if (dom) document.documentElement.dataset.dom = dom; else delete document.documentElement.dataset.dom;
     $('backBtn').hidden = !r.back; $('backBtn').dataset.to = r.back || '';
