@@ -426,3 +426,14 @@ L'application est prête pour être publiée sur le Google Play Store sous forme
 - **Politique de confidentialité** (`privacy.html`, exigée par Google) : liée depuis Paramètres → Données.
 - **Dossier `play/`** (hors du site publié) : guide pas à pas en français (`play/README.md`), textes de la fiche et réponses aux questionnaires (`play/fiche-play-store.md`), 7 captures d'écran et image de présentation générées avec des données fictives (`play/generer-captures.js`), modèle de `assetlinks.json`.
 - Application **gratuite**, sans licences ni paiement intégré.
+
+## Contrats
+
+Plus → **Contrats** (administrateur et comptable) ; aussi depuis la fiche d'un client (onglet Factures → « + Nouveau contrat »).
+
+- **5 modèles** : *Abonnement client* (matériel client / vendu / loué, délai de grâce, durée), *Fourniture Internet Starlink* (CISPOLstore fournisseur d'accès : offre, usage personnel / professionnel / revente d'accès, redevance, mois d'avance, frais de mise en service, préavis), *Vente / installation de matériel* (acompte, solde, livraison, garantie, réserve de propriété), *Contrat de travail / vendeur* (poste, salaire, essai, horaires, commission ; CDD si une durée est indiquée), *Contrat libre* (votre texte, avec `{{client}}`, `{{societe}}`, `{{date}}`, `{{montant}}`, `{{adresse}}`, `{{telephone}}`, `{{debut}}`, `{{fin}}`).
+- Numéros `CTR-AAAA-NNNN`. Le texte (articles) est généré à partir de la fiche, puis **modifiable** (« Lire / modifier le texte ») ; « Modifier » peut le régénérer.
+- Statuts : brouillon → **en cours** (signé) → terminé / résilié. Un contrat en cours dont l'échéance est dans moins de 30 jours (ou dépassée) apparaît dans « À faire » sur l'accueil ; **Renouveler** crée le contrat suivant à la fin de l'ancien.
+- Impression, **PDF**, **WhatsApp** ; en-tête, cachet et signatures comme les factures et les devis.
+- Les contrats sont dans la sauvegarde, la synchronisation et le journal d'activité.
+- ⚠️ Les modèles sont **indicatifs** (droit congolais, formulations générales) : faites-les relire par un juriste avant de les utiliser pour un engagement important.
