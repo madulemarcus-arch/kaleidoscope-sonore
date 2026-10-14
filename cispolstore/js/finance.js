@@ -18,6 +18,7 @@
     (db.purchases || []).forEach(b => rows.push({ date: b.date, kind: 'out', type: 'Achat', label: App.purchaseLabel(b), who: App.purchaseWho(b), mode: b.mode || NOMODE, ref: b.ref || '', cur: b.currency, amt: App.purchaseTotal(b), usd: U(App.purchaseTotal(b), b.currency, b), go: ['purchase', b.id] }));
     db.moves.filter(m => m.qty > 0 && (m.purchase === true || (m.purchase === undefined && !m.invoiceId && m.supplierId && !/^Annulation/.test(m.note || ''))) && m.cost > 0).forEach(m => { const p = App.prod(m.pid); rows.push({ date: m.date, kind: 'out', type: 'Achat stock', label: `Achat stock · ${p ? p.name : '?'} × ${App.nf(m.qty, 2)}`, who: (App.supplier(m.supplierId) || {}).name || '', mode: NOMODE, ref: '', cur: 'USD', amt: m.qty * m.cost, usd: m.qty * m.cost, go: ['stock', ''] }); });
     (App.depRows ? App.depRows() : []).forEach(r => rows.push(r));
+    (App.slRows ? App.slRows() : []).forEach(r => rows.push(r));
     return rows.map((r, k) => ({ ...r, k })).sort((a, b) => b.date.localeCompare(a.date) || b.k - a.k);
   };
   App.instOut = () => App.db.settings.instFromCash !== false;

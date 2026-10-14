@@ -351,3 +351,12 @@ Menu **Plus → Relances du jour** : un seul écran regroupe les abonnements à 
 - **Tout relancer en série** déroule les clients un par un (« Relance 2 / 5 ») : Envoyer sur WhatsApp ou Passer.
 - Un client relancé depuis moins de 2 jours est mis de côté. Les clients sans numéro sont comptés à part.
 - L'accueil affiche « N relance(s) à faire aujourd'hui » dans « À faire ».
+
+## Dû à Starlink (étape 3 des améliorations)
+
+Menu **Plus → Dû à Starlink** (administrateur et comptable) : suit l'argent des abonnements encaissé auprès des clients, qui doit être reversé à Starlink.
+
+- **Encaissé pour Starlink** = part « abonnement » de chaque paiement + part Starlink des pénalités payées, mois par mois.
+- **Reversements** : le bouton « + Reversement à Starlink » (montant prérempli avec le reste dû) enregistre chaque somme envoyée. Le **reste à reverser** = encaissé − reversé (ou « avance » s'il est négatif).
+- Un reversement peut être modifié ou supprimé. Il apparaît dans le journal de caisse seulement si les abonnements ne sont pas déjà retirés de la caisse (réglage de Finance), pour ne pas compter deux fois.
+- L'accueil affiche « Dû à Starlink : X $ » dans « À faire » tant qu'il reste une somme à reverser.
