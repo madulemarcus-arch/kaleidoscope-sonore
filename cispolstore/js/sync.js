@@ -6,7 +6,7 @@
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc;
   const CKEY = 'cispolstore-sync';
-  const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'purchases', 'deposits', 'slpays', 'quotes', 'caisse', 'closings', 'log'];
+  const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'purchases', 'deposits', 'slpays', 'quotes', 'counts', 'orders', 'caisse', 'closings', 'log'];
   const SHARED = ['company', 'rate', 'period', 'grace', 'msgs', 'plans', 'users', 'rates', 'instFromCash', 'subFromCash', 'goal']; // PIN, theme and auto-lock stay per device
   const js = JSON.stringify;
 
