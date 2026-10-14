@@ -408,3 +408,12 @@ Menu **Plus → Devis** : créez un devis numéroté `DEV-AAAA-NNNN` pour un cli
 - **Abonnements : qui part, qui reste** : à partir de l'historique des renouvellements, l'application reconstitue qui était abonné (période en cours ou sursis) au début de la période. **Taux de départ** = abonnés perdus ÷ abonnés du début ; sont aussi comptés ceux qui sont restés et les anciens **réactivés**. Un graphique montre, sur 6 mois, les nouveaux clients et les abonnements perdus. La liste des clients perdus et un raccourci vers les relances pour les abonnés **à risque** (sursis ou fin dans 7 jours) complètent le tout.
 - **Meilleurs clients** : top 10 de la période avec leur part du chiffre d'affaires et leur valeur depuis toujours ; part des 5 premiers ; valeur moyenne depuis toujours.
 - **Clients endormis** : sans achat depuis plus de 3 mois (et sans abonnement en cours), classés par valeur, pour les relancer.
+
+## Export pour le comptable et rapport mensuel complet (étape 10 des améliorations)
+
+Sur l'écran **Plus → Rapport mensuel** (administrateur et comptable), choisir le mois puis :
+
+- **📊 Excel pour le comptable** : un classeur `.xlsx` mis en forme (en-têtes colorés, volets figés, filtres, vraies dates, montants en $ et en CDF, formules de totaux recalculées à l'ouverture, prêt à imprimer en A4) avec six feuilles : **Résumé** (activité du mois, encaissements par mode, sorties par type, situation à ce jour : impayés, fonds de clients en attente, dû à Starlink, valeur du stock), **Ventes** (factures du mois : total, payé, reste, équivalent $), **Journal de caisse** (toutes les entrées et sorties, avec totaux SUMIF et solde), **Dépenses**, **Impayés** (âge en jours) et **Stock valorisé** (quantité × prix d'achat / de vente).
+- **📄 Rapport complet en PDF** : plusieurs pages A4 avec l'en-tête de l'entreprise : chiffres clés, courbe des ventes par jour, finances, abonnements, meilleurs clients du mois, argent encaissé et dépensé, dépenses par catégorie, situation à ce jour, plus gros impayés, stock bas, signature et tampon. Partage direct (WhatsApp, e-mail) ou téléchargement.
+
+Le bouton « Imprimer » du rapport reste disponible. Les anciens exports (CSV, Excel simple dans Paramètres) ne changent pas.
