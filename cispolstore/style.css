@@ -580,3 +580,15 @@ button.sbadge:active { transform:scale(.96); }
 
 /* fonds en attente */
 .dhero .cstats { margin-top:12px; }
+
+/* Backup reminder banner */
+.bkban { display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:12px; border-radius:16px; background:color-mix(in srgb, var(--warn) 16%, var(--card)); border:1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); box-shadow:var(--shadow); }
+.bkban .bki { font-size:24px; }
+.bkban b { font-size:15px; line-height:1.25; }
+.bkban small { display:block; color:var(--mut); font-size:12px; line-height:1.3; white-space:normal; }
+.bkban .btn { flex:none; padding:9px 12px; font-size:14px; white-space:nowrap; }
+.bkban .bki { flex:none; }
+.bkban .bkx { flex:none; width:32px; height:32px; font-size:14px; background:transparent; color:var(--mut); }
+.card.ok { border-color:color-mix(in srgb, var(--ok) 45%, var(--line)); background:color-mix(in srgb, var(--ok) 10%, var(--card)); }
+.card.warn { border-color:color-mix(in srgb, var(--warn) 45%, var(--line)); background:color-mix(in srgb, var(--warn) 12%, var(--card)); }
+.card.bad { border-color:color-mix(in srgb, var(--bad) 45%, var(--line)); background:color-mix(in srgb, var(--bad) 10%, var(--card)); }

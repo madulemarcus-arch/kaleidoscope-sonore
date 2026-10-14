@@ -46,7 +46,7 @@
     // things the administrator should still set up (shown until done)
     const setup = [];
     if (App.role() === App.ROLES.admin) {
-      const lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, t) : null, co = S.company;
+      const lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = App.backupAge(), co = S.company;
       if (App.drive && App.drive.needsAttention()) setup.push(['☁️', 'Sauvegarde Google Drive : reconnexion nécessaire (Paramètres → Sauvegarde Google Drive). Elle ne se fait pas toute seule.']);
     }
     const setupAlerts = setup.map(([ico, txt]) => `<button class="item" data-act="go" data-v="settings"><span class="avatar warn" style="width:36px;height:36px;font-size:16px">${ico}</span><div class="grow"><b style="white-space:normal">${txt}</b></div><span class="mut">›</span></button>`);
@@ -65,7 +65,7 @@
     const pendHtml = App.canView('invoices') && App.stalePending().length ? `<button class="item" data-act="pend_go" style="margin-bottom:12px"><span class="avatar warn">⏳</span><div class="grow"><b>${App.stalePending().length} facture(s) en attente depuis 3 jours ou plus</b><small>Le client prend-il le produit ? Valider ou annuler</small></div><span class="mut">›</span></button>` : '';
     const unpaidHtml = App.unpaidTotal() > 0.004 ? `<button class="item" data-act="go" data-v="impayes" style="margin-bottom:12px"><span class="avatar warn">🧾</span><div class="grow"><b>Impayés : ${App.fmt(App.unpaidTotal())}</b><small>Voir et relancer</small></div><span class="mut">›</span></button>` : '';
     // start-up checklist (administrator): shown until everything is done
-    const co2 = S.company, lastB2 = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age2 = lastB2 ? -App.diff(lastB2, t) : null;
+    const co2 = S.company, lastB2 = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age2 = App.backupAge();
     const steps = App.role() === App.ROLES.admin ? [[App.hasPin(), '🔐', 'Code PIN', "Protégez l'application"], [age2 !== null && age2 <= 7, '💾', 'Sauvegarde', age2 === null ? 'Aucune sauvegarde faite' : `Dernière il y a ${age2} j`], [!!(co2.rccm || co2.idnat || co2.impot), '📄', 'Infos légales', 'RCCM, ID Nat., N° Impôt sur les factures'], [db.clients.length > 0 && db.products.length > 0, '📦', 'Clients et stock', 'Ajoutez vos clients et vos produits']] : [];
     const doneN = steps.filter(x => x[0]).length;
     const startCard = steps.length && doneN < steps.length ? `<div class="card start"><div class="spread"><b>🚀 Bien démarrer</b><span class="mut">${doneN}/${steps.length}</span></div><div class="pbar2"><i style="width:${Math.round(doneN / steps.length * 100)}%"></i></div>${steps.map(([ok2, ico, t1, t2]) => `<button class="step ${ok2 ? 'done' : ''}" data-act="go" data-v="${t1 === 'Clients et stock' ? 'clients' : 'settings'}"><span class="chk">${ok2 ? '✓' : ico}</span><div class="grow"><b>${t1}</b><small>${t2}</small></div></button>`).join('')}</div>` : '';

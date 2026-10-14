@@ -5,7 +5,7 @@
   const ACC = [['orange', '#d5522f', 'Orange'], ['blue', '#2f7de1', 'Bleu'], ['green', '#169c5b', 'Vert'], ['violet', '#7c5cff', 'Violet'], ['pink', '#e0457b', 'Rose'], ['gold', '#c98a0a', 'Or']];
   // header of the Plus and Settings screens: company, who is signed in, and three status badges (PIN, backup, synchronisation)
   App.profileHero = (withVersion) => {
-    const S = App.db.settings, co = S.company, me = App.me(), lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, App.today()) : null;
+    const S = App.db.settings, co = S.company, me = App.me(), lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = App.backupAge();
     const b = (cls, ico, txt, act) => `<${act && App.guard(act) ? `button data-act="${act}"` : 'span'} class="sbadge ${cls}"><i>${ico}</i>${txt}</${act && App.guard(act) ? 'button' : 'span'}>`;
     const sy = App.sync && App.sync.status !== 'off';
     return `<section class="hero phero"><div class="chead"><img src="${esc(co.logo || 'logo.png')}" alt=""><div><h2>${esc(co.name)}</h2><small>${me.name && me.name !== App.role().label ? esc(me.name) + ' · ' : ''}${esc(App.role().label)}${withVersion ? ' · version 2.0' : ''} · build ${App.BUILD}</small></div></div>
@@ -24,7 +24,7 @@
   const row = (t, s, btn) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${btn || ''}</div>`;
   const LOCKS = [[0, 'Jamais'], [1, '1 minute'], [2, '2 minutes'], [5, '5 minutes'], [15, '15 minutes']];
   App.views.settings = () => {
-    const S = App.db.settings, co = S.company, lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = lastB ? -App.diff(lastB, App.today()) : null;
+    const S = App.db.settings, co = S.company, lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = App.backupAge();
     const warn = App.hasData(App.db) && (age === null || age > 7);
     return {
       title: 'Paramètres', back: 'more', nav: 'more',
@@ -52,6 +52,7 @@
           ${row('Stockage interne', `Les données sont enregistrées dans la mémoire de cet appareil, même sans internet. Protection contre l'effacement : <b class="${App.persisted ? 'ok' : 'warn'}">${App.persisted ? 'activée' : App.persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b>`)}
           ${row('Sauvegarde', `Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${lastB ? App.fdate(lastB) : 'jamais'}</b>${warn ? ' — pensez à en faire une.' : ''}`, '<button class="btn sm" data-act="backup">Sauvegarder</button>')}
           ${row('Restaurer / importer', 'Recharger un fichier de sauvegarde (.json), y compris de l\'ancienne version.', '<label class="btn sm sec" style="cursor:pointer">Restaurer<input type="file" id="s_restore" accept=".json,application/json" hidden></label>')}
+          ${App.backupRows ? App.backupRows() : ''}
           ${row('Importer des clients', 'Ajouter d\'un coup les clients d\'un fichier Excel (.xlsx) ou CSV.', '<button class="btn sm sec" data-act="go" data-v="importc">Importer</button>')}
           ${row('Importer des factures', 'Ajouter d\'anciennes factures depuis des fichiers Word (.docx) : aperçu, client trouvé ou créé, payée ou non.', '<button class="btn sm sec" data-act="go" data-v="importf">Importer</button>')}
           ${row('Exporter en CSV', 'Un tableau à la fois (Excel, Google Sheets).', '<button class="btn sm sec" data-act="exportcsv">Choisir…</button>')}
@@ -104,7 +105,8 @@
       if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Sauvegarde CISPOLstore' });
       else App.download(name, txt, 'application/json');
     } catch (e) { if (e.name === 'AbortError') return; App.download(name, txt, 'application/json'); }
-    App.db.settings.lastBackup = App.today(); App.save(); App.toast('Sauvegarde créée'); App.refresh();
+    App.db.settings.lastBackup = App.today(); delete App.db.settings.bkSnooze; App.save(); const v = App.verifyBackup ? App.verifyBackup(txt) : null;
+    App.toast(!v ? 'Sauvegarde créée' : v.ok ? `Sauvegarde créée et vérifiée ✔ (${v.clients} clients, ${v.invoices} factures)` : '⚠ Sauvegarde incomplète : ' + v.bad.join(', ')); App.refresh();
   };
   // Restore from backup text (file or Google Drive)
   App.restoreData = text => {
