@@ -467,3 +467,10 @@ Contrats → Nouveau contrat → **Contrat de travail / vendeur** (14 articles, 
 - Durée par défaut **6 mois (CDD)** : un **motif** est alors obligatoire (temps déterminé, ouvrage, remplacement…). Mettre la durée à **0** pour un **CDI** (obligatoire pour un poste permanent).
 - Aucune retenue automatique sur le salaire pour les écarts de caisse.
 - ⚠️ À faire confirmer par un avocat ou l'inspection du travail : durée maximale d'un CDD, durées exactes de la période d'essai et préavis (le texte renvoie au Code du travail sans chiffre).
+
+### Contrat de prestation de services : technicien indépendant
+
+Contrats → Nouveau contrat → **Technicien indépendant / prestataire** (15 articles, deux textes comme les autres contrats intégrés). Le prestataire est une **personne seule** (nom, pièce d'identité, adresse, téléphone ; identification fiscale facultative), pas une entreprise.
+- Rémunération au choix : **par intervention** (tarif) ou **forfait mensuel** ; paiement sous **7 jours** après validation du bon d'intervention.
+- Indépendance (aucun lien de subordination), exécution personnelle des missions, bon d'intervention, moyens propres, qualité et sécurité, **reprise des malfaçons sous 30 jours**, obligations sociales et fiscales à sa charge, confidentialité et données des clients, **non-sollicitation 6 mois** après la fin, **préavis 15 jours**.
+- ⚠️ À faire confirmer par un avocat : le champ d'application de la loi 17/001 sur la sous-traitance (débattu pour un prestataire seul), le risque de requalification en contrat de travail si le technicien travaille sous les ordres et horaires de CISPOLstore, et la validité de la non-sollicitation après la fin du contrat.
