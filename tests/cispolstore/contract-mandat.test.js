@@ -1,0 +1,25 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'K',name:'Jean K',phone:'0991',address:'Av. Test 1',acc:'ACC-77',plan:'Illimité',price:70,created:t,subs:[]});App.save();App.go('contracts')});await p.waitForTimeout(500);
+await p.click('[data-act=ct_new]');await p.waitForTimeout(400);
+ok('type list has Mandat de gestion de fonds',await p.evaluate(()=>[...document.querySelectorAll('#ct_type option')].some(o=>o.value==='mandat'&&/Mandat de gestion de fonds/.test(o.textContent))));
+await p.selectOption('#ct_type','mandat');await p.waitForTimeout(200);
+ok('mandat fields: default restitution 7 days and fee 0',await p.inputValue('#cf_restit')==='7'&&await p.inputValue('#cf_fee')==='0');
+await p.selectOption('#ct_cl','c1');ok('client ACC prefilled',await p.inputValue('#cf_acc')==='ACC-77');
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(300);
+ok('refuses mandat without amount',await p.evaluate(()=>App.db.contracts.length===0));
+await p.fill('#cf_amount','200');await p.fill('#cf_fee','2');
+await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(800);
+const c=await p.evaluate(()=>App.db.contracts[0]);
+ok('mandat created',c&&c.type==='mandat'&&c.status==='draft'&&c.months===0);
+const arts=(c.body.match(/^Article \d+ –/gm)||[]).length;ok('14 articles',arts===14,String(arts));
+ok('amount, ACC, fixed fee, 7 days, caisse and threshold in text',/200\s\$/.test(c.body)&&/ACC-77/.test(c.body)&&/frais de gestion fixes de 2\s\$ par paiement/.test(c.body)&&/dans un délai de 7 jours/.test(c.body)&&/dans la caisse du Mandataire/.test(c.body)&&/10 000 \$ américains/.test(c.body),c.body.slice(0,200));
+ok('no broken grammar (de le / à le)',!/\b(de|à) le (Mandat|Mandant)/.test(c.body),(c.body.match(/\b(de|à) le \w+/g)||[]).join('|'));
+const doc=await p.evaluate(()=>App.contractDoc(App.db.contracts[0],'','s'));
+ok('document title and parties',/CONTRAT DE MANDAT DE GESTION DE FONDS/.test(doc)&&/LE MANDATAIRE/.test(doc)&&/LE MANDANT/.test(doc)&&/Jean K/.test(doc)&&!/\{\{/.test(doc));
+// data protection article now in every generated type
+const ok2=await p.evaluate(()=>{const mk=type=>{const c={id:'t',no:'T',type,clientId:'c1',party:{},date:App.today(),start:App.today(),months:12,end:'',currency:'USD',rep:'',f:{amount:10,site:'x',items:'a',job:'V'}};return App.contractText(c)};return ['abonnement','fournisseur','materiel','travail','mandat'].every(t=>/Données personnelles/.test(mk(t)))});
+ok('every generated type has a personal-data article',ok2);
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();

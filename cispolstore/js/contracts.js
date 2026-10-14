@@ -21,6 +21,8 @@
       fields: [['plan', 'Offre / débit', 'text', 'Starlink Standard, illimité'], ['usage', 'Usage', 'sel', 'pro', [['perso', 'Résidentiel / personnel'], ['pro', 'Professionnel (entreprise, bureau)'], ['revente', 'Revente d\'accès (cybercafé, zone Wi-Fi)']]], ['amount', 'Redevance mensuelle', 'num', 100], ['advance', 'Mois payés d\'avance', 'num', 1], ['fee', 'Frais d\'installation / mise en service', 'num', 0], ['notice', 'Préavis de résiliation (jours)', 'num', 30], ['site', 'Site d\'installation', 'text', ''], ['acc', 'Compte Starlink (ACC)', 'text', '']] },
     materiel: { label: 'Vente / installation de matériel', icon: '🧰', title: 'CONTRAT DE VENTE ET D\'INSTALLATION DE MATÉRIEL', a: ['LE VENDEUR', 'le Vendeur'], b: ['L\'ACHETEUR', 'l\'Acheteur'], term: 0, who: 'client', noTerm: true,
       fields: [['items', 'Matériel et quantités', 'area', 'Kit Starlink Standard × 1\nRouteur Wi-Fi × 1'], ['amount', 'Prix total', 'num', ''], ['deposit', 'Acompte versé', 'num', 0], ['delivery', 'Livraison / installation prévue le', 'date', ''], ['install', 'Installation incluse', 'sel', 'oui', [['oui', 'Oui, installation incluse'], ['non', 'Non, livraison seule']]], ['warranty', 'Garantie (mois)', 'num', 12], ['site', 'Lieu de livraison / d\'installation', 'text', '']] },
+    mandat: { label: 'Mandat de gestion de fonds', icon: '💼', title: 'CONTRAT DE MANDAT DE GESTION DE FONDS', a: ['LE MANDATAIRE', 'le Mandataire'], b: ['LE MANDANT', 'le Mandant'], term: 0, who: 'client',
+      fields: [['purpose', 'Objet des paiements', 'text', 'Abonnement Starlink'], ['amount', 'Montant remis', 'num', ''], ['fee', 'Frais de gestion fixes (par paiement effectué)', 'num', 0], ['restit', 'Délai de restitution du solde (jours)', 'num', 7], ['acc', 'Compte Starlink concerné (ACC)', 'text', '']] },
     travail: { label: 'Contrat de travail / vendeur', icon: '👔', title: 'CONTRAT DE TRAVAIL', a: ['L\'EMPLOYEUR', 'l\'Employeur'], b: ['L\'EMPLOYÉ(E)', 'l\'Employé(e)'], term: 0, who: 'person',
       fields: [['job', 'Poste / fonction', 'text', 'Vendeur'], ['amount', 'Salaire mensuel', 'num', ''], ['commission', 'Commission / prime (facultatif)', 'text', ''], ['trial', 'Période d\'essai (jours)', 'num', 30], ['hours', 'Horaires de travail', 'text', 'Du lundi au samedi, de 8 h à 17 h'], ['place', 'Lieu de travail', 'text', '']] },
     libre: { label: 'Contrat libre', icon: '📄', title: 'CONTRAT', a: ['PARTIE 1', 'la Première partie'], b: ['PARTIE 2', 'la Seconde partie'], term: 0, who: 'client', free: true,
@@ -80,6 +82,24 @@
         ['Données personnelles', 'Les informations du Client servent uniquement à l\'exécution du contrat et ne sont pas transmises à des tiers, sauf obligation légale.'],
         ['Litiges', law]]);
     }
+    if (c.type === 'mandat') {
+      const lim = '10 000 $ américains (ou l\'équivalent en francs congolais au taux du jour)';
+      return art([
+        ['Objet', `Le Mandant confie au Mandataire des fonds${f.amount > 0 ? ` d'un montant de ${money(f.amount, cu)} (${word(f.amount, cu)})` : ''} pour payer, en son nom et pour son compte : ${f.purpose || 'les paiements convenus'}${f.acc ? ` (compte Starlink n° ${f.acc})` : ''}. ${A} accepte ce mandat.`],
+        ['Pouvoirs du mandataire', `${A} ne peut utiliser les fonds que pour les paiements prévus à l'article 1. Il ne peut pas les employer pour ses propres besoins, ni les prêter, ni les confier à un tiers autrement que pour exécuter le paiement.`],
+        ['Remise des fonds', `Chaque remise de fonds fait l'objet d'un reçu écrit (papier ou message) indiquant le montant, la date et le mode de paiement (espèces, M-Pesa, Airtel Money, Orange Money ou banque). Les fonds sont reçus dans la caisse du Mandataire.`],
+        ['Vigilance sur les montants', `Lorsque le total des fonds remis par ${b} dépasse ${lim}, ${a} peut exiger une pièce d'identité valable et un justificatif de l'origine des fonds, et peut refuser ou suspendre l'opération à défaut. Ces vérifications sont faites dans l'intérêt des deux parties.`],
+        ['Exécution des paiements', `${A} effectue les paiements aux échéances indiquées par ${b} ou résultant du service concerné, et lui envoie la preuve de chaque paiement (reçu ou message).`],
+        ['Frais', `${A} perçoit des frais de gestion fixes de ${money(f.fee || 0, cu)} par paiement effectué. Les éventuels frais de transfert ou de change réellement supportés sont indiqués au Mandant et déduits des fonds, sur justificatif.`],
+        ['Compte rendu', `${A} envoie au Mandant, chaque mois et à tout moment sur demande, la situation de ses fonds : montants reçus, paiements effectués, frais déduits et solde.`],
+        ['Séparation des fonds', `Les fonds du Mandant sont inscrits à part dans la comptabilité du Mandataire (registre des fonds en attente) et ne sont pas mélangés avec ses propres recettes.`],
+        ['Solde et restitution', `Le solde est restitué au Mandant sur simple demande, dans un délai de ${f.restit || 7} jours, par le mode de paiement choisi, après déduction des frais dus.`],
+        ['Fonds insuffisants', `${A} n'avance jamais d'argent. Si les fonds sont insuffisants, il en informe ${b} sans délai et n'est pas responsable de la suspension du service qui en résulte.`],
+        ['Responsabilité', `${A} répond de ses fautes dans l'exécution du mandat. Il ne répond pas des changements de prix, de tarif ou de taux de change décidés par des tiers, ni des cas de force majeure.`],
+        ['Durée et révocation', `Le mandat prend effet le ${App.fdate(c.start)}, ${termText(c)}. ${B} peut le révoquer à tout moment par écrit (message compris) ; ${a} rend alors compte immédiatement et restitue le solde dans le délai prévu à l'article 9. ${A} peut y renoncer avec un préavis de 15 jours.`],
+        ['Données personnelles', `Les informations du Mandant servent uniquement à l'exécution du mandat et ne sont pas transmises à des tiers, sauf obligation légale ou nécessité du paiement.`],
+        ['Litiges', law]]);
+    }
     if (c.type === 'materiel') {
       const solde = Math.max(0, (f.amount || 0) - (f.deposit || 0));
       return art([
@@ -89,6 +109,7 @@
         ['Réception', 'À la livraison, l\'Acheteur vérifie le matériel. Toute anomalie apparente est signalée immédiatement, sinon le matériel est réputé conforme.'],
         ['Garantie', `Le matériel est garanti ${f.warranty > 0 ? f.warranty + ' mois' : 'selon les conditions du fabricant'} contre les défauts de fabrication. La garantie ne couvre pas la foudre, les surtensions, l'humidité, les chocs, une mauvaise utilisation ni l'intervention d'un tiers non autorisé.`],
         ['Réserve de propriété', 'Le matériel reste la propriété du Vendeur jusqu\'au paiement complet du prix.'],
+        ['Données personnelles', 'Les informations de l\'Acheteur servent uniquement à l\'exécution du contrat (vente, livraison, garantie) et ne sont pas transmises à des tiers, sauf obligation légale.'],
         ['Litiges', law]]);
     }
     if (c.type === 'travail') {
@@ -101,6 +122,7 @@
         ['Obligations de l\'employé(e)', `${B} exécute ses tâches avec loyauté et sérieux, soigne le matériel et les marchandises qui lui sont confiés, rend compte fidèlement des encaissements et du stock, et respecte la confidentialité des informations de l'entreprise (clients, prix, comptes), y compris après la fin du contrat.`],
         ['Obligations de l\'employeur', `${A} verse le salaire à l'échéance, assure des conditions de travail correctes et accorde les congés et absences prévus par la loi.`],
         ['Fin du contrat', `${cdd ? 'Le contrat prend fin à son terme.' : 'Chaque partie peut y mettre fin par écrit.'} Un préavis est observé conformément au Code du travail. Une faute grave permet la rupture sans préavis, dans les conditions légales.`],
+        ['Données personnelles', `${A} traite les données personnelles de ${b} uniquement pour la gestion du contrat de travail (paie, déclarations, dossier du personnel), conformément à la loi, et ne les transmet pas à des tiers sauf obligation légale.`],
         ['Droit applicable et litiges', `Le présent contrat est régi par la législation du travail en vigueur en République démocratique du Congo. Les litiges relèvent du tribunal du travail compétent de ${city}, après tentative de règlement amiable.`]]);
     }
     return '';
@@ -153,7 +175,7 @@
         const cl = t.who === 'person' ? '' : App.v('ct_cl'), p = { name: App.v('ct_pname').trim(), idno: App.v('ct_pidno').trim(), phone: App.v('ct_pphone').trim(), address: App.v('ct_paddr').trim() };
         if (!cl && !p.name) { App.toast(t.who === 'person' ? 'Saisissez le nom de l\'employé(e)' : 'Choisissez un client ou saisissez un nom'); return false; }
         if (type === 'libre' && !f.body) { App.toast('Écrivez le texte du contrat'); return false; }
-        if ((type === 'materiel' || type === 'travail' || type === 'abonnement' || type === 'fournisseur') && !(f.amount > 0)) { App.toast(type === 'travail' ? 'Saisissez le salaire' : 'Saisissez le montant'); return false; }
+        if ((type === 'materiel' || type === 'travail' || type === 'abonnement' || type === 'fournisseur' || type === 'mandat') && !(f.amount > 0)) { App.toast(type === 'travail' ? 'Saisissez le salaire' : 'Saisissez le montant'); return false; }
         const date = App.v('ct_date') || t0, start = App.v('ct_start') || date, months = t.noTerm ? 0 : Math.max(0, Math.round(App.n('ct_months')));
         const o = { type, clientId: cl, party: cl ? {} : p, date, start, months, end: endOf(start, months), currency: App.v('ct_cur') || 'USD', rep: App.v('ct_rep').trim(), f };
         if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date), status: 'draft' }); if (/^m:/.test(type)) { const m = models().find(x => 'm:' + x.id === type); c.mt = { name: m.name, icon: m.icon, title: m.title, a: m.a, b: m.b, body: m.body }; } c.body = bodyFor(c); list().push(c); if (cl) App.log(cl, `Contrat ${c.no} : ${t.label}`); }
