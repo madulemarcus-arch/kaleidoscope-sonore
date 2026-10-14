@@ -1,0 +1,21 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({viewport:{width:1440,height:900}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();for(let i=0;i<5;i++)App.db.clients.push({id:'c'+i,code:'CL-'+i,type:'gere',first:'C',last:'N'+i,name:'C N'+i,phone:'09'+i,acc:'ACC-'+i,start:t,period:30,grace:15,subs:[],created:t,note:''});App.save();App.go('home')});await p.waitForTimeout(500);
+const view=()=>p.evaluate(()=>App.state.view);
+await p.keyboard.press('g');await p.keyboard.press('c');await p.waitForTimeout(200);ok('G C -> clients',await view()==='clients');
+await p.keyboard.press('g');await p.keyboard.press('f');await p.waitForTimeout(200);ok('G F -> invoices',await view()==='invoices');
+await p.keyboard.press('g');await p.keyboard.press('h');await p.waitForTimeout(200);ok('G H -> home',await view()==='home');
+await p.keyboard.press('?');await p.waitForTimeout(300);ok('? opens help',/Raccourcis clavier/.test(await p.innerText('dialog'))&&(await p.$$('dialog kbd')).length>8);await p.screenshot({path:'dk-keys.png'});
+await p.keyboard.press('Escape');await p.waitForTimeout(300);
+await p.keyboard.press('/');await p.waitForTimeout(300);ok('/ opens search',await p.evaluate(()=>!!document.querySelector('dialog[open]')));await p.keyboard.press('Escape');await p.waitForTimeout(300);
+await p.keyboard.press('c');await p.waitForTimeout(400);ok('C opens new client form',/Nouveau client/.test(await p.innerText('dialog')));
+await p.keyboard.press('Escape');await p.waitForTimeout(300);await p.keyboard.press('/');await p.waitForTimeout(300);const inp=await p.$('dialog input');await inp.focus();await p.keyboard.type('gc');ok('typing in a field ignores shortcuts',(await inp.inputValue())==='gc'&&await view()==='home');await p.keyboard.press('Escape');await p.waitForTimeout(300);
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);await p.hover('#clist .swr:nth-child(3)');await p.waitForTimeout(500);
+ok('hover shows round action buttons',await p.evaluate(()=>{const e=document.querySelector('#clist .swr:hover .swa');return !!e&&getComputedStyle(e).opacity==='1'&&e.querySelector('.sw').getBoundingClientRect().width<=40}));
+await p.screenshot({path:'dk-hover.png',clip:{x:248,y:250,width:900,height:240}});
+// vendeur: no finance shortcut
+await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('home')});await p.waitForTimeout(500);
+await p.keyboard.press('g');await p.keyboard.press('b');await p.waitForTimeout(200);ok('vendeur cannot reach finance by shortcut',await view()!=='finance');
+console.log(errs);await b.close();process.exit(f?1:0)})();

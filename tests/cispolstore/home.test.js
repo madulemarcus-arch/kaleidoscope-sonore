@@ -1,0 +1,24 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'A',last:'B',name:'A B',phone:'',acc:'X1',start:t,period:30,grace:15,subs:[],created:t,note:''});
+const prev=App.iso(new Date(+t.slice(0,4),+t.slice(5,7)-2,1));
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:prev,lines:[{pid:'',desc:'Kit',qty:1,price:400,cost:0}],payAmount:400},0);
+App.createInvoice({type:'complete',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Kit',qty:1,price:600,cost:0},{pid:'',desc:'Abonnement Illimité',qty:1,price:70,cost:0},{pid:'',desc:'Installation Starlink',qty:1,price:50,cost:0}],payAmount:720},0);
+App.go('home')});await p.waitForTimeout(1100);
+let v=await p.innerText('#view');
+ok('hero shows CA réel 600 $ (without sub/install)',/CA réel · ce mois/.test(v)&&/600 \$/.test(v));
+ok('delta vs last month +50 %',/▲ 50 % vs le mois dernier/.test(v),v.match(/[▲▼][^\n]*/)?.[0]);
+ok('no goal: dashed ring',/Objectif/.test(v));
+await p.click('[data-act=goal_edit]');await p.fill('#g_goal','1200');await p.click('#dok');await p.waitForTimeout(400);
+v=await p.innerText('#view');ok('goal ring 50 %',/50%/.test(v)&&await p.evaluate(()=>App.db.settings.goal===1200));
+ok('quick action tiles',(await p.$$('.qa button')).length===4);
+await p.click('.qa [data-act=q_client]');await p.waitForTimeout(300);ok('tile opens client form',/Nouveau client/.test(await p.innerText('dialog')));await p.keyboard.press('Escape');
+ok('subscriptions pulse bar',await p.isVisible('.pulse'));
+ok('start checklist for admin',/Bien démarrer/.test(v));
+await p.click('[data-act=dper][data-p=day]');await p.waitForTimeout(500);v=await p.innerText('#view');ok('day period: no ring',!(await p.$('.ring'))&&/aujourd'hui/.test(v));
+// vendeur: hero without money, tiles limited
+await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('home')});await p.waitForTimeout(600);
+v=await p.innerText('#view');ok('vendeur: no CA réel, sees clients actifs',!/CA réel/.test(v)&&/Clients actifs/.test(v)&&!/Bien démarrer/.test(v));
+console.log(errs);await b.close();process.exit(f?1:0)})();

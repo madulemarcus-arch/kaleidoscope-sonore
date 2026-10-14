@@ -1,0 +1,16 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'Mukendi',name:'Jean Mukendi',phone:'0991',acc:'ACC-77',subs:[],created:t},{id:'c2',code:'CL-2',type:'gere',first:'Éliane',last:'Kabo',name:'Éliane Kabo',phone:'0992',acc:'',subs:[],created:t},{id:'c3',code:'CL-3',type:'mat',first:'Marc',last:'Materiel',name:'Marc Materiel',phone:'0993',created:t},{id:'c4',code:'CL-4',type:'install',first:'Ines',last:'Inst',name:'Ines Inst',phone:'0994',created:t});App.save();App.go('deposits')});await p.waitForTimeout(500);
+await p.click('[data-act=dep_new]');await p.waitForTimeout(400);
+const opts=()=>p.$$eval('#f_dc option',o=>o.map(x=>x.textContent));
+let o=await opts();ok('only managed clients listed',o.length===3&&!o.some(x=>/Marc|Ines/.test(x)),o.join(' / '));
+await p.fill('#f_dq','acc-77');o=await opts();ok('search by ACC',o.length===2&&/Jean/.test(o[1]),o.join(' / '));
+ok('single match auto-selected',await p.inputValue('#f_dc')==='c1');
+await p.fill('#f_dq','eliane');o=await opts();ok('search accent-insensitive',/Éliane/.test(o[1]));
+await p.fill('#f_dq','0992');o=await opts();ok('search by phone',o.length===2&&/Éliane/.test(o[1]));
+await p.fill('#f_dq','marc');o=await opts();ok('non managed not found',/Aucun client trouvé/.test(o[0]));
+await p.fill('#f_dq','');await p.selectOption('#f_dc','c2');await p.fill('#f_da','20');await p.click('dialog .btn:not(.sec)');await p.waitForTimeout(500);
+ok('deposit saved',await p.evaluate(()=>App.db.deposits.length===1&&App.db.deposits[0].clientId==='c2'));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
