@@ -364,3 +364,12 @@ Menu **Plus → Dû à Starlink** (administrateur et comptable) : suit l'argent 
 ## Dépôt client : recherche et clients gérés seulement
 
 Dans « Nouveau dépôt client », un champ **Rechercher un client** (nom, compte ACC, téléphone, sans tenir compte des accents) filtre la liste, et seuls les **clients gérés par CISPOLstore** y apparaissent. Quand un seul client correspond, il est choisi automatiquement.
+
+## Devis (étape 4 des améliorations)
+
+Menu **Plus → Devis** : créez un devis numéroté `DEV-AAAA-NNNN` pour un client ou un prospect (nom libre), avec des lignes tirées du stock ou libres, une devise et une durée de validité (15 jours par défaut).
+
+- **Imprimer / PDF / WhatsApp** : le document reprend l'en-tête de vos factures, avec « Bon pour accord » et le tampon.
+- **Statuts** : En attente, Accepté, Refusé, Facturé ; un devis en attente dont la date de validité est passée s'affiche « Expiré ».
+- **Transformer en facture** : une facture est créée avec les mêmes lignes (stock déduit comme pour une vente normale, ou « en attente » si coché). On peut saisir un acompte payé. Le devis passe à « Facturé » et garde le lien vers la facture.
+- Modifier, dupliquer, supprimer. L'accueil signale les devis en attente de réponse.
