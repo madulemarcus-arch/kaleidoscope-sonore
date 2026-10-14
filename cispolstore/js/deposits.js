@@ -52,13 +52,20 @@
   App.actions.q_deposit = () => { App.close(); setTimeout(() => App.depositForm(), 30); };
 
   // ---------- create / edit ----------
+  // only the clients managed by CISPOLstore (plus the one already on an existing deposit), filtered by a search text
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const clientOpts = (q, keep) => { const n = norm(q), l = App.db.clients.filter(c => c.type === 'gere' || c.id === keep).filter(c => !n || norm([App.cname(c), c.acc, c.phone, c.phone2, c.code].join(' ')).includes(n));
+    return [['', l.length ? '— Choisir (' + l.length + ') —' : 'Aucun client trouvé'], ...l.map(c => [c.id, `${App.cname(c)}${c.acc ? ' · ' + c.acc : ''}${c.phone ? ' · ' + c.phone : ''}`])]; };
+  const wireSearch = () => { const q = $('f_dq'), s = $('f_dc'); if (!q || !s) return;
+    q.oninput = () => { const cur = s.value; s.innerHTML = clientOpts(q.value, cur).map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (cur && [...s.options].some(o => o.value === cur)) s.value = cur; else if (s.options.length === 2) s.selectedIndex = 1; }; };
+
   App.depositForm = (dep, cid) => {
     if (!App.can('finance')) return App.toast('Action réservée au gérant ou au comptable');
     const isNew = !dep, t = App.today(), d = dep || { clientId: cid || '', date: t, amount: '', currency: 'USD', mode: 'Cash', purpose: 'Abonnement Starlink', note: '', ref: '' };
     if (!App.db.clients.length) return App.toast("Ajoutez d'abord un client");
     App.modal(isNew ? 'Nouveau dépôt client' : 'Modifier le dépôt',
       `<p class="mut" style="margin-top:0">Argent reçu d'un client, que vous gardez en attendant de payer pour lui.</p>
-       ${F.sel('f_dc', 'Client', App.clientOpts('— Choisir —'), d.clientId)}
+       ${F.text('f_dq', 'Rechercher un client', '', 'placeholder="Nom, compte ACC ou téléphone" autocomplete="off"')}${F.sel('f_dc', 'Client géré par CISPOLstore', clientOpts('', d.clientId), d.clientId)}
        <div class="row">${F.num('f_da', 'Montant reçu', d.amount)}${F.sel('f_dcur', 'Devise', [['USD', 'Dollars ($)'], ['CDF', 'Francs (CDF)']], d.currency)}</div>
        <div class="row">${F.sel('f_dp', 'Pour payer', PURPOSES, d.purpose)}${F.sel('f_dm', 'Reçu par', App.PAY_MODES, d.mode)}</div>
        ${F.date('f_dd', 'Date de réception', d.date, `max="${t}"`)}${F.text('f_dr', 'Référence (n° transaction)', d.ref || '')}${F.text('f_dn', 'Note', d.note || '', 'placeholder="Ex. à payer à Starlink le 15"')}`,
@@ -69,7 +76,7 @@
         if (isNew) { Object.assign(d, o, { id: App.uid(), ts: Date.now(), rate: App.rate(), uses: [], no: nextNo(o.date) }); list().push(d); App.log(cl, `Dépôt reçu : ${money(amt, o.currency)} (${o.purpose})`); }
         else { if (o.currency !== d.currency) o.rate = App.rate(); Object.assign(d, o); App.log(cl, `Dépôt modifié : ${money(amt, o.currency)}`); }
         App.save(); App.toast(isNew ? 'Dépôt enregistré : ' + money(amt, o.currency) : 'Dépôt modifié'); App.refresh();
-      }, isNew ? 'Enregistrer le dépôt' : 'Enregistrer');
+      }, isNew ? 'Enregistrer le dépôt' : 'Enregistrer'); wireSearch();
   };
 
   // printed / shared receipt of a deposit, with what has been paid for the client since and what is still held
