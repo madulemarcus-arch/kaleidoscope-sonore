@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
-  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'relances', 'stock', 'product', 'invoices', 'invoice', 'quotes', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'purchase', 'reports', 'settings', 'livraisons', 'users', 'importc', 'importf', 'rapportmois', 'daily', 'finance', 'deposits', 'starlink', 'more', 'profile'];
+  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'relances', 'stock', 'product', 'invoices', 'invoice', 'quotes', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'purchase', 'reports', 'settings', 'livraisons', 'users', 'importc', 'importf', 'rapportmois', 'daily', 'finance', 'deposits', 'starlink', 'inventory', 'invcount', 'reorder', 'more', 'profile'];
   // actions only the administrator may run
   const ADMIN = /^(del[a-z]+|pen_del|backup|plansfix|setco|setapp|pin[a-z]+|sync[a-z]+|drive_[a-z]+|msgreset|users_[a-z]+|imp_[a-z]+|dl_del|restore)$/;
   const COMMON = /^(go|copy|calday|calnav|cltab|clfilter|search|sgo|stcat|invfilter|dper|repper|reptab|paymode|lockNow|me_[a-z]+|shareapp|cf_type|dl_filter|dl_view|theme_set|accent_set)$/;

@@ -37,6 +37,7 @@
         ${low.length && st.f === 'all' ? `<div class="card" style="margin-bottom:10px"><b class="warn">⚠ Stock bas :</b> ${low.map(x => esc(x.name) + ' (' + qtyText(x) + ')').join(', ')}</div>` : ''}
         <div id="plist"></div>
         <div class="bar" style="margin-top:14px"><button class="btn" data-act="newprod">+ Produit</button><button class="btn sec" data-act="stin">📥 Entrée</button><button class="btn sec" data-act="stout">📤 Sortie</button><button class="btn sec" data-csv="produits">CSV</button></div>
+        <div class="bar">${App.canView('inventory') ? '<button class="btn sec" data-act="go" data-v="inventory">📋 Inventaire</button><button class="btn sec" data-act="go" data-v="reorder">🛒 À commander' + (App.reorderCount() ? ' (' + App.reorderCount() + ')' : '') + '</button>' : ''}</div>
         ${moves.length ? `<h2 class="sec">Mouvements récents</h2><div class="list">${moves.map(m => { const p = App.prod(m.pid), c = App.client(m.clientId), i = App.invoice(m.invoiceId); return `<div class="item"><div class="grow"><b>${esc(p ? p.name : '?')}</b><small>${App.fdate(m.date)}${i ? ' · ' + esc(i.number) : ''}${c ? ' · ' + esc(App.cname(c)) : ''}${m.note ? ' · ' + esc(m.note) : ''}</small></div><b class="${m.qty >= 0 ? 'ok' : 'bad'}">${m.qty > 0 ? '+' : ''}${App.nf(m.qty, 2)}${p && p.unit === 'm' ? ' m' : ''}</b></div>`; }).join('')}</div>` : ''}`,
       after: () => { drawList(); $('pq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };

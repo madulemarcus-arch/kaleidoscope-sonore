@@ -373,3 +373,13 @@ Menu **Plus → Devis** : créez un devis numéroté `DEV-AAAA-NNNN` pour un cli
 - **Statuts** : En attente, Accepté, Refusé, Facturé ; un devis en attente dont la date de validité est passée s'affiche « Expiré ».
 - **Transformer en facture** : une facture est créée avec les mêmes lignes (stock déduit comme pour une vente normale, ou « en attente » si coché). On peut saisir un acompte payé. Le devis passe à « Facturé » et garde le lien vers la facture.
 - Modifier, dupliquer, supprimer. L'accueil signale les devis en attente de réponse.
+
+## Inventaire du stock et bons de commande (étape 5 des améliorations)
+
+**Stock → 📋 Inventaire** (administrateur et comptable) :
+
+- **Comptage** : l'écran liste les produits suivis en stock ; saisissez la quantité réellement en rayon. L'écart avec le stock théorique s'affiche tout de suite (✓, +2, −3), avec le nombre d'écarts et leur valeur. Le comptage est enregistré au fur et à mesure et peut être repris plus tard.
+- **Terminer** : un récapitulatif montre les manques et surplus. On peut corriger le stock avec les quantités comptées : les ajustements apparaissent dans les mouvements avec la note « Inventaire INV-AAAA-NNNN » et ne comptent pas comme des achats dans la caisse. Les produits non comptés ne sont pas touchés.
+- **Historique** : chaque inventaire (numéroté `INV-AAAA-NNNN`) peut être consulté, imprimé ou envoyé en PDF.
+
+**Stock → 🛒 À commander** : les produits dont le stock est au minimum (ou en dessous) sont regroupés par fournisseur, avec une quantité suggérée (2 × le minimum − le stock). Cochez, ajustez, puis « Créer le bon de commande » (`BC-AAAA-NNNN`) : impression, PDF ou WhatsApp au fournisseur, puis « Marquer comme reçu ». Seuls les produits ayant un **stock minimum** défini apparaissent. L'accueil signale les produits à commander.
