@@ -1,0 +1,33 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'K',name:'Jean K',phone:'0991',address:'Av. Test 1',installAddr:'Gombe, Av. Test 1',created:t,subs:[]});App.save();App.go('contracts')});await p.waitForTimeout(500);
+await p.click('[data-act=ct_new]');await p.waitForTimeout(400);
+ok('type list has Installation et maintenance',await p.evaluate(()=>[...document.querySelectorAll('#ct_type option')].some(o=>o.value==='installation'&&/Installation et maintenance/.test(o.textContent))));
+await p.selectOption('#ct_type','installation');await p.waitForTimeout(200);
+ok('defaults: 50 %, 48 h, 3 mois, 1 visit, both',await p.inputValue('#cf_pct')==='50'&&await p.inputValue('#cf_delay')==='48'&&await p.inputValue('#cf_warranty')==='3'&&await p.inputValue('#cf_visits')==='1'&&await p.inputValue('#cf_kind')==='both');
+await p.selectOption('#ct_cl','c1');ok('site prefilled from the client',await p.inputValue('#cf_site')==='Gombe, Av. Test 1');
+const create=async()=>{await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(800)};
+await create();ok('refuses without install price',await p.evaluate(()=>App.db.contracts.length===0));
+await p.fill('#cf_amount','200');await p.fill('#cf_maint','20');await create();
+let c=await p.evaluate(()=>App.db.contracts[0]);
+ok('created with 13 articles',c&&c.type==='installation'&&(c.body.match(/^Article \d+ –/gm)||[]).length===13);
+ok('both: price, deposit 100, balance, maintenance fee, 48 h, 3 mois, 1 visite',/200\s\$/.test(c.body)&&/acompte de 50 %, soit 100\s\$/.test(c.body)&&/20\s\$ par mois/.test(c.body)&&/48 heures ouvrables/.test(c.body)&&/garantis 3 mois/.test(c.body)&&/1 visite préventive par an/.test(c.body)&&/pose de l'antenne/.test(c.body),c.body.slice(0,300));
+ok('no broken grammar',!/\b(de|à) le (Client|Prestataire)/.test(c.body),(c.body.match(/\b(de|à) le \w+/g)||[]).join('|'));
+ok('two texts kept (proposed in force, skeleton aside)',c.src==='auto'&&/Article 1 – Objet\n\nArticle 2/.test(c.alt));
+const doc=await p.evaluate(()=>App.contractDoc(App.db.contracts[0],'','s'));
+ok('document title and parties',/CONTRAT D(&#39;|')INSTALLATION ET DE MAINTENANCE/.test(doc)&&/LE PRESTATAIRE/.test(doc)&&/LE CLIENT/.test(doc)&&/Jean K/.test(doc));
+await p.keyboard.press('Escape');await p.waitForTimeout(300);
+// installation only
+await p.click('[data-act=ct_new]');await p.waitForTimeout(300);await p.selectOption('#ct_type','installation');await p.selectOption('#ct_cl','c1');await p.selectOption('#cf_kind','install');await p.fill('#cf_amount','150');await p.fill('#cf_pct','0');await create();
+c=await p.evaluate(()=>App.db.contracts[1]);
+ok('install only: no maintenance text, no deposit',!/maintenance comprend/.test(c.body)&&!/redevance de maintenance/.test(c.body)&&/payable à la réception des travaux/.test(c.body)&&/L'installation prend fin à la réception/.test(c.body)&&!/préavis de 30 jours/.test(c.body),c.body.slice(0,200));
+await p.keyboard.press('Escape');await p.waitForTimeout(300);
+// maintenance only
+await p.click('[data-act=ct_new]');await p.waitForTimeout(300);await p.selectOption('#ct_type','installation');await p.selectOption('#ct_cl','c1');await p.selectOption('#cf_kind','maint');await create();
+ok('maintenance only requires the fee',await p.evaluate(()=>App.db.contracts.length===2));
+await p.fill('#cf_maint','300');await p.selectOption('#cf_per','an');await p.fill('#cf_delay','24');await p.fill('#cf_visits','2');await create();
+c=await p.evaluate(()=>App.db.contracts[2]);
+ok('maintenance only: fee per an, 24 h, 2 visites, no install price',/300\s\$ par an/.test(c.body)&&/24 heures ouvrables/.test(c.body)&&/2 visites préventives par an/.test(c.body)&&!/prix de l'installation/.test(c.body)&&!/pose de l'antenne/.test(c.body)&&/La maintenance peut être résiliée/.test(c.body),c.body.slice(0,260));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
