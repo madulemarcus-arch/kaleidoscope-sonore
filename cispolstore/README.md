@@ -417,3 +417,12 @@ Sur l'écran **Plus → Rapport mensuel** (administrateur et comptable), choisir
 - **📄 Rapport complet en PDF** : plusieurs pages A4 avec l'en-tête de l'entreprise : chiffres clés, courbe des ventes par jour, finances, abonnements, meilleurs clients du mois, argent encaissé et dépensé, dépenses par catégorie, situation à ce jour, plus gros impayés, stock bas, signature et tampon. Partage direct (WhatsApp, e-mail) ou téléchargement.
 
 Le bouton « Imprimer » du rapport reste disponible. Les anciens exports (CSV, Excel simple dans Paramètres) ne changent pas.
+
+## Application Android et Play Store (étape 11 des améliorations)
+
+L'application est prête pour être publiée sur le Google Play Store sous forme d'enveloppe Android (Trusted Web Activity) qui ouvre l'application web, hors connexion comprise :
+
+- **Manifeste complet** : icône « adaptative » (`icon-maskable-512.png`), catégories, et **raccourcis** du menu de l'icône (Relances du jour, Clients, Factures, Devis) grâce au paramètre d'adresse `?go=<écran>` (ignoré si le profil n'a pas le droit de voir l'écran).
+- **Politique de confidentialité** (`privacy.html`, exigée par Google) : liée depuis Paramètres → Données.
+- **Dossier `play/`** (hors du site publié) : guide pas à pas en français (`play/README.md`), textes de la fiche et réponses aux questionnaires (`play/fiche-play-store.md`), 7 captures d'écran et image de présentation générées avec des données fictives (`play/generer-captures.js`), modèle de `assetlinks.json`.
+- Application **gratuite**, sans licences ni paiement intégré.
