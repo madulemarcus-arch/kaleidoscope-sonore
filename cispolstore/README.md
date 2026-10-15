@@ -483,3 +483,7 @@ Contrats → Nouveau contrat → **Apporteur d'affaires / agent** (15 articles, 
 - Commission **payée dans les 7 jours après l'encaissement** du client (pas de relevé mensuel), avec le détail envoyé à l'intermédiaire. Aucune commission sur une vente non payée ou annulée.
 - Contrat **non exclusif**, **interdiction d'encaisser** l'argent des clients (sauf mandat écrit), indépendance, confidentialité, préavis de **30 jours** (les commissions des ventes conclues avant la fin restent dues).
 - ⚠️ À faire confirmer par un avocat : les règles de l'Acte uniforme OHADA sur le droit commercial général concernant l'agent commercial (rémunération, fin du contrat, indemnité éventuelle), non vérifiées dans le détail.
+
+## Recherche d'un client dans les formulaires
+
+Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.

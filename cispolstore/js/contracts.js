@@ -234,7 +234,7 @@
     App.modal(isNew ? 'Nouveau contrat' : 'Modifier ' + c.no,
       `${isNew ? F.sel('ct_type', 'Type de contrat', [...Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), ...models().map(m => ['m:' + m.id, (m.icon || '📄') + ' ' + m.name + ' (mon modèle)'])], c.type) : `<p class="mut" style="margin-top:0">${T(c).icon} ${esc(T(c).label)}</p>`}
        ${isNew ? `<div id="ct_srcrow">${F.sel('ct_src', 'Texte du contrat', [['auto', 'Texte proposé (déjà rédigé, modifiable)'], ['perso', 'Mon propre texte (je le rédige moi-même)']], 'auto')}</div>` : ''}
-       <div id="ct_clrow">${F.sel('ct_cl', 'Client', App.clientOpts('— Autre (saisir ci-dessous) —'), c.clientId)}</div>
+       <div id="ct_clrow">${App.clientFinder('ct_cl')}${F.sel('ct_cl', 'Client', App.clientOpts('— Autre (saisir ci-dessous) —'), c.clientId)}</div>
        <div id="ct_party" ${cl0 ? 'hidden' : ''}>${F.text('ct_pname', 'Nom complet', (c.party || {}).name || '')}${F.text('ct_pidno', 'N° pièce d\'identité (facultatif)', (c.party || {}).idno || '')}<div class="row">${F.text('ct_pphone', 'Téléphone', (c.party || {}).phone || '')}${F.text('ct_paddr', 'Adresse', (c.party || {}).address || '')}</div></div>
        <div class="row">${F.date('ct_date', 'Date de signature', c.date)}${F.date('ct_start', 'Début', c.start)}</div>
        <div id="ct_termrow" class="row">${F.num('ct_months', 'Durée (mois, 0 = indéterminée)', c.months, 'min="0"')}${F.sel('ct_cur', 'Devise', CUR, c.currency)}</div>
@@ -257,6 +257,7 @@
       isNew ? 'Créer le contrat' : 'Enregistrer');
     render(c.type);
     if ($('ct_type')) $('ct_type').onchange = () => render($('ct_type').value);
+    App.wireClientFinder('ct_cl', s => App.clientOpts('— Autre (saisir ci-dessous) —', null, s));
     $('ct_cl').onchange = () => { const cl = App.client($('ct_cl').value); $('ct_party').hidden = !!cl; if (cl) { const s = $('cf_site'), a = $('cf_acc'); if (s && !s.value) s.value = cl.installAddr || cl.address || ''; if (a && !a.value) a.value = cl.acc || ''; const pl = $('cf_plan'); if (pl && cl.plan && !pl.value) pl.value = cl.plan; } };
   };
   App.actions.ct_new = d => App.contractForm(null, d && d.cid);

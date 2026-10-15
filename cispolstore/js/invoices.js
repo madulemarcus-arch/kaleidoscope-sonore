@@ -91,7 +91,7 @@
       else if (gInv >= tot - 0.004) { el.className = 'ok'; el.textContent = '✅ Payée en totalité' + (gInv - tot > 0.004 ? ` · À rendre au client : ${App.fmt(round(App.conv(gInv - tot, c, pc, rate), pc), pc)}` : ''); }
       else { el.className = 'warn'; el.textContent = `Le client a donné ${App.fmt(given, pc)} · Reste à payer : ${App.fmt(tot - gInv, c)}` + ($('f_neg').checked ? ' → sera soldée au prix convenu' : ''); }
     };
-    const clientSel = () => App.clientOpts(needsClient(type) ? '— Choisir un client —' : 'Client de passage', type === 'abonnement' ? ['gere'] : null);
+    const clientSel = q => App.clientOpts(needsClient(type) ? '— Choisir un client —' : 'Client de passage', type === 'abonnement' ? ['gere'] : null, q);
     const cl = clientSel();
     const qcType = type === 'abonnement' ? 'gere' : type === 'installation' ? 'install' : type === 'materiel' ? 'mat' : 'gere';
     const quick = `<div class="bar" style="margin-top:6px"><button type="button" class="btn sm sec" id="qc_open">＋ Nouveau client</button></div>
@@ -105,7 +105,7 @@
     const renewBlock = ['abonnement', 'complete'].includes(type) ? `<label class="l" id="renwrap"><input type="checkbox" id="f_renew" checked style="width:auto"> Renouveler l'abonnement du client (nouvelle période) — décochez pour facturer la période en cours</label>` : '';
     const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.text('f_obs', 'Observations', '')}</div>` : '';
     App.modal('Nouvelle facture · ' + App.invTypes[type],
-      `${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
+      `${App.clientFinder('f_cl')}${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div>
        ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}<p class="mut" style="font-size:12px;margin:2px 0 0">Le taux est enregistré sur cette facture. Si vous le changez ici, il devient le taux du jour.</p>
        <h2 class="sec">Lignes de la facture</h2><div id="cart"></div>
@@ -159,6 +159,7 @@
         if (np && App.invDue(inv) <= 0.004 && !inv.pending) App.celebrate();
       }, 'Créer la facture');
     // renewal is on by default only when the client already had a subscription invoice
+    App.wireClientFinder('f_cl', clientSel);
     const syncRenew = () => { const cb = $('f_renew'); if (cb) cb.checked = db.invoices.some(i => i.clientId === App.v('f_cl') && i.lines.some(l => /^abonnement/i.test(l.desc))); };
     $('f_cl').addEventListener('change', syncRenew); syncRenew();
     // quick client creation without leaving the invoice
@@ -174,7 +175,7 @@
       const c = { id: App.uid(), code: App.nextClientCode(), type: t, first, last, name: (first + ' ' + last).trim(), phone: App.v('qc_phone'), phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: 0, payMode: 'Cash', start: '', period: S.period, grace: S.grace, note: '', article: '', created: App.today(), subs: [] };
       if (t === 'gere') Object.assign(c, { acc: App.v('qc_acc'), plan: App.v('qc_plan'), price: App.n('qc_price'), start: App.v('qc_start') || App.today() });
       db.clients.push(c); App.log(c.id, 'Client créé (' + App.TYPES[t] + ')'); App.save();
-      $('f_cl').innerHTML = App.opts(clientSel()); $('f_cl').value = c.id; $('f_cl').dispatchEvent(new Event('change'));
+      if ($('f_cl_q')) $('f_cl_q').value = ''; $('f_cl').innerHTML = App.opts(clientSel()); $('f_cl').value = c.id; $('f_cl').dispatchEvent(new Event('change'));
       ['qc_first', 'qc_last', 'qc_phone', 'qc_acc', 'qc_plan', 'qc_price'].forEach(i => { $(i).value = ''; }); qcClose(); App.toast('Client ajouté : ' + App.cname(c));
     };
     // behaviour
@@ -356,7 +357,7 @@
     const invOpts = cid => [['', '— Sans facture —'], ...db.invoices.filter(i => App.invDue(i) > 0.004 && (!cid || i.clientId === cid)).map(i => [i.id, `${i.number} · ${App.cname(App.client(i.clientId))} · reste ${App.fmt(App.invDue(i), i.currency)}`])];
     const inv0 = App.invoice(pre.invoiceId), cid0 = pre.clientId || (inv0 && inv0.clientId) || '';
     App.modal('Nouveau paiement',
-      `${F.sel('f_cl', 'Client', App.clientOpts('— Aucun —'), cid0)}${F.sel('f_inv', 'Facture', invOpts(cid0), pre.invoiceId || '')}
+      `${App.clientFinder('f_cl')}${F.sel('f_cl', 'Client', App.clientOpts('— Aucun —'), cid0)}${F.sel('f_inv', 'Facture', invOpts(cid0), pre.invoiceId || '')}
        <div class="row">${F.num('f_amt', 'Montant', inv0 ? App.invDue(inv0) : '')}${F.sel('f_cur', 'Devise', CUR, inv0 ? inv0.currency : 'USD')}</div>
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
        ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}
@@ -380,6 +381,7 @@
     const ppFill = k => { const i = App.invoice($('f_inv').value); if (!i) return App.toast('Choisissez d\'abord une facture'); $('f_cur').value = i.currency; $('f_amt').value = Math.round(App.invDue(i) * k * 100) / 100; ppSync(); };
     $('pp_all').onclick = () => ppFill(1); $('pp_half').onclick = () => ppFill(.5); $('f_amt').oninput = ppSync; $('f_cur').onchange = ppSync; ppSync();
     $('f_cl').onchange = () => { $('f_inv').innerHTML = App.opts(invOpts($('f_cl').value)); };
+    App.wireClientFinder('f_cl', q => App.clientOpts('— Aucun —', null, q));
     $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = App.invDue(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } ppSync(); };
   };
   // negotiated price on an existing invoice: what was already received becomes the agreed price

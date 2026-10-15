@@ -42,7 +42,7 @@
     qd = { lines: q.lines.map(l => ({ ...l })) };
     const valid = q.until ? Math.max(0, App.diff(q.date, q.until)) : 0;
     App.modal(isNew ? 'Nouveau devis' : 'Modifier ' + q.no,
-      `${F.sel('q_cl', 'Client', App.clientOpts('Client de passage / prospect'), q.clientId)}${F.text('q_name', 'Nom du prospect (si pas encore client)', q.name || '')}
+      `${App.clientFinder('q_cl')}${F.sel('q_cl', 'Client', App.clientOpts('Client de passage / prospect'), q.clientId)}${F.text('q_name', 'Nom du prospect (si pas encore client)', q.name || '')}
        <div class="row">${F.date('q_date', 'Date', q.date)}${F.num('q_valid', 'Valable (jours)', valid, 'min="0"')}</div>
        ${F.sel('q_cur', 'Devise', CUR, q.currency)}
        <h2 class="sec">Lignes du devis</h2><div id="q_cart"></div>
@@ -57,6 +57,7 @@
         else Object.assign(q, o);
         App.save(); App.toast(isNew ? 'Devis créé : ' + q.no : 'Devis modifié'); App.refresh(); if (isNew) setTimeout(() => App.actions.quote_open({ id: q.id }), 80); },
       isNew ? 'Créer le devis' : 'Enregistrer');
+    App.wireClientFinder('q_cl', s => App.clientOpts('Client de passage / prospect', null, s));
     $('q_prod').onchange = () => { const p = App.prod($('q_prod').value); if (p) { $('q_desc').value = p.name; $('q_price').value = App.conv(p.price, 'USD', cur(), q.rate || App.rate()); } };
     $('q_cur').onchange = () => { qd.lines.forEach(l => { l.price = App.conv(l.price, qd.cur || 'USD', cur(), q.rate || App.rate()); }); qd.cur = cur(); draw(); };
     qd.cur = q.currency;
