@@ -493,6 +493,16 @@ Contrats → Nouveau contrat → **Revendeur de tickets WiFi Zone** (15 articles
 - **Plafond de stock** confié (200 $ par défaut) ; **caution** facultative (0 = aucune, sinon un article « Caution » est ajouté, rendue à la fin après décompte).
 - Compte rendu hebdomadaire, inventaire à tout moment, **ticket défectueux** à signaler sous 48 h, préavis de **7 jours**, solde de tout compte sous 48 h, aucune donnée d'acheteur conservée.
 
+### Contrat d'hébergement d'une borne Wi-Fi
+
+Contrats → Nouveau contrat → **Hébergement d'une borne Wi-Fi** (15 articles, deux textes comme les autres contrats intégrés). L'hôte (commerçant ou particulier qui accueille la borne WiFi Zone) est une **personne seule** (nom, téléphone, adresse saisis dans le formulaire) ; l'adresse du local se saisit dans le champ « Adresse du local ».
+- Le **matériel reste la propriété de CISPOLstore** (insaisissable pour les dettes de l'hôte), inventaire signé, constat de mise en service ; l'hôte rembourse le matériel perdu, volé ou abîmé par sa faute.
+- **Électricité et emplacement** : indemnité mensuelle (5 $ par défaut, 0 = aucune).
+- **Avantage de l'hôte** au choix : accès Wi-Fi gratuit (par défaut), part en % des ventes de tickets de la borne, montant fixe par mois, ou aucun ; l'avantage n'est pas dû pendant plus de 7 jours de panne par la faute de l'hôte (part ou montant fixe).
+- Dépannage sous **48 h ouvrables**, préavis de **15 jours**, restitution du matériel sous **48 h**, aucune caution. Option « l'hôte est locataire » : ajoute l'obligation d'obtenir l'accord écrit du bailleur.
+- L'hôte ne vend ni n'encaisse rien (sauf contrat de revendeur séparé) et n'a aucun accès aux données de connexion.
+- ⚠️ À faire confirmer par un avocat : la protection du matériel contre les créanciers de l'hôte (insaisissabilité) et le rôle du bailleur si l'hôte est locataire.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
