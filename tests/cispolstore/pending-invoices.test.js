@@ -22,4 +22,10 @@ ok('payment form opened',await p.isVisible('#f_amt'));await p.click('#dcancel').
 await p.evaluate(()=>{const i=App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',pending:true,lines:[{pid:'p1',desc:'Kit',qty:1,price:100,cost:30}]},0);window.__c=i.id;App.save();App.go('invoice',{id:i.id})});
 console.log('DBG',await p.evaluate(()=>[document.querySelector('dialog')&&document.querySelector('dialog').open, !!document.querySelector('[data-act=invcancel]')]));await p.click('[data-act=invcancel]');await p.waitForTimeout(300);
 console.log('DBG2',await p.evaluate(()=>[!!App.invoice(window.__c),App.db.products[0].qty,App.db.invoices.length]));ok('cancelled: invoice gone, stock still 3',await p.evaluate(()=>!App.invoice(window.__c)&&App.db.products[0].qty===3));
+// swipe action in the list deletes a pending invoice (and only pending ones)
+await p.evaluate(()=>{const i=App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',pending:true,lines:[{pid:'p1',desc:'Kit',qty:1,price:100,cost:30}]},0);window.__s=i.id;App.save();App.go('invoices')});await p.waitForTimeout(300);
+ok('pending row has a Supprimer swipe action',await p.evaluate(()=>!!document.querySelector('#ilist [data-act=invcancel][data-id="'+window.__s+'"]')));
+ok('settled invoices have none',await p.evaluate(()=>document.querySelectorAll('#ilist [data-act=invcancel]').length===App.db.invoices.filter(i=>i.pending).length));
+await p.evaluate(()=>document.querySelector('#ilist [data-act=invcancel][data-id="'+window.__s+'"]').click());await p.waitForTimeout(300);
+ok('swipe delete removes it, stock still 3',await p.evaluate(()=>!App.invoice(window.__s)&&App.db.products[0].qty===3));
 console.log(errs);await b.close();process.exit(f?1:0)})();
