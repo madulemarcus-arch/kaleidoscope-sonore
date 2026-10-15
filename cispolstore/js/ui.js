@@ -39,7 +39,17 @@
   };
   App.v = id => ($(id) ? $(id).value.trim() : '');
   App.n = id => parseFloat(String($(id) ? $(id).value : '').replace(',', '.')) || 0;
-  App.clientOpts = (withNone, only) => [...(withNone ? [['', withNone]] : []), ...App.db.clients.filter(c => !only || only.includes(c.type)).map(c => [c.id, `${App.cname(c)}${c.acc ? ' · ' + c.acc : ''}`])];
+  // client list for a <select>; with a search text q only the matching clients (name, ACC, phone, code, accents ignored)
+  const nrm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  App.clientMatch = (c, q) => { const n = nrm(q).trim(); return !n || nrm([App.cname(c), c.acc, c.phone, c.phone2, c.code].join(' ')).includes(n); };
+  App.clientOpts = (withNone, only, q) => [...(withNone ? [['', withNone]] : []), ...App.db.clients.filter(c => (!only || only.includes(c.type)) && App.clientMatch(c, q)).map(c => [c.id, `${App.cname(c)}${c.acc ? ' · ' + c.acc : ''}`])];
+  // search box above a client <select>: App.clientFinder(id) gives the HTML, App.wireClientFinder(id, build) connects it once the dialog exists
+  App.clientFinder = id => `<div class="fld"><label class="l" for="${id}_q">Rechercher un client</label><input id="${id}_q" placeholder="Nom, téléphone, compte ACC ou code" autocomplete="off" enterkeyhint="search"><div class="mut" id="${id}_n" style="font-size:12px;margin-top:4px"></div></div>`;
+  App.wireClientFinder = (id, build) => { const q = $(id + '_q'), s = $(id); if (!q || !s) return;
+    q.oninput = () => { const cur = s.value, list = build(q.value), n = list.filter(o => o[0]).length; s.innerHTML = App.opts(list, cur);
+      if ($(id + '_n')) $(id + '_n').textContent = !q.value.trim() ? '' : n ? `${n} client${n > 1 ? 's' : ''} trouvé${n > 1 ? 's' : ''}${n > 1 ? ' : choisissez dans la liste' : ''}` : 'Aucun client trouvé'; if (cur && [...s.options].some(o => o.value === cur)) s.value = cur;
+      else if (q.value.trim() && s.options.length === 2) s.selectedIndex = 1; // a single match is chosen right away
+      if (s.value !== cur) s.dispatchEvent(new Event('change')); }; };
 
   // ---------- Router ----------
   App.state = { view: 'home', params: {} };
