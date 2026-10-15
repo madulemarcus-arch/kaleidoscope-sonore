@@ -484,6 +484,15 @@ Contrats → Nouveau contrat → **Apporteur d'affaires / agent** (15 articles, 
 - Contrat **non exclusif**, **interdiction d'encaisser** l'argent des clients (sauf mandat écrit), indépendance, confidentialité, préavis de **30 jours** (les commissions des ventes conclues avant la fin restent dues).
 - ⚠️ À faire confirmer par un avocat : les règles de l'Acte uniforme OHADA sur le droit commercial général concernant l'agent commercial (rémunération, fin du contrat, indemnité éventuelle), non vérifiées dans le détail.
 
+### Contrat de revendeur de tickets WiFi Zone
+
+Contrats → Nouveau contrat → **Revendeur de tickets WiFi Zone** (15 articles, 16 avec caution, deux textes comme les autres contrats intégrés). Le revendeur est une **personne seule** (nom, téléphone, adresse saisis dans le formulaire).
+- **Remise** du revendeur en % du prix public (10 % par défaut), vente **au prix public uniquement**, pas de rabais sans accord écrit.
+- **Tickets confiés** sur bordereau signé, propriété de CISPOLstore tant qu'ils ne sont pas vendus et payés ; le revendeur répond des tickets perdus, volés ou vendus sans versement.
+- **Versement des fonds** au choix : chaque semaine le lundi (par défaut), à chaque nouvelle remise de tickets, ou chaque jour ; dans la Caisse ou par Mobile Money, avec reçu.
+- **Plafond de stock** confié (200 $ par défaut) ; **caution** facultative (0 = aucune, sinon un article « Caution » est ajouté, rendue à la fin après décompte).
+- Compte rendu hebdomadaire, inventaire à tout moment, **ticket défectueux** à signaler sous 48 h, préavis de **7 jours**, solde de tout compte sous 48 h, aucune donnée d'acheteur conservée.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
