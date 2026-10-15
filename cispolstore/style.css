@@ -377,7 +377,7 @@ dialog { border-radius:22px; }
 .swa { position:absolute; top:0; bottom:0; right:0; display:flex; }
 .sw { width:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border:0; color:#fff; font-size:11px; font-weight:700; text-decoration:none; padding:0 2px; text-align:center; line-height:1.1; }
 .sw span { font-size:21px; line-height:1; }
-.sw-call { background:linear-gradient(135deg,#1f9d55,#33b86e); } .sw-wa { background:linear-gradient(135deg,#1fb857,#25d366); } .sw-copy { background:linear-gradient(135deg,#64788f,#8296ad); } .sw-renew { background:linear-gradient(135deg,#7c5cff,#9a82ff); } .sw-pay { background:linear-gradient(135deg,#1f9d55,#33b86e); } .sw-print { background:linear-gradient(135deg,#3b6ea8,#5b93d0); }
+.sw-call { background:linear-gradient(135deg,#1f9d55,#33b86e); } .sw-wa { background:linear-gradient(135deg,#1fb857,#25d366); } .sw-copy { background:linear-gradient(135deg,#64788f,#8296ad); } .sw-renew { background:linear-gradient(135deg,#7c5cff,#9a82ff); } .sw-pay { background:linear-gradient(135deg,#1f9d55,#33b86e); } .sw-print { background:linear-gradient(135deg,#3b6ea8,#5b93d0); } .sw-del { background:linear-gradient(135deg,#c0392b,#e0564a); }
 @media (hover:hover) and (min-width:1024px) { .swr:hover > .item { transform:translateX(var(--w)); } }
 @media (min-width:1024px) {
   #clist .list > .lh, #ilist .list > .lh, #plist .list > .lh { grid-column:1/-1; top:0; }
