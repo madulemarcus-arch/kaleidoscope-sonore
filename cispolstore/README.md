@@ -503,6 +503,15 @@ Contrats → Nouveau contrat → **Hébergement d'une borne Wi-Fi** (15 articles
 - L'hôte ne vend ni n'encaisse rien (sauf contrat de revendeur séparé) et n'a aucun accès aux données de connexion.
 - ⚠️ À faire confirmer par un avocat : la protection du matériel contre les créanciers de l'hôte (insaisissabilité) et le rôle du bailleur si l'hôte est locataire.
 
+### Accord de confidentialité (NDA)
+
+Contrats → Nouveau contrat → **Confidentialité (NDA)** (13 articles, deux textes comme les autres contrats intégrés). Le destinataire est une **personne seule** (employé, technicien, partenaire : nom, téléphone, adresse saisis dans le formulaire) ; CISPOLstore est le **divulgateur** (accord à sens unique).
+- **Motif** de la communication libre (par défaut « Collaboration commerciale ou technique avec CISPOLstore »).
+- Informations visées : clients, prix et marges, fournisseurs, comptes et codes d'accès, méthodes techniques, chiffres de vente, projets et contrats ; exceptions classiques (déjà public, déjà connu, reçu d'un tiers, développé seul).
+- Interdiction de copier ou transférer vers un compte personnel, personnes autorisées limitées, données personnelles protégées, divulgation légale encadrée.
+- **Restitution ou destruction** sous 7 jours (réglable), **confidentialité 3 ans après la fin** (réglable ; sans limite pour les données personnelles et les secrets commerciaux), pénalité facultative par manquement (0 = aucune).
+- ⚠️ À faire confirmer par un avocat : la durée de 3 ans après la fin, la validité de la pénalité (le juge peut la réduire) et la conformité avec le Code du numérique pour les données personnelles.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
