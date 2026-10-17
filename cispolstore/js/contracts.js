@@ -25,6 +25,8 @@
       fields: [['kind', 'Prestations', 'sel', 'both', [['both', 'Installation et maintenance'], ['install', 'Installation seule'], ['maint', 'Maintenance seule']]], ['equip', 'Équipement concerné', 'text', 'Kit Starlink'], ['site', 'Site d\'installation', 'text', ''], ['amount', 'Prix de l\'installation', 'num', ''], ['pct', 'Acompte à la signature (%)', 'num', 50], ['when', 'Installation prévue le', 'date', ''], ['maint', 'Redevance de maintenance', 'num', 0], ['per', 'Redevance payable', 'sel', 'mois', [['mois', 'par mois'], ['an', 'par an']]], ['delay', 'Délai de dépannage (heures ouvrables)', 'num', 48], ['visits', 'Visites préventives par an', 'num', 1], ['warranty', 'Garantie des travaux (mois)', 'num', 3]] },
     prestataire: { label: 'Technicien indépendant / prestataire', icon: '🛠️', title: 'CONTRAT DE PRESTATION DE SERVICES (TECHNICIEN INDÉPENDANT)', a: ['LE DONNEUR D\'ORDRE', 'le Donneur d\'ordre'], b: ['LE PRESTATAIRE', 'le Prestataire'], term: 0, who: 'person',
       fields: [['missions', 'Missions confiées', 'text', 'Installation, dépannage et maintenance d\'équipements Internet'], ['zone', 'Zone d\'intervention', 'text', ''], ['mode', 'Rémunération', 'sel', 'intervention', [['intervention', 'Par intervention (tarif)'], ['forfait', 'Forfait mensuel']]], ['amount', 'Tarif par intervention ou forfait mensuel', 'num', ''], ['pay', 'Délai de paiement après validation (jours)', 'num', 7], ['repair', 'Reprise des malfaçons (jours)', 'num', 30], ['nosol', 'Non-sollicitation après la fin (mois)', 'num', 6], ['notice', 'Préavis de résiliation (jours)', 'num', 15], ['nif', 'N° d\'identification fiscale (s\'il en a un)', 'text', '']] },
+    dette: { label: 'Reconnaissance de dette (échéancier)', icon: '🧾', title: 'RECONNAISSANCE DE DETTE AVEC ÉCHÉANCIER DE REMBOURSEMENT', a: ['LE CRÉANCIER', 'le Créancier'], b: ['LE DÉBITEUR', 'le Débiteur'], term: 0, who: 'client', noTerm: true,
+      fields: [['invid', 'Facture impayée concernée (facultatif : remplit le montant et l\'origine)', 'sel', '', [['', '— Aucune —']]], ['amount', 'Montant total de la dette', 'num', ''], ['origin', 'Origine de la dette', 'text', ''], ['deposit', 'Versement à la signature (0 = aucun)', 'num', 0], ['count', 'Nombre de versements', 'num', 6], ['freq', 'Rythme', 'sel', 'month', [['month', 'Mensuel'], ['fortnight', 'Tous les 15 jours'], ['week', 'Hebdomadaire']]], ['first', 'Date du premier versement', 'date', ''], ['interest', 'Intérêt (% par mois, 0 = aucun)', 'num', 0], ['penalty', 'Pénalité de retard (% de l\'échéance)', 'num', 5], ['grace', 'Délai de grâce (jours)', 'num', 5], ['strikes', 'Échéances impayées avant déchéance du terme', 'num', 2], ['warn', 'Avertissement avant déchéance (jours)', 'num', 7], ['surety', 'Caution : nom, adresse, téléphone (facultatif)', 'text', '']] },
     cgu: { label: 'Conditions d\'utilisation du Wi-Fi', icon: '📶', title: 'CONDITIONS D\'UTILISATION DU SERVICE WI-FI (WIFI ZONE)', a: ['LE FOURNISSEUR', 'le Fournisseur'], b: ['L\'UTILISATEUR', 'l\'Utilisateur'], term: 0, who: 'none', noTerm: true,
       fields: [['point', 'Point de vente / zone (facultatif)', 'text', ''], ['devices', 'Appareils par ticket', 'sel', 'one', [['one', 'Un seul appareil'], ['many', 'Plusieurs appareils (selon le ticket)']]], ['startmode', 'La durée du ticket commence', 'sel', 'first', [['first', 'À la première connexion'], ['sale', 'À la vente du ticket']]], ['keep', 'Conservation des données de connexion (mois)', 'num', 12], ['claim', 'Délai de réclamation (heures)', 'num', 24], ['contact', 'Contact pour les réclamations (vide = téléphone de l\'entreprise)', 'text', ''], ['extra', 'Interdiction supplémentaire propre au point de vente (facultatif)', 'text', '']] },
     confidentialite: { label: 'Confidentialité (NDA)', icon: '🤐', title: 'ACCORD DE CONFIDENTIALITÉ', a: ['LE DIVULGATEUR', 'le Divulgateur'], b: ['LE DESTINATAIRE', 'le Destinataire'], term: 0, who: 'person',
@@ -135,6 +137,30 @@
         ['Durée et résiliation', `Le contrat prend effet le ${App.fdate(c.start)}, ${termText(c)}. Chaque partie peut y mettre fin par écrit (message compris) avec un préavis de ${f.notice || 15} jours. Une faute grave permet la résiliation immédiate.`],
         ['Données personnelles', 'Les informations du Prestataire servent uniquement à la gestion du contrat et ne sont pas transmises à des tiers, sauf obligation légale.'],
         ['Litiges', law]]);
+    }
+    if (c.type === 'dette') {
+      const n = Math.max(1, Math.round(f.count) || 1), dep = Math.min(f.deposit || 0, f.amount || 0), rest = Math.round(((f.amount || 0) - dep) * 100) / 100, base = Math.floor(rest / n * 100) / 100;
+      const first = f.first || App.addDays(c.date, 30), nth = k => f.freq === 'week' ? App.addDays(first, 7 * k) : f.freq === 'fortnight' ? App.addDays(first, 14 * k) : addMonths(first, k);
+      let left = rest; const rows = []; for (let k = 0; k < n; k++) { const x = k === n - 1 ? Math.round(left * 100) / 100 : base; left = Math.round((left - x) * 100) / 100; rows.push(`${k + 1}. ${App.fdate(nth(k))} : ${money(x, cu)} (solde restant : ${money(Math.max(0, left), cu)})`); }
+      const rhythm = { month: 'mensuels', fortnight: 'tous les 15 jours', week: 'hebdomadaires' }[f.freq] || 'mensuels';
+      const list = [
+        ['Reconnaissance de la dette', `Le Débiteur reconnaît devoir au Créancier la somme de ${money(f.amount, cu)} (${word(f.amount, cu)}), qu'il s'engage à lui rembourser selon les conditions ci-après.`],
+        ['Origine de la dette', `Cette dette résulte de : ${f.origin || 'à préciser'}. Le Débiteur confirme que le montant est exact, qu'il est dû et qu'il ne le conteste pas.`],
+        ['Versement initial', dep > 0 ? `Un versement de ${money(dep, cu)} (${word(dep, cu)}) est effectué à la signature ; il est déduit de la dette.` : 'Aucun versement n\'est effectué à la signature.'],
+        ['Échéancier', `Le Débiteur rembourse ${dep > 0 ? 'le solde de ' + money(rest, cu) : 'la totalité de la dette'} en ${n} versement${n > 1 ? 's' : ''} ${rhythm}, le premier le ${App.fdate(first)}, selon le tableau suivant. Le dernier versement est ajusté pour solder exactement la dette.\n${rows.join('\n')}`],
+        ['Mode de paiement', 'Les versements se font en espèces dans la Caisse, par Mobile Money ou par virement, au choix du Débiteur. Chaque versement donne lieu à un reçu remis au Débiteur. Seul le reçu (ou la preuve du virement) fait foi du paiement.'],
+        ['Intérêts', f.interest > 0 ? `Un intérêt de ${f.interest} % par mois s'applique sur le solde restant dû avant chaque versement et se paie avec l'échéance.` : 'Aucun intérêt n\'est dû sur la dette tant que les échéances sont payées à la date prévue.'],
+        ['Retard de paiement', f.penalty > 0 ? `Passé un délai de grâce de ${f.grace || 0} jours, tout retard entraîne une pénalité de ${f.penalty} % du montant de l'échéance en retard, sans mise en demeure préalable. Le Créancier peut aussi suspendre toute nouvelle vente ou prestation tant que l'échéance en retard n'est pas payée.` : 'Le Créancier peut suspendre toute nouvelle vente ou prestation tant qu\'une échéance en retard n\'est pas payée.'],
+        ['Déchéance du terme', `Si ${f.strikes || 2} échéances ne sont pas payées à leur date, ou si le Débiteur disparaît, cesse son activité ou donne de fausses informations, la totalité du solde devient immédiatement exigible, après un message d'avertissement resté sans effet pendant ${f.warn || 7} jours.`],
+        ['Paiement anticipé', 'Le Débiteur peut rembourser tout ou partie de la dette à l\'avance, sans frais. Les sommes versées en plus de l\'échéance réduisent les dernières échéances.']];
+      if (f.surety) list.push(['Garantie', `Pour garantir le paiement, ${f.surety} se porte caution solidaire du Débiteur pour le montant de la dette. La caution signe le présent acte pour accepter.`]);
+      list.push(
+        ['Frais de recouvrement', 'En cas de poursuite, les frais raisonnables de recouvrement sont à la charge du Débiteur, dans la limite permise par la loi.'],
+        ['Communication', 'Les parties communiquent par téléphone, WhatsApp ou message, aux numéros indiqués au présent acte. Tout changement d\'adresse ou de numéro est signalé sans délai.'],
+        ['Données personnelles', 'Les informations du Débiteur ne servent qu\'à la gestion de la dette et au recouvrement ; elles ne sont pas transmises à des tiers, sauf obligation légale ou poursuite.'],
+        ['Litiges', law],
+        ['Mention manuscrite', `Le Débiteur écrit de sa main « Lu et approuvé, bon pour reconnaissance de dette de ${word(f.amount, cu)} » et signe.${f.surety ? ' La caution écrit la même mention, avec le montant garanti.' : ''}`]);
+      return art(list);
     }
     if (c.type === 'cgu') {
       const co2 = co.phone || '', contact = f.contact || co2 || 'le point de vente';
@@ -314,6 +340,7 @@
     const cl0 = c.clientId && App.client(c.clientId);
     const render = type => { const t = tdef(type), ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('ct_cl') || c.clientId);
       if (cl) { if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.acc === undefined) ex.acc = cl.acc || ''; if ((type === 'abonnement' || type === 'fournisseur') && cl.type === 'gere') { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.amount === undefined && cl.price) ex.amount = cl.price; } }
+      if (type === 'dette' && ex.first === undefined) ex.first = App.addDays(t0, 30);
       if (type === 'travail' && ex.place === undefined) ex.place = S.company.city || ''; if (type === 'abonnement' && ex.grace === undefined) ex.grace = S.grace || 15;
       $('ct_f').innerHTML = fieldHtml(t, null, ex); if (t.noTerm) $('ct_termrow').style.display = 'none'; else $('ct_termrow').style.display = ''; $('ct_clrow').style.display = t.who === 'person' || t.who === 'none' ? 'none' : ''; $('ct_party').style.display = t.who === 'none' ? 'none' : ''; if ($('ct_srcrow')) $('ct_srcrow').style.display = twoTexts(type) ? '' : 'none'; $('ct_months').value = type === c.type ? c.months : t.term; };
     App.modal(isNew ? 'Nouveau contrat' : 'Modifier ' + c.no,
@@ -331,7 +358,8 @@
         const cl = t.who === 'person' || t.who === 'none' ? '' : App.v('ct_cl'), p = { name: App.v('ct_pname').trim(), idno: App.v('ct_pidno').trim(), phone: App.v('ct_pphone').trim(), address: App.v('ct_paddr').trim() };
         if (!cl && !p.name && t.who !== 'none') { App.toast(t.who === 'person' ? (type === 'travail' ? 'Saisissez le nom de l\'employé(e)' : type === 'apporteur' ? 'Saisissez le nom de l\'apporteur' : type === 'revendeur' ? 'Saisissez le nom du revendeur' : type === 'hebergement' ? 'Saisissez le nom de l\'hôte' : type === 'confidentialite' ? 'Saisissez le nom du destinataire' : 'Saisissez le nom du prestataire') : 'Choisissez un client ou saisissez un nom'); return false; }
         if (type === 'libre' && !f.body) { App.toast('Écrivez le texte du contrat'); return false; }
-        if ((type === 'materiel' || type === 'travail' || type === 'abonnement' || type === 'fournisseur' || type === 'mandat' || type === 'prestataire' || type === 'apporteur' || type === 'revendeur') && !(f.amount > 0)) { App.toast(type === 'travail' ? 'Saisissez le salaire' : type === 'apporteur' ? 'Saisissez la commission' : type === 'revendeur' ? 'Saisissez la remise du revendeur' : 'Saisissez le montant'); return false; }
+        if ((type === 'materiel' || type === 'travail' || type === 'abonnement' || type === 'fournisseur' || type === 'mandat' || type === 'prestataire' || type === 'apporteur' || type === 'revendeur' || type === 'dette') && !(f.amount > 0)) { App.toast(type === 'dette' ? 'Saisissez le montant de la dette' : type === 'travail' ? 'Saisissez le salaire' : type === 'apporteur' ? 'Saisissez la commission' : type === 'revendeur' ? 'Saisissez la remise du revendeur' : 'Saisissez le montant'); return false; }
+        if (type === 'dette' && (f.deposit >= f.amount || !(f.count >= 1))) { App.toast(f.deposit >= f.amount ? 'Le versement à la signature doit être inférieur à la dette' : 'Indiquez au moins 1 versement'); return false; }
         if (type === 'installation' && (f.kind === 'maint' ? !(f.maint > 0) : !(f.amount > 0))) { App.toast(f.kind === 'maint' ? 'Saisissez la redevance de maintenance' : 'Saisissez le prix de l\'installation'); return false; }
         if (type === 'travail' && Math.round(App.n('ct_months')) > 0 && !f.motif) { App.toast('Un CDD exige un motif : saisissez-le, ou mettez la durée à 0 (CDI)'); return false; }
         const date = App.v('ct_date') || t0, start = App.v('ct_start') || date, months = t.noTerm ? 0 : Math.max(0, Math.round(App.n('ct_months')));
@@ -340,8 +368,17 @@
         else { Object.assign(c, o); if ($('ct_regen') && $('ct_regen').checked) { if (twoTexts(type) && c.src === 'perso') c.alt = bodyFor(c); else c.body = bodyFor(c); } else if (type === 'libre') c.body = f.body; }
         App.save(); App.toast(isNew ? 'Contrat créé : ' + c.no : 'Contrat modifié'); App.refresh(); if (isNew) setTimeout(() => App.actions[c.src === 'perso' ? 'ct_text' : 'ct_open']({ id: c.id }), 80); },
       isNew ? 'Créer le contrat' : 'Enregistrer');
-    render(c.type);
-    if ($('ct_type')) $('ct_type').onchange = () => render($('ct_type').value);
+    // debt: pick one of the client's unpaid invoices to fill the amount and the origin
+    let debtFill = null;
+    const wireDebt = ex => { const sel = $('cf_invid'); if (!sel) return;
+      debtFill = () => { const cid = App.v('ct_cl'), keep = sel.value || ex.invid || '', rows = App.db.invoices.filter(i => App.invDue(i) > 0.004 && (!cid || i.clientId === cid)); sel.innerHTML = App.opts([['', '— Aucune —'], ...rows.map(i => [i.id, `${i.number} · ${App.cname(App.client(i.clientId))} · reste ${App.fmt(App.invDue(i), i.currency)}`])], keep); if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep; };
+      debtFill();
+      sel.onchange = () => { const i = App.invoice(sel.value); if (!i) return; if (i.clientId && $('ct_cl').value !== i.clientId) { $('ct_cl').value = i.clientId; $('ct_cl').dispatchEvent(new Event('change')); debtFill(); sel.value = i.id; }
+        $('cf_amount').value = Math.round(App.invDue(i) * 100) / 100; $('cf_origin').value = `Facture ${i.number} du ${App.fdate(i.date)}`; if ($('ct_cur')) $('ct_cur').value = i.currency === 'CDF' ? 'CDF' : 'USD'; }; };
+    const renderAll = type => { debtFill = null; render(type); if (type === 'dette') wireDebt(type === c.type ? c.f || {} : {}); };
+    renderAll(c.type);
+    if ($('ct_type')) $('ct_type').onchange = () => renderAll($('ct_type').value);
+    $('ct_cl').addEventListener('change', () => { if (debtFill) debtFill(); });
     App.wireClientFinder('ct_cl', s => App.clientOpts('— Autre (saisir ci-dessous) —', null, s));
     $('ct_cl').onchange = () => { const cl = App.client($('ct_cl').value); $('ct_party').hidden = !!cl; if (cl) { const s = $('cf_site'), a = $('cf_acc'); if (s && !s.value) s.value = cl.installAddr || cl.address || ''; if (a && !a.value) a.value = cl.acc || ''; const pl = $('cf_plan'); if (pl && cl.plan && !pl.value) pl.value = cl.plan; } };
   };
