@@ -512,6 +512,10 @@ Contrats → Nouveau contrat → **Confidentialité (NDA)** (13 articles, deux t
 - **Restitution ou destruction** sous 7 jours (réglable), **confidentialité 3 ans après la fin** (réglable ; sans limite pour les données personnelles et les secrets commerciaux), pénalité facultative par manquement (0 = aucune).
 - ⚠️ À faire confirmer par un avocat : la durée de 3 ans après la fin, la validité de la pénalité (le juge peut la réduire) et la conformité avec le Code du numérique pour les données personnelles.
 
+### Nom du fichier d'une facture
+
+Quand vous **partagez en PDF**, **enregistrez en Word** ou **imprimez en PDF** une facture, le fichier porte le **nom du client** puis le numéro de la facture (par exemple « Marie Kabasele - FAC-0012.pdf »). Les caractères interdits dans un nom de fichier sont retirés.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.

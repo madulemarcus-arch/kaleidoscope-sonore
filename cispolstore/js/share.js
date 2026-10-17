@@ -48,6 +48,6 @@
       App.toast('PDF enregistré : ' + name);
     } catch (e) { console.warn('sharePdf', e); App.toast('PDF indisponible sur cet appareil : utilisez Imprimer'); }
   };
-  App.actions.invshare = async d => { const i = App.invoice(d.id); if (i) App.sharePdf(`${i.number}.pdf`, App.invoiceDoc(i, await App.docKit.logoData(), await App.docKit.stampData())); };
+  App.actions.invshare = async d => { const i = App.invoice(d.id); if (i) App.sharePdf(`${App.invFileName(i)}.pdf`, App.invoiceDoc(i, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.recshare = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) App.sharePdf(`Recu-${App.receiptNo(p)}.pdf`, App.receiptDoc(p, await App.docKit.logoData(), await App.docKit.stampData())); };
 })();
