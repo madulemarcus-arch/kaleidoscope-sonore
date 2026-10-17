@@ -282,15 +282,17 @@
     try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
   };
   App.docKit = { DOC_CSS: () => PAPER_CSS, logoData, stampData, head: paperHead, boxes: twoBoxes, foot: paperFoot, money, print: printRaw };
+  // file name of an invoice: the client's name first, then the number (browsers use the page title when saving a print as PDF)
+  App.invFileName = inv => { const n = String(App.cname(App.client(inv.clientId)) || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return n ? `${n} - ${inv.number}` : String(inv.number); };
   const printDoc = async inv => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;
     f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
   const wordDoc = async inv => {
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}</body></html>`;
-    App.download(`${inv.number}.doc`, html, 'application/msword');
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}</body></html>`;
+    App.download(`${App.invFileName(inv)}.doc`, html, 'application/msword');
   };
 
   // what this invoice is made of: installation (technicians), subscription (Starlink) and CISPOLstore's own revenue
