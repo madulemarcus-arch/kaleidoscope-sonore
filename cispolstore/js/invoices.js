@@ -78,7 +78,7 @@
     const draw = () => {
       const t = total();
       $('cart').innerHTML = draft.lines.length ? `<div class="list">${draft.lines.map((l, k) => `<div class="item"><div class="grow"><b>${esc(l.desc)}</b><small>${l.qty} ${esc(l.unit || '')} × ${App.fmt(l.price, cur())}</small></div><b>${App.fmt(l.qty * l.price, cur())}</b><button type="button" class="btn sm del" data-act="rmline" data-i="${k}">✕</button></div>`).join('')}<div class="item"><div class="grow"><b>Total</b></div><b>${App.fmt(t, cur())}</b></div></div>` : '<div class="empty" style="padding:10px">Aucune ligne. Ajoutez un article ci-dessous.</div>';
-      if (!draft.paidTouched) $('f_paid').value = t ? round(App.conv(t, cur(), $('f_pcur').value, frate()), $('f_pcur').value) : '';
+      if (!draft.paidTouched) $('f_paid').value = $('f_pend') && $('f_pend').checked ? '' : t ? round(App.conv(t, cur(), $('f_pcur').value, frate()), $('f_pcur').value) : '';
       paySync();
     };
     const round = (n, c) => c === 'CDF' ? Math.round(n) : Math.round(n * 100) / 100;
@@ -87,6 +87,8 @@
       const c = cur(), pc = $('f_pcur').value, rate = frate(), tot = total(), given = App.n('f_paid'), gInv = App.conv(given, pc, c, rate);
       $('p_total').textContent = App.fmt(tot, c) + (pc !== c ? ' ≈ ' + App.fmt(App.conv(tot, c, pc, rate), pc) : '');
       const el = $('p_sum'); const canNeg = given > 0 && gInv < tot - 0.004; $('p_negw').style.display = canNeg ? '' : 'none'; if (!canNeg) $('f_neg').checked = false;
+      const pn = $('f_pend') && $('f_pend').checked;
+      if (pn) { $('p_negw').style.display = 'none'; $('f_neg').checked = false; el.className = given > 0 ? 'ok' : 'mut'; el.textContent = given > 0 ? `Acompte noté : ${App.fmt(Math.min(given, App.conv(tot, c, pc, rate)), pc)} (le solde sera à encaisser quand le client prendra le produit).` : 'Aucun acompte : laissez vide si le client n\'a rien donné.'; return; }
       if (!(given > 0)) { el.className = 'warn'; el.textContent = tot ? `Aucun paiement enregistré : la facture restera impayée (reste ${App.fmt(tot, c)}).` : ''; }
       else if (gInv >= tot - 0.004) { el.className = 'ok'; el.textContent = '✅ Payée en totalité' + (gInv - tot > 0.004 ? ` · À rendre au client : ${App.fmt(round(App.conv(gInv - tot, c, pc, rate), pc), pc)}` : ''); }
       else { el.className = 'warn'; el.textContent = `Le client a donné ${App.fmt(given, pc)} · Reste à payer : ${App.fmt(tot - gInv, c)}` + ($('f_neg').checked ? ' → sera soldée au prix convenu' : ''); }
@@ -117,7 +119,7 @@
        ${renewBlock}${instBlock}
        <label class="chk" style="display:block;margin-top:14px;padding:10px;border:2px dashed var(--acc);border-radius:10px"><input type="checkbox" id="f_pend"> <b>⏳ Facture en attente</b> : le client demande seulement la facture et n'a pas encore pris le produit. Rien n'est déduit du stock ni compté dans les ventes jusqu'à la validation.</label>
        <div class="card" id="paycard" style="margin-top:14px;border:2px solid var(--acc)">
-         <h2 class="sec" style="margin:0 0 6px">💰 Paiement du client</h2>
+         <h2 class="sec" style="margin:0 0 6px" id="p_title">💰 Paiement du client</h2>
          <div class="spread"><span>Total à payer</span><b id="p_total" style="font-size:18px"></b></div>
          <div class="row">${F.num('f_paid', 'Le client a donné', '')}${F.sel('f_pcur', 'En', CUR, 'USD')}</div>
          <div class="bar"><button type="button" class="btn sm sec" id="p_all">Tout payé</button><button type="button" class="btn sm sec" id="p_half">La moitié</button><button type="button" class="btn sm sec" id="p_none">Rien pour l'instant</button></div>
@@ -144,7 +146,7 @@
         const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
         const pc = App.v('f_pcur') || curr, given = App.n('f_paid'), gInv = App.conv(given, pc, curr, rate), payAmount = given > 0 ? (gInv > total ? round(App.conv(total, curr, pc, rate), pc) : given) : 0;
         const prevSub = c ? { start: c.start || '', period: c.period, price: c.price } : null;
-        const pend = !!($('f_pend') && $('f_pend').checked), inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate, pending: pend || undefined, payAmount: pend ? 0 : payAmount, payCur: pc, payRef: App.v('f_ref') }, 0);
+        const pend = !!($('f_pend') && $('f_pend').checked), inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate, pending: pend || undefined, payAmount, payCur: pc, payRef: App.v('f_ref') }, 0);
         const fx = { renewed, prevSub };
         if (['installation', 'complete'].includes(type) && cid) {
           const fee = lines.filter(l => !l.pid && /install/i.test(l.desc)).reduce((a, l) => a + l.qty * l.price, 0);
@@ -201,7 +203,7 @@
     };
     $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'Starlink'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur(), frate()) : ''; $('f_price').focus(); };
     $('f_addinst').onclick = () => { $('f_prod').value = ''; $('f_desc').value = 'Installation Starlink'; $('f_qty').value = 1; $('f_price').value = ''; $('f_price').focus(); };
-    $('f_pend').onchange = () => { $('paycard').style.display = $('f_pend').checked ? 'none' : ''; }; $('f_neg').onchange = paySync; $('f_paid').oninput = () => { draft.paidTouched = true; paySync(); };
+    $('f_pend').onchange = () => { const pn = $('f_pend').checked; $('p_title').textContent = pn ? '💰 Acompte reçu du client (facultatif)' : '💰 Paiement du client'; $('p_all').style.display = pn ? 'none' : ''; draft.paidTouched = pn; if (pn) $('f_paid').value = ''; else { draft.paidTouched = false; draw(); } paySync(); }; $('f_neg').onchange = paySync; $('f_paid').oninput = () => { draft.paidTouched = true; paySync(); };
     $('f_pcur').onchange = () => { draft.paidTouched = false; draw(); };
     $('p_all').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total(), cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
     $('p_half').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total() / 2, cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
@@ -309,7 +311,7 @@
           ${i.clientId && App.client(i.clientId) ? `<button class="chip" data-act="go" data-v="client" data-id="${i.clientId}">👤 ${esc(App.cname(App.client(i.clientId)))} ›</button>` : ''}</section>
         <div class="card" style="margin-bottom:10px"><div class="spread"><span>Total de la facture imprimée</span><b>${App.fmt(App.invTotal(i), i.currency)}</b></div>${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<div class="spread"><span>Prix convenu (négocié)</span><b>${App.fmt(App.invAgreed(i), i.currency)}</b></div>` : ''}<div class="spread"><span>Reçu du client</span><b class="ok">${App.fmt(App.invPaid(i), i.currency)}</b></div><div class="spread"><span>Reste à payer</span><b class="${due > 0.004 ? 'bad' : 'ok'}">${App.fmt(due, i.currency)}</b></div></div>
         ${splitCardInv(i)}
-        ${i.pending ? `<div class="card noprint" style="margin-bottom:10px;border:2px solid var(--warn,#e8a317)"><b>⏳ Facture en attente</b><p class="mut" style="margin:6px 0">Le client a la facture mais la vente n'est pas encore faite : le stock n'est pas déduit, rien n'est compté dans les ventes ni dans les impayés.</p><div class="bar"><button class="btn" data-act="invvalid" data-id="${i.id}">✅ Le client prend le produit</button><button class="btn del" data-act="invcancel" data-id="${i.id}">✖ Le client n'en veut plus</button></div></div>` : ''}
+        ${i.pending ? `<div class="card noprint" style="margin-bottom:10px;border:2px solid var(--warn,#e8a317)"><b>⏳ Facture en attente</b><p class="mut" style="margin:6px 0">Le client a la facture mais la vente n'est pas encore faite : le stock n'est pas déduit, rien n'est compté dans les ventes ni dans les impayés.</p><div class="bar"><button class="btn sec" data-act="newpay" data-iid="${i.id}">💰 Recevoir un acompte</button><button class="btn" data-act="invvalid" data-id="${i.id}">✅ Le client prend le produit</button><button class="btn del" data-act="invcancel" data-id="${i.id}">✖ Le client n'en veut plus</button></div></div>` : ''}
         <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}${due > 0.004 && App.invPaid(i) > 0.004 ? `<button class="btn sec" data-act="invneg" data-id="${i.id}">🤝 Solder au prix négocié</button>` : ''}${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<button class="btn sec" data-act="invunneg" data-id="${i.id}">↩ Annuler le prix négocié</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button><button class="btn sec" data-act="invshare" data-id="${i.id}">📤 Partager en PDF</button></div>
         ${App.invoiceDoc(i)}
         ${pays.length ? `<h2 class="sec noprint">Paiements reçus</h2><div class="list noprint">${App.invPayments(i).map(({ p: x, n, left }) => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(App.receiptNo(x))}${x.ref ? ' · ' + esc(x.ref) : ''} · reste ${App.fmt(left, i.currency)}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${x.id}" title="Imprimer le reçu">🧾</button><button class="btn sm sec" data-act="recshare" data-id="${x.id}" title="Partager le reçu en PDF">📤</button></div>`).join('')}</div>` : ''}
@@ -356,35 +358,36 @@
   // ---------- Payments ----------
   App.paymentForm = (pre = {}) => {
     const db = App.db;
-    const invOpts = cid => [['', '— Sans facture —'], ...db.invoices.filter(i => App.invDue(i) > 0.004 && (!cid || i.clientId === cid)).map(i => [i.id, `${i.number} · ${App.cname(App.client(i.clientId))} · reste ${App.fmt(App.invDue(i), i.currency)}`])];
+    const bal = i => i.pending ? Math.max(0, App.invAgreed(i) - App.invPaid(i)) : App.invDue(i); // a pending invoice can already receive a deposit
+    const invOpts = cid => [['', '— Sans facture —'], ...db.invoices.filter(i => bal(i) > 0.004 && (!cid || i.clientId === cid)).map(i => [i.id, `${i.number} · ${App.cname(App.client(i.clientId))} · ${i.pending ? '⏳ en attente · ' : ''}reste ${App.fmt(bal(i), i.currency)}`])];
     const inv0 = App.invoice(pre.invoiceId), cid0 = pre.clientId || (inv0 && inv0.clientId) || '';
     App.modal('Nouveau paiement',
       `${App.clientFinder('f_cl')}${F.sel('f_cl', 'Client', App.clientOpts('— Aucun —'), cid0)}${F.sel('f_inv', 'Facture', invOpts(cid0), pre.invoiceId || '')}
-       <div class="row">${F.num('f_amt', 'Montant', inv0 ? App.invDue(inv0) : '')}${F.sel('f_cur', 'Devise', CUR, inv0 ? inv0.currency : 'USD')}</div>
+       <div class="row">${F.num('f_amt', 'Montant', inv0 ? bal(inv0) : '')}${F.sel('f_cur', 'Devise', CUR, inv0 ? inv0.currency : 'USD')}</div>
        <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
        ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}
        ${F.text('f_ref', 'Référence (n° transaction)', '')}${F.text('f_com', 'Commentaire', '')}`,
       () => {
         let amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
         const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
-        if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > App.invDue(i) + 0.004 && App.invDue(i) > 0.004) amt = Math.round(App.conv(App.invDue(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
+        if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > bal(i) + 0.004 && bal(i) > 0.004) amt = Math.round(App.conv(bal(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
         if (rate !== App.rate()) App.setRate(rate);
         db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
         App.log(cid, `Paiement ${App.fmt(amt, App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
         if (i && $('f_neg').checked && !$('pp_negw').style.display) { i.agreed = Math.round(App.invPaid(i) * 100) / 100; App.log(cid, `Prix négocié sur ${i.number} : ${App.fmt(i.agreed, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); }
         const np = db.payments[db.payments.length - 1]; App.save(); App.refresh();
         App.undoBar('Paiement enregistré : ' + App.fmt(amt, App.v('f_cur')), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
-        if (i && App.invDue(i) <= 0.004) App.celebrate();
+        if (i && bal(i) <= 0.004) App.celebrate();
       }, 'Enregistrer le paiement');
     // live balance + quick buttons (works for old invoices too)
     const box = document.createElement('div'); box.className = 'fld'; box.innerHTML = '<div class="bar"><button class="btn sec sm" type="button" id="pp_all">Tout le reste</button><button class="btn sec sm" type="button" id="pp_half">Moitié</button></div><div id="pp_msg" class="muted" style="margin-top:6px"></div><label id="pp_negw" class="chk" style="display:none;margin-top:6px"><input type="checkbox" id="f_neg"> Le client a marchandé : solder la facture avec ce paiement (prix convenu)</label>';
     $('f_amt').closest('.row').before(box);
-    const ppSync = () => { const i = App.invoice($('f_inv').value), a = App.n('f_amt'); if (!i) { $('pp_msg').textContent = ''; $('pp_negw').style.display = 'none'; return; } const d = App.invDue(i), g = App.conv(a, App.v('f_cur'), i.currency, App.rateOf(i)), left = d - g; $('pp_negw').style.display = left > 0.004 ? '' : 'none'; if (left <= 0.004) $('f_neg').checked = false; $('pp_msg').textContent = left > 0.004 ? `Reste après ce paiement : ${App.fmt(left, i.currency)}` : left < -0.004 ? `Trop perçu : ${App.fmt(-left, i.currency)} à rendre au client (le solde sera ramené à 0)` : '✅ La facture sera soldée'; };
-    const ppFill = k => { const i = App.invoice($('f_inv').value); if (!i) return App.toast('Choisissez d\'abord une facture'); $('f_cur').value = i.currency; $('f_amt').value = Math.round(App.invDue(i) * k * 100) / 100; ppSync(); };
+    const ppSync = () => { const i = App.invoice($('f_inv').value), a = App.n('f_amt'); if (!i) { $('pp_msg').textContent = ''; $('pp_negw').style.display = 'none'; return; } const d = bal(i), g = App.conv(a, App.v('f_cur'), i.currency, App.rateOf(i)), left = d - g; $('pp_negw').style.display = left > 0.004 && !i.pending ? '' : 'none'; if (left <= 0.004 || i.pending) $('f_neg').checked = false; $('pp_msg').textContent = left > 0.004 ? `Reste après ce paiement : ${App.fmt(left, i.currency)}` : left < -0.004 ? `Trop perçu : ${App.fmt(-left, i.currency)} à rendre au client (le solde sera ramené à 0)` : '✅ La facture sera soldée'; };
+    const ppFill = k => { const i = App.invoice($('f_inv').value); if (!i) return App.toast('Choisissez d\'abord une facture'); $('f_cur').value = i.currency; $('f_amt').value = Math.round(bal(i) * k * 100) / 100; ppSync(); };
     $('pp_all').onclick = () => ppFill(1); $('pp_half').onclick = () => ppFill(.5); $('f_amt').oninput = ppSync; $('f_cur').onchange = ppSync; ppSync();
     $('f_cl').onchange = () => { $('f_inv').innerHTML = App.opts(invOpts($('f_cl').value)); };
     App.wireClientFinder('f_cl', q => App.clientOpts('— Aucun —', null, q));
-    $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = App.invDue(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } ppSync(); };
+    $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = bal(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } ppSync(); };
   };
   // negotiated price on an existing invoice: what was already received becomes the agreed price
   App.actions.invneg = d => { const i = App.invoice(d.id); if (!i) return; const p = Math.round(App.invPaid(i) * 100) / 100;
@@ -392,7 +395,7 @@
     i.agreed = p; App.log(i.clientId, `Prix négocié sur ${i.number} : ${App.fmt(p, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); App.save(); App.refresh(); App.celebrate(); };
   App.actions.invunneg = d => { const i = App.invoice(d.id); if (!i) return; delete i.agreed; App.save(); App.refresh(); App.toast('Prix négocié annulé'); };
   App.actions.invvalid = d => { const i = App.invoice(d.id); if (!i) return; if (!App.confirm(`Valider la vente ${i.number} ? Le stock sera déduit et la facture comptera dans les ventes.`)) return; App.validateInvoice(i.id); App.refresh(); if (App.invDue(i) > 0.004) App.paymentForm({ invoiceId: i.id }); };
-  App.actions.invcancel = d => { const i = App.invoice(d.id); if (!i || !i.pending) return; if (!App.confirm(`Annuler la facture ${i.number} ? Le client ne prend pas le produit : rien n'a été déduit du stock.`)) return; App.removeInvoices([i.id]); App.go('invoices'); };
+  App.actions.invcancel = d => { const i = App.invoice(d.id); if (!i || !i.pending) return; const dep = App.invPaid(i); if (!App.confirm(`Annuler la facture ${i.number} ? Le client ne prend pas le produit : rien n'a été déduit du stock.${dep > 0.004 ? ` Le client avait donné ${App.fmt(dep, i.currency)} : rendez-lui cet argent (l'acompte sera retiré de la caisse).` : ''}`)) return; App.removeInvoices([i.id]); App.go('invoices'); };
   App.actions.newpay = d => App.paymentForm({ clientId: d.cid, invoiceId: d.iid });
 
   const pq = { mode: 'all' };

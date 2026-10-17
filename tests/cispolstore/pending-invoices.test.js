@@ -7,7 +7,7 @@ await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-
 await p.selectOption('#f_cl','c1');await p.selectOption('#f_prod','p1').catch(()=>{});
 const hasProd=await p.evaluate(()=>!!document.getElementById('f_prod'));
 await p.fill('#f_desc','Kit');await p.fill('#f_price','100');await p.click('#f_add');
-await p.check('#f_pend');ok('payment card hidden',!(await p.isVisible('#paycard')));await p.click('#dok');await p.waitForTimeout(300);
+await p.check('#f_pend');ok('payment card stays as an optional deposit, not pre-filled',await p.isVisible('#paycard')&&/Acompte reçu/.test(await p.innerText('#paycard'))&&(await p.inputValue('#f_paid'))==='');await p.click('#dok');await p.waitForTimeout(300);
 const r=await p.evaluate(()=>{const i=App.db.invoices[0];return{pend:i.pending,st:App.invStatus(i),due:App.invDue(i),pays:App.db.payments.length,qty:App.db.products[0].qty,mv:App.db.moves.length,unpaid:App.db.invoices.filter(x=>App.invDue(x)>0).length}});
 ok('pending, no payment, status pending',r.pend===true&&r.st==='pending'&&r.pays===0&&r.due===0);
 ok('not in unpaid list',r.unpaid===0);
