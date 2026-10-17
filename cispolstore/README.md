@@ -523,6 +523,16 @@ Contrats → Nouveau contrat → **Conditions d'utilisation du Wi-Fi** (13 artic
 - Contenu : service fourni « en l'état », ticket prépayé non remboursable, usages autorisés et interdits, responsabilité de l'utilisateur, réseau public non sécurisé, données personnelles non vendues, coupure sans remboursement en cas d'abus, responsabilité limitée au prix du ticket.
 - ⚠️ À faire confirmer par un avocat : la conformité avec le Code du numérique (conservation des données de connexion, durée de 12 mois), la validité de la limitation de responsabilité et la valeur de l'acceptation par simple connexion.
 
+### Reconnaissance de dette avec échéancier
+
+Contrats → Nouveau contrat → **Reconnaissance de dette (échéancier)** (14 articles, 15 avec caution, deux textes comme les autres contrats intégrés). Le débiteur est un **client de l'application** ou une personne saisie à la main ; CISPOLstore est le créancier.
+- **Facture impayée** (facultatif) : la liste montre les factures impayées du client choisi ; en en choisissant une, le client, le montant restant dû, la devise et l'origine (« Facture … du … ») se remplissent tout seuls.
+- **Échéancier calculé** par l'application : nombre de versements (6 par défaut), rythme (mensuel, tous les 15 jours ou hebdomadaire), date du premier versement (30 jours après la signature par défaut) et **versement à la signature** facultatif ; le tableau indique la date, le montant et le solde restant de chaque échéance, et la dernière échéance solde exactement la dette.
+- **Intérêt** : aucun par défaut (réglable en % par mois). **Pénalité de retard** de 5 % de l'échéance après 5 jours de grâce, **déchéance du terme** après 2 échéances impayées et 7 jours d'avertissement (tout réglable).
+- Remboursement anticipé sans frais, frais de recouvrement, **caution** facultative (un article de plus), mention manuscrite « Lu et approuvé, bon pour reconnaissance de dette de … ».
+- Le suivi automatique des remboursements (échéances payées ou en retard, alertes) n'existe pas encore : les versements s'enregistrent comme d'habitude dans les paiements.
+- ⚠️ À faire confirmer par un avocat : le plafond légal des intérêts (usure) avant d'en demander, la validité de la pénalité et de la clause de déchéance, et l'intérêt d'une légalisation chez un notaire pour les gros montants.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
