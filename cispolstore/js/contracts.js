@@ -427,6 +427,9 @@
     if (p.phone) window.open(App.waUrl(p.phone, txt), '_blank', 'noopener'); else window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank', 'noopener'); };
 
   // ---------- detail ----------
+  // whole contract text, article by article, with the placeholders filled in
+  const fullText = c => { const blocks = fill(c.body, c).split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+    return blocks.length ? blocks.map(b => { const [h, ...r] = b.split('\n'); return /^article\b/i.test(h) ? `<p style="margin:10px 0 2px"><b>${esc(h)}</b></p>${r.length ? `<p style="margin:0;white-space:pre-line">${esc(r.join('\n'))}</p>` : ''}` : `<p style="margin:8px 0;white-space:pre-line">${esc(b)}</p>`; }).join('') : '<p class="mut">Texte vide : ajoutez des articles avec « 📝 Articles ».</p>'; };
   App.actions.ct_open = x => {
     const c = list().find(y => y.id === x.id); if (!c) return; const s = STAT[App.contractStatus(c)], t = T(c), p = partyOf(c);
     App.modal('Contrat ' + c.no,
@@ -434,6 +437,7 @@
         <div class="mut">${esc(p.name)}${p.phone ? ' · ' + esc(p.phone) : ''}</div><div class="mut">Signé le ${App.fdate(c.date)} · du ${App.fdate(c.start)}${c.end ? ' au ' + App.fdate(c.end) : ' (durée indéterminée)'}</div>
         ${c.f && c.f.amount ? `<div class="spread" style="margin-top:8px"><span>Montant</span><b style="font-size:18px">${App.fmt(c.f.amount, c.currency)}</b></div>` : ''}</div>
        <div class="bar noprint"><button type="button" class="btn sec" data-act="ct_print" data-id="${c.id}">🖨️ Imprimer</button><button type="button" class="btn sec" data-act="ct_pdf" data-id="${c.id}">📤 PDF</button><button type="button" class="btn sec" data-act="ct_wa" data-id="${c.id}">💬 WhatsApp</button></div>
+       <div class="card" id="ct_full" style="margin:0 0 10px"><div class="spread"><b>📜 Texte complet du contrat</b>${twoTexts(c.type) ? `<span class="mut">${c.src === 'perso' ? 'mon propre texte' : 'texte proposé'}</span>` : ''}</div>${fullText(c)}</div>
        ${twoTexts(c.type) ? `<div class="spread" style="margin:0 0 8px"><span class="mut">Texte en vigueur : <b>${c.src === 'perso' ? 'mon propre texte' : 'texte proposé'}</b></span><button type="button" class="btn sm sec" data-act="ct_swap" data-id="${c.id}">⇄ ${c.src === 'perso' ? 'Utiliser le texte proposé' : 'Utiliser mon propre texte'}</button></div>` : ''}<div class="bar"><button type="button" class="btn sec" data-act="ct_text" data-id="${c.id}">📝 Articles : lire, ajouter, modifier</button></div>
        ${c.status === 'draft' ? `<div class="bar"><button type="button" class="btn" data-act="ct_set" data-id="${c.id}" data-s="active">✅ Signé : mettre en cours</button></div>` : ''}
        ${c.status === 'active' ? `<div class="bar"><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="ended">🏁 Terminé</button><button type="button" class="btn sec" data-act="ct_set" data-id="${c.id}" data-s="cancelled">⛔ Résilié</button>${c.end ? `<button type="button" class="btn" data-act="ct_renew" data-id="${c.id}">🔁 Renouveler</button>` : ''}</div>` : ''}
