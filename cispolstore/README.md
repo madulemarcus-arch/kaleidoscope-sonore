@@ -533,6 +533,18 @@ Contrats → Nouveau contrat → **Reconnaissance de dette (échéancier)** (14 
 - Le suivi automatique des remboursements (échéances payées ou en retard, alertes) n'existe pas encore : les versements s'enregistrent comme d'habitude dans les paiements.
 - ⚠️ À faire confirmer par un avocat : le plafond légal des intérêts (usure) avant d'en demander, la validité de la pénalité et de la clause de déchéance, et l'intérêt d'une légalisation chez un notaire pour les gros montants.
 
+### Location de matériel avec caution
+
+Contrats → Nouveau contrat → **Location de matériel (avec caution)** (14 articles, 15 avec option d'achat, deux textes comme les autres contrats intégrés). Le locataire est un **client de l'application** ou une personne saisie à la main ; CISPOLstore est le loueur. Durée de 6 mois par défaut (modifiable, 0 = indéterminée).
+- **Matériel** : désignation avec numéros de série (champ libre) et **valeur de remplacement** (obligatoire) ; lieu d'utilisation repris de l'adresse du client.
+- **Loyer** obligatoire, par mois (ou par semaine), payable d'avance.
+- **Caution** : vide = égale à la valeur du matériel ; rendue sous 7 jours après contrôle de la restitution, déduction faite des sommes dues.
+- Dépannage sous 48 h ouvrables, vol déclaré sous 24 h, perte/vol/dommages remboursés à la valeur de l'inventaire diminuée de l'usure normale.
+- Retard : 5 jours de grâce, pénalité de 5 % du loyer, reprise du matériel après 2 loyers impayés et 7 jours d'avertissement ; préavis de 15 jours, restitution sous 48 h.
+- **Option d'achat** facultative (prix et part des loyers déduite du prix) : un article de plus.
+- Le suivi du stock (matériel sorti en location, remis en stock à la restitution) n'existe pas encore.
+- ⚠️ À faire confirmer par un avocat : la qualification du contrat (louage de choses), la validité de la clause de reprise du matériel sans décision de justice et de la pénalité.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
