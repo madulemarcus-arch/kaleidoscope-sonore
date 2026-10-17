@@ -516,6 +516,13 @@ Contrats → Nouveau contrat → **Confidentialité (NDA)** (13 articles, deux t
 
 Quand vous **partagez en PDF**, **enregistrez en Word** ou **imprimez en PDF** une facture, le fichier porte le **nom du client** puis le numéro de la facture (par exemple « Marie Kabasele - FAC-0012.pdf »). Les caractères interdits dans un nom de fichier sont retirés.
 
+### Conditions d'utilisation du Wi-Fi
+
+Contrats → Nouveau contrat → **Conditions d'utilisation du Wi-Fi** (13 articles, deux textes comme les autres contrats intégrés). Ce n'est **pas un contrat signé** : c'est le texte que les clients de WiFi Zone acceptent en se connectant (page de connexion, affiche au point de vente, dos du ticket). Il n'a ni client, ni durée, ni signature ; le document imprimé porte « Version en vigueur à partir du … » et la mention d'acceptation par la connexion.
+- Réglages : point de vente ou zone (facultatif, affiché dans la liste), **un seul appareil** par ticket (ou plusieurs), durée du ticket qui commence à la **première connexion** (ou à la vente), conservation des données de connexion **12 mois**, délai de réclamation **24 h**, contact de réclamation (téléphone de l'entreprise par défaut), interdiction supplémentaire propre au point de vente (facultative).
+- Contenu : service fourni « en l'état », ticket prépayé non remboursable, usages autorisés et interdits, responsabilité de l'utilisateur, réseau public non sécurisé, données personnelles non vendues, coupure sans remboursement en cas d'abus, responsabilité limitée au prix du ticket.
+- ⚠️ À faire confirmer par un avocat : la conformité avec le Code du numérique (conservation des données de connexion, durée de 12 mois), la validité de la limitation de responsabilité et la valeur de l'acceptation par simple connexion.
+
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
