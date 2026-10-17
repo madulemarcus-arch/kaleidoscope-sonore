@@ -43,7 +43,7 @@ await p.keyboard.press('Escape');await p.waitForTimeout(200);
 await p.evaluate(()=>App.go('client',{id:'c1',tab:'fac'}));await p.waitForTimeout(500);ok('client sheet lists the contract',/CTR-/.test(await p.innerText('#view')));
 // other types
 const gens=await p.evaluate(()=>Object.keys(App.contractTypes));
-ok('12 contract types',gens.length===12&&['abonnement','fournisseur','materiel','installation','prestataire','confidentialite','hebergement','revendeur','apporteur','mandat','travail','libre'].every(k=>gens.includes(k)),gens.join(','));
+ok('13 contract types',gens.length===13&&['abonnement','fournisseur','materiel','installation','prestataire','cgu','confidentialite','hebergement','revendeur','apporteur','mandat','travail','libre'].every(k=>gens.includes(k)),gens.join(','));
 async function create(type,fill,extra){await p.evaluate(()=>App.go('contracts'));await p.waitForTimeout(300);await p.click('[data-act=ct_new]');await p.waitForTimeout(300);await p.selectOption('#ct_type',type);await p.waitForTimeout(200);
  if(extra&&extra.client)await p.selectOption('#ct_cl',extra.client);else{await p.fill('#ct_pname',extra&&extra.name||'Marie T');}
  for(const [k,v] of Object.entries(fill)){if(k==='_months'){await p.fill('#ct_months',String(v));continue}const el=await p.$('#cf_'+k);if(el){const tag=await el.evaluate(e=>e.tagName);if(tag==='SELECT')await p.selectOption('#cf_'+k,v);else await p.fill('#cf_'+k,String(v));}}
