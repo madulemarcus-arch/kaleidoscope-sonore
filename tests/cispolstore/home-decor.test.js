@@ -10,11 +10,19 @@ ok('default decor: no extra class',!/decor-/.test(await heroCls()));
 for(const d of ['sunset','night','aurora']){await p.evaluate(d=>App.actions.decor_set({d}),d);await p.waitForTimeout(300);ok('scene '+d+' on the card',(await heroCls()).includes('decor-'+d)&&await p.evaluate(d=>App.db.settings.decor===d,d))}
 // bundled Starlink photos
 await p.evaluate(()=>App.actions.decor_set({d:'starlink'}));await p.waitForTimeout(1500);
-ok('Starlink decor: a band of small photo cards, not one big photo',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),t=[...h.querySelectorAll('.hbg .hband i')];if(t.length<8)return false;const w=t[0].getBoundingClientRect().width,hw=h.getBoundingClientRect().width;return h.classList.contains('decor-starlink')&&w<hw*0.6&&t.slice(0,4).every(x=>/photos\/starlink-\d\.jpg/.test(x.style.backgroundImage))}));
-const x0=await p.evaluate(()=>document.querySelector('.hero .hband i').getBoundingClientRect().x);await p.waitForTimeout(1000);
-const x1=await p.evaluate(()=>document.querySelector('.hero .hband i').getBoundingClientRect().x);
-ok('the cards slide by themselves (one after the other)',x0-x1>30,x0.toFixed(0)+' -> '+x1.toFixed(0));
-ok('cards cover only a part of the card height',await p.evaluate(()=>{const h=document.querySelector('.hero').getBoundingClientRect(),c=document.querySelector('.hero .hband').getBoundingClientRect();return c.height<h.height*0.7}));
+await p.waitForTimeout(500);
+ok('Starlink decor: small photo cards pass over the card (not one big photo)',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),t=[...h.querySelectorAll('.hbg .hcard')];if(!t.length)return false;const hw=h.getBoundingClientRect().width;return h.classList.contains('decor-starlink')&&t.every(x=>x.getBoundingClientRect().width<hw*0.6)&&t.every(x=>/photos\/starlink-\d\.jpg/.test(x.style.backgroundImage))}));
+// every direction really moves the cards the right way
+const snap=()=>p.evaluate(()=>{const h=document.querySelector('.hero').getBoundingClientRect();return [...document.querySelectorAll('.hero .hcard')].map(c=>{const r=c.getBoundingClientRect();return {x:r.x+r.width/2-h.x-h.width/2,y:r.y+r.height/2-h.y-h.height/2,ok:r.right>h.x&&r.left<h.right&&r.bottom>h.y&&r.top<h.bottom}})});
+for(const dir of ['ltr','rtl','ttb','btt','center']){await p.evaluate(d=>App.photo.next(d),dir);await p.waitForTimeout(1500);const a1=await snap();await p.waitForTimeout(350);const a2=await snap();
+ let dx=0,dy=0,dist=0,n=0;a1.forEach((c,i)=>{const d=a2[i];if(d&&c.ok&&d.ok){dx+=d.x-c.x;dy+=d.y-c.y;dist+=Math.hypot(d.x,d.y)-Math.hypot(c.x,c.y);n++}});
+ const good=n>0&&(dir==='ltr'?dx>0&&Math.abs(dx)>Math.abs(dy):dir==='rtl'?dx<0&&Math.abs(dx)>Math.abs(dy):dir==='ttb'?dy>0&&Math.abs(dy)>Math.abs(dx):dir==='btt'?dy<0&&Math.abs(dy)>Math.abs(dx):dist>0);
+ ok('direction '+dir+': the cards move the right way',good,`n=${n} dx=${dx.toFixed(0)} dy=${dy.toFixed(0)} dist=${dist.toFixed(0)}`)}
+// the direction is drawn at random, never twice in a row
+await p.evaluate(()=>{App.photo.dirs.length=0;for(let i=0;i<16;i++)App.photo.next()});
+const dirs=await p.evaluate(()=>App.photo.dirs.slice());
+ok('random directions: at least 4 different kinds in 16 passes',new Set(dirs).size>=4,dirs.join(','));
+ok('never the same direction twice in a row',dirs.every((d,i)=>i===0||d!==dirs[i-1]));
 ok('bundled photos are light (< 300 Ko in total) and all load',await p.evaluate(async()=>{let t=0;for(let i=1;i<=4;i++){const r=await fetch('photos/starlink-'+i+'.jpg');if(!r.ok)return false;t+=(await r.blob()).size}return t<300000}));
 await p.evaluate(()=>App.actions.decor_set({d:'aurora'}));await p.waitForTimeout(300);
 // photos need a photo first
@@ -31,15 +39,15 @@ await fc.setFiles({name:'IMG_1.jpg',mimeType:'image/jpeg',buffer:b1});await p.wa
 ok('photo added and "Mes photos" selected',await p.evaluate(()=>App.db.settings.bgs.length===1&&App.db.settings.decor==='photos'));
 const st=await p.evaluate(()=>App.photo.stats());ok('stored shrunk (< 250 Ko)',st.n===1&&st.bytes<250000&&st.bytes>5000,JSON.stringify(st));
 const dim=await p.evaluate(async()=>{const bm=await createImageBitmap(await App.photo.get(App.db.settings.bgs[0]));return Math.max(bm.width,bm.height)});ok('longest side is 1280 px',dim===1280,String(dim));
-await p.evaluate(()=>App.go('home'));await p.waitForTimeout(1500);
-ok('user photo shown on a card behind the animation',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),bg=h.querySelector('.hbg'),sk=h.querySelector('.hsky');return !!bg&&/blob:/.test(bg.querySelector('.hband i').style.backgroundImage)&&(!sk||+getComputedStyle(sk).zIndex>+getComputedStyle(bg).zIndex)}));
+await p.evaluate(()=>App.go('home'));await p.waitForTimeout(1800);
+ok('user photo shown on a card behind the animation',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),bg=h.querySelector('.hbg'),sk=h.querySelector('.hsky');return !!bg&&/blob:/.test(bg.querySelector('.hcard').style.backgroundImage)&&(!sk||+getComputedStyle(sk).zIndex>+getComputedStyle(bg).zIndex)}));
 ok('hero text above the photo and clickable',await p.evaluate(()=>{const n=document.querySelector('.hero .hero-num'),r=n.getBoundingClientRect(),e=document.elementFromPoint(r.x+4,r.y+4);return !e.closest('.hbg')&&!e.classList.contains('hsky')}));
 // second photo -> slideshow
 const b2=await img(99);await p.evaluate(()=>{document.getElementById('view').insertAdjacentHTML('beforeend',App.photoCard())});await p.waitForTimeout(300);
 const [fc2]=await Promise.all([p.waitForEvent('filechooser'),p.click('#view [data-act=ph_add]:not([data-cam])')]);await fc2.setFiles({name:'IMG_2.jpg',mimeType:'image/jpeg',buffer:b2});await p.waitForTimeout(1800);
 ok('two photos stored',await p.evaluate(()=>App.db.settings.bgs.length===2));
 await p.evaluate(()=>App.go('home'));await p.waitForTimeout(1200);
-ok('two photos: the band lists both, twice, for a seamless loop',await p.evaluate(()=>{const us=[...document.querySelectorAll('.hero .hband i')].map(x=>x.style.backgroundImage);return us.length>=4&&new Set(us).size===2}));
+ok('with two photos, cards show them in turn',await p.evaluate(()=>{const us=[...document.querySelectorAll('.hero .hcard')].map(x=>x.style.backgroundImage);return us.length>=2&&us.every(u=>/blob:/.test(u))}));
 // lighten
 const before=(await p.evaluate(()=>App.photo.stats())).bytes;
 await p.evaluate(()=>App.actions.ph_shrink());await p.waitForTimeout(2500);
