@@ -34,6 +34,7 @@
   // Small photo cards pass across the card. Each pass picks a direction at random (never the same twice in a row):
   // left to right, right to left, top to bottom, bottom to top, or flying out from the centre. WAAPI animations run on the compositor, so it stays light.
   const DIRS = ['ltr', 'rtl', 'ttb', 'btt', 'center'], rnd = (a, b) => a + Math.random() * (b - a), reduce = () => window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const GC = ['62,198,255', '150,120,255', '255,130,90', '246,196,83']; // glow colours of the cards
   P.dirs = []; P.next = null; P.dir = () => P.dirs[P.dirs.length - 1] || '';
   P.hero = () => {
     P.next = null;
@@ -48,31 +49,36 @@
       if (!bg.isConnected) return;
       const urls = us.filter(Boolean); if (!urls.length) return;
       let anims = [], timer = 0, last = '', seq = 0, pool = [];
-      const W = () => h.clientWidth, H = () => h.clientHeight;
-      const card = (w, hh) => { if (!pool.length) pool = urls.slice().sort(() => Math.random() - .5); const c = document.createElement('i'); c.className = 'hcard'; c.style.width = w + 'px'; c.style.height = hh + 'px'; c.style.backgroundImage = `url(${pool.pop()})`; bg.appendChild(c); return c; };
-      const go = (c, frames, ms, delay) => { const a = c.animate(frames, { duration: ms, delay, easing: 'linear', fill: 'both' }); anims.push(a); return a; };
+      const W = () => h.clientWidth, H = () => h.clientHeight, depth = () => pick3([.76, 1, 1.18]), pick3 = a => a[Math.floor(Math.random() * 3)];
+      // glass card: size and opacity follow its depth (far = small and faint, near = big and bright), z-index too
+      const card = (w, hh, dp) => { if (!pool.length) pool = urls.slice().sort(() => Math.random() - .5); const c = document.createElement('i'); c.className = 'hcard'; c.style.width = Math.round(w * dp) + 'px'; c.style.height = Math.round(hh * dp) + 'px'; c.style.zIndex = dp < 1 ? 0 : dp > 1 ? 2 : 1;
+        c.style.backgroundImage = `url(${pool.pop()})`; c.style.setProperty('--gc', GC[Math.floor(Math.random() * GC.length)]); c.style.setProperty('--sd', rnd(0, 3).toFixed(2) + 's'); bg.appendChild(c); return c; };
+      const op = dp => dp < 1 ? .6 : dp > 1 ? 1 : .86;
+      // moves the card, and fades it in and out softly at the ends of its trip
+      const go = (c, frames, ms, delay, dp) => { const a = c.animate(frames, { duration: ms, delay, easing: 'linear', fill: 'both' }), o = op(dp);
+        const f = c.animate([{ opacity: 0 }, { opacity: o, offset: .14 }, { opacity: o, offset: .86 }, { opacity: 0 }], { duration: ms, delay, easing: 'linear', fill: 'both' }); anims.push(a, f); return a; };
       const pass = force => {
         if (!bg.isConnected) return; clearTimeout(timer);
         if (document.hidden) { timer = setTimeout(() => pass(), 1000); return; }
         anims.forEach(a => a.cancel()); anims = []; bg.textContent = '';
         let dir = force; if (!dir) { do dir = DIRS[Math.floor(Math.random() * DIRS.length)]; while (dir === last); } last = dir; P.dirs.push(dir); if (P.dirs.length > 30) P.dirs.shift();
-        const w = W(), hh = H(), id = ++seq, cw = 140, tilt = () => rnd(-4, 4);
-        if (dir === 'ltr' || dir === 'rtl') { // a row of cards, zigzag, crossing the width
-          const ch = Math.round(hh * .56), sp = 150, ms = (w + cw) / sp * 1000, n = Math.max(5, Math.ceil(w / (cw + 16)) + 3);
-          for (let i = 0; i < n; i++) { const c = card(cw, ch), y = hh * .22 + (i % 2 ? 1 : -1) * hh * .07, r = tilt(), x0 = dir === 'ltr' ? -cw : w, x1 = dir === 'ltr' ? w : -cw;
-            go(c, [{ transform: `translate(${x0}px,${y}px) rotate(${r}deg)` }, { transform: `translate(${x1}px,${y}px) rotate(${r}deg)` }], ms, i * (cw + 16) / sp * 1000); }
+        const w = W(), hh = H(), id = ++seq, cw = 140, tilt = () => rnd(-5, 5);
+        if (dir === 'ltr' || dir === 'rtl') { // a row of cards, zigzag, crossing the width at different speeds (parallax)
+          const ch = Math.round(hh * .5), sp = 150, n = Math.max(5, Math.ceil(w / (cw + 16)) + 3);
+          for (let i = 0; i < n; i++) { const dp = depth(), c = card(cw, ch, dp), cwd = cw * dp, y = hh * .5 - ch * dp / 2 + (i % 2 ? 1 : -1) * hh * .07, r = tilt(), x0 = dir === 'ltr' ? -cwd : w, x1 = dir === 'ltr' ? w : -cwd, v = sp * (dp < 1 ? .7 : dp > 1 ? 1.25 : 1);
+            go(c, [{ transform: `translate(${x0}px,${y}px) rotate(${r}deg)` }, { transform: `translate(${x1}px,${y}px) rotate(${r}deg)` }], (w + cwd) / v * 1000, i * (cw + 16) / sp * 1000, dp); }
         } else if (dir === 'ttb' || dir === 'btt') { // columns of cards falling or rising
-          const lanes = Math.max(2, Math.min(5, Math.round(w / 170))), ch = Math.round(Math.min(170, hh * .5)), sp = 130, ms = (hh + ch) / sp * 1000;
-          for (let i = 0; i < lanes * 2; i++) { const c = card(cw - 20, ch), x = ((i % lanes) + .5) * w / lanes - (cw - 20) / 2 + rnd(-10, 10), r = tilt(), y0 = dir === 'ttb' ? -ch : hh, y1 = dir === 'ttb' ? hh : -ch;
-            go(c, [{ transform: `translate(${x}px,${y0}px) rotate(${r}deg)` }, { transform: `translate(${x}px,${y1}px) rotate(${r}deg)` }], ms, (i % lanes) * 450 + Math.floor(i / lanes) * (ms * .55) + rnd(0, 250)); }
+          const lanes = Math.max(2, Math.min(5, Math.round(w / 170))), ch = Math.round(Math.min(170, hh * .5)), sp = 130;
+          for (let i = 0; i < lanes * 2; i++) { const dp = depth(), c = card(cw - 20, ch, dp), chd = ch * dp, ms = (hh + chd) / (sp * (dp < 1 ? .7 : dp > 1 ? 1.25 : 1)) * 1000, x = ((i % lanes) + .5) * w / lanes - (cw - 20) * dp / 2 + rnd(-10, 10), r = tilt(), y0 = dir === 'ttb' ? -chd : hh, y1 = dir === 'ttb' ? hh : -chd;
+            go(c, [{ transform: `translate(${x}px,${y0}px) rotate(${r}deg)` }, { transform: `translate(${x}px,${y1}px) rotate(${r}deg)` }], ms, (i % lanes) * 450 + Math.floor(i / lanes) * (ms * .55) + rnd(0, 250), dp); }
         } else { // from the centre: the cards grow and fly out in every direction
-          const n = 6, ch = Math.round(hh * .42), cx = w / 2 - cw / 2, cy = hh / 2 - ch / 2, off = rnd(0, 6.28);
-          for (let i = 0; i < n; i++) { const c = card(cw, ch), a = off + i / n * 6.283 + rnd(-.3, .3), dx = Math.cos(a) * w * .7, dy = Math.sin(a) * hh * .75, r = rnd(-10, 10);
-            go(c, [{ transform: `translate(${cx}px,${cy}px) scale(.15) rotate(0deg)`, opacity: 0 }, { opacity: .95, offset: .3 }, { transform: `translate(${cx + dx}px,${cy + dy}px) scale(1.15) rotate(${r}deg)`, opacity: 0 }], 2800, i * 330); }
+          const n = 6, ch = Math.round(hh * .42), off = rnd(0, 6.28);
+          for (let i = 0; i < n; i++) { const dp = depth(), c = card(cw, ch, dp), cx = w / 2 - cw * dp / 2, cy = hh / 2 - ch * dp / 2, a = off + i / n * 6.283 + rnd(-.3, .3), dx = Math.cos(a) * w * .7, dy = Math.sin(a) * hh * .75, r = rnd(-12, 12), o = op(dp);
+            go(c, [{ transform: `translate(${cx}px,${cy}px) scale(.15) rotate(0deg)`, opacity: 0 }, { opacity: o, offset: .3 }, { transform: `translate(${cx + dx}px,${cy + dy}px) scale(1.15) rotate(${r}deg)`, opacity: 0 }], 2800, i * 330, dp); }
         }
         Promise.all(anims.map(a => a.finished.catch(() => null))).then(() => { if (id === seq && bg.isConnected) timer = setTimeout(() => pass(), rnd(300, 900)); });
       };
-      if (reduce()) { for (let i = 0; i < 3; i++) { const c = card(120, Math.round(H() * .5)); c.style.transform = `translate(${(i + .5) * W() / 3 - 70}px,${H() * .25}px) rotate(${(i - 1) * 3}deg)`; } return; }
+      if (reduce()) { for (let i = 0; i < 3; i++) { const c = card(120, Math.round(H() * .5), 1); c.style.opacity = .85; c.style.transform = `translate(${(i + .5) * W() / 3 - 70}px,${H() * .25}px) rotate(${(i - 1) * 3}deg)`; } return; }
       P.next = dir => pass(dir); pass();
     });
   };
