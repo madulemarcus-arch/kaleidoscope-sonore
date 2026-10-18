@@ -65,6 +65,7 @@
     document.querySelectorAll('#bottom [data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === (r.nav || App.state.view)));
     const sideKey = { client: 'clients', invoice: 'invoices', supplier: 'suppliers', technician: 'technicians' }[App.state.view] || App.state.view;
     document.querySelectorAll('#side [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === sideKey));
+    if (App.photo) App.photo.hero();
     if (App.sky) App.sky();
     if (r.after) r.after();
     window.scrollTo(0, keepScroll ? y : 0);

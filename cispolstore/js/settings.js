@@ -123,7 +123,7 @@
       if (!Array.isArray(d.closings)) d.closings = [];
       if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return false;
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
-      d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, lockMin: keep.lockMin };
+      d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, decor: keep.decor, bgs: keep.bgs, lockMin: keep.lockMin };
       App.db = d; if (App.auditReset) { App.auditReset(); App.audit('edit', 'a restauré une sauvegarde (toutes les données remplacées)'); } App.save(); App.applyTheme(); App.toast('Données restaurées'); App.refresh(); return true;
     } catch (e) { App.toast('Fichier de sauvegarde invalide'); return false; }
   };

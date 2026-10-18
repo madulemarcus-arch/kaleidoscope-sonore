@@ -264,13 +264,13 @@ Limites : l'application ne voit que les fichiers qu'elle a créés (`drive.file`
 
 Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), profils utilisateurs (comptable, technicien, vendeur).
 
-## Photos des clients
+## Décor de l'accueil (photos)
 
-- Sur la fiche d'un client, toucher le rond avec les initiales (badge 📷) ouvre « Photo » : **Prendre une photo** (appareil photo) ou **Galerie ou Drive** (le sélecteur du téléphone propose la galerie, Google Drive et les autres dossiers), et **Supprimer**.
-- La photo remplace les initiales sur la fiche et dans la liste des clients.
-- Chaque photo est **réduite sur le téléphone** (800 px, JPEG, environ 60 Ko) avant d'être enregistrée. Elles sont gardées dans leur propre base IndexedDB (`js/photos.js`), jamais dans les données principales (limitées à environ 5 Mo).
-- Elles restent **sur cet appareil** : elles ne sont pas dans les sauvegardes ni la synchronisation (trop lourdes). Supprimer un client supprime sa photo.
-- Réglages (carte « Photos des clients ») : espace utilisé, **Alléger les photos** (480 px, qualité réduite) et **Tout supprimer**.
+- Réglages → « Décor de l'accueil » : le fond de la carte du montant peut être le décor par défaut, une scène intégrée (🌅 Coucher de soleil, 🌌 Nuit, 💚 Aurore) ou **Mes photos**. Le décor s'affiche **derrière l'animation** (étoiles, satellites…) et le texte reste lisible grâce à un voile sombre.
+- **Mes photos** : « 📷 Prendre une photo » (appareil photo) ou « 🖼️ Galerie ou Drive » (le sélecteur du téléphone propose la galerie, Google Drive et les autres dossiers). 8 photos au maximum ; avec plusieurs photos, elles défilent toutes les 7 secondes en fondu.
+- Chaque photo est **réduite sur le téléphone** (1280 px, JPEG, environ 100 Ko) avant d'être enregistrée, dans sa propre base IndexedDB (`js/photos.js`), jamais dans les données principales (limitées à environ 5 Mo).
+- Elles restent **sur cet appareil** : pas dans les sauvegardes ni la synchronisation (trop lourdes). Le choix du décor est conservé lors d'une restauration.
+- La carte affiche l'espace utilisé ; **Alléger les photos** les réduit à 800 px avec une qualité plus basse, **Tout supprimer** les efface.
 
 ## Petits effets (design étape 4c)
 
