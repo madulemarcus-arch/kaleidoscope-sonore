@@ -21,6 +21,34 @@
     };
     requestAnimationFrame(step);
   };
+  // animated sky behind the dashboard: twinkling stars and a Starlink-like train of satellites now and then
+  const sky = (() => {
+    let cv, g, W = 0, H = 0, stars = [], sat = null, nextSat = 0, raf = 0, last = 0, ink = '255,255,255', glow = ['91,155,240', '157,133,255'];
+    const want = () => App.state.view === 'home' && App.db.settings.sky !== false && !reduce() && !document.hidden && !(navigator.connection && navigator.connection.saveData);
+    const dark = () => { const m = /\d+/g, c = (getComputedStyle(document.body).backgroundColor.match(m) || [255, 255, 255]).map(Number); return (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000 < 128; };
+    const size = () => { const dpr = Math.min(2, window.devicePixelRatio || 1); W = window.innerWidth; H = window.innerHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      stars = Array.from({ length: Math.min(110, Math.round(W * H / 9000)) }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 1 + Math.random() * 1.6, ph: Math.random() * 6.28, sp: .4 + Math.random() * .9 })); };
+    const launch = t => { const dir = Math.random() < .5 ? 1 : -1, y0 = H * (.1 + Math.random() * .4), sl = (Math.random() * .25 + .1) * (Math.random() < .5 ? 1 : -1), v = 38 + Math.random() * 14;
+      sat = { x: dir > 0 ? -20 : W + 20, y: y0, vx: v * dir, vy: v * sl, n: 5, born: t }; nextSat = t + 10000 + Math.random() * 12000; };
+    const frame = now => {
+      raf = requestAnimationFrame(frame);
+      if (now - last < 33) return; const dt = Math.min(.1, (now - last) / 1000); last = now; // ~30 images/s keeps the phone cool
+      g.clearRect(0, 0, W, H);
+      glow.forEach((c, i) => { const t = now / 1000 * (.05 + i * .03), x = W * (.5 + .45 * Math.sin(t + i * 2)), y = H * (.45 + .4 * Math.cos(t * 1.3 + i)), R = Math.max(W, H) * .55, gr = g.createRadialGradient(x, y, 0, x, y, R); gr.addColorStop(0, `rgba(${c},.22)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, W, H); }); // slow drifting glows
+      stars.forEach(s => { const a = .3 + .6 * (.5 + .5 * Math.sin(now / 1000 * s.sp + s.ph)); g.fillStyle = `rgba(${ink},${a})`; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.283); g.fill(); });
+      if (!sat && now > nextSat) launch(now);
+      if (sat) { sat.x += sat.vx * dt; sat.y += sat.vy * dt; const L = Math.hypot(sat.vx, sat.vy);
+        for (let i = 0; i < sat.n; i++) { const x = sat.x - sat.vx / L * i * 20, y = sat.y - sat.vy / L * i * 20; g.fillStyle = `rgba(${ink},${.85 - i * .12})`; g.beginPath(); g.arc(x, y, 2.2, 0, 6.283); g.fill(); }
+        if (sat.x < -120 || sat.x > W + 120 || sat.y < -120 || sat.y > H + 120) sat = null; }
+    };
+    const stop = () => { cancelAnimationFrame(raf); raf = 0; if (cv) cv.hidden = true; };
+    const run = () => { if (!cv) { cv = document.createElement('canvas'); cv.id = 'sky'; cv.setAttribute('aria-hidden', 'true'); document.body.prepend(cv); g = cv.getContext('2d'); size(); window.addEventListener('resize', () => cv && !cv.hidden && size()); }
+      cv.hidden = false; const d = dark(); ink = d ? '255,255,255' : '30,90,168'; glow = d ? ['91,155,240', '157,133,255'] : ['30,90,168', '213,82,47']; if (!W || W !== window.innerWidth || H !== window.innerHeight) size(); if (!raf) { nextSat = performance.now() + 2500; last = 0; raf = requestAnimationFrame(frame); } };
+    const sync = () => { if (want()) run(); else if (raf || (cv && !cv.hidden)) stop(); };
+    document.addEventListener('visibilitychange', sync);
+    return sync;
+  })();
+  App.sky = sky;
   // loading pill with a spinner for slow work (reading a file, building a PDF); returns the function that hides it
   App.busy = msg => { const el = document.createElement('div'); el.className = 'busy'; el.setAttribute('role', 'status'); el.innerHTML = `<i></i>${App.esc(msg || 'Un instant…')}`; document.body.appendChild(el); return () => el.remove(); };
   App.greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Bonjour ☀️' : h < 18 ? 'Bon après-midi 🌤️' : 'Bonsoir 🌙'; };
