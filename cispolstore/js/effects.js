@@ -21,30 +21,42 @@
     };
     requestAnimationFrame(step);
   };
-  // animated sky behind the dashboard: twinkling stars and a Starlink-like train of satellites now and then
+  // animated sky: twinkling stars, drifting glows and a Starlink-like train of satellites now and then.
+  // Two layers share one 30 fps loop: a page-wide canvas behind the dashboard and a small one inside the hero card (the amount)
   const sky = (() => {
-    let cv, g, W = 0, H = 0, stars = [], sat = null, nextSat = 0, raf = 0, last = 0, ink = '255,255,255', glow = ['91,155,240', '157,133,255'];
+    let raf = 0, last = 0, page = null, hero = null;
     const want = () => App.state.view === 'home' && App.db.settings.sky !== false && !reduce() && !document.hidden && !(navigator.connection && navigator.connection.saveData);
     const dark = () => { const m = /\d+/g, c = (getComputedStyle(document.body).backgroundColor.match(m) || [255, 255, 255]).map(Number); return (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000 < 128; };
-    const size = () => { const dpr = Math.min(2, window.devicePixelRatio || 1); W = window.innerWidth; H = window.innerHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      stars = Array.from({ length: Math.min(110, Math.round(W * H / 9000)) }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 1 + Math.random() * 1.6, ph: Math.random() * 6.28, sp: .4 + Math.random() * .9 })); };
-    const launch = t => { const dir = Math.random() < .5 ? 1 : -1, y0 = H * (.1 + Math.random() * .4), sl = (Math.random() * .25 + .1) * (Math.random() < .5 ? 1 : -1), v = 38 + Math.random() * 14;
-      sat = { x: dir > 0 ? -20 : W + 20, y: y0, vx: v * dir, vy: v * sl, n: 5, born: t }; nextSat = t + 10000 + Math.random() * 12000; };
+    // a layer owns a canvas; dens = pixels per star, gap = ms between satellite trains
+    const mk = (cv, o) => ({ cv, g: cv.getContext('2d'), W: 0, H: 0, stars: [], sat: null, next: performance.now() + o.first, ...o });
+    const size = (l, w, h) => { const dpr = Math.min(2, window.devicePixelRatio || 1); l.W = w; l.H = h; l.cv.width = Math.max(1, w * dpr); l.cv.height = Math.max(1, h * dpr); l.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      l.stars = Array.from({ length: Math.min(l.max, Math.round(w * h / l.dens)) }, () => ({ x: Math.random() * w, y: Math.random() * h, r: l.r0 + Math.random() * l.r1, ph: Math.random() * 6.28, sp: .4 + Math.random() * .9 })); };
+    const fit = l => l.hero ? size(l, l.cv.parentNode.clientWidth, l.cv.parentNode.clientHeight) : size(l, window.innerWidth, window.innerHeight);
+    const launch = (l, t) => { const dir = Math.random() < .5 ? 1 : -1, sl = (Math.random() * .25 + .1) * (Math.random() < .5 ? 1 : -1), v = l.v + Math.random() * 14;
+      l.sat = { x: dir > 0 ? -20 : l.W + 20, y: l.H * (.1 + Math.random() * (l.hero ? .5 : .4)), vx: v * dir, vy: v * sl, n: 5 }; l.next = t + l.gap + Math.random() * l.gap; };
+    const draw = (l, now, dt) => { const { g, W, H } = l; g.clearRect(0, 0, W, H);
+      l.glow.forEach((c, i) => { const t = now / 1000 * (.05 + i * .03), x = W * (.5 + .45 * Math.sin(t + i * 2)), y = H * (.45 + .4 * Math.cos(t * 1.3 + i)), R = Math.max(W, H) * .55, gr = g.createRadialGradient(x, y, 0, x, y, R); gr.addColorStop(0, `rgba(${c},${l.ga})`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, W, H); });
+      l.stars.forEach(s => { g.fillStyle = `rgba(${l.ink},${.3 + .6 * (.5 + .5 * Math.sin(now / 1000 * s.sp + s.ph))})`; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.283); g.fill(); });
+      if (!l.sat && now > l.next) launch(l, now);
+      const s = l.sat; if (s) { s.x += s.vx * dt; s.y += s.vy * dt; const D = Math.hypot(s.vx, s.vy);
+        for (let i = 0; i < s.n; i++) { g.fillStyle = `rgba(${l.ink},${.85 - i * .12})`; g.beginPath(); g.arc(s.x - s.vx / D * i * 20, s.y - s.vy / D * i * 20, l.hero ? 2.4 : 2.2, 0, 6.283); g.fill(); }
+        if (s.x < -120 || s.x > l.W + 120 || s.y < -120 || s.y > l.H + 120) l.sat = null; } };
     const frame = now => {
       raf = requestAnimationFrame(frame);
       if (now - last < 33) return; const dt = Math.min(.1, (now - last) / 1000); last = now; // ~30 images/s keeps the phone cool
-      g.clearRect(0, 0, W, H);
-      glow.forEach((c, i) => { const t = now / 1000 * (.05 + i * .03), x = W * (.5 + .45 * Math.sin(t + i * 2)), y = H * (.45 + .4 * Math.cos(t * 1.3 + i)), R = Math.max(W, H) * .55, gr = g.createRadialGradient(x, y, 0, x, y, R); gr.addColorStop(0, `rgba(${c},.22)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, W, H); }); // slow drifting glows
-      stars.forEach(s => { const a = .3 + .6 * (.5 + .5 * Math.sin(now / 1000 * s.sp + s.ph)); g.fillStyle = `rgba(${ink},${a})`; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.283); g.fill(); });
-      if (!sat && now > nextSat) launch(now);
-      if (sat) { sat.x += sat.vx * dt; sat.y += sat.vy * dt; const L = Math.hypot(sat.vx, sat.vy);
-        for (let i = 0; i < sat.n; i++) { const x = sat.x - sat.vx / L * i * 20, y = sat.y - sat.vy / L * i * 20; g.fillStyle = `rgba(${ink},${.85 - i * .12})`; g.beginPath(); g.arc(x, y, 2.2, 0, 6.283); g.fill(); }
-        if (sat.x < -120 || sat.x > W + 120 || sat.y < -120 || sat.y > H + 120) sat = null; }
+      if (hero && !hero.cv.isConnected) hero = null; // the screen was redrawn: its hero card is gone
+      [page, hero].forEach(l => l && !l.cv.hidden && draw(l, now, dt));
     };
-    const stop = () => { cancelAnimationFrame(raf); raf = 0; if (cv) cv.hidden = true; };
-    const run = () => { if (!cv) { cv = document.createElement('canvas'); cv.id = 'sky'; cv.setAttribute('aria-hidden', 'true'); document.body.prepend(cv); g = cv.getContext('2d'); size(); window.addEventListener('resize', () => cv && !cv.hidden && size()); }
-      cv.hidden = false; const d = dark(); ink = d ? '255,255,255' : '30,90,168'; glow = d ? ['91,155,240', '157,133,255'] : ['30,90,168', '213,82,47']; if (!W || W !== window.innerWidth || H !== window.innerHeight) size(); if (!raf) { nextSat = performance.now() + 2500; last = 0; raf = requestAnimationFrame(frame); } };
-    const sync = () => { if (want()) run(); else if (raf || (cv && !cv.hidden)) stop(); };
+    const stop = () => { cancelAnimationFrame(raf); raf = 0; if (page) page.cv.hidden = true; document.querySelectorAll('.hsky').forEach(x => x.remove()); hero = null; };
+    const run = () => { const d = dark();
+      if (!page) { const cv = document.createElement('canvas'); cv.id = 'sky'; cv.setAttribute('aria-hidden', 'true'); document.body.prepend(cv); page = mk(cv, { dens: 9000, max: 110, r0: 1, r1: 1.6, ga: .22, v: 38, gap: 10000, first: 2500 });
+        window.addEventListener('resize', () => { fit(page); if (hero && hero.cv.isConnected) fit(hero); }); }
+      page.cv.hidden = false; page.ink = d ? '255,255,255' : '30,90,168'; page.glow = d ? ['91,155,240', '157,133,255'] : ['30,90,168', '213,82,47']; if (page.W !== window.innerWidth || page.H !== window.innerHeight) fit(page);
+      // hero card (the amount): always on a dark blue, so white stars, brighter and more frequent trains
+      const h = document.querySelector('#view .hero'); if (h && !(hero && hero.cv.parentNode === h)) { h.querySelectorAll('.hsky').forEach(x => x.remove()); const cv = document.createElement('canvas'); cv.className = 'hsky'; cv.setAttribute('aria-hidden', 'true'); h.prepend(cv);
+        hero = mk(cv, { hero: true, dens: 1500, max: 70, r0: .9, r1: 1.3, ga: .16, v: 30, gap: 6000, first: 1200, ink: '255,255,255', glow: ['91,155,240', '246,196,83'] }); fit(hero); }
+      if (!raf) { last = 0; raf = requestAnimationFrame(frame); } };
+    const sync = () => { if (want()) run(); else if (raf || (page && !page.cv.hidden)) stop(); };
     document.addEventListener('visibilitychange', sync);
     return sync;
   })();

@@ -596,3 +596,7 @@ button.sbadge:active { transform:scale(.96); }
 /* fond animé de l'accueil (étoiles et satellites) : derrière le contenu, sans capter les clics */
 #sky { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
 #view { position:relative; z-index:1; }
+
+/* animation dans la carte du chiffre d'affaires : sous le texte, sans capter les clics */
+.hero .hsky { position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+.hero > :not(.hsky) { position:relative; z-index:1; }

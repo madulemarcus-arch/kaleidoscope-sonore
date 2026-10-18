@@ -8,6 +8,12 @@ ok('sky is behind the content and ignores taps',await p.evaluate(()=>{const c=ge
 // something is actually drawn
 await p.waitForTimeout(500);
 ok('stars are drawn',await p.evaluate(()=>{const c=document.getElementById('sky'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;for(let i=3;i<d.length;i+=4)if(d[i]>0)return true;return false}));
+// hero card (the amount) has its own animation, under the text
+ok('hero card has its animated canvas',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),c=h&&h.querySelector('canvas.hsky');return !!c&&getComputedStyle(c).pointerEvents==='none'&&getComputedStyle(c).position==='absolute'&&c.width>0}));
+await p.waitForTimeout(600);
+ok('hero stars are drawn',await p.evaluate(()=>{const c=document.querySelector('.hero canvas.hsky'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;for(let i=3;i<d.length;i+=4)if(d[i]>0)return true;return false}));
+ok('hero text stays above and clickable',await p.evaluate(()=>{const n=document.querySelector('.hero .hero-num'),r=n.getBoundingClientRect();return document.elementFromPoint(r.x+4,r.y+4)!==document.querySelector('.hero canvas.hsky')}));
+ok('one hero canvas only after redraw',await p.evaluate(async()=>{App.refresh();await new Promise(r=>setTimeout(r,300));return document.querySelectorAll('.hsky').length===1}));
 // other screens: hidden
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(300);
 ok('hidden on other screens',await p.evaluate(()=>document.getElementById('sky').hidden));
@@ -16,6 +22,7 @@ ok('back on the dashboard',await p.evaluate(()=>!document.getElementById('sky').
 // switch off from Apparence
 await p.evaluate(()=>{App.actions.sky_set({s:'0'})});await p.waitForTimeout(300);
 ok('off: setting saved and canvas hidden',await p.evaluate(()=>App.db.settings.sky===false&&document.getElementById('sky').hidden));
+ok('off: no hero canvas left',await p.evaluate(()=>!document.querySelector('.hsky')));
 await p.evaluate(()=>{App.go('home')});await p.waitForTimeout(300);
 ok('off: stays hidden on the dashboard',await p.evaluate(()=>document.getElementById('sky').hidden));
 await p.evaluate(()=>{App.actions.sky_set({s:'1'})});await p.waitForTimeout(300);
