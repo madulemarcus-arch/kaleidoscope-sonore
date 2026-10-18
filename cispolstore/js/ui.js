@@ -65,6 +65,7 @@
     document.querySelectorAll('#bottom [data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === (r.nav || App.state.view)));
     const sideKey = { client: 'clients', invoice: 'invoices', supplier: 'suppliers', technician: 'technicians' }[App.state.view] || App.state.view;
     document.querySelectorAll('#side [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === sideKey));
+    if (App.photo) App.photo.hero();
     if (App.sky) App.sky();
     if (r.after) r.after();
     window.scrollTo(0, keepScroll ? y : 0);
@@ -290,7 +291,7 @@
       html: App.profileHero(true) + grp('Ventes et clients', [item('relances', '💬', 'Relances du jour', 'Abonnements, impayés et pénalités à relancer'), item('clientstats', '📊', 'Statistiques clients', 'Meilleurs clients, départs, valeur moyenne'), item('subs', '📡', 'Abonnements', 'Calendrier et renouvellements'), item('invoices', '🧾', 'Factures', 'Créer, imprimer, exporter'), item('quotes', '📝', 'Devis', 'Proposer un prix, puis le transformer en facture'), item('contracts', '📄', 'Contrats', 'Abonnement, Starlink, matériel, travail, contrat libre'), item('payments', '💰', 'Paiements', 'Encaissements et modes de paiement'), item('deposits', '💼', 'Fonds en attente', 'Versements reçus, à payer pour les clients'), item('starlink', '📡', 'Dû à Starlink', 'Abonnements encaissés à reverser'), item('impayes', '⏳', 'Impayés', 'Factures à encaisser et relances'), item('importc', '📥', 'Importer des clients', 'Depuis un fichier Excel ou CSV'), item('importf', '📥', 'Importer des factures', 'Depuis des fichiers Word ou PDF')])
         + grp('Terrain et stock', [item('livraisons', '🚚', 'Livraisons', 'Livraisons à effectuer et suivi'), item('installs', '🔧', 'Installations', 'Historique des interventions'), item('technicians', '🧰', 'Techniciens', 'Techniciens et collaborateurs Starlink'), item('suppliers', '🏭', 'Fournisseurs', 'Gérer vos fournisseurs'), item('inventory', '📋', 'Inventaire', 'Compter le stock et voir les écarts'), item('reorder', '🛒', 'À commander', 'Stock bas et bons de commande')])
         + grp('Gestion', [item('finance', '🏦', 'Finance', 'Entrées, sorties et caisse'), item('daily', '🌙', 'Clôture du jour', 'Récapitulatif et caisse de la journée'), item('expenses', '💸', 'Dépenses', 'Toutes les dépenses de l\'activité'), item('reports', '📊', 'Rapports', 'Ventes, bénéfices, stock…'), item('rapportmois', '📑', 'Rapport mensuel', 'Résumé du mois'), item('settings', '⚙️', 'Paramètres', 'Entreprise, taux, PIN, sauvegarde'), item('journal', '🕵️', 'Journal d\'activité', 'Qui a créé, modifié ou supprimé quoi')])
-        + App.appearanceCard()
+        + App.appearanceCard() + App.photoCard()
         + grp('Application', [App.multi() ? item('profile', '👤', 'Mon profil', (App.user ? App.user.name : '') + ' · code PIN, changer de profil') : '', share])
         + `<p class="mut" style="text-align:center;margin-top:18px">CISPOLstore Manager · version 2.0 · build ${App.BUILD}</p>`
     };

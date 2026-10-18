@@ -37,7 +37,7 @@
           ${row('Abonnements', `Durée par défaut : ${S.period} jours · Sursis par défaut : ${S.grace} jours`)}
           ${row('Thème', ({ auto: 'Automatique (suit le téléphone)', light: 'Clair', dark: 'Sombre', black: 'Noir' }[S.theme] || 'Automatique') + ' · couleur ' + (ACC.find(a => a[0] === (S.accent || 'orange')) || ACC[0])[2].toLowerCase() + ' · bouton ☀️/🌙 en haut de l\'écran')}
           ${row('Notifications', 'Les alertes d\'expiration (7, 3, 1 jour avant et le jour même) s\'affichent sur l\'écran d\'accueil.')}</div>
-        ${App.appearanceCard()}
+        ${App.appearanceCard()}${App.photoCard()}
         ${App.fold('share', 'Partager', `<div class="list">
           ${row("Partager l'application", `Lien à envoyer : <b style="word-break:break-all">${esc(new URL('./', location.href).href)}</b><br>Chaque personne installe l'application depuis ce lien ; ses données restent sur son appareil, sauf si elle active la synchronisation avec les mêmes réglages.`, '<button class="btn sm" data-act="shareapp">Partager</button>')}</div>`)}
         <h2 class="sec">Sécurité</h2><div class="list">
@@ -123,7 +123,7 @@
       if (!Array.isArray(d.closings)) d.closings = [];
       if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return false;
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
-      d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, lockMin: keep.lockMin };
+      d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, decor: keep.decor, bgs: keep.bgs, lockMin: keep.lockMin };
       App.db = d; if (App.auditReset) { App.auditReset(); App.audit('edit', 'a restauré une sauvegarde (toutes les données remplacées)'); } App.save(); App.applyTheme(); App.toast('Données restaurées'); App.refresh(); return true;
     } catch (e) { App.toast('Fichier de sauvegarde invalide'); return false; }
   };
