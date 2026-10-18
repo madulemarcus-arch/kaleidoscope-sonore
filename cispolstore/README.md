@@ -533,6 +533,8 @@ Contrats → Nouveau contrat → **Confidentialité (NDA)** (13 articles, deux t
 
 Quand vous **partagez en PDF**, **enregistrez en Word** ou **imprimez en PDF** une facture, le fichier porte le **nom du client** puis le numéro de la facture (par exemple « Marie Kabasele - FAC-0012.pdf »). Les caractères interdits dans un nom de fichier sont retirés.
 
+La même règle s'applique aux **devis** (« Marie Kabasele - Devis DEV-2026-0001 »), aux **reçus de paiement** (PDF, Word, impression : « Marie Kabasele - Recu FAC-0012-P1 »), aux **contrats** (« Marie Kabasele - Contrat CTR-2026-0001 ») et aux **reçus de dépôt** (« Marie Kabasele - Depot DEP-2026-0001 »). Un devis de passage porte le nom saisi ; les conditions d'utilisation du Wi-Fi, qui n'ont pas de client, ne portent que le type et le numéro.
+
 ### Conditions d'utilisation du Wi-Fi
 
 Contrats → Nouveau contrat → **Conditions d'utilisation du Wi-Fi** (13 articles, deux textes comme les autres contrats intégrés). Ce n'est **pas un contrat signé** : c'est le texte que les clients de WiFi Zone acceptent en se connectant (page de connexion, affiche au point de vente, dos du ticket). Il n'a ni client, ni durée, ni signature ; le document imprimé porte « Version en vigueur à partir du … » et la mention d'acceptation par la connexion.

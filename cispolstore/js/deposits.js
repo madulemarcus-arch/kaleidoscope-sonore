@@ -89,8 +89,9 @@
       ${uses.length ? `<table class="items" style="margin-bottom:12px"><thead><tr><th style="width:16%">Date</th><th>Opération</th><th style="width:16%">Mode</th><th class="r" style="width:20%">Montant</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
       <table class="tots"><tr><td><b>Reçu :</b></td><td>${K.money(d.amount, d.currency)}</td></tr><tr class="net"><td>${b > 0.004 ? 'RESTE DÉTENU POUR LE CLIENT :' : 'SOLDE (TOUT EST RÉGLÉ) :'}</td><td>${K.money(b, d.currency)}</td></tr></table>
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${esc2(stamp || 'stamp.png')}" alt=""></td></tr><tr><td class="ln">Le client</td><td class="gp"></td><td class="ln">${esc2(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
-  App.actions.dep_print = async x => { const d = list().find(y => y.id === x.id); if (d) App.docKit.print('Dépôt ' + App.depNo(d), App.depositDoc(d, await App.docKit.logoData(), await App.docKit.stampData())); };
-  App.actions.dep_pdf = async x => { const d = list().find(y => y.id === x.id); if (d) App.sharePdf(`Depot-${App.depNo(d)}.pdf`, App.depositDoc(d, await App.docKit.logoData(), await App.docKit.stampData())); };
+  App.depFileName = d => App.docName(App.cname(App.client(d.clientId)), 'Depot ' + App.depNo(d));
+  App.actions.dep_print = async x => { const d = list().find(y => y.id === x.id); if (d) App.docKit.print(App.depFileName(d), App.depositDoc(d, await App.docKit.logoData(), await App.docKit.stampData())); };
+  App.actions.dep_pdf = async x => { const d = list().find(y => y.id === x.id); if (d) App.sharePdf(`${App.depFileName(d)}.pdf`, App.depositDoc(d, await App.docKit.logoData(), await App.docKit.stampData())); };
 
   // ---------- detail, pay for the client, give back ----------
   const useRows = d => (d.uses || []).map(u => `<div class="item"><span class="avatar ${u.type === 'refund' ? '' : 'ok'}">${u.type === 'refund' ? '↩' : '✓'}</span><div class="grow"><b>${u.type === 'refund' ? 'Remboursé au client' : 'Payé pour le client'}</b><small>${App.fdate(u.date)} · ${esc(u.mode || 'Cash')}${u.note ? ' · ' + esc(u.note) : ''}</small></div><div class="end"><b>${money(u.amount, d.currency)}</b></div></div>`).join('');
