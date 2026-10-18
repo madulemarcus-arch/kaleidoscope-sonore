@@ -14,6 +14,9 @@ await p.waitForTimeout(600);
 ok('hero stars are drawn',await p.evaluate(()=>{const c=document.querySelector('.hero canvas.hsky'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;for(let i=3;i<d.length;i+=4)if(d[i]>0)return true;return false}));
 ok('hero text stays above and clickable',await p.evaluate(()=>{const n=document.querySelector('.hero .hero-num'),r=n.getBoundingClientRect();return document.elementFromPoint(r.x+4,r.y+4)!==document.querySelector('.hero canvas.hsky')}));
 ok('one hero canvas only after redraw',await p.evaluate(async()=>{App.refresh();await new Promise(r=>setTimeout(r,300));return document.querySelectorAll('.hsky').length===1}));
+// the animation keeps changing: several different scenes over a few seconds, with no error
+const seen=new Set();for(let i=0;i<40;i++){seen.add(await p.evaluate(()=>App.sky.scene()));await p.waitForTimeout(400)}seen.delete('');
+ok('scenes change over time',seen.size>=2,[...seen].join(','));
 // other screens: hidden
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(300);
 ok('hidden on other screens',await p.evaluate(()=>document.getElementById('sky').hidden));
