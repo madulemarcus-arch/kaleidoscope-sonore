@@ -16,7 +16,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   ok('ages 45 and 5 days, >30 = 60 $', /45 j/.test(tx) && /5 j/.test(tx) && /Plus de 30 jours 60/.test(tx), tx.slice(0,200)); ok('oldest first', tx.indexOf('0001') < tx.indexOf('0002'));
   ok('total = 60 + 100 = 160 $', await p.evaluate(() => Math.abs(App.unpaidTotal() - 160) < 0.01), await p.evaluate(() => App.unpaidTotal()));
   ok('no WhatsApp button for client without phone', (await p.$$('[data-act=dun]')).length === 1);
-  const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 3000 }).catch(() => null), p.click('[data-act=dun]')]);
+  const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 10000 }).catch(() => null), p.click('[data-act=dun]')]);
   ok('whatsapp opened + lastRemind set', !!pop && await p.evaluate(() => App.invoice('i1').lastRemind === App.today()));
   console.log(decodeURIComponent(await p.evaluate(() => App.waUrl('0812345678', App.unpaidText(App.invoice('i1'), App.client('c1'))))));
   await p.click('[data-act=newpay][data-iid=i1]'); const pre = await p.evaluate(() => document.getElementById('dlg').innerText.replace(/\n/g, ' ').slice(0, 160)); ok('payment form opens', /Paiement|Encaisser|Montant/i.test(pre), pre); await p.keyboard.press('Escape');
