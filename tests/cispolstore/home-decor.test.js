@@ -35,7 +35,7 @@ ok('card shows the six decors',(await p.$$('#view [data-act=decor_set]')).length
 // add a first photo
 const b1=await img(7);ok('test photo is heavy',b1.length>500000,b1.length+' o');
 const [fc]=await Promise.all([p.waitForEvent('filechooser'),p.click('#view [data-act=ph_add]:not([data-cam])')]);
-await fc.setFiles({name:'IMG_1.jpg',mimeType:'image/jpeg',buffer:b1});await p.waitForTimeout(1800);
+await fc.setFiles({name:'IMG_1.jpg',mimeType:'image/jpeg',buffer:b1});await p.waitForFunction(n=>App.db.settings.bgs.length>=n,1,{timeout:15000}).catch(()=>{});await p.waitForTimeout(400);
 ok('photo added and "Mes photos" selected',await p.evaluate(()=>App.db.settings.bgs.length===1&&App.db.settings.decor==='photos'));
 const st=await p.evaluate(()=>App.photo.stats());ok('stored shrunk (< 250 Ko)',st.n===1&&st.bytes<250000&&st.bytes>5000,JSON.stringify(st));
 const dim=await p.evaluate(async()=>{const bm=await createImageBitmap(await App.photo.get(App.db.settings.bgs[0]));return Math.max(bm.width,bm.height)});ok('longest side is 1280 px',dim===1280,String(dim));
@@ -44,7 +44,7 @@ ok('user photo shown on a card behind the animation',await p.evaluate(()=>{const
 ok('hero text above the photo and clickable',await p.evaluate(()=>{const n=document.querySelector('.hero .hero-num'),r=n.getBoundingClientRect(),e=document.elementFromPoint(r.x+4,r.y+4);return !e.closest('.hbg')&&!e.classList.contains('hsky')}));
 // second photo -> slideshow
 const b2=await img(99);await p.evaluate(()=>{document.getElementById('view').insertAdjacentHTML('beforeend',App.photoCard())});await p.waitForTimeout(300);
-const [fc2]=await Promise.all([p.waitForEvent('filechooser'),p.click('#view [data-act=ph_add]:not([data-cam])')]);await fc2.setFiles({name:'IMG_2.jpg',mimeType:'image/jpeg',buffer:b2});await p.waitForTimeout(1800);
+const [fc2]=await Promise.all([p.waitForEvent('filechooser'),p.click('#view [data-act=ph_add]:not([data-cam])')]);await fc2.setFiles({name:'IMG_2.jpg',mimeType:'image/jpeg',buffer:b2});await p.waitForFunction(n=>App.db.settings.bgs.length>=n,2,{timeout:15000}).catch(()=>{});await p.waitForTimeout(400);
 ok('two photos stored',await p.evaluate(()=>App.db.settings.bgs.length===2));
 await p.evaluate(()=>App.go('home'));await p.waitForTimeout(1200);
 ok('with two photos, cards show them in turn',await p.evaluate(()=>{const us=[...document.querySelectorAll('.hero .hcard')].map(x=>x.style.backgroundImage);return us.length>=2&&us.every(u=>/blob:/.test(u))}));
