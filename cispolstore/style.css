@@ -605,6 +605,7 @@ button.sbadge:active { transform:scale(.96); }
 /* décor de l'accueil : scènes intégrées et photos derrière l'animation */
 .hero.decor-sunset { background:radial-gradient(200px 120px at 80% 85%, rgba(255,214,102,.55), transparent 70%), linear-gradient(180deg,#26306e 0%,#8e3b6b 48%,#e0663b 82%,#f6b24d 100%); }
 .hero.decor-night { background:radial-gradient(260px 160px at 20% 0%, rgba(120,150,255,.28), transparent 70%), linear-gradient(180deg,#040b1c 0%,#0a1f4d 60%,#12306b 100%); }
+.hero.decor-starlink { background:#0a0f14; }
 .hero.decor-aurora { background:radial-gradient(220px 150px at 25% 30%, rgba(62,207,142,.45), transparent 70%), radial-gradient(240px 160px at 85% 60%, rgba(124,92,255,.38), transparent 70%), linear-gradient(180deg,#04122a 0%,#0a2a3d 100%); }
 .hero .hbg { position:absolute; inset:0; z-index:0; pointer-events:none; }
 .hero .hbg i { position:absolute; inset:0; background-size:cover; background-position:center; opacity:0; transition:opacity 1.4s ease; }

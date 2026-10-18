@@ -8,13 +8,18 @@ const heroCls=()=>p.evaluate(()=>document.querySelector('#view .hero').className
 ok('default decor: no extra class',!/decor-/.test(await heroCls()));
 // built-in scenes
 for(const d of ['sunset','night','aurora']){await p.evaluate(d=>App.actions.decor_set({d}),d);await p.waitForTimeout(300);ok('scene '+d+' on the card',(await heroCls()).includes('decor-'+d)&&await p.evaluate(d=>App.db.settings.decor===d,d))}
+// bundled Starlink photos
+await p.evaluate(()=>App.actions.decor_set({d:'starlink'}));await p.waitForTimeout(1500);
+ok('Starlink decor: bundled photo behind the animation',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),on=h.querySelector('.hbg i.on');return h.classList.contains('decor-starlink')&&!!on&&/photos\/starlink-\d\.jpg/.test(on.style.backgroundImage)}));
+ok('bundled photos are light (< 300 Ko in total) and all load',await p.evaluate(async()=>{let t=0;for(let i=1;i<=4;i++){const r=await fetch('photos/starlink-'+i+'.jpg');if(!r.ok)return false;t+=(await r.blob()).size}return t<300000}));
+await p.evaluate(()=>App.actions.decor_set({d:'aurora'}));await p.waitForTimeout(300);
 // photos need a photo first
 await p.evaluate(()=>App.actions.decor_set({d:'photos'}));await p.waitForTimeout(200);
 ok('"Mes photos" refused without a photo',await p.evaluate(()=>App.db.settings.decor==='aurora'));
 // the settings card
 await p.evaluate(()=>{document.getElementById('view').insertAdjacentHTML('beforeend',App.photoCard())});await p.waitForTimeout(400);
 ok('card offers camera and gallery/Drive',(await p.innerText('#view')).includes('Prendre une photo')&&(await p.innerText('#view')).includes('Galerie ou Drive'));
-ok('card shows the five decors',(await p.$$('#view [data-act=decor_set]')).length===5);
+ok('card shows the six decors',(await p.$$('#view [data-act=decor_set]')).length===6);
 // add a first photo
 const b1=await img(7);ok('test photo is heavy',b1.length>500000,b1.length+' o');
 const [fc]=await Promise.all([p.waitForEvent('filechooser'),p.click('#view [data-act=ph_add]:not([data-cam])')]);

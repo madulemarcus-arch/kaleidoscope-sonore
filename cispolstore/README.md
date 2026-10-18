@@ -267,6 +267,7 @@ Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la
 ## Décor de l'accueil (photos)
 
 - Réglages → « Décor de l'accueil » : le fond de la carte du montant peut être le décor par défaut, une scène intégrée (🌅 Coucher de soleil, 🌌 Nuit, 💚 Aurore) ou **Mes photos**. Le décor s'affiche **derrière l'animation** (étoiles, satellites…) et le texte reste lisible grâce à un voile sombre.
+- **🛰️ Starlink** : 4 photos fournies avec l'application (parabole Starlink, kit, antenne extérieure sur son mât, routeur et switch), dans `cispolstore/photos/` (environ 170 Ko au total, mises en cache par le service worker : elles marchent hors connexion). Elles défilent en fondu derrière l'animation. Les photos sont recadrées pour ne montrer ni personne, ni adresse, ni intérieur de client : n'en ajouter que dans le même esprit, ce dépôt est public.
 - **Mes photos** : « 📷 Prendre une photo » (appareil photo) ou « 🖼️ Galerie ou Drive » (le sélecteur du téléphone propose la galerie, Google Drive et les autres dossiers). 8 photos au maximum ; avec plusieurs photos, elles défilent toutes les 7 secondes en fondu.
 - Chaque photo est **réduite sur le téléphone** (1280 px, JPEG, environ 100 Ko) avant d'être enregistrée, dans sa propre base IndexedDB (`js/photos.js`), jamais dans les données principales (limitées à environ 5 Mo).
 - Elles restent **sur cet appareil** : pas dans les sauvegardes ni la synchronisation (trop lourdes). Le choix du décor est conservé lors d'une restauration.

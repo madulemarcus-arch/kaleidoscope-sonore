@@ -3,7 +3,8 @@
 // they stay on this device and are not part of backups.
 (() => {
   const App = window.App, $ = id => document.getElementById(id), esc = App.esc, MAX = 8;
-  const DECORS = [['def', 'Par défaut'], ['sunset', '🌅 Coucher de soleil'], ['night', '🌌 Nuit'], ['aurora', '💚 Aurore'], ['photos', '🖼️ Mes photos']];
+  const DECORS = [['def', 'Par défaut'], ['sunset', '🌅 Coucher de soleil'], ['night', '🌌 Nuit'], ['aurora', '💚 Aurore'], ['starlink', '🛰️ Starlink'], ['photos', '🖼️ Mes photos']];
+  const BUNDLED = ['photos/starlink-1.jpg', 'photos/starlink-2.jpg', 'photos/starlink-3.jpg', 'photos/starlink-4.jpg']; // Starlink decor shipped with the app (cached by the service worker)
   const open = () => new Promise((ok, ko) => { const o = indexedDB.open('cispolstore-photos', 1); o.onupgradeneeded = () => o.result.createObjectStore('p'); o.onerror = () => ko(o.error); o.onsuccess = () => ok(o.result); });
   const tx = (mode, fn) => open().then(d => new Promise((ok, ko) => { const r = fn(d.transaction('p', mode).objectStore('p')); r.onsuccess = () => { d.close(); ok(r.result); }; r.onerror = () => { d.close(); ko(r.error); }; }));
   const urls = new Map(), revoke = id => { if (urls.has(id)) { URL.revokeObjectURL(urls.get(id)); urls.delete(id); } };
@@ -36,10 +37,10 @@
     const S = App.db.settings, d = DECORS.some(x => x[0] === S.decor) ? S.decor : 'def';
     DECORS.forEach(x => h.classList.remove('decor-' + x[0])); if (d !== 'def') h.classList.add('decor-' + d);
     h.querySelectorAll('.hbg').forEach(x => x.remove());
-    if (d !== 'photos' || !ids().length) return;
+    if (d !== 'starlink' && !(d === 'photos' && ids().length)) return;
     const bg = document.createElement('div'); bg.className = 'hbg'; bg.setAttribute('aria-hidden', 'true'); bg.innerHTML = '<i></i><i></i>'; h.prepend(bg);
-    const [a, b] = bg.children, list = ids().slice(); let cur = 0, front = a;
-    const show = async () => { if (!bg.isConnected) return; const id = list[cur % list.length], u = await P.url(id).catch(() => null); if (!u || !bg.isConnected) return;
+    const [a, b] = bg.children, list = d === 'starlink' ? BUNDLED.slice() : ids().slice(); let cur = d === 'starlink' ? Math.floor(Math.random() * list.length) : 0, front = a;
+    const show = async () => { if (!bg.isConnected) return; const id = list[cur % list.length], u = id.startsWith('photos/') ? id : await P.url(id).catch(() => null); if (!u || !bg.isConnected) return;
       const next = front === a ? b : a; next.style.backgroundImage = `url(${u})`; next.classList.add('on'); front.classList.remove('on'); front = next; cur++; };
     show();
     if (list.length > 1) { const t = setInterval(() => { if (!bg.isConnected) return clearInterval(t); if (!document.hidden) show(); }, 7000); }
@@ -48,7 +49,7 @@
   // ---------- settings ----------
   App.photoCard = () => { const S = App.db.settings, cur = DECORS.some(x => x[0] === S.decor) ? S.decor : 'def', l = ids();
     return `<h2 class="sec">Décor de l'accueil</h2><div class="card"><div class="chips" role="group" aria-label="Décor">${DECORS.map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-act="decor_set" data-d="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>
-      <p class="mut" style="margin:6px 0 10px">Le décor s'affiche derrière l'animation, dans la carte du montant. Avec « Mes photos », elles défilent doucement.</p>
+      <p class="mut" style="margin:6px 0 10px">Le décor s'affiche derrière l'animation, dans la carte du montant. Avec « Starlink » ou « Mes photos », les photos défilent doucement.</p>
       ${l.length ? `<div class="phgrid">${l.map(id => `<span class="phth"><img data-phimg="${id}" alt=""><button type="button" data-act="ph_del" data-id="${id}" aria-label="Supprimer cette photo">✕</button></span>`).join('')}</div>` : ''}
       <div class="bar"><button class="btn sm" data-act="ph_add" data-cam="1">📷 Prendre une photo</button><button class="btn sm sec" data-act="ph_add">🖼️ Galerie ou Drive</button></div>
       <div class="spread" style="margin-top:12px"><b>Espace utilisé</b><span class="mut" data-phstats>…</span></div>
