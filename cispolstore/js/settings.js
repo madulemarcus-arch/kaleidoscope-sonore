@@ -16,8 +16,10 @@
     return `<h2 class="sec">Apparence</h2><div class="card"><div class="chips" role="group" aria-label="Thème">${[['auto', '🌓 Auto'], ['light', '☀️ Clair'], ['dark', '🌙 Sombre'], ['black', '⚫ Noir']].map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-act="theme_set" data-t="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>
       <p class="mut" style="margin:4px 0 10px">« Auto » suit le réglage du téléphone ; « Noir » économise la batterie sur écran OLED.</p>
       <div class="swatches" role="group" aria-label="Couleur">${ACC.map(([k, c, n]) => `<button type="button" data-act="accent_set" data-a="${k}" style="--c:${c}" aria-label="${n}" aria-pressed="${ac === k}"></button>`).join('')}</div>
-      <p class="mut" style="margin:10px 0 0">Ces choix sont propres à cet appareil.</p></div>`; };
+      <div class="chips" role="group" aria-label="Fond animé" style="margin-top:12px">${[[1, '✨ Fond animé'], [0, 'Fond fixe']].map(([k, t]) => `<button class="chip ${(S.sky !== false) === !!k ? 'on' : ''}" data-act="sky_set" data-s="${k}" aria-pressed="${(S.sky !== false) === !!k}">${t}</button>`).join('')}</div>
+      <p class="mut" style="margin:10px 0 0">Ces choix sont propres à cet appareil. Le fond animé (étoiles et satellites) n'apparaît que sur l'accueil et s'arrête si le téléphone réduit les animations.</p></div>`; };
   App.actions.theme_set = d => { App.db.settings.theme = d.t; App.save(); App.applyTheme(); App.refresh(); };
+  App.actions.sky_set = d => { App.db.settings.sky = d.s === '1'; App.save(); App.refresh(); };
   App.actions.accent_set = d => { App.db.settings.accent = d.a; App.save(); App.applyTheme(); App.refresh(); };
   App.persisted = null;
 
@@ -121,7 +123,7 @@
       if (!Array.isArray(d.closings)) d.closings = [];
       if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return false;
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
-      d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, lockMin: keep.lockMin };
+      d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, lockMin: keep.lockMin };
       App.db = d; if (App.auditReset) { App.auditReset(); App.audit('edit', 'a restauré une sauvegarde (toutes les données remplacées)'); } App.save(); App.applyTheme(); App.toast('Données restaurées'); App.refresh(); return true;
     } catch (e) { App.toast('Fichier de sauvegarde invalide'); return false; }
   };
