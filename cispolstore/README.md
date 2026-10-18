@@ -264,6 +264,14 @@ Limites : l'application ne voit que les fichiers qu'elle a créés (`drive.file`
 
 Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), profils utilisateurs (comptable, technicien, vendeur).
 
+## Photos des clients
+
+- Sur la fiche d'un client, toucher le rond avec les initiales (badge 📷) ouvre « Photo » : **Prendre une photo** (appareil photo) ou **Galerie ou Drive** (le sélecteur du téléphone propose la galerie, Google Drive et les autres dossiers), et **Supprimer**.
+- La photo remplace les initiales sur la fiche et dans la liste des clients.
+- Chaque photo est **réduite sur le téléphone** (800 px, JPEG, environ 60 Ko) avant d'être enregistrée. Elles sont gardées dans leur propre base IndexedDB (`js/photos.js`), jamais dans les données principales (limitées à environ 5 Mo).
+- Elles restent **sur cet appareil** : elles ne sont pas dans les sauvegardes ni la synchronisation (trop lourdes). Supprimer un client supprime sa photo.
+- Réglages (carte « Photos des clients ») : espace utilisé, **Alléger les photos** (480 px, qualité réduite) et **Tout supprimer**.
+
 ## Petits effets (design étape 4c)
 
 - **Confettis** 🎉 quand une facture est soldée (paiement complet, prix négocié), après un import réussi (clients ou factures), quand l'objectif du mois est atteint et quand une réussite est débloquée. Ils sont désactivés si l'appareil demande de réduire les animations.
