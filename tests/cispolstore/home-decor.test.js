@@ -10,7 +10,11 @@ ok('default decor: no extra class',!/decor-/.test(await heroCls()));
 for(const d of ['sunset','night','aurora']){await p.evaluate(d=>App.actions.decor_set({d}),d);await p.waitForTimeout(300);ok('scene '+d+' on the card',(await heroCls()).includes('decor-'+d)&&await p.evaluate(d=>App.db.settings.decor===d,d))}
 // bundled Starlink photos
 await p.evaluate(()=>App.actions.decor_set({d:'starlink'}));await p.waitForTimeout(1500);
-ok('Starlink decor: bundled photo behind the animation',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),on=h.querySelector('.hbg i.on');return h.classList.contains('decor-starlink')&&!!on&&/photos\/starlink-\d\.jpg/.test(on.style.backgroundImage)}));
+ok('Starlink decor: a band of small photo cards, not one big photo',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),t=[...h.querySelectorAll('.hbg .hband i')];if(t.length<8)return false;const w=t[0].getBoundingClientRect().width,hw=h.getBoundingClientRect().width;return h.classList.contains('decor-starlink')&&w<hw*0.6&&t.slice(0,4).every(x=>/photos\/starlink-\d\.jpg/.test(x.style.backgroundImage))}));
+const x0=await p.evaluate(()=>document.querySelector('.hero .hband i').getBoundingClientRect().x);await p.waitForTimeout(1000);
+const x1=await p.evaluate(()=>document.querySelector('.hero .hband i').getBoundingClientRect().x);
+ok('the cards slide by themselves (one after the other)',x0-x1>30,x0.toFixed(0)+' -> '+x1.toFixed(0));
+ok('cards cover only a part of the card height',await p.evaluate(()=>{const h=document.querySelector('.hero').getBoundingClientRect(),c=document.querySelector('.hero .hband').getBoundingClientRect();return c.height<h.height*0.7}));
 ok('bundled photos are light (< 300 Ko in total) and all load',await p.evaluate(async()=>{let t=0;for(let i=1;i<=4;i++){const r=await fetch('photos/starlink-'+i+'.jpg');if(!r.ok)return false;t+=(await r.blob()).size}return t<300000}));
 await p.evaluate(()=>App.actions.decor_set({d:'aurora'}));await p.waitForTimeout(300);
 // photos need a photo first
@@ -28,17 +32,14 @@ ok('photo added and "Mes photos" selected',await p.evaluate(()=>App.db.settings.
 const st=await p.evaluate(()=>App.photo.stats());ok('stored shrunk (< 250 Ko)',st.n===1&&st.bytes<250000&&st.bytes>5000,JSON.stringify(st));
 const dim=await p.evaluate(async()=>{const bm=await createImageBitmap(await App.photo.get(App.db.settings.bgs[0]));return Math.max(bm.width,bm.height)});ok('longest side is 1280 px',dim===1280,String(dim));
 await p.evaluate(()=>App.go('home'));await p.waitForTimeout(1500);
-ok('photo layer behind the animation',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),bg=h.querySelector('.hbg'),sk=h.querySelector('.hsky');return !!bg&&/blob:/.test(bg.querySelector('i.on').style.backgroundImage)&&(!sk||+getComputedStyle(sk).zIndex>+getComputedStyle(bg).zIndex)}));
+ok('user photo shown on a card behind the animation',await p.evaluate(()=>{const h=document.querySelector('#view .hero'),bg=h.querySelector('.hbg'),sk=h.querySelector('.hsky');return !!bg&&/blob:/.test(bg.querySelector('.hband i').style.backgroundImage)&&(!sk||+getComputedStyle(sk).zIndex>+getComputedStyle(bg).zIndex)}));
 ok('hero text above the photo and clickable',await p.evaluate(()=>{const n=document.querySelector('.hero .hero-num'),r=n.getBoundingClientRect(),e=document.elementFromPoint(r.x+4,r.y+4);return !e.closest('.hbg')&&!e.classList.contains('hsky')}));
 // second photo -> slideshow
 const b2=await img(99);await p.evaluate(()=>{document.getElementById('view').insertAdjacentHTML('beforeend',App.photoCard())});await p.waitForTimeout(300);
 const [fc2]=await Promise.all([p.waitForEvent('filechooser'),p.click('#view [data-act=ph_add]:not([data-cam])')]);await fc2.setFiles({name:'IMG_2.jpg',mimeType:'image/jpeg',buffer:b2});await p.waitForTimeout(1800);
 ok('two photos stored',await p.evaluate(()=>App.db.settings.bgs.length===2));
 await p.evaluate(()=>App.go('home'));await p.waitForTimeout(1200);
-const u1=await p.evaluate(()=>document.querySelector('.hero .hbg i.on').style.backgroundImage);
-await p.waitForTimeout(8500);
-const u2=await p.evaluate(()=>document.querySelector('.hero .hbg i.on').style.backgroundImage);
-ok('photos change by themselves',u1&&u2&&u1!==u2);
+ok('two photos: the band lists both, twice, for a seamless loop',await p.evaluate(()=>{const us=[...document.querySelectorAll('.hero .hband i')].map(x=>x.style.backgroundImage);return us.length>=4&&new Set(us).size===2}));
 // lighten
 const before=(await p.evaluate(()=>App.photo.stats())).bytes;
 await p.evaluate(()=>App.actions.ph_shrink());await p.waitForTimeout(2500);

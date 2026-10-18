@@ -31,25 +31,29 @@
   };
 
   // ---------- the card with the amount: scene class now, photos as soon as they are read ----------
-  let slide = 0;
+  // A band of small photo cards slides across the card, one after the other (CSS animation on the compositor, so it stays light)
+  const CARD = 154, SPEED = 70; // card width + margin (px), speed (px/s)
   P.hero = () => {
     const h = document.querySelector('#view .hero'); if (!h || App.state.view !== 'home') return;
     const S = App.db.settings, d = DECORS.some(x => x[0] === S.decor) ? S.decor : 'def';
     DECORS.forEach(x => h.classList.remove('decor-' + x[0])); if (d !== 'def') h.classList.add('decor-' + d);
     h.querySelectorAll('.hbg').forEach(x => x.remove());
-    if (d !== 'starlink' && !(d === 'photos' && ids().length)) return;
-    const bg = document.createElement('div'); bg.className = 'hbg'; bg.setAttribute('aria-hidden', 'true'); bg.innerHTML = '<i></i><i></i>'; h.prepend(bg);
-    const [a, b] = bg.children, list = d === 'starlink' ? BUNDLED.slice() : ids().slice(); let cur = d === 'starlink' ? Math.floor(Math.random() * list.length) : 0, front = a;
-    const show = async () => { if (!bg.isConnected) return; const id = list[cur % list.length], u = id.startsWith('photos/') ? id : await P.url(id).catch(() => null); if (!u || !bg.isConnected) return;
-      const next = front === a ? b : a; next.style.backgroundImage = `url(${u})`; next.classList.add('on'); front.classList.remove('on'); front = next; cur++; };
-    show();
-    if (list.length > 1) { const t = setInterval(() => { if (!bg.isConnected) return clearInterval(t); if (!document.hidden) show(); }, 7000); }
+    const items = d === 'starlink' ? BUNDLED.slice() : d === 'photos' ? ids().slice() : [];
+    if (!items.length) return;
+    // enough cards to fill the width, listed twice so that the loop has no gap
+    const rep = Math.max(1, Math.ceil(Math.max(h.clientWidth, 340) * 1.3 / (items.length * CARD))), half = [];
+    for (let r = 0; r < rep; r++) items.forEach(x => half.push(x));
+    const cards = half.concat(half), bg = document.createElement('div'); bg.className = 'hbg'; bg.setAttribute('aria-hidden', 'true');
+    bg.innerHTML = `<div class="hband" style="animation-duration:${Math.round(half.length * CARD / SPEED)}s">${cards.map(() => '<i></i>').join('')}</div>`; h.prepend(bg);
+    const tiles = bg.querySelectorAll('.hband i');
+    Promise.all(items.map(id => id.startsWith('photos/') ? id : P.url(id).catch(() => null))).then(us => { if (!bg.isConnected) return; const m = new Map(items.map((id, i) => [id, us[i]]));
+      cards.forEach((id, i) => { const u = m.get(id); if (u) tiles[i].style.backgroundImage = `url(${u})`; }); });
   };
 
   // ---------- settings ----------
   App.photoCard = () => { const S = App.db.settings, cur = DECORS.some(x => x[0] === S.decor) ? S.decor : 'def', l = ids();
     return `<h2 class="sec">Décor de l'accueil</h2><div class="card"><div class="chips" role="group" aria-label="Décor">${DECORS.map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-act="decor_set" data-d="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>
-      <p class="mut" style="margin:6px 0 10px">Le décor s'affiche derrière l'animation, dans la carte du montant. Avec « Starlink » ou « Mes photos », les photos défilent doucement.</p>
+      <p class="mut" style="margin:6px 0 10px">Le décor s'affiche derrière l'animation, dans la carte du montant. Avec « Starlink » ou « Mes photos », de petites photos défilent les unes derrière les autres.</p>
       ${l.length ? `<div class="phgrid">${l.map(id => `<span class="phth"><img data-phimg="${id}" alt=""><button type="button" data-act="ph_del" data-id="${id}" aria-label="Supprimer cette photo">✕</button></span>`).join('')}</div>` : ''}
       <div class="bar"><button class="btn sm" data-act="ph_add" data-cam="1">📷 Prendre une photo</button><button class="btn sm sec" data-act="ph_add">🖼️ Galerie ou Drive</button></div>
       <div class="spread" style="margin-top:12px"><b>Espace utilisé</b><span class="mut" data-phstats>…</span></div>
