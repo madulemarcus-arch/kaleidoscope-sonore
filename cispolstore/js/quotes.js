@@ -78,8 +78,10 @@
       <table class="tots"><tr class="net"><td>TOTAL DU DEVIS :</td><td>${K.money(tot, cu)}</td></tr></table>
       <div class="wb"><b>Arrêté le présent devis à la somme de : ${e(App.amountWords(tot, cu))}</b>.${q.note ? '<br>' + e(q.note) : ''}<br><i>Devis sans valeur de facture. Prix valables jusqu'à la date indiquée, sous réserve de disponibilité du stock.</i></div>
       <table class="sg"><tr><td class="ln">Bon pour accord (client)</td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
-  App.actions.quote_print = async x => { const q = list().find(y => y.id === x.id); if (q) App.docKit.print('Devis ' + q.no, App.quoteDoc(q, await App.docKit.logoData(), await App.docKit.stampData())); };
-  App.actions.quote_pdf = async x => { const q = list().find(y => y.id === x.id); if (q) App.sharePdf(`Devis-${q.no}.pdf`, App.quoteDoc(q, await App.docKit.logoData(), await App.docKit.stampData())); };
+  // "Client name - Devis N°" (no name for an anonymous walk-in client)
+  App.quoteFileName = q => App.docName(q.clientId || q.name ? qname(q) : '', 'Devis ' + q.no);
+  App.actions.quote_print = async x => { const q = list().find(y => y.id === x.id); if (q) App.docKit.print(App.quoteFileName(q), App.quoteDoc(q, await App.docKit.logoData(), await App.docKit.stampData())); };
+  App.actions.quote_pdf = async x => { const q = list().find(y => y.id === x.id); if (q) App.sharePdf(`${App.quoteFileName(q)}.pdf`, App.quoteDoc(q, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.quote_wa = x => { const q = list().find(y => y.id === x.id), c = q && q.clientId && App.client(q.clientId); if (!q) return; const co = App.db.settings.company;
     const txt = `Bonjour ${(c && c.first) || qname(q)},\nVoici notre devis ${q.no} : ${q.lines.map(l => `${l.desc} × ${App.nf(l.qty, 2)}`).join(', ')}.\nTotal : ${App.fmt(App.quoteTotal(q), q.currency)}${q.until ? ' (valable jusqu\'au ' + App.fdate(q.until) + ')' : ''}.\n${co.name}`;
     if (c && c.phone) window.open(App.waUrl(c.phone, txt), '_blank', 'noopener'); else window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank', 'noopener'); };

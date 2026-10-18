@@ -274,9 +274,9 @@
     f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
-  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw('Reçu ' + App.receiptNo(p), App.receiptDoc(p, await logoData(), await stampData())); };
+  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw(App.recFileName(p), App.receiptDoc(p, await logoData(), await stampData())); };
   App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
-    App.download(`Reçu-${no}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Reçu ${esc(no)}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}</body></html>`, 'application/msword'); };
+    App.download(`${App.recFileName(p)}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.recFileName(p))}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}</body></html>`, 'application/msword'); };
 
   const stampData = async () => { try { const b = await (await fetch('stamp.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; } };
   const logoData = async () => {
@@ -285,7 +285,10 @@
   };
   App.docKit = { DOC_CSS: () => PAPER_CSS, logoData, stampData, head: paperHead, boxes: twoBoxes, foot: paperFoot, money, print: printRaw };
   // file name of an invoice: the client's name first, then the number (browsers use the page title when saving a print as PDF)
-  App.invFileName = inv => { const n = String(App.cname(App.client(inv.clientId)) || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return n ? `${n} - ${inv.number}` : String(inv.number); };
+  // file name of a document: "Client name - Reference" (the client name comes first so that the files sort by client)
+  App.docName = (who, ref) => { const n = String(who || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return n ? `${n} - ${ref}` : String(ref); };
+  App.invFileName = inv => App.docName(App.cname(App.client(inv.clientId)), inv.number);
+  App.recFileName = p => { const i = App.invoice(p.invoiceId), c = App.client(p.clientId) || (i && App.client(i.clientId)); return App.docName(c ? App.cname(c) : '', 'Recu ' + App.receiptNo(p)); };
   const printDoc = async inv => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;

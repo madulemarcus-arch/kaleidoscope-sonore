@@ -419,8 +419,10 @@
       ${blocks}
       ${t.who === 'none' ? `<p class="ctp" style="margin-top:14px"><i>Version en vigueur à partir du ${App.fdate(c.start)}. En se connectant, l'Utilisateur accepte ces conditions.</i></p>${K.foot(stamp, true)}</div>` : `<p class="ctp" style="margin-top:14px">Fait à ${e(co.city || 'Kinshasa')}, le ${App.fdate(c.date)}, en deux exemplaires originaux.</p>
       <table class="sg ctsg"><tr><td class="ln">${e(t.b[0])}<br><small>Lu et approuvé, bon pour accord</small></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(t.a[0])}<br><small>${e(co.name)}${c.rep ? ' · ' + e(c.rep) : ''}</small></td></tr></table>${K.foot(stamp, true)}</div>`}`; };
-  App.actions.ct_print = async x => { const c = list().find(y => y.id === x.id); if (c) App.docKit.print('Contrat ' + c.no, App.contractDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
-  App.actions.ct_pdf = async x => { const c = list().find(y => y.id === x.id); if (c) App.sharePdf(`Contrat-${c.no}.pdf`, App.contractDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
+  // "Party name - Contrat N°" (no name for the general conditions, which have no single party)
+  App.contractFileName = c => App.docName(T(c).who === 'none' ? '' : partyOf(c).name, 'Contrat ' + c.no);
+  App.actions.ct_print = async x => { const c = list().find(y => y.id === x.id); if (c) App.docKit.print(App.contractFileName(c), App.contractDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
+  App.actions.ct_pdf = async x => { const c = list().find(y => y.id === x.id); if (c) App.sharePdf(`${App.contractFileName(c)}.pdf`, App.contractDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.ct_wa = x => { const c = list().find(y => y.id === x.id); if (!c) return; const p = partyOf(c), co = App.db.settings.company, t = T(c);
     if (t.who === 'none') return window.open('https://wa.me/?text=' + encodeURIComponent(`Conditions d'utilisation du Wi-Fi ${c.no} en vigueur depuis le ${App.fdate(c.start)}.\n${co.name}`), '_blank', 'noopener');
     const txt = `Bonjour ${p.name},\nVoici votre contrat ${c.no} (${t.label}) du ${App.fdate(c.date)}${c.end ? ', valable jusqu\'au ' + App.fdate(c.end) : ''}.${c.f && c.f.amount ? '\nMontant : ' + App.fmt(c.f.amount, c.currency) : ''}\nMerci de le lire puis de nous confirmer votre accord.\n${co.name}`;
