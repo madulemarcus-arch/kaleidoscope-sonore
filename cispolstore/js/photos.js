@@ -3,7 +3,8 @@
 // they stay on this device and are not part of backups.
 (() => {
   const App = window.App, $ = id => document.getElementById(id), esc = App.esc, MAX = 8;
-  const DECORS = [['def', 'Par défaut'], ['sunset', '🌅 Coucher de soleil'], ['night', '🌌 Nuit'], ['aurora', '💚 Aurore'], ['photos', '🖼️ Mes photos']];
+  const DECORS = [['def', 'Par défaut'], ['sunset', '🌅 Coucher de soleil'], ['night', '🌌 Nuit'], ['aurora', '💚 Aurore'], ['starlink', '🛰️ Starlink'], ['photos', '🖼️ Mes photos']];
+  const BUNDLED = ['photos/starlink-1.jpg', 'photos/starlink-2.jpg', 'photos/starlink-3.jpg', 'photos/starlink-4.jpg']; // Starlink decor shipped with the app (cached by the service worker)
   const open = () => new Promise((ok, ko) => { const o = indexedDB.open('cispolstore-photos', 1); o.onupgradeneeded = () => o.result.createObjectStore('p'); o.onerror = () => ko(o.error); o.onsuccess = () => ok(o.result); });
   const tx = (mode, fn) => open().then(d => new Promise((ok, ko) => { const r = fn(d.transaction('p', mode).objectStore('p')); r.onsuccess = () => { d.close(); ok(r.result); }; r.onerror = () => { d.close(); ko(r.error); }; }));
   const urls = new Map(), revoke = id => { if (urls.has(id)) { URL.revokeObjectURL(urls.get(id)); urls.delete(id); } };
@@ -30,25 +31,56 @@
   };
 
   // ---------- the card with the amount: scene class now, photos as soon as they are read ----------
-  let slide = 0;
+  // Small photo cards pass across the card. Each pass picks a direction at random (never the same twice in a row):
+  // left to right, right to left, top to bottom, bottom to top, or flying out from the centre. WAAPI animations run on the compositor, so it stays light.
+  const DIRS = ['ltr', 'rtl', 'ttb', 'btt', 'center'], rnd = (a, b) => a + Math.random() * (b - a), reduce = () => window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  P.dirs = []; P.next = null; P.dir = () => P.dirs[P.dirs.length - 1] || '';
   P.hero = () => {
+    P.next = null;
     const h = document.querySelector('#view .hero'); if (!h || App.state.view !== 'home') return;
     const S = App.db.settings, d = DECORS.some(x => x[0] === S.decor) ? S.decor : 'def';
     DECORS.forEach(x => h.classList.remove('decor-' + x[0])); if (d !== 'def') h.classList.add('decor-' + d);
     h.querySelectorAll('.hbg').forEach(x => x.remove());
-    if (d !== 'photos' || !ids().length) return;
-    const bg = document.createElement('div'); bg.className = 'hbg'; bg.setAttribute('aria-hidden', 'true'); bg.innerHTML = '<i></i><i></i>'; h.prepend(bg);
-    const [a, b] = bg.children, list = ids().slice(); let cur = 0, front = a;
-    const show = async () => { if (!bg.isConnected) return; const id = list[cur % list.length], u = await P.url(id).catch(() => null); if (!u || !bg.isConnected) return;
-      const next = front === a ? b : a; next.style.backgroundImage = `url(${u})`; next.classList.add('on'); front.classList.remove('on'); front = next; cur++; };
-    show();
-    if (list.length > 1) { const t = setInterval(() => { if (!bg.isConnected) return clearInterval(t); if (!document.hidden) show(); }, 7000); }
+    const items = d === 'starlink' ? BUNDLED.slice() : d === 'photos' ? ids().slice() : [];
+    if (!items.length) return;
+    const bg = document.createElement('div'); bg.className = 'hbg'; bg.setAttribute('aria-hidden', 'true'); h.prepend(bg);
+    Promise.all(items.map(id => id.startsWith('photos/') ? id : P.url(id).catch(() => null))).then(us => {
+      if (!bg.isConnected) return;
+      const urls = us.filter(Boolean); if (!urls.length) return;
+      let anims = [], timer = 0, last = '', seq = 0, pool = [];
+      const W = () => h.clientWidth, H = () => h.clientHeight;
+      const card = (w, hh) => { if (!pool.length) pool = urls.slice().sort(() => Math.random() - .5); const c = document.createElement('i'); c.className = 'hcard'; c.style.width = w + 'px'; c.style.height = hh + 'px'; c.style.backgroundImage = `url(${pool.pop()})`; bg.appendChild(c); return c; };
+      const go = (c, frames, ms, delay) => { const a = c.animate(frames, { duration: ms, delay, easing: 'linear', fill: 'both' }); anims.push(a); return a; };
+      const pass = force => {
+        if (!bg.isConnected) return; clearTimeout(timer);
+        if (document.hidden) { timer = setTimeout(() => pass(), 1000); return; }
+        anims.forEach(a => a.cancel()); anims = []; bg.textContent = '';
+        let dir = force; if (!dir) { do dir = DIRS[Math.floor(Math.random() * DIRS.length)]; while (dir === last); } last = dir; P.dirs.push(dir); if (P.dirs.length > 30) P.dirs.shift();
+        const w = W(), hh = H(), id = ++seq, cw = 140, tilt = () => rnd(-4, 4);
+        if (dir === 'ltr' || dir === 'rtl') { // a row of cards, zigzag, crossing the width
+          const ch = Math.round(hh * .56), sp = 150, ms = (w + cw) / sp * 1000, n = Math.max(5, Math.ceil(w / (cw + 16)) + 3);
+          for (let i = 0; i < n; i++) { const c = card(cw, ch), y = hh * .22 + (i % 2 ? 1 : -1) * hh * .07, r = tilt(), x0 = dir === 'ltr' ? -cw : w, x1 = dir === 'ltr' ? w : -cw;
+            go(c, [{ transform: `translate(${x0}px,${y}px) rotate(${r}deg)` }, { transform: `translate(${x1}px,${y}px) rotate(${r}deg)` }], ms, i * (cw + 16) / sp * 1000); }
+        } else if (dir === 'ttb' || dir === 'btt') { // columns of cards falling or rising
+          const lanes = Math.max(2, Math.min(5, Math.round(w / 170))), ch = Math.round(Math.min(170, hh * .5)), sp = 130, ms = (hh + ch) / sp * 1000;
+          for (let i = 0; i < lanes * 2; i++) { const c = card(cw - 20, ch), x = ((i % lanes) + .5) * w / lanes - (cw - 20) / 2 + rnd(-10, 10), r = tilt(), y0 = dir === 'ttb' ? -ch : hh, y1 = dir === 'ttb' ? hh : -ch;
+            go(c, [{ transform: `translate(${x}px,${y0}px) rotate(${r}deg)` }, { transform: `translate(${x}px,${y1}px) rotate(${r}deg)` }], ms, (i % lanes) * 450 + Math.floor(i / lanes) * (ms * .55) + rnd(0, 250)); }
+        } else { // from the centre: the cards grow and fly out in every direction
+          const n = 6, ch = Math.round(hh * .42), cx = w / 2 - cw / 2, cy = hh / 2 - ch / 2, off = rnd(0, 6.28);
+          for (let i = 0; i < n; i++) { const c = card(cw, ch), a = off + i / n * 6.283 + rnd(-.3, .3), dx = Math.cos(a) * w * .7, dy = Math.sin(a) * hh * .75, r = rnd(-10, 10);
+            go(c, [{ transform: `translate(${cx}px,${cy}px) scale(.15) rotate(0deg)`, opacity: 0 }, { opacity: .95, offset: .3 }, { transform: `translate(${cx + dx}px,${cy + dy}px) scale(1.15) rotate(${r}deg)`, opacity: 0 }], 2800, i * 330); }
+        }
+        Promise.all(anims.map(a => a.finished.catch(() => null))).then(() => { if (id === seq && bg.isConnected) timer = setTimeout(() => pass(), rnd(300, 900)); });
+      };
+      if (reduce()) { for (let i = 0; i < 3; i++) { const c = card(120, Math.round(H() * .5)); c.style.transform = `translate(${(i + .5) * W() / 3 - 70}px,${H() * .25}px) rotate(${(i - 1) * 3}deg)`; } return; }
+      P.next = dir => pass(dir); pass();
+    });
   };
 
   // ---------- settings ----------
   App.photoCard = () => { const S = App.db.settings, cur = DECORS.some(x => x[0] === S.decor) ? S.decor : 'def', l = ids();
     return `<h2 class="sec">Décor de l'accueil</h2><div class="card"><div class="chips" role="group" aria-label="Décor">${DECORS.map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-act="decor_set" data-d="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>
-      <p class="mut" style="margin:6px 0 10px">Le décor s'affiche derrière l'animation, dans la carte du montant. Avec « Mes photos », elles défilent doucement.</p>
+      <p class="mut" style="margin:6px 0 10px">Le décor s'affiche derrière l'animation, dans la carte du montant. Avec « Starlink » ou « Mes photos », de petites photos défilent les unes derrière les autres.</p>
       ${l.length ? `<div class="phgrid">${l.map(id => `<span class="phth"><img data-phimg="${id}" alt=""><button type="button" data-act="ph_del" data-id="${id}" aria-label="Supprimer cette photo">✕</button></span>`).join('')}</div>` : ''}
       <div class="bar"><button class="btn sm" data-act="ph_add" data-cam="1">📷 Prendre une photo</button><button class="btn sm sec" data-act="ph_add">🖼️ Galerie ou Drive</button></div>
       <div class="spread" style="margin-top:12px"><b>Espace utilisé</b><span class="mut" data-phstats>…</span></div>
