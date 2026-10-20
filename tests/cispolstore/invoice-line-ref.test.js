@@ -1,0 +1,12 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+const r=await p.evaluate(()=>{App.db.clients.push({id:'cx1',type:'gere',name:'Marie Kabasele',phone:'0810000001',code:'CL-X1'});
+ const inv=App.createInvoice({type:'materiel',clientId:'cx1',currency:'USD',payMode:'Cash',lines:[{desc:'Kit Starlink',qty:1,price:600,cost:0},{desc:'Câble 30 m',qty:1,price:50,cost:0,ref:'CAB-30'},{desc:'Installation',qty:1,price:80,cost:0},{desc:'Routeur',qty:2,price:40,cost:0}]},0);App.save();
+ const d=document.createElement('div');d.innerHTML=App.invoiceDoc(inv,'','');return [...d.querySelectorAll('.items tbody tr')].map(tr=>tr.children[0].textContent+'|'+tr.children[1].textContent)});
+ok('line without reference gets P0001',/^P0001\|Kit Starlink/.test(r[0]),r[0]);
+ok('line with its own reference keeps it',/^CAB-30\|/.test(r[1]),r[1]);
+ok('numbering follows the line position (P0003, P0004)',/^P0003\|Installation/.test(r[2])&&/^P0004\|Routeur/.test(r[3]),r[2]+' / '+r[3]);
+ok('no "—" left in the reference column',r.every(x=>!/^—/.test(x)));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
