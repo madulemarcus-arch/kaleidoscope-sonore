@@ -90,7 +90,8 @@
         <option value="epargne">Épargne &amp; dettes (20 %)</option>
       </select>
       <input id="txLabel" placeholder="Libellé" required class="wide">
-      <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="Montant ($)" required>
+      <input id="txAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
+      <select id="txCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
       <input id="txDate" type="date" required>
       <button class="primary wide">Ajouter</button>
     </form>
@@ -108,7 +109,8 @@
     <form id="debtForm">
       <select id="dDir" aria-label="Sens"><option value="owe">Je dois à…</option><option value="owed">Me doit…</option></select>
       <input id="dWho" placeholder="Personne" required>
-      <input id="dAmount" type="number" min="0.01" step="0.01" placeholder="Montant ($)" required>
+      <input id="dAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
+      <select id="dCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
       <input id="dDue" type="date" aria-label="Échéance (facultatif)" title="Échéance (facultatif)">
       <input id="dNote" placeholder="Note (facultatif)" class="wide">
       <button class="primary wide">Ajouter</button>
@@ -152,6 +154,8 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const sum = a => a.reduce((t, x) => t + x, 0);
   const rest = d => Math.max(0, Math.round((d.amount - d.paid) * 100) / 100);
+  // Entered amounts may be in USD or FC; everything is stored in USD
+  const toUsd = (v, c) => Math.round((c === 'fc' ? v / data.rate : v) * 1e6) / 1e6;
   const dateFr = s => s.split('-').reverse().join('/');
 
   // ---------- Rendering ----------
@@ -226,7 +230,7 @@
   $('txForm').onsubmit = e => {
     e.preventDefault();
     const type = $('txType').value;
-    data.tx.push({ id: uid(), type, label: $('txLabel').value.trim(), amount: +$('txAmount').value, date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null });
+    data.tx.push({ id: uid(), type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null });
     $('txLabel').value = ''; $('txAmount').value = '';
     $('month').value = data.tx[data.tx.length - 1].date.slice(0, 7);
     save(); render();
@@ -234,7 +238,7 @@
 
   $('debtForm').onsubmit = e => {
     e.preventDefault();
-    data.debts.push({ id: uid(), dir: $('dDir').value, who: $('dWho').value.trim(), amount: +$('dAmount').value, paid: 0, due: $('dDue').value, note: $('dNote').value.trim() });
+    data.debts.push({ id: uid(), dir: $('dDir').value, who: $('dWho').value.trim(), amount: toUsd(+$('dAmount').value, $('dCur').value), paid: 0, due: $('dDue').value, note: $('dNote').value.trim() });
     e.target.reset(); save(); render();
   };
 
@@ -244,7 +248,8 @@
     else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
     else if (t.dataset.pay) {
       const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
-      const v = parseFloat(String(prompt(`Montant en $ ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left}) :`, left) || '').replace(',', '.'));
+      const raw = String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left} $, ou ${Math.round(left * data.rate)} FC). Ajoute « FC » pour des francs congolais :`, left) || '');
+      const v = toUsd(parseFloat(raw.replace(',', '.')), /fc|cdf/i.test(raw) ? 'fc' : 'usd');
       if (!(v > 0)) return;
       const amt = Math.min(v, left);
       d.paid += amt;
