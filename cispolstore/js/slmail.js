@@ -4,7 +4,7 @@
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
   const KEY = 'cispolstore-gmail', DRIVE_KEY = 'cispolstore-drive', SCOPE = 'https://www.googleapis.com/auth/gmail.readonly', API = 'https://gmail.googleapis.com/gmail/v1/users/me';
-  const FIRST_DAYS = 30, MAX_MSG = 300, MAX_LOG = 600, DUP_MS = 30 * 60e3;
+  const FIRST_DAYS = 30, MAX_MSG = 300, MAX_LOG = 600, DUP_MS = 2 * 3600e3;
 
   let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
   cfg.accounts = Array.isArray(cfg.accounts) ? cfg.accounts : [];
@@ -67,14 +67,25 @@
   };
   // an e-mail whose ACC was not known yet is tried again once the client has it
   const rematch = () => { let n = 0; log().slice().sort((a, b) => a.ts - b.ts).forEach(e => { if (e.res === 'sans-client' || e.res === 'ambigu') { apply(e); if (e.res === 'ok') n++; } }); return n; };
-  // the same notice arriving in two mailboxes (forwarding) is counted once
-  const isDup = e => log().some(x => x.id !== e.id && x.acc === e.acc && x.kind === e.kind && x.amount === e.amount && Math.abs(x.ts - e.ts) < DUP_MS);
+  // the same notice arriving in several mailboxes (forwarding, or Starlink writing to every contact address of the account) is counted once:
+  // same Message-ID, or same account + same kind + same amount within two hours. The other mailboxes are remembered on the entry ("also").
+  const findDup = e => log().find(x => x.id !== e.id && (e.rid && x.rid === e.rid || x.acc === e.acc && x.kind === e.kind && x.amount === e.amount && Math.abs(x.ts - e.ts) < DUP_MS));
   L.ingest = (m, mailbox) => {
     const id = mailbox + ':' + m.id, p = L.parse(m); if (!p.acc) return null; // not about an account: ignored
     const e = { id, ts: m.ts, acc: p.acc, kind: p.kind, amount: p.amount, cur: p.cur, days: p.days, due: p.due || '', from: p.from || '', to: p.to || '', subject: String(m.subject || '').slice(0, 120), mailbox, res: '' };
-    if (isDup(e)) return null;
+    e.rid = String(m.rid || '').slice(0, 200);
+    const dup = findDup(e); if (dup) { if (dup.mailbox !== mailbox && !(dup.also || []).includes(mailbox)) dup.also = (dup.also || []).concat(mailbox); return null; }
     apply(e); log().push(e); if (log().length > MAX_LOG) App.db.slmail = log().slice(-MAX_LOG);
     return e;
+  };
+  // ACC found in e-mails but not (or twice) in the client list, one line per account whatever the number of e-mails and mailboxes
+  L.unknown = () => {
+    const g = new Map();
+    log().filter(e => e.res === 'sans-client' || e.res === 'ambigu').forEach(e => {
+      const k = accKey(e.acc); let o = g.get(k); if (!o) g.set(k, o = { acc: e.acc, ambiguous: false, boxes: new Set(), events: [], last: e });
+      o.ambiguous = o.ambiguous || e.res === 'ambigu'; o.events.push(e); o.boxes.add(e.mailbox); (e.also || []).forEach(b => o.boxes.add(b)); if (e.ts > o.last.ts) o.last = e;
+    });
+    return [...g.values()].sort((a, b) => b.last.ts - a.last.ts);
   };
   L.alerts = () => App.db.clients.filter(c => c.slm && STATES[c.slm.state] && STATES[c.slm.state][3] > 0).sort((a, b) => STATES[b.slm.state][3] - STATES[a.slm.state][3] || b.slm.ts - a.slm.ts);
   L.count = () => L.alerts().length;
@@ -140,7 +151,7 @@
         if (have.has(a.email + ':' + id) || seen.has(id)) continue;
         const m = await gq(`${API}/messages/${id}?format=full`, tok), from = header(m, 'from');
         if (!/starlink\.com/i.test(from)) seen.add(id);
-        else { const e = L.ingest({ id, subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) added++; else seen.add(id); }
+        else { const e = L.ingest({ id, rid: header(m, 'message-id'), subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) added++; else seen.add(id); }
         if (L.pace) await L.delay(L.pace);
       }
     } finally { a.seen = [...seen].slice(-500); }
@@ -212,7 +223,8 @@
   };
   const RES = { ok: ['✅', 'Appliqué'], ancien: ['🕓', 'Ancien : un e-mail plus récent est déjà appliqué'], 'sans-client': ['❓', 'Aucun client avec cet ACC'], ambigu: ['❗', 'Plusieurs clients ont cet ACC'], inconnu: ['📨', 'Type d\'e-mail non reconnu'], annule: ['↩️', 'Annulé'] };
   App.views.slmail = () => {
-    const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), todo = lg.filter(e => ['sans-client', 'ambigu', 'inconnu'].includes(e.res));
+    const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), unk = L.unknown(), odd = lg.filter(e => e.res === 'inconnu'), nTodo = unk.length + odd.length;
+    if (rematch()) App.save();
     const chip = (k, t) => `<button class="chip ${tab === k ? 'on' : ''}" data-act="slm_tab" data-v="${k}">${t}</button>`;
     const cnt = k => al.filter(c => c.slm.state === k).length;
     const first = c => c.first || App.cname(c);
@@ -221,17 +233,35 @@
         <div class="mut" style="margin-top:4px">${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</div>
         <div class="bar">${c.phone ? `<button class="btn sm" data-act="slm_wa" data-id="${c.id}">💬 Relancer</button>` : ''}<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche</button><button class="btn sm sec" data-act="slm_done" data-id="${c.id}">✔ Réglé</button></div></div>`; };
     const logRow = e => { const r = RES[e.res] || ['', e.res], k = STATES[e.kind], c = App.client(e.clientId);
-      return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : e.kind === 'programme' ? '📅 Paiement programmé' + (e.due ? ' pour le ' + App.fdate(e.due) : '') : '📨 ' + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
+      return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : e.kind === 'programme' ? '📅 Paiement programmé' + (e.due ? ' pour le ' + App.fdate(e.due) : '') : '📨 ' + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}${(e.also || []).length ? ' · aussi reçu dans ' + e.also.map(esc).join(', ') : ''}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
+    const evLabel = e => STATES[e.kind] ? STATES[e.kind][0] + ' ' + STATES[e.kind][1] : e.kind === 'programme' ? '📅 Paiement programmé' : '📨 ' + esc(e.subject);
+    const unkRow = o => { const e = o.last, cs = App.db.clients.filter(c => accKey(c.acc) === accKey(o.acc));
+      return `<div class="card"><div class="spread"><b class="mono" style="word-break:break-all">${esc(o.acc)}</b><span class="pill ${o.ambiguous ? 'bad' : 'warn'}">${o.ambiguous ? 'Plusieurs clients' : 'Non enregistré'}</span></div>
+        <div class="mut" style="margin-top:4px;white-space:normal">Dernier e-mail : ${evLabel(e)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''} · ${when(e.ts)}<br>${o.events.length} e-mail(s) · boîte(s) : ${[...o.boxes].map(esc).join(', ')}</div>
+        <div class="bar">${o.ambiguous ? cs.map(c => `<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche : ${esc(App.cname(c))}</button>`).join('') : `<button class="btn sm" data-act="slm_link" data-acc="${esc(o.acc)}">🔗 Associer à un client</button><button class="btn sm sec" data-act="slm_new" data-acc="${esc(o.acc)}">➕ Nouveau client</button>`}<button class="btn sm sec" data-act="copy" data-t="${esc(o.acc)}">Copier ACC</button></div></div>`; };
     const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
-      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Ces e-mails n'ont modifié aucun client. Ajoutez l'ACC sur la fiche du bon client : il sera rapproché à la prochaine vérification.</p><div class="list">${todo.length ? todo.map(logRow).join('') : '<div class="empty">Rien à vérifier 🎉</div>'}</div>`
+      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
     return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📧 Clients à suivre</small><div class="hero-num">${al.length}</div></div></div>
         <div class="cstats"><div><b>${cnt('echec')}</b><small>paiement échoué</small></div><div><b>${cnt('avis')}</b><small>suspension imminente</small></div><div><b>${cnt('suspendu')}</b><small>suspendus</small></div></div></section>
         <div class="bar"><button class="btn" data-act="slm_check" ${cfg.accounts.length ? '' : 'disabled'}>🔄 Vérifier les e-mails</button>${cfg.accounts.length ? '' : '<button class="btn sec" data-act="go" data-v="clients">Configurer Gmail</button>'}</div>
         <p class="mut" style="font-size:13px;margin:0 0 8px">Dernière vérification : ${when(cfg.lastCheck)} · ${cfg.accounts.length} boîte(s) Gmail liée(s)</p>
-        <div class="chips">${chip('alerts', `Alertes (${al.length})`)}${chip('journal', 'Journal')}${chip('todo', `À vérifier (${todo.length})`)}</div>${body}` };
+        <div class="chips">${chip('alerts', `Alertes (${al.length})`)}${chip('journal', 'Journal')}${chip('todo', `À vérifier (${nTodo})`)}</div>${body}` };
   };
+  // link an unknown ACC to a client: search a client, or create one with the ACC already filled in
+  let linkAcc = '';
+  const pickList = q => { const k = fold(q); return App.db.clients.filter(c => accKey(c.acc) !== accKey(linkAcc) && (!k || fold([App.cname(c), c.code, c.acc, c.phone].join(' ')).includes(k))).sort((a, b) => (a.acc ? 1 : 0) - (b.acc ? 1 : 0)).slice(0, 40)
+    .map(c => `<button class="item" data-act="slm_pick" data-id="${c.id}"><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.code || '')} · ${c.acc ? esc(c.acc) : "pas d'ACC"}</small></div></button>`).join('') || '<div class="empty">Aucun client</div>'; };
+  App.actions.slm_link = d => { linkAcc = d.acc; App.modal('Associer ' + d.acc, `<input id="slm_q" placeholder="Chercher un client (nom, code, téléphone)…" autocomplete="off"><div class="list" id="slm_list" style="margin-top:8px;max-height:50vh;overflow:auto">${pickList('')}</div>`, () => { App.close(); }, 'Fermer'); };
+  document.addEventListener('input', e => { if (e.target && e.target.id === 'slm_q' && $('slm_list')) $('slm_list').innerHTML = pickList(e.target.value); });
+  App.actions.slm_pick = d => {
+    const c = App.client(d.id); if (!c || !linkAcc) return;
+    if (c.acc && accKey(c.acc) !== accKey(linkAcc) && !App.confirm(`${App.cname(c)} a déjà l'ACC ${c.acc}. Le remplacer par ${linkAcc} ?`)) return;
+    c.acc = linkAcc; const n = rematch(); App.save(); App.close(); App.toast('ACC associé à ' + App.cname(c) + (n ? ` · ${n} e-mail(s) appliqué(s)` : '')); App.refresh();
+  };
+  App.actions.slm_new = d => { App.clientForm(null, 'gere'); const el = $('f_acc'); if (el) el.value = d.acc; };
+  App.actions.slm_todo = () => { tab = 'todo'; App.go('slmail'); };
   App.actions.slm_wa = d => { const c = App.client(d.id); if (!c || !c.slm || !MSG[c.slm.state]) return; const url = App.waUrl(c.phone, MSG[c.slm.state](c.first || App.cname(c), c)); if (!url) return App.toast('Pas de numéro de téléphone'); window.open(url, '_blank', 'noopener'); };
   App.actions.slm_done = d => { const c = App.client(d.id); if (!c) return; c.slm = { state: 'actif', ts: Date.now(), manual: true }; App.save(); App.toast('Alerte clôturée'); App.refresh(); };
   App.actions.slm_undo = d => {
@@ -248,7 +278,9 @@
     if (!App.guard('slm_check')) return '';
     setTimeout(auto, 600);
     const n = L.count(), warn = L.needsAttention(), title = '📧 E-mails Starlink' + (n ? ` · ${n} à suivre` : '') + (warn ? ' · reconnexion nécessaire' : '');
+    if (rematch()) App.save();
+    const nu = L.unknown().length, unkLine = nu ? `<button class="item" data-act="slm_todo" style="margin-bottom:8px"><span class="avatar warn" style="width:36px;height:36px;font-size:16px">🔗</span><div class="grow"><b style="white-space:normal">${nu} compte(s) Starlink (ACC) vu(s) dans vos e-mails mais pas dans la liste des clients.</b></div><span class="mut">›</span></button>` : '';
     const alertLine = n ? `<button class="item" data-act="go" data-v="slmail" style="margin-bottom:8px"><span class="avatar bad" style="width:36px;height:36px;font-size:16px">📧</span><div class="grow"><b style="white-space:normal">${n} client(s) Starlink à suivre (paiement échoué ou suspension).</b></div><span class="mut">›</span></button>` : '';
-    return alertLine + App.fold('slmail', title, App.slmailCard().replace(/^<h2 class="sec">.*?<\/h2>/, ''));
+    return unkLine + alertLine + App.fold('slmail', title, App.slmailCard().replace(/^<h2 class="sec">.*?<\/h2>/, ''));
   };
 })();

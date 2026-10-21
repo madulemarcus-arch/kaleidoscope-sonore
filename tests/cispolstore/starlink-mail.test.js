@@ -28,6 +28,9 @@ const BOX={
   msg('b2','Service Starlink suspendu',body.suspendu(Y),T0+120*MIN),
   msg('b1','Échec du paiement Starlink',body.echec(X,'61 008,07'),T0+9*MIN+10e3)] // the same notice, forwarded: counted once
 };
+BOX['c@example.test']=[ // a third mailbox: the same notice as a4 (Starlink writes to every contact address) and an account we do not know
+  msg('c2','Service Starlink suspendu',body.suspendu('ACC-DF-10000006-66666-66'),T0+260*MIN),
+  msg('c1','Échec du paiement Starlink',body.echec(Z,'87 000,00'),T0+241*MIN)];
 BOX['b@example.test'].push(msg('b0','Newsletter','x',T0,'Autre <news@example.test>'));
 (async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
 let calls=0,qmode='',qLeft=0;
@@ -61,8 +64,13 @@ await p.click('[data-act=slm_add]');await p.waitForTimeout(1500);
 await p.evaluate(()=>{window.__pick='b@example.test'});
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
 await p.click('[data-act=slm_add]');await p.waitForTimeout(1800);
+await p.evaluate(()=>{window.__pick='c@example.test'});
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
+await p.click('[data-act=slm_add]');await p.waitForTimeout(1800);
 const st=await p.evaluate(()=>({acc:JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.map(a=>a.email),log:App.db.slmail.map(e=>[e.id,e.res,e.kind].join('|')),cl:Object.fromEntries(['cm','cp','cw1','cw2'].map(i=>[i,(App.client(i).slm||{}).state||'']))}));
-ok('two mailboxes linked',st.acc.join(',')==='a@example.test,b@example.test',st.acc.join(','));
+ok('three mailboxes linked',st.acc.join(',')==='a@example.test,b@example.test,c@example.test',st.acc.join(','));
+const al4=await p.evaluate(()=>App.db.slmail.find(e=>e.id==='a@example.test:a4'));
+ok('same notice in two mailboxes: one entry, the other mailbox remembered',!!al4&&(al4.also||[]).join()==='c@example.test'&&!(await p.evaluate(()=>App.db.slmail.some(e=>e.id==='c@example.test:c1'))));
 ok('newest e-mail wins whatever the reading order (Marie reactivated, Paul suspended)',st.cl.cm==='actif'&&st.cl.cp==='suspendu',JSON.stringify(st.cl));
 ok('older e-mail kept as "ancien" (a1 older than a2), not applied',st.log.some(x=>/:a1\|ancien/.test(x))&&st.log.some(x=>/:a3\|ok/.test(x)),st.log.join(' '));
 ok('forwarded duplicate counted once (b1 absent), newsletter and promotion ignored',!st.log.some(x=>/:b1\|/.test(x))&&!st.log.some(x=>/:b[06]\|/.test(x)),st.log.join(' '));
@@ -79,7 +87,8 @@ await p.evaluate(()=>App.go('slmail'));await p.waitForTimeout(600);
 let txt=await p.innerText('#view');
 ok('Alertes Starlink: Paul listed with his ACC, Marie (reactivated) not',/Paul Test/.test(txt)&&/Suspendu/.test(txt)&&!/Marie Test/.test(txt)&&/ACC-DF-10000002-22222-22/.test(txt));
 await p.click('[data-act=slm_tab][data-v=todo]');await p.waitForTimeout(300);txt=await p.innerText('#view');
-ok('À vérifier: 3 e-mails (sans client, ambigu, inconnu)',/À vérifier \(3\)/.test(txt)&&/Aucun client avec cet ACC/.test(txt)&&/Plusieurs clients ont cet ACC/.test(txt)&&/non reconnu/.test(txt));
+ok('À vérifier: one line per unknown ACC (not registered, shared by two clients) plus the unrecognised e-mail',/À vérifier \(4\)/.test(txt)&&(txt.match(/Non enregistré/g)||[]).length===2&&/Plusieurs clients/.test(txt)&&/E-mails non reconnus \(1\)/.test(txt),txt.slice(0,300));
+ok('unknown ACC line shows how many e-mails and which mailboxes (Z: a and c)',/2? ?e-mail\(s\) · boîte\(s\) : a@example\.test, c@example\.test/.test(txt)||/boîte\(s\) : a@example\.test, c@example\.test/.test(txt),txt.slice(0,700));
 await p.click('[data-act=slm_tab][data-v=journal]');await p.waitForTimeout(300);
 ok('Journal lists the e-mails with their mailbox',/a@example\.test/.test(await p.innerText('#view'))&&/b@example\.test/.test(await p.innerText('#view')));
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);
@@ -96,6 +105,21 @@ ok('WhatsApp message to the client mentions the suspension',/wa\.me/.test(wa)&&/
 await p.click('[data-act=slm_tab][data-v=journal]');await p.waitForTimeout(300);
 await p.click('[data-act=slm_undo][data-id="b@example.test:b2"]');await p.waitForTimeout(400);
 ok('undo restores the previous state (suspended -> suspension notice a3)',await p.evaluate(()=>App.client('cp').slm.state)==='avis');
+// ---- link an unknown ACC to a client / create a client with the ACC filled in
+await p.evaluate(()=>{App.db.clients.push({id:'cu',type:'gere',first:'Uma',last:'Test',name:'Uma Test',phone:'0810000009',code:'CL-U'});App.save();App.go('slmail')});await p.waitForTimeout(500);
+await p.click('[data-act=slm_tab][data-v=todo]');await p.waitForTimeout(300);
+await p.click('[data-act=slm_new][data-acc="%s"]'.replace('%s',Z));await p.waitForTimeout(400);
+ok('"Nouveau client" opens the form with the ACC already filled in',await p.evaluate(()=>document.getElementById('f_acc')&&document.getElementById('f_acc').value)===Z);
+await p.evaluate(()=>App.close());await p.waitForTimeout(300);
+await p.click('[data-act=slm_link][data-acc="%s"]'.replace('%s','ACC-DF-10000006-66666-66'));await p.waitForTimeout(400);
+await p.fill('#slm_q','Uma');await p.waitForTimeout(300);
+ok('picker filters the clients',(await p.$$('[data-act=slm_pick]')).length===1);
+await p.click('[data-act=slm_pick][data-id=cu]');await p.waitForTimeout(500);
+const lk=await p.evaluate(()=>({acc:App.client('cu').acc,st:(App.client('cu').slm||{}).state,left:App.slmail.unknown().length}));
+ok('linking sets the client ACC and applies the waiting e-mails at once (suspended)',lk.acc==='ACC-DF-10000006-66666-66'&&lk.st==='suspendu',JSON.stringify(lk));
+ok('the linked ACC leaves the "À vérifier" list',lk.left===2,JSON.stringify(lk));
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);
+ok('Clients screen: line for unknown ACC still to link',/compte\(s\) Starlink \(ACC\) vu\(s\) dans vos e-mails/.test(await p.innerText('#view')));
 // ---- rematch once the client has the ACC
 await p.evaluate(([Z])=>{App.db.clients.push({id:'cz',type:'gere',name:'Zed Test',code:'CL-Z',acc:Z});App.save()},[Z]);
 await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
@@ -120,5 +144,5 @@ ok('next reading resumes and completes',await p.evaluate(()=>App.db.slmail.lengt
 // ---- remove a mailbox
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
 await p.click('[data-act=slm_remove][data-v="1"]');await p.waitForTimeout(300);
-ok('mailbox removed, alerts kept',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.length)===1&&await p.evaluate(()=>App.db.slmail.length)>0);
+ok('mailbox removed, alerts kept',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.length)===2&&await p.evaluate(()=>App.db.slmail.length)>0);
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
