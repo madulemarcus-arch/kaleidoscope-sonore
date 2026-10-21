@@ -94,9 +94,18 @@
   const gf = async (url, tok) => {
     const r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
     if (r.status === 401) throw Object.assign(new Error('Reconnexion à Google nécessaire'), { code: 'auth' });
-    if (!r.ok) { let m = ''; try { m = (await r.json()).error.message; } catch (e) {} throw Object.assign(new Error('Gmail : ' + (m || r.status)), { status: r.status }); }
+    if (!r.ok) {
+      let m = '', why = ''; try { const j = (await r.json()).error; m = j.message; why = ((j.errors || [])[0] || {}).reason || ''; } catch (e) {}
+      // Gmail limits how fast a mailbox can be read ("Quota exceeded … Units per minute per user"): slow down and retry
+      if (r.status === 429 || (r.status === 403 && (/rate|quota/i.test(why) || /quota|rate limit/i.test(m)))) throw Object.assign(new Error('Gmail limite le débit de lecture'), { code: 'quota', retry: +r.headers.get('retry-after') || 0 });
+      throw Object.assign(new Error('Gmail : ' + (m || r.status)), { status: r.status });
+    }
     return r.json();
   };
+  L.pace = 150; // ms between two messages read
+  L.delay = ms => new Promise(ok => setTimeout(ok, ms));
+  // same request, retried a few times with a growing pause when Gmail asks to slow down
+  const gq = async (url, tok) => { for (let i = 0; ; i++) { try { return await gf(url, tok); } catch (e) { if (e.code !== 'quota' || i >= 3) throw e; await L.delay((e.retry || 10 * 2 ** i) * 1000); } } };
   // email '' = pick any Google account (adding a mailbox); interactive false = reuse the existing Google session silently
   const getToken = async (email, interactive) => {
     const t0 = email && toks[email.toLowerCase()]; if (t0 && Date.now() < t0.exp) return t0.tok;
@@ -123,22 +132,25 @@
   const syncAccount = async (a, interactive) => {
     const tok = await getToken(a.email, interactive), since = a.last ? Math.floor((a.last - 2 * 864e5) / 1000) : Math.floor((Date.now() - FIRST_DAYS * 864e5) / 1000);
     const q = encodeURIComponent(`from:starlink.com after:${since}`), have = new Set(log().map(e => e.id)), seen = new Set(a.seen || []);
-    let ids = [], page = ''; do { const r = await gf(`${API}/messages?q=${q}&maxResults=100${page ? '&pageToken=' + page : ''}`, tok); ids = ids.concat((r.messages || []).map(x => x.id)); page = r.nextPageToken || ''; } while (page && ids.length < MAX_MSG);
+    let ids = [], page = ''; do { const r = await gq(`${API}/messages?q=${q}&maxResults=100${page ? '&pageToken=' + page : ''}`, tok); ids = ids.concat((r.messages || []).map(x => x.id)); page = r.nextPageToken || ''; } while (page && ids.length < MAX_MSG);
     let added = 0;
-    for (const id of ids.slice(0, MAX_MSG)) {
-      if (have.has(a.email + ':' + id) || seen.has(id)) continue;
-      const m = await gf(`${API}/messages/${id}?format=full`, tok), from = header(m, 'from');
-      if (!/starlink\.com/i.test(from)) { seen.add(id); continue; }
-      const e = L.ingest({ id, subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email);
-      if (e) added++; else seen.add(id);
-    }
-    a.seen = [...seen].slice(-500); a.last = Date.now(); delete a.err; return added;
+    // newest first: if Gmail stops us half way, the most recent notices are already read and the next reading resumes where this one stopped
+    try {
+      for (const id of ids.slice(0, MAX_MSG)) {
+        if (have.has(a.email + ':' + id) || seen.has(id)) continue;
+        const m = await gq(`${API}/messages/${id}?format=full`, tok), from = header(m, 'from');
+        if (!/starlink\.com/i.test(from)) seen.add(id);
+        else { const e = L.ingest({ id, subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) added++; else seen.add(id); }
+        if (L.pace) await L.delay(L.pace);
+      }
+    } finally { a.seen = [...seen].slice(-500); }
+    a.last = Date.now(); delete a.err; return added;
   };
   const NEED_LOGIN = ['interaction_required', 'access_denied', 'auth', 'popup_closed', 'popup_failed_to_open', 'immediate_failed', 'user_logged_out', 'consent_required', 'login_required', 'popup', 'unknown'];
   L.check = async interactive => {
     if (busy || !cfg.accounts.length) return 0; busy = true; L.status = 'busy'; redraw();
     let added = 0; const errs = [];
-    for (const a of cfg.accounts) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : e.message); } }
+    for (const a of cfg.accounts) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
     const re = rematch(); cfg.lastCheck = Date.now(); saveCfg(); App.save();
     L.status = errs.length ? 'error' : 'idle'; L.error = errs.join(' · '); busy = false;
     if (interactive) App.toast(errs.length ? errs[0] : added ? `${added} e-mail(s) Starlink lu(s)` + (re ? `, ${re} rapproché(s)` : '') : 'Aucun nouvel e-mail Starlink');

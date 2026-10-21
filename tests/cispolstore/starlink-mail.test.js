@@ -30,12 +30,13 @@ const BOX={
 };
 BOX['b@example.test'].push(msg('b0','Newsletter','x',T0,'Autre <news@example.test>'));
 (async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
-let calls=0;
+let calls=0,qmode='',qLeft=0;
 await ctx.route('https://gmail.googleapis.com/**',async r=>{calls++;const u=new URL(r.request().url()),who=(r.request().headers().authorization||'').replace('Bearer tok-',''),box=BOX[who];
  const json=o=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(o)});
  if(!box)return r.fulfill({status:401,body:'{}'});
  if(u.pathname.endsWith('/profile'))return json({emailAddress:who});
  if(u.pathname.endsWith('/messages'))return json({messages:box.map(m=>({id:m.id}))});
+ if((qmode==='all'||(qmode==='some'&&qLeft>0))&&/\/messages\/./.test(u.pathname)){qLeft--;return r.fulfill({status:429,contentType:'application/json',headers:{'retry-after':'1'},body:JSON.stringify({error:{code:429,message:"Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'",errors:[{reason:'rateLimitExceeded'}]}})})}
  const id=u.pathname.split('/').pop();return json(box.find(m=>m.id===id))});
 await p.addInitScript(()=>{window.__pick='a@example.test';window.google={accounts:{oauth2:{initTokenClient:c=>({requestAccessToken:()=>setTimeout(()=>c.callback({access_token:'tok-'+(c.login_hint||window.__pick),expires_in:3600}),5)}),revoke:()=>{}}}}});
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
@@ -107,6 +108,15 @@ const c0=calls;await p.reload();await p.waitForTimeout(6000);
 ok('nothing is read when the app opens (dashboard untouched)',calls===c0);
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(3500);
 ok('opening Clients reads the mailboxes quietly (no window)',calls>c0&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).lastCheck)>0);
+// ---- Gmail slows the reading down (quota): retry, keep the progress, resume
+const reset=async()=>{await p.evaluate(()=>{App.db.slmail=[];App.db.clients.forEach(c=>{delete c.slm;delete c.slp});const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.accounts.forEach(a=>{delete a.last;delete a.seen;delete a.err});c.lastCheck=Date.now();localStorage.setItem(k,JSON.stringify(c));App.save()});await p.reload();await p.waitForTimeout(1000);await p.evaluate(()=>{App.slmail.delay=()=>Promise.resolve();App.slmail.pace=0})};
+await reset();qmode='some';qLeft=3;await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+ok('Gmail asks to slow down: the reading retries and still reads everything',await p.evaluate(()=>App.db.slmail.length)===n0&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.every(a=>!a.err)),String(await p.evaluate(()=>App.db.slmail.length))+'/'+n0);
+await reset();qmode='all';await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+const q=await p.evaluate(()=>({n:App.db.slmail.length,errs:JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.map(a=>a.err||'')}));
+ok('quota never lifts: no crash, clear message, nothing lost',q.n<n0&&q.errs.every(e=>/limite le débit/.test(e)),JSON.stringify(q));
+qmode='';await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+ok('next reading resumes and completes',await p.evaluate(()=>App.db.slmail.length)===n0&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.every(a=>!a.err)));
 // ---- remove a mailbox
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
 await p.click('[data-act=slm_remove][data-v="1"]');await p.waitForTimeout(300);
