@@ -8,16 +8,19 @@ const body={
  echec:(a,amt)=>`Échec de paiement\nVotre paiement a échoué et nécessite votre attention.\n\n  Numéro de compte   ${a}\n\n  Montant du paiement   CDF ${amt}\n\nVotre paiement a échoué parce que le montant dépassait la limite disponible.\n\nCe message a été envoyé à l'adresse x@example.test pour le compte ${cut(a)}.`,
  avis:a=>`Avis de suspension\n${a}\n\nVotre compte sera suspendu dans 1 jour. Veuillez prendre des mesures pour éviter l’interruption de votre service Starlink.\n\nCe message a été envoyé à l'adresse x@example.test pour le compteACC-DF-10000002-\n22222-22.`,
  suspendu:a=>`Service suspendu\nVotre service Starlink a été suspendu en raison d’un solde impayé relatif au compte ${cut(a)}.\n\nVeuillez modifier vos données de facturation.`,
+ prog:(a,amt)=>`Paiement programmé\nLe paiement automatique de votre service mensuel est programmé pour le 19/10/2026.\n\nPériode du relevé 19/10/2026 - 18/11/2026\n\nSolde actuel CDF ${amt}\n\nConnectez-vous à votre compte pour vérifier votre paiement.\n\nCe message a été envoyé à l'adresse x@example.test pour le compte${a.slice(0,16)}\n${a.slice(16)}.`,
  actif:a=>`Service réactivé\nNous réactivons le service pour votre compte ${cut(a)}.`
 };
 const msg=(id,subject,text,ts,from='Starlink <no-reply@starlink.com>')=>({id,internalDate:String(ts),payload:{mimeType:'multipart/alternative',headers:[{name:'From',value:from},{name:'Subject',value:subject}],parts:[{mimeType:'text/plain',body:{data:Buffer.from(text,'utf8').toString('base64url')}}]}});
 const BOX={
  'a@example.test':[ // newest first, like Gmail
+  msg('a5','Rappel de paiement automatique',body.prog(Y,'143 999,99'),T0+30*MIN),
   msg('a4','Échec du paiement Starlink',body.echec(Z,'87 000,00'),T0+240*MIN),
   msg('a3','Suspension de votre service Starlink',body.avis(Y),T0+60*MIN),
   msg('a2','Échec du paiement Starlink',body.echec(X,'61 008,07'),T0+9*MIN),
   msg('a1','Échec du paiement Starlink',body.echec(X,'157 661,28'),T0)],
  'b@example.test':[
+  msg('b7','Rappel de paiement automatique',body.prog(Y,'97 500,09'),T0+500*MIN),
   msg('b6','Promotion Starlink','Bonne affaire !',T0+300*MIN),
   msg('b5','Échec du paiement Starlink',body.echec(W,'10 000,00'),T0+250*MIN),
   msg('b4','Facture disponible',`Votre facture est prête pour le compte ${Y}.`,T0+200*MIN),
@@ -37,10 +40,11 @@ await ctx.route('https://gmail.googleapis.com/**',async r=>{calls++;const u=new 
 await p.addInitScript(()=>{window.__pick='a@example.test';window.google={accounts:{oauth2:{initTokenClient:c=>({requestAccessToken:()=>setTimeout(()=>c.callback({access_token:'tok-'+(c.login_hint||window.__pick),expires_in:3600}),5)}),revoke:()=>{}}}}});
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
 // ---- reading one e-mail (no network)
-const P=await p.evaluate(([bodyEchec,bodyAvis,bodySusp,bodyAct])=>{const P=App.slmail.parse;return[P({subject:'Échec du paiement Starlink',text:bodyEchec}),P({subject:'Suspension de votre service Starlink',text:bodyAvis}),P({subject:'Service Starlink suspendu',text:bodySusp}),P({subject:'Le service Starlink a été réactivé',text:bodyAct}),P({subject:'Autre',text:'rien'}),P({subject:'Échec du paiement Starlink',text:'Numéro de compte ACC-DF-10000001-11111-11\nMontant du paiement USD 1,234.50'})]},[body.echec(X,'157 661,28'),body.avis(Y),body.suspendu(Y),body.actif(X)]);
+const P=await p.evaluate(([bodyEchec,bodyAvis,bodySusp,bodyAct,bodyProg])=>{const P=App.slmail.parse;return[P({subject:'Échec du paiement Starlink',text:bodyEchec}),P({subject:'Suspension de votre service Starlink',text:bodyAvis}),P({subject:'Service Starlink suspendu',text:bodySusp}),P({subject:'Le service Starlink a été réactivé',text:bodyAct}),P({subject:'Autre',text:'rien'}),P({subject:'Échec du paiement Starlink',text:'Numéro de compte ACC-DF-10000001-11111-11\nMontant du paiement USD 1,234.50'}),P({subject:'Rappel de paiement automatique',text:bodyProg})]},[body.echec(X,'157 661,28'),body.avis(Y),body.suspendu(Y),body.actif(X),body.prog(Y,'143 999,99')]);
 ok('failed payment: kind, ACC cut by a line break, amount in CDF',P[0].kind==='echec'&&P[0].acc===X&&P[0].amount===157661.28&&P[0].cur==='CDF',JSON.stringify(P[0]));
 ok('suspension notice: ACC glued to the previous word',P[1].kind==='avis'&&P[1].acc===Y&&P[1].days===1,JSON.stringify(P[1]));
 ok('suspended and reactivated recognised',P[2].kind==='suspendu'&&P[2].acc===Y&&P[3].kind==='actif'&&P[3].acc===X);
+ok('payment reminder: next debit date, statement period and amount read (ACC glued and cut)',P[6].kind==='programme'&&P[6].acc===Y&&P[6].due==='2026-10-19'&&P[6].from==='2026-10-19'&&P[6].to==='2026-11-18'&&P[6].amount===143999.99&&P[6].cur==='CDF',JSON.stringify(P[6]));
 ok('unknown e-mail: no kind, no ACC; English amount format read',P[4].kind===''&&P[4].acc===''&&P[5].amount===1234.5&&P[5].cur==='USD',JSON.stringify(P[5]));
 // ---- clients
 await p.evaluate(([X,Y,W])=>{App.db.clients.push({id:'cm',type:'gere',first:'Marie',last:'Test',name:'Marie Test',phone:'0810000001',code:'CL-M',acc:X.replace('ACC-DF-','ACC DF ')},{id:'cp',type:'gere',first:'Paul',last:'Test',name:'Paul Test',phone:'0810000002',code:'CL-P',acc:Y},{id:'cw1',type:'gere',name:'Double 1',code:'CL-W1',acc:W},{id:'cw2',type:'gere',name:'Double 2',code:'CL-W2',acc:W});App.save()},[X,Y,W]);
@@ -62,6 +66,9 @@ ok('newest e-mail wins whatever the reading order (Marie reactivated, Paul suspe
 ok('older e-mail kept as "ancien" (a1 older than a2), not applied',st.log.some(x=>/:a1\|ancien/.test(x))&&st.log.some(x=>/:a3\|ok/.test(x)),st.log.join(' '));
 ok('forwarded duplicate counted once (b1 absent), newsletter and promotion ignored',!st.log.some(x=>/:b1\|/.test(x))&&!st.log.some(x=>/:b[06]\|/.test(x)),st.log.join(' '));
 ok('unknown ACC -> sans-client, shared ACC -> ambigu, unknown type -> inconnu',st.log.includes('a@example.test:a4|sans-client|echec')&&st.log.includes('b@example.test:b5|ambigu|echec')&&st.log.some(x=>/:b4\|inconnu/.test(x)),st.log.join(' '));
+const sp=await p.evaluate(()=>({p:App.client('cp').slp,s:App.client('cp').slm.state,m:App.client('cm').slp,al:App.slmail.count()}));
+ok('payment reminder stored apart: newest (b7, 97 500,09) wins and Paul stays suspended',sp.p&&sp.p.amount===97500.09&&sp.p.due==='2026-10-19'&&sp.s==='suspendu',JSON.stringify(sp));
+ok('payment reminder is not an alert',sp.al===1&&!sp.m);
 ok('ambiguous ACC changed neither client',st.cl.cw1===''&&st.cl.cw2==='');
 // ---- second reading: nothing new, nothing doubled
 const n0=await p.evaluate(()=>App.db.slmail.length);await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
@@ -79,7 +86,7 @@ ok('client list: badge on Paul only',/Suspendu/.test(await p.innerText('#clist')
 await p.evaluate(()=>App.go('home'));await p.waitForTimeout(600);
 ok('home: Starlink alert in "À faire"',/1 client\(s\) Starlink à suivre/.test(await p.innerText('#view')));
 await p.evaluate(()=>App.go('client',{id:'cp'}));await p.waitForTimeout(500);
-ok('client file (Infos) shows the e-mail status',/E-mail Starlink/.test(await p.innerText('#view'))&&/Suspendu/.test(await p.innerText('#view')));
+ok('client file (Infos) shows the e-mail status and the next debit',/E-mail Starlink/.test(await p.innerText('#view'))&&/Suspendu/.test(await p.innerText('#view'))&&/Prélèvement Starlink/.test(await p.innerText('#view'))&&/19\/10\/2026/.test(await p.innerText('#view')));
 // ---- WhatsApp message, resolve, undo
 await p.evaluate(()=>App.go('slmail'));await p.waitForTimeout(500);await p.evaluate(()=>{window.__u='';window.open=u=>{window.__u=u}});
 await p.click('[data-act=slm_tab][data-v=alerts]');await p.waitForTimeout(300);await p.click('[data-act=slm_wa]');const wa=decodeURIComponent(await p.evaluate(()=>window.__u));

@@ -35,6 +35,7 @@
     if (/^suspension de votre service/.test(s) || /sera suspendu dans/.test(b) || /avis de suspension/.test(b)) return 'avis';
     if (/service (starlink )?suspendu/.test(s) || /service starlink a ete suspendu|service a ete suspendu/.test(b)) return 'suspendu';
     if (/reactiv/.test(s) || /reactiv/.test(b)) return 'actif';
+    if (/rappel de paiement automatique/.test(s) || /paiement programme/.test(b)) return 'programme'; // information only: next automatic debit
     return '';
   };
   // m: { subject, text, ts } -> { kind, acc, amount, cur, days } ; kind '' = a Starlink e-mail we do not know yet
@@ -42,6 +43,12 @@
     const text = String(m.text || ''), acc = extractAcc(text) || extractAcc(m.subject), kind = kindOf(m.subject, text), out = { kind, acc, amount: 0, cur: '', days: 0 };
     const a = /montant du paiement\s*([A-Z]{3}|US\$|\$)?\s*(\d[\d\s  .,]*\d)/i.exec(text); if (a) { out.cur = (a[1] || 'CDF').replace('US$', 'USD').replace('$', 'USD').toUpperCase(); out.amount = money(a[2]); }
     const d = /dans\s+(\d+)\s+jour/i.exec(text); if (d) out.days = +d[1];
+    if (out.kind === 'programme') {
+      const iso = x => x ? `${x[3]}-${x[2]}-${x[1]}` : '', date = /(\d{2})\/(\d{2})\/(\d{4})/;
+      const due = /programm\S*\s+pour\s+le\s+(\d{2}\/\d{2}\/\d{4})/i.exec(text), per = /p[ée]riode du relev[ée]\s*(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})/i.exec(text), bal = /solde actuel\s*([A-Z]{3}|US\$|\$)?\s*(\d[\d\s\u00a0\u202f.,]*\d)/i.exec(text);
+      out.due = due ? iso(date.exec(due[1])) : ''; if (per) { out.from = iso(date.exec(per[1])); out.to = iso(date.exec(per[2])); }
+      if (bal) { out.cur = (bal[1] || 'CDF').replace('US$', 'USD').replace('$', 'USD').toUpperCase(); out.amount = money(bal[2]); }
+    }
     return out;
   };
 
@@ -51,8 +58,12 @@
     if (!e.kind) { e.res = 'inconnu'; return; }
     const cs = clientsFor(e.acc); if (!cs.length) { e.res = 'sans-client'; return; } if (cs.length > 1) { e.res = 'ambigu'; return; }
     const c = cs[0]; e.clientId = c.id;
-    if (c.slm && c.slm.ts > e.ts) { e.res = 'ancien'; return; } // a more recent e-mail was already applied
-    e.prev = c.slm ? { ...c.slm } : null; c.slm = { state: e.kind, ts: e.ts, amount: e.amount || 0, cur: e.cur || '', mid: e.id }; e.res = 'ok';
+    // a payment reminder only tells when Starlink will debit next: it never changes the alert state of the client
+    const fld = e.kind === 'programme' ? 'slp' : 'slm'; e.field = fld;
+    if (c[fld] && c[fld].ts > e.ts) { e.res = 'ancien'; return; } // a more recent e-mail was already applied
+    e.prev = c[fld] ? { ...c[fld] } : null;
+    c[fld] = fld === 'slp' ? { ts: e.ts, due: e.due || '', from: e.from || '', to: e.to || '', amount: e.amount || 0, cur: e.cur || 'CDF', mid: e.id } : { state: e.kind, ts: e.ts, amount: e.amount || 0, cur: e.cur || '', mid: e.id };
+    e.res = 'ok';
   };
   // an e-mail whose ACC was not known yet is tried again once the client has it
   const rematch = () => { let n = 0; log().slice().sort((a, b) => a.ts - b.ts).forEach(e => { if (e.res === 'sans-client' || e.res === 'ambigu') { apply(e); if (e.res === 'ok') n++; } }); return n; };
@@ -60,7 +71,7 @@
   const isDup = e => log().some(x => x.id !== e.id && x.acc === e.acc && x.kind === e.kind && x.amount === e.amount && Math.abs(x.ts - e.ts) < DUP_MS);
   L.ingest = (m, mailbox) => {
     const id = mailbox + ':' + m.id, p = L.parse(m); if (!p.acc) return null; // not about an account: ignored
-    const e = { id, ts: m.ts, acc: p.acc, kind: p.kind, amount: p.amount, cur: p.cur, days: p.days, subject: String(m.subject || '').slice(0, 120), mailbox, res: '' };
+    const e = { id, ts: m.ts, acc: p.acc, kind: p.kind, amount: p.amount, cur: p.cur, days: p.days, due: p.due || '', from: p.from || '', to: p.to || '', subject: String(m.subject || '').slice(0, 120), mailbox, res: '' };
     if (isDup(e)) return null;
     apply(e); log().push(e); if (log().length > MAX_LOG) App.db.slmail = log().slice(-MAX_LOG);
     return e;
@@ -70,7 +81,7 @@
   App.slBadge = c => { const s = c.slm && STATES[c.slm.state]; return s && s[3] > 0 ? `<span class="pill ${s[2]}" title="Dernier e-mail Starlink : ${when(c.slm.ts)}">${s[1]}</span>` : ''; };
   App.slLine = c => { const s = c.slm && STATES[c.slm.state]; if (!s) return ''; return `<div class="mut" style="margin-top:6px">E-mail Starlink du ${when(c.slm.ts)} : <b class="${s[2]}">${s[0]} ${s[1]}</b>${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</div>`; };
 
-  App.slRow = c => { const s = c.slm && STATES[c.slm.state]; return s ? `<dt>E-mail Starlink</dt><dd><span class="${s[2]}">${s[0]} ${s[1]}</span> · ${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</dd>` : ''; };
+  App.slRow = c => { const p = c.slp, nx = p ? `<dt>Prélèvement Starlink</dt><dd>prévu le ${App.fdate(p.due || App.iso(new Date(p.ts)))}${p.amount ? ' · ' + App.nf(p.amount, 2) + ' ' + esc(p.cur || 'CDF') : ''}${p.from ? ` · période du ${App.fdate(p.from)} au ${App.fdate(p.to)}` : ''}</dd>` : '', s = c.slm && STATES[c.slm.state]; return nx + (s ? `<dt>E-mail Starlink</dt><dd><span class="${s[2]}">${s[0]} ${s[1]}</span> · ${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</dd>` : ''); };
 
   // ---------- Google sign-in and Gmail REST ----------
   const loadGis = () => new Promise((ok, ko) => {
@@ -198,7 +209,7 @@
         <div class="mut" style="margin-top:4px">${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</div>
         <div class="bar">${c.phone ? `<button class="btn sm" data-act="slm_wa" data-id="${c.id}">💬 Relancer</button>` : ''}<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche</button><button class="btn sm sec" data-act="slm_done" data-id="${c.id}">✔ Réglé</button></div></div>`; };
     const logRow = e => { const r = RES[e.res] || ['', e.res], k = STATES[e.kind], c = App.client(e.clientId);
-      return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : '📨 ' + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
+      return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : e.kind === 'programme' ? '📅 Paiement programmé' + (e.due ? ' pour le ' + App.fdate(e.due) : '') : '📨 ' + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
     const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
       : tab === 'todo' ? `<p class="mut" style="font-size:13px">Ces e-mails n'ont modifié aucun client. Ajoutez l'ACC sur la fiche du bon client : il sera rapproché à la prochaine vérification.</p><div class="list">${todo.length ? todo.map(logRow).join('') : '<div class="empty">Rien à vérifier 🎉</div>'}</div>`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
@@ -213,8 +224,9 @@
   App.actions.slm_done = d => { const c = App.client(d.id); if (!c) return; c.slm = { state: 'actif', ts: Date.now(), manual: true }; App.save(); App.toast('Alerte clôturée'); App.refresh(); };
   App.actions.slm_undo = d => {
     const e = log().find(x => x.id === d.id), c = e && App.client(e.clientId); if (!e || e.res !== 'ok' || !c) return;
-    if (!c.slm || c.slm.mid !== e.id) return App.toast("Un e-mail plus récent a été appliqué depuis : annulation impossible");
-    if (e.prev) c.slm = e.prev; else delete c.slm; e.res = 'annule'; App.save(); App.refresh(); App.toast('E-mail annulé');
+    const fld = e.field || 'slm';
+    if (!c[fld] || c[fld].mid !== e.id) return App.toast("Un e-mail plus récent a été appliqué depuis : annulation impossible");
+    if (e.prev) c[fld] = e.prev; else delete c[fld]; e.res = 'annule'; App.save(); App.refresh(); App.toast('E-mail annulé');
   };
 
   // check quietly when the app opens (only reuses the existing Google session: no window), then at most every 30 minutes
