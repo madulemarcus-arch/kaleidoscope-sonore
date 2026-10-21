@@ -4,7 +4,8 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); const p = await (await b.newContext({ ...devices['Pixel 5'] })).newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.addInitScript(()=>{document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{const d=document.querySelector('dialog');if(d&&d.open&&/Envoyez le reçu au client/.test(d.textContent))d.close()}).observe(document,{subtree:true,childList:true,attributes:true,characterData:true}))}); // these tests are not about the receipt window: close it as soon as it opens
+await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   await p.evaluate(() => { App.db.clients.push({ id: 'c1', code: 'CL-1', type: 'mat', first: 'Awa', last: 'Diop', name: 'Awa Diop', phone: '081', subs: [], created: App.today() }); App.setRate(2800); App.save(); });
   const open = async () => { await p.evaluate(() => App.invoiceForm('materiel')); await p.selectOption('#f_cl', 'c1'); await p.fill('#f_desc', 'Starlink'); await p.fill('#f_price', '450'); await p.click('#f_add'); };
   const sum = async () => (await p.innerText('#p_sum')).replace(/ | /g, ' ');
@@ -21,7 +22,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   let r = await p.evaluate(() => { const i = App.db.invoices[0], pay = App.db.payments[0]; return { paid: App.invPaid(i), pay: [pay.amount, pay.currency, pay.mode, pay.ref, pay.rate] }; });
   ok('overpayment: 450 recorded (not 500), M-Pesa, reference kept', r.paid === 450 && JSON.stringify(r.pay) === JSON.stringify([450, 'USD', 'M-Pesa', 'MP999', 2800]), JSON.stringify(r));
   ok('invoice page shows Total / Reçu / Reste', /Reçu du client\s*450 \$/.test((await p.innerText('#view')).replace(/\n/g, ' ').replace(/ | /g, ' ')));
-  ok('receipt offered right after creating the invoice', /reçu/i.test(await p.innerText('#undogo')));
+  ok('receipt flagged « à envoyer » right after creating the invoice', await p.evaluate(() => App.rcptTodo().length === 1));
   // ---- partial, paid in CDF (invoice in USD)
   await p.evaluate(() => { App.db.invoices = []; App.db.payments = []; App.save(); }); await open();
   await p.selectOption('#f_pcur', 'CDF'); ok('paying in CDF: prefilled with 1 260 000 (= 450 × 2 800)', (await p.inputValue('#f_paid')) === '1260000', await p.inputValue('#f_paid'));
@@ -36,7 +37,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   // ---- nothing given
   await p.evaluate(() => { const u = document.getElementById('undo'); if (u) u.remove(); });
   await p.evaluate(() => { App.db.invoices = []; App.db.payments = []; App.save(); }); await open(); await p.click('#p_none'); await p.click('#dok'); await p.waitForTimeout(200);
-  ok('nothing given: invoice unpaid, no payment', await p.evaluate(() => App.db.payments.length === 0 && App.invStatus(App.db.invoices[0]) === 'unpaid')); ok('no receipt bar when nothing was paid', !(await p.$('#undo')));
+  ok('nothing given: invoice unpaid, no payment', await p.evaluate(() => App.db.payments.length === 0 && App.invStatus(App.db.invoices[0]) === 'unpaid')); ok('no receipt to send when nothing was paid', await p.evaluate(() => App.rcptTodo().length === 0));
   await p.screenshot({ path: 'pay.png', fullPage: true });
   console.log('errors', errs); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close();
 })();
