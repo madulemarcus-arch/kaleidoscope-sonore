@@ -100,7 +100,7 @@
   // email '' = pick any Google account (adding a mailbox); interactive false = reuse the existing Google session silently
   const getToken = async (email, interactive) => {
     const t0 = email && toks[email.toLowerCase()]; if (t0 && Date.now() < t0.exp) return t0.tok;
-    if (!clientId()) throw Object.assign(new Error("Identifiant Google non configuré (Réglages → E-mails Starlink)"), { code: 'config' });
+    if (!clientId()) throw Object.assign(new Error("Identifiant Google non configuré (Clients → E-mails Starlink)"), { code: 'config' });
     await loadGis();
     const t = await new Promise((ok, ko) => {
       const tc = google.accounts.oauth2.initTokenClient({
@@ -145,7 +145,7 @@
     App.refresh(); return added;
   };
   L.needsAttention = () => cfg.accounts.some(a => a.err === 'reconnect');
-  const redraw = () => { if (['settings', 'slmail'].includes(App.state.view) && !document.getElementById('dlg').open) App.refresh(); };
+  const redraw = () => { if (['clients', 'slmail'].includes(App.state.view) && !document.getElementById('dlg').open) App.refresh(); };
 
   // ---------- settings card ----------
   App.slmailCard = () => {
@@ -213,10 +213,10 @@
     const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
       : tab === 'todo' ? `<p class="mut" style="font-size:13px">Ces e-mails n'ont modifié aucun client. Ajoutez l'ACC sur la fiche du bon client : il sera rapproché à la prochaine vérification.</p><div class="list">${todo.length ? todo.map(logRow).join('') : '<div class="empty">Rien à vérifier 🎉</div>'}</div>`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
-    return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'more', nav: 'more',
+    return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📧 Clients à suivre</small><div class="hero-num">${al.length}</div></div></div>
         <div class="cstats"><div><b>${cnt('echec')}</b><small>paiement échoué</small></div><div><b>${cnt('avis')}</b><small>suspension imminente</small></div><div><b>${cnt('suspendu')}</b><small>suspendus</small></div></div></section>
-        <div class="bar"><button class="btn" data-act="slm_check" ${cfg.accounts.length ? '' : 'disabled'}>🔄 Vérifier les e-mails</button>${cfg.accounts.length ? '' : '<button class="btn sec" data-act="go" data-v="settings">Configurer Gmail</button>'}</div>
+        <div class="bar"><button class="btn" data-act="slm_check" ${cfg.accounts.length ? '' : 'disabled'}>🔄 Vérifier les e-mails</button>${cfg.accounts.length ? '' : '<button class="btn sec" data-act="go" data-v="clients">Configurer Gmail</button>'}</div>
         <p class="mut" style="font-size:13px;margin:0 0 8px">Dernière vérification : ${when(cfg.lastCheck)} · ${cfg.accounts.length} boîte(s) Gmail liée(s)</p>
         <div class="chips">${chip('alerts', `Alertes (${al.length})`)}${chip('journal', 'Journal')}${chip('todo', `À vérifier (${todo.length})`)}</div>${body}` };
   };
@@ -229,8 +229,14 @@
     if (e.prev) c[fld] = e.prev; else delete c[fld]; e.res = 'annule'; App.save(); App.refresh(); App.toast('E-mail annulé');
   };
 
-  // check quietly when the app opens (only reuses the existing Google session: no window), then at most every 30 minutes
-  const auto = () => { if (cfg.accounts.length && clientId() && App.guard('slm_check') && Date.now() - (cfg.lastCheck || 0) > 30 * 60e3) L.check(false); };
-  setTimeout(auto, 4000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(auto, 1500); });
+  // Everything lives in the Clients screen (nothing on the dashboard, nothing read when the app opens): opening Clients reads the mailboxes quietly
+  // (only reuses the existing Google session: no window), at most every 30 minutes.
+  const auto = () => { if (App.state.view === 'clients' && cfg.accounts.length && clientId() && App.guard('slm_check') && Date.now() - (cfg.lastCheck || 0) > 30 * 60e3) L.check(false); };
+  App.slmailPanel = () => {
+    if (!App.guard('slm_check')) return '';
+    setTimeout(auto, 600);
+    const n = L.count(), warn = L.needsAttention(), title = '📧 E-mails Starlink' + (n ? ` · ${n} à suivre` : '') + (warn ? ' · reconnexion nécessaire' : '');
+    const alertLine = n ? `<button class="item" data-act="go" data-v="slmail" style="margin-bottom:8px"><span class="avatar bad" style="width:36px;height:36px;font-size:16px">📧</span><div class="grow"><b style="white-space:normal">${n} client(s) Starlink à suivre (paiement échoué ou suspension).</b></div><span class="mut">›</span></button>` : '';
+    return alertLine + App.fold('slmail', title, App.slmailCard().replace(/^<h2 class="sec">.*?<\/h2>/, ''));
+  };
 })();

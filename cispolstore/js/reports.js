@@ -47,12 +47,10 @@
     const setup = [];
     if (App.role() === App.ROLES.admin) {
       const lastB = [S.lastBackup, App.drive && App.drive.lastDate()].filter(Boolean).sort().pop(), age = App.backupAge(), co = S.company;
-      if (App.slmail && App.slmail.needsAttention()) setup.push(['📧', 'E-mails Starlink : reconnexion à Google nécessaire (Paramètres → E-mails Starlink).']);
       if (App.drive && App.drive.needsAttention()) setup.push(['☁️', 'Sauvegarde Google Drive : reconnexion nécessaire (Paramètres → Sauvegarde Google Drive). Elle ne se fait pas toute seule.']);
     }
     const setupAlerts = setup.map(([ico, txt]) => `<button class="item" data-act="go" data-v="settings"><span class="avatar warn" style="width:36px;height:36px;font-size:16px">${ico}</span><div class="grow"><b style="white-space:normal">${txt}</b></div><span class="mut">›</span></button>`);
     const alert = (ico, txt, cls) => `<button class="item" data-act="go" data-v="subs"><span class="avatar ${cls}" style="width:36px;height:36px;font-size:16px">${ico}</span><div class="grow"><b style="white-space:normal">${txt}</b></div><span class="mut">›</span></button>`;
-    const slAl = App.slmail && App.canView('slmail') && App.slmail.count() ? `<button class="item" data-act="go" data-v="slmail"><span class="avatar bad" style="width:36px;height:36px;font-size:16px">📧</span><div class="grow"><b style="white-space:normal">${App.slmail.count()} client(s) Starlink à suivre (paiement échoué ou suspension).</b></div><span class="mut">›</span></button>` : '';
     const alerts = [soon.length && alert('⚠️', `${soon.length} abonnement(s) expirent bientôt (≤ 7 jours).`, 'warn'), n('sursis') && alert('🟠', `${n('sursis')} client(s) sont actuellement en sursis.`, 'warn'), becomeInactive.length && alert('🔴', `${becomeInactive.length} client(s) deviennent inactifs aujourd'hui.`, 'bad')].filter(Boolean).concat(setupAlerts);
     // hero: real revenue of the period compared with the same stretch of the previous one, monthly goal ring, sparkline
     const per = dper, R = App.range(per), el = Math.max(0, App.diff(R[0], t)), fin = App.can('finance');
@@ -78,7 +76,7 @@
     const roHtml = App.reorderCount && App.canView('reorder') && App.reorderCount() ? `<button class="item" data-act="go" data-v="reorder" style="margin-bottom:12px"><span class="avatar warn">🛒</span><div class="grow"><b>${App.reorderCount()} produit(s) à commander</b><small>Stock au minimum : créez un bon de commande</small></div><span class="mut">›</span></button>` : '';
     const relHtml = App.relanceCount && App.canView('relances') && App.relanceCount() ? `<button class="item" data-act="go" data-v="relances" style="margin-bottom:12px"><span class="avatar" style="background:linear-gradient(135deg,#7c5cff,#a08bff)">💬</span><div class="grow"><b>${App.relanceCount()} relance(s) à faire aujourd'hui</b><small>Abonnements, impayés, pénalités : un message prêt par client</small></div><span class="mut">›</span></button>` : '';
     const QA = [['q_invoice', '🧾', 'Facture', '#e4572e'], ['newpay', '💰', 'Encaisser', '#1f9d55'], ['q_client', '👤', 'Client', '#2f7de1'], ['q_renew', '📡', 'Renouveler', '#7c5cff']].filter(x => App.guard(x[0]));
-    const todo = alerts.length || slAl || pendHtml || unpaidHtml || depHtml || slHtml || qtHtml || ctHtml || roHtml || relHtml;
+    const todo = alerts.length || pendHtml || unpaidHtml || depHtml || slHtml || qtHtml || ctHtml || roHtml || relHtml;
     return {
       title: 'Accueil', nav: 'home',
       html: `<section class="hero">
@@ -90,7 +88,7 @@
         ${QA.length ? `<div class="qa">${QA.map(([act, ico, t1, col]) => `<button data-act="${act}" style="--qc:${col}"><span>${ico}</span>${t1}</button>`).join('')}</div>` : ''}
         ${tot ? `<button class="card pulse" data-act="go" data-v="subs"><div class="spread"><b>📡 Abonnements</b><span class="mut">${db.clients.length} clients · voir ›</span></div><div class="pbar">${n('actif') ? `<i class="a" style="flex:${n('actif')}"></i>` : ''}${n('sursis') ? `<i class="s" style="flex:${n('sursis')}"></i>` : ''}${n('inactif') ? `<i class="x" style="flex:${n('inactif')}"></i>` : ''}</div><div class="plegend"><span><i class="a"></i>${n('actif')} actifs</span><span><i class="s"></i>${n('sursis')} en sursis</span><span><i class="x"></i>${n('inactif')} inactifs</span>${soon.length ? `<span class="warn">⏰ ${soon.length} expirent bientôt</span>` : ''}${today.length ? `<span class="bad">⚠️ ${today.length} aujourd'hui</span>` : ''}</div></button>` : ''}
         ${App.badgesHtml()}
-        <div class="dash"><div style="grid-area:a">${startCard}${todo ? `<h2 class="sec">À faire</h2><div class="list">${alerts.join('')}${slAl}${relHtml}${pendHtml}${unpaidHtml}${depHtml}${slHtml}${qtHtml}${ctHtml}${roHtml}</div>` : ''}</div>
+        <div class="dash"><div style="grid-area:a">${startCard}${todo ? `<h2 class="sec">À faire</h2><div class="list">${alerts.join('')}${relHtml}${pendHtml}${unpaidHtml}${depHtml}${slHtml}${qtHtml}${ctHtml}${roHtml}</div>` : ''}</div>
         <div style="grid-area:b"${fin ? '' : ' hidden'}><h2 class="sec">Finances · ${PN}</h2>
         <div class="kpis"><div class="stat"><small>💰 Total facturé</small><b data-count="${f.ca}">${App.fmt(f.ca)}</b></div><div class="stat"><small>📈 Bénéfice net</small><b class="${f.net >= 0 ? 'ok' : 'bad'}" data-count="${f.net}">${App.fmt(f.net)}</b></div><div class="stat"><small>💸 Dépenses</small><b data-count="${f.exp}">${App.fmt(f.exp)}</b></div><div class="stat"><small>Marge brute</small><b data-count="${f.margin}">${App.fmt(f.margin)}</b></div></div>
         ${App.chart.bars(bars, { title: 'Ventes facturées', sub: PN })}

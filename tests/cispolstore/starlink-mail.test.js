@@ -49,16 +49,16 @@ ok('unknown e-mail: no kind, no ACC; English amount format read',P[4].kind===''&
 // ---- clients
 await p.evaluate(([X,Y,W])=>{App.db.clients.push({id:'cm',type:'gere',first:'Marie',last:'Test',name:'Marie Test',phone:'0810000001',code:'CL-M',acc:X.replace('ACC-DF-','ACC DF ')},{id:'cp',type:'gere',first:'Paul',last:'Test',name:'Paul Test',phone:'0810000002',code:'CL-P',acc:Y},{id:'cw1',type:'gere',name:'Double 1',code:'CL-W1',acc:W},{id:'cw2',type:'gere',name:'Double 2',code:'CL-W2',acc:W});App.save()},[X,Y,W]);
 // ---- settings: configure, add the two mailboxes
-await p.evaluate(()=>App.go('settings'));await p.waitForTimeout(500);
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);
 await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
-ok('settings: E-mails Starlink card with Configurer',await p.isVisible('[data-act=slm_setup]'));
+ok('Clients screen: E-mails Starlink panel with Configurer',await p.isVisible('[data-act=slm_setup]'));
 await p.click('[data-act=slm_setup]');await p.waitForTimeout(300);await p.fill('#slm_cid','invalide');await p.click('#dlg .btn:not(.sec):not(.del)');
 ok('invalid client id refused',/ne ressemble pas/.test(await p.innerText('#slm_msg')));
 await p.fill('#slm_cid','123456789-test.apps.googleusercontent.com');await p.click('#dlg .btn:not(.sec):not(.del)');await p.waitForTimeout(400);
 ok('configured: add button shown',await p.isVisible('[data-act=slm_add]'));
 await p.click('[data-act=slm_add]');await p.waitForTimeout(1500);
 await p.evaluate(()=>{window.__pick='b@example.test'});
-await p.evaluate(()=>App.go('settings'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
 await p.click('[data-act=slm_add]');await p.waitForTimeout(1800);
 const st=await p.evaluate(()=>({acc:JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.map(a=>a.email),log:App.db.slmail.map(e=>[e.id,e.res,e.kind].join('|')),cl:Object.fromEntries(['cm','cp','cw1','cw2'].map(i=>[i,(App.client(i).slm||{}).state||'']))}));
 ok('two mailboxes linked',st.acc.join(',')==='a@example.test,b@example.test',st.acc.join(','));
@@ -83,8 +83,9 @@ await p.click('[data-act=slm_tab][data-v=journal]');await p.waitForTimeout(300);
 ok('Journal lists the e-mails with their mailbox',/a@example\.test/.test(await p.innerText('#view'))&&/b@example\.test/.test(await p.innerText('#view')));
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);
 ok('client list: badge on Paul only',/Suspendu/.test(await p.innerText('#clist'))&&(await p.innerText('#clist')).match(/Suspendu/g).length===1);
+ok('Clients screen: alert line for the clients to follow',/1 client\(s\) Starlink à suivre/.test(await p.innerText('#view')));
 await p.evaluate(()=>App.go('home'));await p.waitForTimeout(600);
-ok('home: Starlink alert in "À faire"',/1 client\(s\) Starlink à suivre/.test(await p.innerText('#view')));
+ok('home: nothing about Starlink e-mails on the dashboard',!/Starlink à suivre|E-mails Starlink/.test(await p.innerText('#view')));
 await p.evaluate(()=>App.go('client',{id:'cp'}));await p.waitForTimeout(500);
 ok('client file (Infos) shows the e-mail status and the next debit',/E-mail Starlink/.test(await p.innerText('#view'))&&/Suspendu/.test(await p.innerText('#view'))&&/Prélèvement Starlink/.test(await p.innerText('#view'))&&/19\/10\/2026/.test(await p.innerText('#view')));
 // ---- WhatsApp message, resolve, undo
@@ -100,8 +101,14 @@ await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
 ok('an e-mail waiting for its client is applied once the ACC exists',await p.evaluate(()=>(App.client('cz').slm||{}).state)==='echec'&&await p.evaluate(()=>App.db.slmail.find(e=>e.id==='a@example.test:a4').res)==='ok');
 await p.evaluate(()=>App.slmail.check(true));
 await p.evaluate(()=>App.actions.slm_done({id:'cz'}));ok('"Réglé" closes the alert',await p.evaluate(()=>App.client('cz').slm.state)==='actif');
+// ---- nothing is read when the app opens; opening Clients reads quietly
+await p.evaluate(()=>{const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.lastCheck=0;localStorage.setItem(k,JSON.stringify(c))});
+const c0=calls;await p.reload();await p.waitForTimeout(6000);
+ok('nothing is read when the app opens (dashboard untouched)',calls===c0);
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(3500);
+ok('opening Clients reads the mailboxes quietly (no window)',calls>c0&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).lastCheck)>0);
 // ---- remove a mailbox
-await p.evaluate(()=>App.go('settings'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
 await p.click('[data-act=slm_remove][data-v="1"]');await p.waitForTimeout(300);
 ok('mailbox removed, alerts kept',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.length)===1&&await p.evaluate(()=>App.db.slmail.length)>0);
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
