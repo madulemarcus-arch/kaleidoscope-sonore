@@ -1,7 +1,7 @@
 const BASE = process.env.BASE_URL || 'http://localhost:8774';
 const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
 // Fictitious account numbers and mailboxes only: the repository is public.
-const X='ACC-DF-10000001-11111-11',Y='ACC-DF-10000002-22222-22',Z='ACC-DF-10000003-33333-33',W='ACC-DF-10000004-44444-44';
+const X='ACC-DF-10000001-11111-11',Y='ACC-DF-10000002-22222-22',Z='ACC-DF-10000003-33333-33',W='ACC-DF-10000004-44444-44',V='ACC-DF-10000007-77777-77';
 const T0=Date.parse('2026-10-19T08:00:00Z'),MIN=60e3;
 const cut=a=>a.replace(/(\d+-)(\d+-\d+)$/,'$1\n   $2'); // the real e-mails cut the number at a hyphen
 const body={
@@ -14,6 +14,8 @@ const body={
 const msg=(id,subject,text,ts,from='Starlink <no-reply@starlink.com>')=>({id,internalDate:String(ts),payload:{mimeType:'multipart/alternative',headers:[{name:'From',value:from},{name:'Subject',value:subject}],parts:[{mimeType:'text/plain',body:{data:Buffer.from(text,'utf8').toString('base64url')}}]}});
 const BOX={
  'a@example.test':[ // newest first, like Gmail
+  msg('a7','Échec du paiement Starlink',body.echec(V,'55 000,00'),T0+20*MIN),
+  msg('a6','Rappel de paiement automatique',body.prog(V,'55 000,00'),T0+15*MIN),
   msg('a5','Rappel de paiement automatique',body.prog(Y,'143 999,99'),T0+30*MIN),
   msg('a4','Échec du paiement Starlink',body.echec(Z,'87 000,00'),T0+240*MIN),
   msg('a3','Suspension de votre service Starlink',body.avis(Y),T0+60*MIN),
@@ -87,7 +89,7 @@ await p.evaluate(()=>App.go('slmail'));await p.waitForTimeout(600);
 let txt=await p.innerText('#view');
 ok('Alertes Starlink: Paul listed with his ACC, Marie (reactivated) not',/Paul Test/.test(txt)&&/Suspendu/.test(txt)&&!/Marie Test/.test(txt)&&/ACC-DF-10000002-22222-22/.test(txt));
 await p.click('[data-act=slm_tab][data-v=todo]');await p.waitForTimeout(300);txt=await p.innerText('#view');
-ok('À vérifier: one line per unknown ACC (not registered, shared by two clients) plus the unrecognised e-mail',/À vérifier \(4\)/.test(txt)&&(txt.match(/Non enregistré/g)||[]).length===2&&/Plusieurs clients/.test(txt)&&/E-mails non reconnus \(1\)/.test(txt),txt.slice(0,300));
+ok('À vérifier: one line per unknown ACC (not registered, shared by two clients) plus the unrecognised e-mail',/À vérifier \(5\)/.test(txt)&&(txt.match(/Non enregistré/g)||[]).length===3&&/Plusieurs clients/.test(txt)&&/E-mails non reconnus \(1\)/.test(txt),txt.slice(0,300));
 ok('unknown ACC line shows how many e-mails and which mailboxes (Z: a and c)',/2? ?e-mail\(s\) · boîte\(s\) : a@example\.test, c@example\.test/.test(txt)||/boîte\(s\) : a@example\.test, c@example\.test/.test(txt),txt.slice(0,700));
 await p.click('[data-act=slm_tab][data-v=journal]');await p.waitForTimeout(300);
 ok('Journal lists the e-mails with their mailbox',/a@example\.test/.test(await p.innerText('#view'))&&/b@example\.test/.test(await p.innerText('#view')));
@@ -117,7 +119,7 @@ ok('picker filters the clients',(await p.$$('[data-act=slm_pick]')).length===1);
 await p.click('[data-act=slm_pick][data-id=cu]');await p.waitForTimeout(500);
 const lk=await p.evaluate(()=>({acc:App.client('cu').acc,st:(App.client('cu').slm||{}).state,left:App.slmail.unknown().length}));
 ok('linking sets the client ACC and applies the waiting e-mails at once (suspended)',lk.acc==='ACC-DF-10000006-66666-66'&&lk.st==='suspendu',JSON.stringify(lk));
-ok('the linked ACC leaves the "À vérifier" list',lk.left===2,JSON.stringify(lk));
+ok('the linked ACC leaves the "À vérifier" list',lk.left===3,JSON.stringify(lk));
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);
 ok('Clients screen: line for unknown ACC still to link',/compte\(s\) Starlink \(ACC\) vu\(s\) dans vos e-mails/.test(await p.innerText('#view')));
 // ---- rematch once the client has the ACC
@@ -126,6 +128,14 @@ await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
 ok('an e-mail waiting for its client is applied once the ACC exists',await p.evaluate(()=>(App.client('cz').slm||{}).state)==='echec'&&await p.evaluate(()=>App.db.slmail.find(e=>e.id==='a@example.test:a4').res)==='ok');
 await p.evaluate(()=>App.slmail.check(true));
 await p.evaluate(()=>App.actions.slm_done({id:'cz'}));ok('"Réglé" closes the alert',await p.evaluate(()=>App.client('cz').slm.state)==='actif');
+// ---- create the missing clients in one go (ambiguous ACC are left alone)
+await p.evaluate(()=>App.go('slmail'));await p.waitForTimeout(500);await p.click('[data-act=slm_tab][data-v=todo]');await p.waitForTimeout(300);
+ok('button to create the missing client appears',/Créer le client manquant/.test(await p.innerText('#view')),(await p.innerText('#view')).slice(0,200));
+await p.evaluate(()=>{window.confirm=()=>true});
+await p.evaluate(()=>App.actions.slm_createall());await p.waitForTimeout(500);
+const cr=await p.evaluate(V=>{const c=App.db.clients.find(x=>x.acc===V);return c&&{name:c.name,start:c.start,period:c.period,st:(c.slm||{}).state,fromMail:c.fromMail,left:App.slmail.unknown().length}},V);
+ok('client created from the e-mails with ACC, subscription dates and Starlink state',!!cr&&/^Compte /.test(cr.name)&&cr.start==='2026-10-19'&&cr.period===30&&cr.st==='echec'&&cr.fromMail===true,JSON.stringify(cr));
+ok('only the ambiguous ACC remains in "À vérifier"',cr&&cr.left===1,JSON.stringify(cr));
 // ---- nothing is read when the app opens; opening Clients reads quietly
 await p.evaluate(()=>{const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.lastCheck=0;localStorage.setItem(k,JSON.stringify(c))});
 const c0=calls;await p.reload();await p.waitForTimeout(6000);

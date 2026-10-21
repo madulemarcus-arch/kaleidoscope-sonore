@@ -240,7 +240,7 @@
         <div class="mut" style="margin-top:4px;white-space:normal">Dernier e-mail : ${evLabel(e)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''} · ${when(e.ts)}<br>${o.events.length} e-mail(s) · boîte(s) : ${[...o.boxes].map(esc).join(', ')}</div>
         <div class="bar">${o.ambiguous ? cs.map(c => `<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche : ${esc(App.cname(c))}</button>`).join('') : `<button class="btn sm" data-act="slm_link" data-acc="${esc(o.acc)}">🔗 Associer à un client</button><button class="btn sm sec" data-act="slm_new" data-acc="${esc(o.acc)}">➕ Nouveau client</button>`}<button class="btn sm sec" data-act="copy" data-t="${esc(o.acc)}">Copier ACC</button></div></div>`; };
     const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
-      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
+      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${(() => { const k = unk.filter(o => !o.ambiguous).length; return k ? `<div class="bar"><button class="btn" data-act="slm_createall">➕ Créer ${k > 1 ? 'les ' + k + ' clients manquants' : 'le client manquant'}</button></div>` : ''; })()}${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
     return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📧 Clients à suivre</small><div class="hero-num">${al.length}</div></div></div>
@@ -261,6 +261,19 @@
     c.acc = linkAcc; const n = rematch(); App.save(); App.close(); App.toast('ACC associé à ' + App.cname(c) + (n ? ` · ${n} e-mail(s) appliqué(s)` : '')); App.refresh();
   };
   App.actions.slm_new = d => { App.clientForm(null, 'gere'); const el = $('f_acc'); if (el) el.value = d.acc; };
+  // one client per unknown ACC (shared ACC excluded): ACC, Starlink state, and the subscription dates when a payment reminder gave the billing period
+  App.actions.slm_createall = () => {
+    const todo = L.unknown().filter(o => !o.ambiguous); if (!todo.length) return;
+    if (!App.confirm(`Créer ${todo.length} client(s) à partir des comptes Starlink trouvés dans vos e-mails ? Ils s'appelleront « Compte … » : vous complétez ensuite le nom et le téléphone.`)) return;
+    const S = App.db.settings, today = App.today();
+    todo.forEach(o => {
+      const short = o.acc.replace(/^ACC-DF-/i, ''), ev = o.events.filter(e => e.kind === 'programme' && e.from && e.to).sort((a, b) => b.ts - a.ts)[0];
+      const c = { id: App.uid(), type: 'gere', first: 'Compte', last: short, name: 'Compte ' + short, phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: o.acc, serial: '', kit: '', plan: '', price: 0, payMode: 'Cash',
+        start: ev ? ev.from : '', period: ev ? Math.max(1, App.diff(ev.from, ev.to)) : S.period, grace: S.grace, note: 'Créé le ' + App.fdate(today) + ' depuis les e-mails Starlink : nom et téléphone à compléter.', fromMail: true, code: App.nextClientCode(), created: today, subs: [] };
+      App.db.clients.push(c); App.log(c.id, 'Client créé depuis les e-mails Starlink (' + o.acc + ')');
+    });
+    const n = rematch(); App.save(); App.toast(`${todo.length} client(s) créé(s), ${n} e-mail(s) appliqué(s). Cherchez « Compte » dans Clients pour compléter leurs noms.`); App.refresh();
+  };
   App.actions.slm_todo = () => { tab = 'todo'; App.go('slmail'); };
   App.actions.slm_wa = d => { const c = App.client(d.id); if (!c || !c.slm || !MSG[c.slm.state]) return; const url = App.waUrl(c.phone, MSG[c.slm.state](c.first || App.cname(c), c)); if (!url) return App.toast('Pas de numéro de téléphone'); window.open(url, '_blank', 'noopener'); };
   App.actions.slm_done = d => { const c = App.client(d.id); if (!c) return; c.slm = { state: 'actif', ts: Date.now(), manual: true }; App.save(); App.toast('Alerte clôturée'); App.refresh(); };
