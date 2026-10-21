@@ -3,9 +3,9 @@
 (() => {
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
-  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'relances', 'stock', 'product', 'invoices', 'invoice', 'quotes', 'contracts', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'purchase', 'reports', 'settings', 'livraisons', 'users', 'importc', 'importf', 'rapportmois', 'daily', 'finance', 'deposits', 'starlink', 'inventory', 'invcount', 'reorder', 'journal', 'clientstats', 'more', 'profile'];
+  const ALL = ['home', 'clients', 'client', 'subs', 'rappels', 'relances', 'stock', 'product', 'invoices', 'invoice', 'quotes', 'contracts', 'payments', 'impayes', 'suppliers', 'supplier', 'technicians', 'technician', 'installs', 'expenses', 'purchase', 'reports', 'settings', 'livraisons', 'users', 'slmail', 'importc', 'importf', 'rapportmois', 'daily', 'finance', 'deposits', 'starlink', 'inventory', 'invcount', 'reorder', 'journal', 'clientstats', 'more', 'profile'];
   // actions only the administrator may run
-  const ADMIN = /^(del[a-z]+|pen_del|backup|plansfix|setco|setapp|pin[a-z]+|sync[a-z]+|drive_[a-z]+|msgreset|users_[a-z]+|imp_[a-z]+|dl_del|restore)$/;
+  const ADMIN = /^(del[a-z]+|pen_del|backup|plansfix|setco|setapp|pin[a-z]+|sync[a-z]+|drive_[a-z]+|slm_[a-z]+|msgreset|users_[a-z]+|imp_[a-z]+|dl_del|restore)$/;
   const COMMON = /^(go|copy|calday|calnav|cltab|clfilter|search|sgo|stcat|invfilter|dper|repper|reptab|paymode|lockNow|me_[a-z]+|shareapp|cf_type|dl_filter|dl_view|theme_set|accent_set)$/;
   const ROLES = {
     admin: { label: 'Administrateur', icon: '🛡️', views: ALL, home: 'home', nav: ['home', 'clients', 'finance', 'stock', 'more'], fab: true, costs: true, finance: true, stockedit: true, desc: 'Voit et modifie tout, gère les profils et les réglages.' },

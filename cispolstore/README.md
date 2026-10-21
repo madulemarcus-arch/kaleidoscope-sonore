@@ -567,3 +567,21 @@ Contrats → Nouveau contrat → **Location de matériel (avec caution)** (14 ar
 ## Recherche d'un client dans les formulaires
 
 Dans les formulaires **Nouvelle facture**, **Nouveau paiement**, **Nouveau devis** et **Nouveau contrat**, un champ **« Rechercher un client »** se trouve au-dessus de la liste des clients : tapez une partie du **nom**, du **téléphone**, du **compte ACC** ou du **code client** (les majuscules et les accents sont ignorés) et la liste se réduit. S'il n'y a qu'un seul résultat, il est choisi tout de suite ; plusieurs résultats sont comptés sous le champ (« 2 clients trouvés »), « Aucun client trouvé » sinon. Une facture d'abonnement ne propose que les clients gérés par CISPOLstore.
+
+## E-mails Starlink (Gmail) : alertes automatiques par ACC
+
+L'application peut **lire vos e-mails Starlink** et mettre à jour le client concerné, retrouvé grâce à son **numéro ACC** (par exemple `ACC-DF-16170842-48858-58`, saisi dans le champ « ACC » de la fiche client ; peu importent les espaces, les tirets ou les majuscules). **Lecture seule** : l'application ne peut ni envoyer, ni modifier, ni supprimer un message, et ne lit que les e-mails venant de `starlink.com`.
+
+| E-mail Starlink | Effet sur le client |
+|---|---|
+| « Échec du paiement Starlink » | pastille **Paiement échoué** (date et montant) |
+| « Suspension de votre service Starlink » (suspension dans 1 jour) | pastille **Suspension imminente** |
+| « Service Starlink suspendu » | pastille **Suspendu** |
+| « Le service Starlink a été réactivé » | l'alerte disparaît (**Réactivé**) |
+
+- **Mise en place** (Réglages → **E-mails Starlink (Gmail)**, administrateur) : activer *Gmail API* dans le projet Google déjà utilisé pour la sauvegarde Drive, ajouter la portée `gmail.readonly` et les adresses Gmail comme utilisateurs test, puis coller (ou vérifier) l'**ID client Google** (le même que pour Drive).
+- **Plusieurs boîtes Gmail** : bouton **+ Gmail** pour chacune (par exemple la boîte qui reçoit les paiements et celle qui reçoit les suspensions). Un même avis reçu dans deux boîtes (transfert) n'est compté qu'une fois.
+- **Quand** : au démarrage de l'application (sans fenêtre, si la session Google est active, au plus toutes les 30 minutes) et avec **🔄 Vérifier les e-mails**. L'autorisation Google doit être renouvelée de temps en temps (message « reconnexion nécessaire » sur l'accueil).
+- **Écran Alertes Starlink** (Plus → Alertes Starlink) : **Alertes** (clients à suivre, boutons *Relancer* par WhatsApp avec un message adapté, *Fiche*, *Réglé*), **Journal** (chaque e-mail lu, sa boîte, son résultat, bouton *Annuler*) et **À vérifier** (ACC inconnu, ACC partagé par deux clients, type d'e-mail non reconnu : rien n'est modifié ; ajoutez l'ACC sur la bonne fiche, il sera rapproché à la prochaine vérification). Les alertes apparaissent aussi dans « À faire » sur l'accueil, dans la liste des clients (pastille) et dans l'onglet *Infos* de la fiche.
+- **Règles de prudence** : c'est le message le plus récent qui compte (un ancien ne remplace jamais un récent, quel que soit l'ordre de lecture) ; aucun paiement, aucune facture et aucune date d'abonnement ne sont créés ou modifiés ; les e-mails d'un type inconnu sont mis de côté dans « À vérifier ».
+- **Pas encore reconnus** : « paiement programmé » et « paiement traité » (preuve de paiement) : ils apparaissent comme *non reconnus* dans « À vérifier » tant qu'un exemple n'a pas été ajouté.
