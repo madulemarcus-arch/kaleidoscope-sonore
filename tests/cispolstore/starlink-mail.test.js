@@ -218,6 +218,20 @@ ok('only that mailbox gets a « Reconnecter » button, with an explanation that 
 await p.evaluate(()=>{window.__fail=[]});
 await p.click('[data-act=slm_reconnect]');await p.waitForTimeout(1500);
 ok('« Reconnecter » signs in (window opened straight from the tap) and the mailbox is read again',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.every(a=>!a.err)&&document.querySelectorAll('[data-act=slm_reconnect]').length===0));
+// ---- a device that cannot sign in to a mailbox leaves it to the other devices (their alerts arrive through the sync)
+await p.reload();await p.waitForTimeout(800);
+await p.evaluate(()=>{window.__fail=['c@example.test'];App.go('clients')});await p.waitForTimeout(500);
+await p.evaluate(()=>{const d=document.querySelector('details[data-fold=slmail]');if(d)d.open=true});
+await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+ok('mailbox c fails here again: « Reconnecter » and « Ne pas lire ici » are offered',await p.evaluate(()=>document.querySelectorAll('[data-act=slm_reconnect]').length===1&&document.querySelectorAll('[data-act=slm_skip]').length===1));
+await p.click('[data-act=slm_skip]');await p.waitForTimeout(500);
+const sk=await p.evaluate(()=>({acc:JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.map(a=>(a.skip?'S':'-')+(a.err?'E':'-')).join(),shared:App.db.settings.gmail.accounts.length,txt:document.getElementById('view').textContent,head:document.querySelector('details[data-fold=slmail] summary').textContent}));
+ok('« Ne pas lire ici »: kept on this device only, the shared list is untouched, the warning is gone',sk.acc==='--,--,S-'&&sk.shared===3&&/Lue par vos autres appareils/.test(sk.txt)&&!/reconnexion nécessaire/i.test(sk.head),JSON.stringify([sk.acc,sk.shared,sk.head]));
+await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+ok('the next readings skip that mailbox without any error',await p.evaluate(()=>App.slmail.error==='')&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.every(a=>!a.err)));
+await p.evaluate(()=>{window.__fail=[]});await p.click('[data-act=slm_skip]');await p.waitForTimeout(400);
+await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+ok('« Lire ici » puts the mailbox back: it is read again here',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.every(a=>!a.skip&&!a.err)));
 // ---- Gmail slows the reading down (quota): retry, keep the progress, resume
 const reset=async()=>{await p.evaluate(()=>{App.db.slmail=[];App.db.clients.forEach(c=>{delete c.slm;delete c.slp});const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.accounts.forEach(a=>{delete a.last;delete a.seen;delete a.err});c.lastCheck=Date.now();localStorage.setItem(k,JSON.stringify(c));App.save()});await p.reload();await p.waitForTimeout(1000);await p.evaluate(()=>{App.slmail.delay=()=>Promise.resolve();App.slmail.pace=0})};
 await reset();qmode='some';qLeft=3;await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
