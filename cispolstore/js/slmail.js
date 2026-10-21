@@ -89,10 +89,10 @@
   };
   L.alerts = () => App.db.clients.filter(c => c.slm && STATES[c.slm.state] && STATES[c.slm.state][3] > 0).sort((a, b) => STATES[b.slm.state][3] - STATES[a.slm.state][3] || b.slm.ts - a.slm.ts);
   L.count = () => L.alerts().length;
-  App.slBadge = c => { const s = c.slm && STATES[c.slm.state]; return s && s[3] > 0 ? `<span class="pill ${s[2]}" title="Dernier e-mail Starlink : ${when(c.slm.ts)}">${s[1]}</span>` : ''; };
+  App.slBadge = c => { const s = c.slm && STATES[c.slm.state]; return (c.nameCheck ? '<span class="pill warn" title="Nom lu sur la facture Starlink">Nom à valider</span>' : '') + (s && s[3] > 0 ? `<span class="pill ${s[2]}" title="Dernier e-mail Starlink : ${when(c.slm.ts)}">${s[1]}</span>` : ''); };
   App.slLine = c => { const s = c.slm && STATES[c.slm.state]; if (!s) return ''; return `<div class="mut" style="margin-top:6px">E-mail Starlink du ${when(c.slm.ts)} : <b class="${s[2]}">${s[0]} ${s[1]}</b>${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</div>`; };
 
-  App.slRow = c => { const p = c.slp, nx = p ? `<dt>Prélèvement Starlink</dt><dd>prévu le ${App.fdate(p.due || App.iso(new Date(p.ts)))}${p.amount ? ' · ' + App.nf(p.amount, 2) + ' ' + esc(p.cur || 'CDF') : ''}${p.from ? ` · période du ${App.fdate(p.from)} au ${App.fdate(p.to)}` : ''}</dd>` : '', s = c.slm && STATES[c.slm.state]; return nx + (s ? `<dt>E-mail Starlink</dt><dd><span class="${s[2]}">${s[0]} ${s[1]}</span> · ${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</dd>` : ''); };
+  App.slRow = c => { const p = c.slp, nx = p ? `<dt>Prélèvement Starlink</dt><dd>prévu le ${App.fdate(p.due || App.iso(new Date(p.ts)))}${p.amount ? ' · ' + App.nf(p.amount, 2) + ' ' + esc(p.cur || 'CDF') : ''}${p.from ? ` · période du ${App.fdate(p.from)} au ${App.fdate(p.to)}` : ''}</dd>` : '', s = c.slm && STATES[c.slm.state]; return (c.nameCheck ? `<dt>Nom</dt><dd>lu sur la facture Starlink : à vérifier <button class="btn sm sec" data-act="slm_valid" data-id="${c.id}">C'est bon</button></dd>` : '') + nx + (s ? `<dt>E-mail Starlink</dt><dd><span class="${s[2]}">${s[0]} ${s[1]}</span> · ${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</dd>` : ''); };
 
   // ---------- Google sign-in and Gmail REST ----------
   const loadGis = () => new Promise((ok, ko) => {
@@ -240,7 +240,7 @@
         <div class="mut" style="margin-top:4px;white-space:normal">Dernier e-mail : ${evLabel(e)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''} · ${when(e.ts)}<br>${o.events.length} e-mail(s) · boîte(s) : ${[...o.boxes].map(esc).join(', ')}</div>
         <div class="bar">${o.ambiguous ? cs.map(c => `<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche : ${esc(App.cname(c))}</button>`).join('') : `<button class="btn sm" data-act="slm_link" data-acc="${esc(o.acc)}">🔗 Associer à un client</button><button class="btn sm sec" data-act="slm_new" data-acc="${esc(o.acc)}">➕ Nouveau client</button>`}<button class="btn sm sec" data-act="copy" data-t="${esc(o.acc)}">Copier ACC</button></div></div>`; };
     const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
-      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${(() => { const k = unk.filter(o => !o.ambiguous).length; return k ? `<div class="bar"><button class="btn" data-act="slm_createall">➕ Créer ${k > 1 ? 'les ' + k + ' clients manquants' : 'le client manquant'}</button></div>` : ''; })()}${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
+      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${(() => { const k = unk.filter(o => !o.ambiguous).length; return k ? `<div class="bar"><button class="btn" data-act="slm_createall">➕ Créer ${k > 1 ? 'les ' + k + ' clients manquants' : 'le client manquant'}</button></div>` : ''; })()}${(() => { const n = L.pending().length; return n ? `<div class="bar"><button class="btn sec" data-act="slm_pdf">📄 Compléter ${n} fiche(s) depuis les factures PDF</button></div>` : ''; })()}${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
     return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📧 Clients à suivre</small><div class="hero-num">${al.length}</div></div></div>
@@ -274,6 +274,61 @@
     });
     const n = rematch(); App.save(); App.toast(`${todo.length} client(s) créé(s), ${n} e-mail(s) appliqué(s). Cherchez « Compte » dans Clients pour compléter leurs noms.`); App.refresh();
   };
+  // ---------- invoices (PDF attached by Starlink): name, locality, plan and kit of a client created from an ACC ----------
+  const MONTHS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+  const frDate = t => { const m = /(\d{1,2})\s+([a-z]+)\s+(\d{4})/.exec(fold(t)), i = m ? MONTHS.indexOf(m[2]) : -1; return i < 0 ? '' : `${m[3]}-${String(i + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`; };
+  // text of an invoice (App.pdfText) -> fields
+  L.invoice = text => {
+    const lines = String(text || '').split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean), o = { acc: extractAcc(text), name: '', place: '', gps: '', plan: '', from: '', to: '', serial: '', kit: '', inv: '', amount: 0, cur: '' };
+    const at = lines.findIndex(l => /^Attn\s*:/i.test(l)); if (at >= 0) o.name = lines[at].replace(/^Attn\s*:\s*/i, '').trim();
+    const em = lines.findIndex(l => /^Emplacement\s*:/i.test(l)), g = em >= 0 && /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/.exec(lines[em]); if (g) o.gps = g[1] + ',' + g[2];
+    const pl = lines[(em >= 0 ? em : at) + 1]; if (pl && !/:/.test(pl) && !/^(facture|INV-)/i.test(pl)) o.place = pl.replace(/\s*,\s*/g, ', ');
+    const li = lines.map(l => /^([^|]+?)\s*\|\s*\((.+?)\s+-\s+(.+?)\)/.exec(l)).find(Boolean); if (li) { o.plan = li[1].trim(); o.from = frDate(li[2]); o.to = frDate(li[3]); }
+    const k = /([A-Z][A-Z0-9-]*[A-Z0-9])\s+(KIT[0-9A-Z]{6,})/.exec(text) || /()(KIT[0-9A-Z]{6,})/.exec(text); if (k) { o.kit = k[1]; o.serial = k[2]; }
+    const iv = /\bINV-[A-Z0-9-]+/.exec(text); if (iv) o.inv = iv[0];
+    const t = /Prix total\s*([A-Z]{3})?\s*(\d[\d\s .,]*\d)/i.exec(text); if (t) { o.cur = t[1] || 'CDF'; o.amount = money(t[2]); }
+    return o;
+  };
+  const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim();
+  // a client still waiting for its details: created from the e-mails (or still called « Compte … ») and not read yet
+  L.pending = () => App.db.clients.filter(c => (c.fromMail || /^Compte /.test(c.name || '')) && !c.pdfDone && accKey(c.acc) && log().some(e => accKey(e.acc) === accKey(c.acc)));
+  const pdfPart = payload => { let r = null; const walk = x => { if (!r && x.filename && /\.pdf$/i.test(x.filename) && x.body && (x.body.attachmentId || x.body.data)) r = x; (x.parts || []).forEach(walk); }; walk(payload || {}); return r; };
+  const bytesOf = d => Uint8Array.from(atob(String(d).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  // the invoice of a client: tries its e-mails (payment reminders first, newest first) until one carries a PDF
+  const fetchInvoice = async (c, interactive) => {
+    const k = accKey(c.acc), es = log().filter(e => accKey(e.acc) === k).sort((a, b) => (b.kind === 'programme') - (a.kind === 'programme') || b.ts - a.ts).slice(0, 5);
+    for (const e of es) {
+      const box = e.mailbox, gid = e.id.slice(box.length + 1), tok = await getToken(box, interactive), part = pdfPart((await gq(`${API}/messages/${gid}?format=full`, tok)).payload);
+      if (!part) continue;
+      const data = part.body.data || (await gq(`${API}/messages/${gid}/attachments/${part.body.attachmentId}`, tok)).data;
+      const v = L.invoice(await App.pdfText(bytesOf(data))); if (accKey(v.acc) === k) return v;
+    }
+    return null;
+  };
+  const applyInvoice = (c, v) => {
+    const S = App.db.settings, ch = [];
+    if (v.name && /^Compte /.test(c.name || '')) { const w = cleanName(v.name).split(' '); c.first = w.length > 1 ? w[0] : ''; c.last = w.length > 1 ? w.slice(1).join(' ') : w[0]; c.name = cleanName(v.name); c.nameCheck = true; ch.push('nom'); }
+    if (v.place && !c.city) { c.city = v.place.split(',')[0].trim(); if (!c.address) c.address = v.place; ch.push('localité'); }
+    if (v.gps && !c.installAddr) { c.installAddr = 'GPS ' + v.gps; ch.push('position'); }
+    if (v.serial && !c.serial) { c.serial = v.serial; ch.push('série du kit'); }
+    if (v.plan && !c.plan) { const p = App.PLANS.find(x => fold(x) === fold(v.plan)) || v.plan; c.plan = p; if (!c.price && S.plans && S.plans[p]) c.price = S.plans[p].price || 0; ch.push('forfait'); }
+    if (v.from && v.to && !c.start) { c.start = v.from; c.period = Math.max(1, App.diff(v.from, v.to)); ch.push('période'); }
+    c.note = (c.note ? c.note + '\n' : '') + `Facture Starlink ${v.inv}${v.kit ? ' · kit ' + v.kit : ''} lue le ${App.fdate(App.today())} : à vérifier.`;
+    c.pdfDone = true; App.log(c.id, 'Fiche complétée depuis la facture Starlink (' + (ch.join(', ') || 'rien de nouveau') + ')');
+    return ch.length;
+  };
+  L.readInvoices = async interactive => {
+    if (busy) return; const todo = L.pending(); if (!todo.length) return; busy = true; let ok = 0, none = 0, err = '';
+    try {
+      for (const c of todo) {
+        try { const v = await fetchInvoice(c, interactive); if (v) { applyInvoice(c, v); ok++; } else none++; } catch (e) { err = e.message; if (e.code === 'quota' || e.code === 'config' || NEED_LOGIN.includes(e.code)) break; }
+        if (L.pace) await L.delay(L.pace);
+      }
+    } finally { busy = false; }
+    App.save(); App.toast(`${ok} fiche(s) complétée(s) depuis les factures PDF${none ? ` · ${none} sans facture PDF` : ''}${err ? ' · ' + err : ''}`); App.refresh();
+  };
+  App.actions.slm_pdf = () => L.readInvoices(true);
+  App.actions.slm_valid = d => { const c = App.client(d.id); if (!c) return; delete c.nameCheck; App.save(); App.toast('Nom validé'); App.refresh(); };
   App.actions.slm_todo = () => { tab = 'todo'; App.go('slmail'); };
   App.actions.slm_wa = d => { const c = App.client(d.id); if (!c || !c.slm || !MSG[c.slm.state]) return; const url = App.waUrl(c.phone, MSG[c.slm.state](c.first || App.cname(c), c)); if (!url) return App.toast('Pas de numéro de téléphone'); window.open(url, '_blank', 'noopener'); };
   App.actions.slm_done = d => { const c = App.client(d.id); if (!c) return; c.slm = { state: 'actif', ts: Date.now(), manual: true }; App.save(); App.toast('Alerte clôturée'); App.refresh(); };
