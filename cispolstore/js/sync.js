@@ -7,7 +7,7 @@
   const App = window.App, $ = App.$, esc = App.esc;
   const CKEY = 'cispolstore-sync';
   const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'purchases', 'deposits', 'slpays', 'slmail', 'quotes', 'proformas', 'contracts', 'cmodels', 'counts', 'orders', 'caisse', 'closings', 'log'];
-  const SHARED = ['company', 'rate', 'period', 'grace', 'msgs', 'plans', 'users', 'rates', 'instFromCash', 'subFromCash', 'goal']; // PIN, theme and auto-lock stay per device
+  const SHARED = ['company', 'rate', 'period', 'grace', 'msgs', 'plans', 'users', 'rates', 'instFromCash', 'subFromCash', 'goal', 'gmail']; // PIN, theme and auto-lock stay per device
   const js = JSON.stringify;
 
   let cfg = null; try { cfg = JSON.parse(localStorage.getItem(CKEY)); } catch (e) {}

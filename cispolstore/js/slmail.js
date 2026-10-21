@@ -9,6 +9,18 @@
   let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
   cfg.accounts = Array.isArray(cfg.accounts) ? cfg.accounts : [];
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
+  // The list of mailboxes, the Google client ID and the reading frequency follow the data (synced settings), so the phone shows the same mailboxes as the computer.
+  // Tokens never leave the device: each device signs in to Google itself. Last change wins (cfg.gt = time of the version this device holds).
+  const shareCfg = () => { if (!App.db || !App.db.settings) return; const t = Date.now(); cfg.gt = t; saveCfg(); App.db.settings.gmail = { t, clientId: clientId(), every: cfg.every, accounts: cfg.accounts.map(a => a.email) }; App.save(); };
+  const adopt = () => {
+    const g = App.db && App.db.settings && App.db.settings.gmail;
+    if (!g) { if (App.db && App.db.settings && (cfg.accounts.length || cfg.clientId)) shareCfg(); return false; } // first time on this device: publish what it already has
+    if (!(g.t > (cfg.gt || 0))) return false;
+    cfg.accounts = (g.accounts || []).map(e => cfg.accounts.find(a => a.email.toLowerCase() === String(e).toLowerCase()) || { email: e });
+    if (g.clientId) cfg.clientId = g.clientId; if (g.every !== undefined) cfg.every = g.every; cfg.gt = g.t; saveCfg(); return true;
+  };
+  const EVERY = [[24, '1 fois par jour'], [12, '2 fois par jour'], [0, 'Seulement avec « Vérifier maintenant »']];
+  const everyH = () => cfg.every === undefined || cfg.every === null ? 12 : +cfg.every;
   const driveId = () => { try { return (JSON.parse(localStorage.getItem(DRIVE_KEY)) || {}).clientId || ''; } catch (e) { return ''; } };
   const clientId = () => cfg.clientId || driveId();
   const L = App.slmail = { status: 'idle', error: '' };
@@ -126,7 +138,7 @@
       const tc = google.accounts.oauth2.initTokenClient({
         client_id: clientId(), scope: SCOPE, login_hint: email || undefined,
         callback: r => r.error ? ko(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : ok({ tok: r.access_token, exp: Date.now() + ((+r.expires_in || 3600) - 60) * 1000 }),
-        error_callback: e => ko(Object.assign(new Error(e && e.type === 'popup_closed' ? 'Fenêtre Google fermée avant la fin' : 'Connexion Google impossible (' + ((e && e.type) || 'erreur') + ')'), { code: (e && e.type) || 'popup' }))
+        error_callback: e => ko(Object.assign(new Error(e && e.type === 'popup_closed' ? 'Fenêtre Google fermée avant la fin' : e && e.type === 'popup_failed_to_open' ? 'Le navigateur a bloqué la fenêtre Google : autorisez les fenêtres surgissantes pour ce site (icône dans la barre d\'adresse) ou ouvrez l\'application dans Chrome, puis réessayez.' : 'Connexion Google impossible (' + ((e && e.type) || 'erreur') + ')'), { code: (e && e.type) || 'popup' }))
       });
       tc.requestAccessToken({ prompt: interactive ? (email ? '' : 'select_account') : 'none' });
     });
@@ -159,7 +171,7 @@
   };
   const NEED_LOGIN = ['interaction_required', 'access_denied', 'auth', 'popup_closed', 'popup_failed_to_open', 'immediate_failed', 'user_logged_out', 'consent_required', 'login_required', 'popup', 'unknown'];
   L.check = async interactive => {
-    if (busy || !cfg.accounts.length) return 0; busy = true; L.status = 'busy'; redraw();
+    adopt(); if (busy || !cfg.accounts.length) return 0; busy = true; L.status = 'busy'; redraw();
     let added = 0; const errs = [];
     for (const a of cfg.accounts) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
     const re = rematch(); cfg.lastCheck = Date.now(); saveCfg(); App.save();
@@ -172,6 +184,7 @@
 
   // ---------- settings card ----------
   App.slmailCard = () => {
+    adopt();
     const row = (t, s, b) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${b || ''}</div>`;
     let body;
     if (!clientId()) body = row('État', "Non configuré. L'application lit les e-mails de Starlink (échec de paiement, suspension, réactivation) et met à jour le client grâce à son numéro ACC. Lecture seule : rien n'est envoyé, rien n'est supprimé.", '<button class="btn sm" data-act="slm_setup">Configurer</button>');
@@ -180,6 +193,7 @@
       body = row('État', `<b class="${cls}">${st}</b><br>Dernière vérification : <b>${when(cfg.lastCheck)}</b>`, cfg.accounts.length ? '<button class="btn sm" data-act="slm_check">Vérifier maintenant</button>' : '')
         + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.err === 'reconnect' ? '<span class="warn">Reconnexion nécessaire : touchez « Vérifier maintenant »</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last), `<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button>`)).join('')
         + row('Ajouter une boîte Gmail', 'Vous pouvez en lier plusieurs (par exemple la boîte qui reçoit les e-mails de paiement et celle qui reçoit les suspensions).', '<button class="btn sm" data-act="slm_add">+ Gmail</button>')
+        + row('Lecture automatique', 'À l\'ouverture de l\'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.', `<select id="slm_every" style="width:auto">${App.opts(EVERY, everyH())}</select>`)
         + row('Alertes et journal', `${L.count()} alerte(s) en cours`, '<button class="btn sm sec" data-act="go" data-v="slmail">Ouvrir</button>')
         + row('Identifiant Google', esc(clientId().slice(0, 18)) + '…', '<button class="btn sm sec" data-act="slm_setup">Modifier</button>');
     }
@@ -199,7 +213,7 @@
       () => {
         const id = App.v('slm_cid');
         if (!/^\S+\.apps\.googleusercontent\.com$/.test(id)) { $('slm_msg').textContent = "Cet identifiant ne ressemble pas à un ID client Google (il finit par .apps.googleusercontent.com)."; return false; }
-        cfg.clientId = id; saveCfg(); App.close(); App.refresh();
+        cfg.clientId = id; shareCfg(); App.close(); App.refresh();
       }, 'Enregistrer');
   };
   App.actions.slm_add = async () => {
@@ -208,10 +222,11 @@
       App.toast('Choisissez le compte Gmail…'); await getToken('', true);
       const email = Object.keys(toks).filter(k => !cfg.accounts.some(a => a.email.toLowerCase() === k)).pop();
       if (!email) return App.toast('Ce compte est déjà lié');
-      cfg.accounts.push({ email }); saveCfg(); App.refresh(); App.toast(email + ' lié : lecture des e-mails…'); L.check(true);
-    } catch (e) { App.toast(e.message); }
+      cfg.accounts.push({ email }); shareCfg(); App.refresh(); App.toast(email + ' lié : lecture des e-mails…'); L.check(true);
+    } catch (e) { L.status = 'error'; L.error = e.message; App.toast(e.message); App.refresh(); }
   };
-  App.actions.slm_remove = d => { const a = cfg.accounts[+d.v]; if (!a || !App.confirm('Retirer ' + a.email + ' ? Les alertes déjà créées sont conservées.')) return; if (toks[a.email.toLowerCase()] && window.google && google.accounts) { try { google.accounts.oauth2.revoke(toks[a.email.toLowerCase()].tok, () => {}); } catch (e) {} } delete toks[a.email.toLowerCase()]; cfg.accounts.splice(+d.v, 1); saveCfg(); App.refresh(); };
+  App.actions.slm_remove = d => { const a = cfg.accounts[+d.v]; if (!a || !App.confirm('Retirer ' + a.email + ' ? Les alertes déjà créées sont conservées.')) return; if (toks[a.email.toLowerCase()] && window.google && google.accounts) { try { google.accounts.oauth2.revoke(toks[a.email.toLowerCase()].tok, () => {}); } catch (e) {} } delete toks[a.email.toLowerCase()]; cfg.accounts.splice(+d.v, 1); shareCfg(); App.refresh(); };
+  document.addEventListener('change', e => { if (e.target && e.target.id === 'slm_every') { cfg.every = +e.target.value; shareCfg(); App.toast('Lecture automatique : ' + (EVERY.find(x => x[0] === cfg.every) || EVERY[1])[1].toLowerCase()); } });
   App.actions.slm_check = () => L.check(true);
   App.actions.slm_tab = d => { tab = d.v; App.refresh(); };
 
@@ -341,10 +356,10 @@
 
   // Everything lives in the Clients screen (nothing on the dashboard, nothing read when the app opens): opening Clients reads the mailboxes quietly
   // (only reuses the existing Google session: no window), at most every 30 minutes.
-  const auto = () => { if (App.state.view === 'clients' && cfg.accounts.length && clientId() && App.guard('slm_check') && Date.now() - (cfg.lastCheck || 0) > 30 * 60e3) L.check(false); };
+  const auto = () => { adopt(); if (App.state.view === 'clients' && everyH() > 0 && cfg.accounts.length && clientId() && App.guard('slm_check') && Date.now() - (cfg.lastCheck || 0) > everyH() * 3600e3) L.check(false); };
   App.slmailPanel = () => {
     if (!App.guard('slm_check')) return '';
-    setTimeout(auto, 600);
+    adopt(); setTimeout(auto, 600);
     const n = L.count(), warn = L.needsAttention(), title = '📧 E-mails Starlink' + (n ? ` · ${n} à suivre` : '') + (warn ? ' · reconnexion nécessaire' : '');
     if (rematch()) App.save();
     const nu = L.unknown().length, unkLine = nu ? `<button class="item" data-act="slm_todo" style="margin-bottom:8px"><span class="avatar warn" style="width:36px;height:36px;font-size:16px">🔗</span><div class="grow"><b style="white-space:normal">${nu} compte(s) Starlink (ACC) vu(s) dans vos e-mails mais pas dans la liste des clients.</b></div><span class="mut">›</span></button>` : '';

@@ -168,6 +168,37 @@ const c0=calls;await p.reload();await p.waitForTimeout(6000);
 ok('nothing is read when the app opens (dashboard untouched)',calls===c0);
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(3500);
 ok('opening Clients reads the mailboxes quietly (no window)',calls>c0&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).lastCheck)>0);
+// ---- popup blocked (typical on a phone): a clear, lasting message instead of a toast that vanishes
+await p.evaluate(async()=>{const o=google.accounts.oauth2,orig=o.initTokenClient;o.initTokenClient=c=>({requestAccessToken:()=>setTimeout(()=>c.error_callback({type:'popup_failed_to_open'}),5)});await App.actions.slm_add();o.initTokenClient=orig});await p.waitForTimeout(400);
+ok('blocked Google window: lasting explanation in the e-mail card',await p.evaluate(()=>/fenêtres surgissantes/.test(App.slmail.error))&&/fenêtres surgissantes/.test(await p.evaluate(()=>document.getElementById('view').textContent)));
+// ---- the mailboxes follow the data (synced settings): the phone shows the same mailboxes as the computer
+const g1=await p.evaluate(()=>App.db.settings.gmail);
+ok('mailboxes, client ID and frequency are published in the synced settings (no token in them)',g1&&g1.accounts.length===3&&g1.accounts.includes('a@example.test')&&g1.t>0&&!/tok-/.test(JSON.stringify(g1)),JSON.stringify(g1));
+// ---- reading frequency: 1 / 2 times a day, or only by hand
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(600);
+ok('« Lecture automatique » choice in the e-mail card, 2 times a day by default',await p.evaluate(()=>{const s=document.getElementById('slm_every');return !!s&&s.value==='12'&&[...s.options].length===3}));
+const pick=async v=>{await p.evaluate(()=>{const d=document.querySelector('details[data-fold=slmail]');if(d)d.open=true});await p.selectOption('#slm_every',v)};
+const setLast=async h=>{await p.evaluate(h=>{const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.lastCheck=Date.now()-h*3600e3;localStorage.setItem(k,JSON.stringify(c))},h)};
+const reopen=async()=>{await p.reload();await p.waitForTimeout(800);await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(3200)};
+await pick('0');await p.waitForTimeout(300);
+ok('« manual only » is saved on this device and published for the other devices',await p.evaluate(()=>App.db.settings.gmail.every===0&&JSON.parse(localStorage.getItem('cispolstore-gmail')).every===0));
+await setLast(100);let c1=calls;await reopen();
+ok('manual only: opening Clients reads nothing, even after 100 hours',calls===c1);
+await pick('12');await p.waitForTimeout(300);await setLast(3);c1=calls;await reopen();
+ok('2 times a day: 3 hours after the last reading, nothing is read',calls===c1);
+await setLast(13);c1=calls;await reopen();
+ok('2 times a day: 13 hours after the last reading, opening Clients reads',calls>c1);
+await pick('24');await p.waitForTimeout(300);await setLast(13);c1=calls;await reopen();
+ok('1 time a day: 13 hours after, nothing is read; 25 hours after, it reads',calls===c1&&await (async()=>{await setLast(25);const c2=calls;await reopen();return calls>c2})());
+// ---- a second device: it adopts the mailboxes published by the first one; a removal travels too
+await p.evaluate(()=>{localStorage.setItem('cispolstore-gmail',JSON.stringify({accounts:[]}));App.db.settings.gmail={t:Date.now()+5000,clientId:'123-test.apps.googleusercontent.com',every:0,accounts:['a@example.test','b@example.test','c@example.test','d@example.test']};App.save()});
+await p.reload();await p.waitForTimeout(800);await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(800);
+const dv=await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')));
+ok('a device with no mailbox adopts the 4 published ones, the Google client ID and the chosen frequency',dv.accounts.map(a=>a.email).join()==='a@example.test,b@example.test,c@example.test,d@example.test'&&dv.every===0&&dv.clientId==='123-test.apps.googleusercontent.com',JSON.stringify(dv));
+ok('the adopted mailboxes are listed in the e-mail card',/d@example\.test/.test(await p.evaluate(()=>document.getElementById('view').textContent)));
+await p.evaluate(()=>{App.db.settings.gmail={t:Date.now()+9000,clientId:'123-test.apps.googleusercontent.com',every:12,accounts:['a@example.test','b@example.test','c@example.test']};App.save()});
+await p.reload();await p.waitForTimeout(800);await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(800);
+ok('a mailbox removed on the other device disappears here too',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.length)===3);
 // ---- Gmail slows the reading down (quota): retry, keep the progress, resume
 const reset=async()=>{await p.evaluate(()=>{App.db.slmail=[];App.db.clients.forEach(c=>{delete c.slm;delete c.slp});const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.accounts.forEach(a=>{delete a.last;delete a.seen;delete a.err});c.lastCheck=Date.now();localStorage.setItem(k,JSON.stringify(c));App.save()});await p.reload();await p.waitForTimeout(1000);await p.evaluate(()=>{App.slmail.delay=()=>Promise.resolve();App.slmail.pace=0})};
 await reset();qmode='some';qLeft=3;await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
