@@ -33,6 +33,15 @@ const BOX={
 BOX['c@example.test']=[ // a third mailbox: the same notice as a4 (Starlink writes to every contact address) and an account we do not know
   msg('c2','Service Starlink suspendu',body.suspendu('ACC-DF-10000006-66666-66'),T0+260*MIN),
   msg('c1','Échec du paiement Starlink',body.echec(Z,'87 000,00'),T0+241*MIN)];
+// Fictitious invoice PDF built like Starlink's (Type0 / Identity-H font with a ToUnicode map, Flate streams, one text object per line)
+const zlib=require('zlib');
+const makePdf=rows=>{const chars=[...new Set(rows.join('').split(''))],gid=c=>chars.indexOf(c)+1,h4=n=>n.toString(16).toUpperCase().padStart(4,'0');
+ let c='BT\n';rows.forEach((t,i)=>{c+=`/F1 12 Tf 1 0 0 -1 0 0 Tm\n75 ${-(100+i*25)} Td <${h4(gid(t[0]))}> Tj\n`;t.slice(1).split('').forEach(ch=>{c+=`6.5 0 Td <${h4(gid(ch))}> Tj\n`})});c+='ET\n';
+ const cmap=`/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${chars.length} beginbfchar\n${chars.map(ch=>`<${h4(gid(ch))}> <${h4(ch.charCodeAt(0))}>`).join('\n')}\nendbfchar\nendcmap\nend\nend\n`;
+ const st=(n,d)=>Buffer.concat([Buffer.from(`${n} 0 obj\n<< /Length ${d.length+1} /Filter /FlateDecode >>\nstream\n`,'latin1'),d,Buffer.from('\nendstream\nendobj\n','latin1')]);
+ return Buffer.concat([Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/Contents 4 0 R\n/Resources 5 0 R\n>>\nendobj\n5 0 obj\n<<\n/Font <<\n/F1 6 0 R\n>>\n>>\nendobj\n6 0 obj\n<< /Type /Font\n/Subtype /Type0\n/BaseFont /Test\n/Encoding /Identity-H\n/ToUnicode 7 0 R>>\nendobj\n','latin1'),st(4,zlib.deflateSync(Buffer.from(c,'latin1'))),st(7,zlib.deflateSync(Buffer.from(cmap,'latin1'))),Buffer.from('%%EOF\n','latin1')]);};
+const PDF=makePdf(['Attn: Alice Exemple','Emplacement : 1.2345,2.3456','Ville Test, Province Test','Facture','INV-DF-COD-000001-00001-01','Compte client: '+V,'Résidentiel | (lundi 19 octobre 2026 - mercredi 18 novembre 2026) 1 CDF 50 000,00','GB-EXEMPLE KIT123456789ABC','Prix total CDF 55 000,00']);
+BOX['a@example.test'].find(m=>m.id==='a6').payload.parts.push({filename:'INV-DF-COD-000001-00001-01.pdf',mimeType:'application/pdf',body:{attachmentId:'att1',size:PDF.length}});
 BOX['b@example.test'].push(msg('b0','Newsletter','x',T0,'Autre <news@example.test>'));
 (async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
 let calls=0,qmode='',qLeft=0;
@@ -42,6 +51,7 @@ await ctx.route('https://gmail.googleapis.com/**',async r=>{calls++;const u=new 
  if(u.pathname.endsWith('/profile'))return json({emailAddress:who});
  if(u.pathname.endsWith('/messages'))return json({messages:box.map(m=>({id:m.id}))});
  if((qmode==='all'||(qmode==='some'&&qLeft>0))&&/\/messages\/./.test(u.pathname)){qLeft--;return r.fulfill({status:429,contentType:'application/json',headers:{'retry-after':'1'},body:JSON.stringify({error:{code:429,message:"Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'",errors:[{reason:'rateLimitExceeded'}]}})})}
+ if(/\/attachments\/att1$/.test(u.pathname))return json({data:PDF.toString('base64').replace(/\+/g,'-').replace(/\//g,'_')});
  const id=u.pathname.split('/').pop();return json(box.find(m=>m.id===id))});
 await p.addInitScript(()=>{window.__pick='a@example.test';window.google={accounts:{oauth2:{initTokenClient:c=>({requestAccessToken:()=>setTimeout(()=>c.callback({access_token:'tok-'+(c.login_hint||window.__pick),expires_in:3600}),5)}),revoke:()=>{}}}}});
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
@@ -136,6 +146,22 @@ await p.evaluate(()=>App.actions.slm_createall());await p.waitForTimeout(500);
 const cr=await p.evaluate(V=>{const c=App.db.clients.find(x=>x.acc===V);return c&&{name:c.name,start:c.start,period:c.period,st:(c.slm||{}).state,fromMail:c.fromMail,left:App.slmail.unknown().length}},V);
 ok('client created from the e-mails with ACC, subscription dates and Starlink state',!!cr&&/^Compte /.test(cr.name)&&cr.start==='2026-10-19'&&cr.period===30&&cr.st==='echec'&&cr.fromMail===true,JSON.stringify(cr));
 ok('only the ambiguous ACC remains in "À vérifier"',cr&&cr.left===1,JSON.stringify(cr));
+// ---- fill the created client from the invoice PDF attached to the payment reminder
+const tx=await p.evaluate(async b64=>App.pdfText(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))),PDF.toString('base64'));
+ok('PDF reader: lines of the invoice, accents and spaces kept',/^Attn: Alice Exemple$/m.test(tx)&&/Résidentiel \| \(lundi 19 octobre 2026/.test(tx)&&/Prix total CDF 55 000,00/.test(tx),tx.slice(0,200));
+const iv=await p.evaluate(t=>App.slmail.invoice(t),tx);
+ok('invoice fields: name, place, GPS, plan, period, kit, amount',iv.name==='Alice Exemple'&&iv.place==='Ville Test, Province Test'&&iv.gps==='1.2345,2.3456'&&iv.plan==='Résidentiel'&&iv.from==='2026-10-19'&&iv.to==='2026-11-18'&&iv.serial==='KIT123456789ABC'&&iv.kit==='GB-EXEMPLE'&&iv.amount===55000&&iv.cur==='CDF'&&iv.acc===V,JSON.stringify(iv));
+await p.evaluate(()=>App.go('slmail'));await p.waitForTimeout(500);await p.click('[data-act=slm_tab][data-v=todo]');await p.waitForTimeout(300);
+ok('button to complete the client from the invoice appears (1 client waiting)',/Compléter 1 fiche\(s\) depuis les factures PDF/.test(await p.innerText('#view')));
+await p.click('[data-act=slm_pdf]');await p.waitForTimeout(1500);
+const pc=await p.evaluate(V=>{const c=App.db.clients.find(x=>x.acc===V);return{name:c.name,first:c.first,last:c.last,city:c.city,addr:c.address,gps:c.installAddr,serial:c.serial,plan:c.plan,price:c.price,chk:c.nameCheck,done:c.pdfDone,left:App.slmail.pending().length}},V);
+ok('client completed from the PDF: name, locality, position, kit serial, plan and its price',pc.name==='Alice Exemple'&&pc.first==='Alice'&&pc.last==='Exemple'&&pc.city==='Ville Test'&&pc.addr==='Ville Test, Province Test'&&pc.gps==='GPS 1.2345,2.3456'&&pc.serial==='KIT123456789ABC'&&pc.plan==='Résidentiel'&&pc.price===70&&pc.done===true&&pc.left===0,JSON.stringify(pc));
+ok('the name read on the invoice is flagged to be checked',pc.chk===true);
+await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(500);
+ok('client list: « Nom à valider » badge',/Nom à valider/.test(await p.innerText('#clist')));
+await p.evaluate(V=>App.go('client',{id:App.db.clients.find(x=>x.acc===V).id}),V);await p.waitForTimeout(500);
+await p.click('[data-act=slm_valid]');await p.waitForTimeout(400);
+ok('"C\'est bon" validates the name',await p.evaluate(V=>!App.db.clients.find(x=>x.acc===V).nameCheck,V));
 // ---- nothing is read when the app opens; opening Clients reads quietly
 await p.evaluate(()=>{const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.lastCheck=0;localStorage.setItem(k,JSON.stringify(c))});
 const c0=calls;await p.reload();await p.waitForTimeout(6000);
