@@ -48,7 +48,7 @@ await ctx.route('https://gmail.googleapis.com/**',async r=>{calls++;const u=new 
  if((qmode==='all'||(qmode==='some'&&qLeft>0))&&/\/messages\/./.test(u.pathname)){qLeft--;return r.fulfill({status:429,contentType:'application/json',headers:{'retry-after':'1'},body:JSON.stringify({error:{code:429,message:"Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'",errors:[{reason:'rateLimitExceeded'}]}})})}
  if(/\/attachments\/att1$/.test(u.pathname))return json({data:PDF.toString('base64').replace(/\+/g,'-').replace(/\//g,'_')});
  const id=u.pathname.split('/').pop();return json(box.find(m=>m.id===id))});
-await p.addInitScript(()=>{window.__pick='a@example.test';window.google={accounts:{oauth2:{initTokenClient:c=>({requestAccessToken:()=>setTimeout(()=>c.callback({access_token:'tok-'+(c.login_hint||window.__pick),expires_in:3600}),5)}),revoke:()=>{}}}}});
+await p.addInitScript(()=>{window.__pick='a@example.test';window.google={accounts:{oauth2:{initTokenClient:c=>({requestAccessToken:()=>setTimeout(()=>{if((window.__fail||[]).includes(c.login_hint))return c.error_callback({type:'popup_failed_to_open'});c.callback({access_token:'tok-'+(c.login_hint||window.__pick),expires_in:3600})},5)}),revoke:()=>{}}}}});
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
 // ---- reading one e-mail (no network)
 const P=await p.evaluate(([bodyEchec,bodyAvis,bodySusp,bodyAct,bodyProg])=>{const P=App.slmail.parse;return[P({subject:'Échec du paiement Starlink',text:bodyEchec}),P({subject:'Suspension de votre service Starlink',text:bodyAvis}),P({subject:'Service Starlink suspendu',text:bodySusp}),P({subject:'Le service Starlink a été réactivé',text:bodyAct}),P({subject:'Autre',text:'rien'}),P({subject:'Échec du paiement Starlink',text:'Numéro de compte ACC-DF-10000001-11111-11\nMontant du paiement USD 1,234.50'}),P({subject:'Rappel de paiement automatique',text:bodyProg})]},[body.echec(X,'157 661,28'),body.avis(Y),body.suspendu(Y),body.actif(X),body.prog(Y,'143 999,99')]);
@@ -208,6 +208,16 @@ ok('the adopted mailboxes are listed in the e-mail card',/d@example\.test/.test(
 await p.evaluate(()=>{App.db.settings.gmail={t:Date.now()+9000,clientId:'123-test.apps.googleusercontent.com',every:12,accounts:['a@example.test','b@example.test','c@example.test']};App.save()});
 await p.reload();await p.waitForTimeout(800);await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(800);
 ok('a mailbox removed on the other device disappears here too',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.length)===3);
+// ---- one mailbox needs a new Google sign-in on this device (window blocked): the others are read, that one gets its own « Reconnecter » button
+await p.evaluate(()=>{window.__fail=['c@example.test'];App.go('clients')});await p.waitForTimeout(500);
+await p.evaluate(()=>document.querySelector('details[data-fold=slmail]').open=true);
+await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
+const rc=await p.evaluate(()=>({btn:[...document.querySelectorAll('[data-act=slm_reconnect]')].map(b=>b.dataset.v),txt:document.getElementById('view').textContent,errs:JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.map(a=>a.err||'')}));
+ok('a mailbox that cannot sign in here is flagged, the others are fine',rc.errs.join()===',,reconnect',rc.errs.join());
+ok('only that mailbox gets a « Reconnecter » button, with an explanation that does not point to « Vérifier maintenant »',rc.btn.join()==='2'&&/touchez « Reconnecter »/.test(rc.txt));
+await p.evaluate(()=>{window.__fail=[]});
+await p.click('[data-act=slm_reconnect]');await p.waitForTimeout(1500);
+ok('« Reconnecter » signs in (window opened straight from the tap) and the mailbox is read again',await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.every(a=>!a.err)&&document.querySelectorAll('[data-act=slm_reconnect]').length===0));
 // ---- Gmail slows the reading down (quota): retry, keep the progress, resume
 const reset=async()=>{await p.evaluate(()=>{App.db.slmail=[];App.db.clients.forEach(c=>{delete c.slm;delete c.slp});const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.accounts.forEach(a=>{delete a.last;delete a.seen;delete a.err});c.lastCheck=Date.now();localStorage.setItem(k,JSON.stringify(c));App.save()});await p.reload();await p.waitForTimeout(1000);await p.evaluate(()=>{App.slmail.delay=()=>Promise.resolve();App.slmail.pace=0})};
 await reset();qmode='some';qLeft=3;await p.evaluate(()=>App.slmail.check(true));await p.waitForTimeout(1500);
