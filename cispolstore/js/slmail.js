@@ -216,14 +216,33 @@
         cfg.clientId = id; shareCfg(); App.close(); App.refresh();
       }, 'Enregistrer');
   };
-  App.actions.slm_add = async () => {
+  // adding a mailbox: type the address (Google then asks to sign in with exactly that account, even when the phone is signed in to another one),
+  // or pick one of the accounts already known on this device
+  const failAdd = e => { L.status = 'error'; L.error = e.message; App.toast(e.message); App.refresh(); };
+  const linkMailbox = async email => {
+    try {
+      if (cfg.accounts.some(a => a.email.toLowerCase() === email)) return App.toast('Cette boîte est déjà liée');
+      App.toast('Connexion à Google : ' + email); await getToken(email, true);
+      cfg.accounts.push({ email }); shareCfg(); App.refresh(); App.toast(email + ' lié : lecture des e-mails…'); L.check(true);
+    } catch (e) { failAdd(e); }
+  };
+  App.actions.slm_add = () => {
     if (!clientId()) return App.actions.slm_setup();
+    loadGis().catch(() => {}); // loaded before the tap on « Connecter »: a window opened after a download is blocked on phones
+    App.modal('Ajouter une boîte Gmail',
+      `<p class="mut" style="margin-top:0">Saisissez l'adresse Gmail qui reçoit les e-mails de Starlink. Google vous demandera de vous connecter avec <b>cette adresse</b>, même si le téléphone est connecté à un autre compte.</p>
+       ${F.text('slm_email', 'Adresse Gmail', '', 'type="text" inputmode="email" autocapitalize="none" autocomplete="off" placeholder="exemple@gmail.com"')}<p id="slm_msg" class="warn"></p>
+       <div class="bar"><button type="button" class="btn sec" data-act="slm_chooser">Choisir parmi les comptes de cet appareil</button></div>`,
+      () => { const e = App.v('slm_email').trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { $('slm_msg').textContent = 'Saisissez une adresse e-mail valide (exemple@gmail.com).'; return false; } linkMailbox(e); }, 'Connecter');
+  };
+  App.actions.slm_chooser = async () => {
+    App.close();
     try {
       App.toast('Choisissez le compte Gmail…'); await getToken('', true);
       const email = Object.keys(toks).filter(k => !cfg.accounts.some(a => a.email.toLowerCase() === k)).pop();
       if (!email) return App.toast('Ce compte est déjà lié');
       cfg.accounts.push({ email }); shareCfg(); App.refresh(); App.toast(email + ' lié : lecture des e-mails…'); L.check(true);
-    } catch (e) { L.status = 'error'; L.error = e.message; App.toast(e.message); App.refresh(); }
+    } catch (e) { failAdd(e); }
   };
   App.actions.slm_remove = d => { const a = cfg.accounts[+d.v]; if (!a || !App.confirm('Retirer ' + a.email + ' ? Les alertes déjà créées sont conservées.')) return; if (toks[a.email.toLowerCase()] && window.google && google.accounts) { try { google.accounts.oauth2.revoke(toks[a.email.toLowerCase()].tok, () => {}); } catch (e) {} } delete toks[a.email.toLowerCase()]; cfg.accounts.splice(+d.v, 1); shareCfg(); App.refresh(); };
   document.addEventListener('change', e => { if (e.target && e.target.id === 'slm_every') { cfg.every = +e.target.value; shareCfg(); App.toast('Lecture automatique : ' + (EVERY.find(x => x[0] === cfg.every) || EVERY[1])[1].toLowerCase()); } });

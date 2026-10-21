@@ -67,13 +67,17 @@ await p.click('[data-act=slm_setup]');await p.waitForTimeout(300);await p.fill('
 ok('invalid client id refused',/ne ressemble pas/.test(await p.innerText('#slm_msg')));
 await p.fill('#slm_cid','123456789-test.apps.googleusercontent.com');await p.click('#dlg .btn:not(.sec):not(.del)');await p.waitForTimeout(400);
 ok('configured: add button shown',await p.isVisible('[data-act=slm_add]'));
-await p.click('[data-act=slm_add]');await p.waitForTimeout(1500);
+await p.click('[data-act=slm_add]');await p.waitForTimeout(300);
+ok('add window: type the address, or pick an account of the device',await p.isVisible('#slm_email')&&await p.isVisible('[data-act=slm_chooser]'));
+await p.fill('#slm_email','not-an-address');await p.click('#dok');await p.waitForTimeout(200);
+ok('invalid address: message, window stays open',/adresse e-mail valide/.test(await p.innerText('#slm_msg'))&&await p.isVisible('#slm_email'));
+await p.fill('#slm_email','a@example.test');await p.click('#dok');await p.waitForTimeout(1500);
 await p.evaluate(()=>{window.__pick='b@example.test'});
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
-await p.click('[data-act=slm_add]');await p.waitForTimeout(1800);
+await p.click('[data-act=slm_add]');await p.waitForTimeout(300);await p.click('[data-act=slm_chooser]');await p.waitForTimeout(1800);
 await p.evaluate(()=>{window.__pick='c@example.test'});
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(400);await p.evaluate(()=>document.querySelector('[data-fold=slmail]').setAttribute('open',''));
-await p.click('[data-act=slm_add]');await p.waitForTimeout(1800);
+await p.click('[data-act=slm_add]');await p.waitForTimeout(300);await p.fill('#slm_email','C@Example.test ');await p.click('#dok');await p.waitForTimeout(1800);
 const st=await p.evaluate(()=>({acc:JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.map(a=>a.email),log:App.db.slmail.map(e=>[e.id,e.res,e.kind].join('|')),cl:Object.fromEntries(['cm','cp','cw1','cw2'].map(i=>[i,(App.client(i).slm||{}).state||'']))}));
 ok('three mailboxes linked',st.acc.join(',')==='a@example.test,b@example.test,c@example.test',st.acc.join(','));
 const al4=await p.evaluate(()=>App.db.slmail.find(e=>e.id==='a@example.test:a4'));
@@ -164,8 +168,13 @@ ok('nothing is read when the app opens (dashboard untouched)',calls===c0);
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(3500);
 ok('opening Clients reads the mailboxes quietly (no window)',calls>c0&&await p.evaluate(()=>JSON.parse(localStorage.getItem('cispolstore-gmail')).lastCheck)>0);
 // ---- popup blocked (typical on a phone): a clear, lasting message instead of a toast that vanishes
-await p.evaluate(async()=>{const o=google.accounts.oauth2,orig=o.initTokenClient;o.initTokenClient=c=>({requestAccessToken:()=>setTimeout(()=>c.error_callback({type:'popup_failed_to_open'}),5)});await App.actions.slm_add();o.initTokenClient=orig});await p.waitForTimeout(400);
+await p.evaluate(async()=>{const o=google.accounts.oauth2,orig=o.initTokenClient;o.initTokenClient=c=>({requestAccessToken:()=>setTimeout(()=>c.error_callback({type:'popup_failed_to_open'}),5)});await App.actions.slm_chooser();o.initTokenClient=orig});await p.waitForTimeout(400);
 ok('blocked Google window: lasting explanation in the e-mail card',await p.evaluate(()=>/fenêtres surgissantes/.test(App.slmail.error))&&/fenêtres surgissantes/.test(await p.evaluate(()=>document.getElementById('view').textContent)));
+// ---- address typed but Google signs in to another account: clear message, nothing linked
+await p.evaluate(()=>{const o=google.accounts.oauth2;o.__orig=o.initTokenClient;o.initTokenClient=c=>({requestAccessToken:()=>setTimeout(()=>c.callback({access_token:'tok-a@example.test',expires_in:3600}),5)});App.actions.slm_add()});await p.waitForTimeout(300);
+await p.fill('#slm_email','d@example.test');await p.click('#dok');await p.waitForTimeout(800);
+ok('typed address but Google signed in to another account: clear message, nothing linked',await p.evaluate(()=>/Mauvais compte Google/.test(App.slmail.error)&&JSON.parse(localStorage.getItem('cispolstore-gmail')).accounts.length===3));
+await p.evaluate(()=>{google.accounts.oauth2.initTokenClient=google.accounts.oauth2.__orig});
 // ---- the mailboxes follow the data (synced settings): the phone shows the same mailboxes as the computer
 const g1=await p.evaluate(()=>App.db.settings.gmail);
 ok('mailboxes, client ID and frequency are published in the synced settings (no token in them)',g1&&g1.accounts.length===3&&g1.accounts.includes('a@example.test')&&g1.t>0&&!/tok-/.test(JSON.stringify(g1)),JSON.stringify(g1));
