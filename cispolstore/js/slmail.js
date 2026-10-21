@@ -193,7 +193,7 @@
       body = row('État', `<b class="${cls}">${st}</b><br>Dernière vérification : <b>${when(cfg.lastCheck)}</b>`, cfg.accounts.length ? '<button class="btn sm" data-act="slm_check">Vérifier maintenant</button>' : '')
         + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.err === 'reconnect' ? '<span class="warn">Reconnexion nécessaire : touchez « Vérifier maintenant »</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last), `<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button>`)).join('')
         + row('Ajouter une boîte Gmail', 'Vous pouvez en lier plusieurs (par exemple la boîte qui reçoit les e-mails de paiement et celle qui reçoit les suspensions).', '<button class="btn sm" data-act="slm_add">+ Gmail</button>')
-        + row('Lecture automatique', 'À l\'ouverture de l\'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.', `<select id="slm_every" style="width:auto">${App.opts(EVERY, everyH())}</select>`)
+        + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Lecture automatique</b><small style="white-space:normal">À l'ouverture de l'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.</small></div><select id="slm_every" style="width:100%">${App.opts(EVERY, everyH())}</select></div>`
         + row('Alertes et journal', `${L.count()} alerte(s) en cours`, '<button class="btn sm sec" data-act="go" data-v="slmail">Ouvrir</button>')
         + row('Identifiant Google', esc(clientId().slice(0, 18)) + '…', '<button class="btn sm sec" data-act="slm_setup">Modifier</button>');
     }
@@ -276,15 +276,17 @@
     c.acc = linkAcc; const n = rematch(); App.save(); App.close(); App.toast('ACC associé à ' + App.cname(c) + (n ? ` · ${n} e-mail(s) appliqué(s)` : '')); App.refresh();
   };
   App.actions.slm_new = d => { App.clientForm(null, 'gere'); const el = $('f_acc'); if (el) el.value = d.acc; };
+  // a client created from an ACC alone (« Compte … »): the name and the phone are completed later
+  const mkClient = (acc, from, to, note) => { const short = acc.replace(/^ACC-DF-/i, ''), S = App.db.settings;
+    return { id: App.uid(), type: 'gere', first: 'Compte', last: short, name: 'Compte ' + short, phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc, serial: '', kit: '', plan: '', price: 0, payMode: 'Cash',
+      start: from || '', period: from && to ? Math.max(1, App.diff(from, to)) : S.period, grace: S.grace, note, fromMail: true, code: App.nextClientCode(), created: App.today(), subs: [] }; };
   // one client per unknown ACC (shared ACC excluded): ACC, Starlink state, and the subscription dates when a payment reminder gave the billing period
   App.actions.slm_createall = () => {
     const todo = L.unknown().filter(o => !o.ambiguous); if (!todo.length) return;
     if (!App.confirm(`Créer ${todo.length} client(s) à partir des comptes Starlink trouvés dans vos e-mails ? Ils s'appelleront « Compte … » : vous complétez ensuite le nom et le téléphone.`)) return;
-    const S = App.db.settings, today = App.today();
+    const today = App.today();
     todo.forEach(o => {
-      const short = o.acc.replace(/^ACC-DF-/i, ''), ev = o.events.filter(e => e.kind === 'programme' && e.from && e.to).sort((a, b) => b.ts - a.ts)[0];
-      const c = { id: App.uid(), type: 'gere', first: 'Compte', last: short, name: 'Compte ' + short, phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: o.acc, serial: '', kit: '', plan: '', price: 0, payMode: 'Cash',
-        start: ev ? ev.from : '', period: ev ? Math.max(1, App.diff(ev.from, ev.to)) : S.period, grace: S.grace, note: 'Créé le ' + App.fdate(today) + ' depuis les e-mails Starlink : nom et téléphone à compléter.', fromMail: true, code: App.nextClientCode(), created: today, subs: [] };
+      const ev = o.events.filter(e => e.kind === 'programme' && e.from && e.to).sort((a, b) => b.ts - a.ts)[0], c = mkClient(o.acc, ev && ev.from, ev && ev.to, 'Créé le ' + App.fdate(today) + ' depuis les e-mails Starlink : nom et téléphone à compléter.');
       App.db.clients.push(c); App.log(c.id, 'Client créé depuis les e-mails Starlink (' + o.acc + ')');
     });
     const n = rematch(); App.save(); App.toast(`${todo.length} client(s) créé(s), ${n} e-mail(s) appliqué(s). Cherchez « Compte » dans Clients pour compléter leurs noms.`); App.refresh();
@@ -344,6 +346,32 @@
   };
   App.actions.slm_pdf = () => L.readInvoices(true);
   App.actions.slm_valid = d => { const c = App.client(d.id); if (!c) return; delete c.nameCheck; App.save(); App.toast('Nom validé'); App.refresh(); };
+  // ---------- import Starlink invoices (PDF files picked on this device): classify clients without Gmail ----------
+  // newest invoice of each ACC wins; the client is found by its ACC (completed, never overwritten) or created; the name read is flagged « à valider »
+  let imp = [];
+  const readPdfInvoice = async file => { try { const v = L.invoice(await App.pdfText(new Uint8Array(await file.arrayBuffer()))); return v.acc ? v : null; } catch (e) { return null; } };
+  const impKind = v => { const cs = clientsFor(v.acc); return cs.length > 1 ? 'ambigu' : cs.length ? 'maj' : 'new'; };
+  App.slPdfButton = () => App.canView('importc') ? `<label class="btn sec full" style="cursor:pointer;display:block;margin-top:8px;text-align:center">📄 Importer des factures Starlink (PDF)<input type="file" id="sp_file" accept=".pdf,application/pdf" multiple hidden></label>` : '';
+  const impApply = () => {
+    const todo = imp.filter(x => x.kind !== 'ambigu'); let nNew = 0, nUp = 0;
+    todo.forEach(({ v }) => {
+      let c = clientsFor(v.acc)[0];
+      if (!c) { c = mkClient(v.acc, v.from, v.to, 'Créé le ' + App.fdate(App.today()) + ' depuis une facture Starlink (PDF).'); c.fromMail = false; c.fromPdf = true; App.db.clients.push(c); App.log(c.id, 'Client créé depuis une facture Starlink (' + v.acc + ')'); nNew++; } else nUp++;
+      applyInvoice(c, v);
+    });
+    const re = rematch(); App.save(); App.toast(`${nNew} client(s) créé(s), ${nUp} fiche(s) complétée(s)${re ? `, ${re} e-mail(s) appliqué(s)` : ''}. Vérifiez les noms marqués « Nom à valider ».`); App.refresh();
+  };
+  document.addEventListener('change', async e => {
+    if (!e.target || e.target.id !== 'sp_file' || !e.target.files.length) return;
+    const files = [...e.target.files]; e.target.value = ''; const done = App.busy ? App.busy('Lecture des factures…') : () => {}, byAcc = new Map(); let bad = 0;
+    try { for (const f of files) { const v = await readPdfInvoice(f); if (!v) { bad++; continue; } const k = accKey(v.acc), o = byAcc.get(k); if (!o || (v.from || '') > (o.from || '')) byAcc.set(k, v); } } finally { done(); }
+    imp = [...byAcc.values()].map(v => ({ v, kind: impKind(v) }));
+    if (!imp.length) return App.toast(`Aucune facture Starlink reconnue (${files.length} fichier(s) lu(s)).`);
+    const ok = imp.filter(x => x.kind !== 'ambigu').length, pill = { new: ['ok', 'Nouveau client'], maj: ['warn', 'Complète la fiche'], ambigu: ['bad', 'Plusieurs clients : ignoré'] };
+    const row = ({ v, kind }) => { const c = kind === 'maj' ? clientsFor(v.acc)[0] : null; return `<div class="item"><div class="grow"><b style="white-space:normal">${esc(v.name || 'Sans nom')}</b><small style="white-space:normal">${esc(v.acc)}${v.place ? ' · ' + esc(v.place) : ''}${v.plan ? ' · ' + esc(v.plan) : ''}${c ? ' · fiche « ' + esc(App.cname(c)) + ' »' : ''}</small></div><span class="pill ${pill[kind][0]}">${pill[kind][1]}</span></div>`; };
+    App.modal('Factures Starlink lues', `<p class="mut" style="margin-top:0">${files.length} fichier(s) : ${imp.length} compte(s) Starlink reconnu(s)${bad ? `, ${bad} fichier(s) non reconnu(s)` : ''}. Rien n'est enregistré avant que vous confirmiez. Le nom est celui que Starlink a enregistré : vous le validez ensuite fiche par fiche.</p><div class="list">${imp.map(row).join('')}</div>`,
+      ok ? () => { impApply(); } : null, ok ? `Importer (${ok})` : 'Fermer');
+  });
   App.actions.slm_todo = () => { tab = 'todo'; App.go('slmail'); };
   App.actions.slm_wa = d => { const c = App.client(d.id); if (!c || !c.slm || !MSG[c.slm.state]) return; const url = App.waUrl(c.phone, MSG[c.slm.state](c.first || App.cname(c), c)); if (!url) return App.toast('Pas de numéro de téléphone'); window.open(url, '_blank', 'noopener'); };
   App.actions.slm_done = d => { const c = App.client(d.id); if (!c) return; c.slm = { state: 'actif', ts: Date.now(), manual: true }; App.save(); App.toast('Alerte clôturée'); App.refresh(); };
