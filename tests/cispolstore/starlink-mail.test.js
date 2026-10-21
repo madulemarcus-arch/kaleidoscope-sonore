@@ -34,12 +34,7 @@ BOX['c@example.test']=[ // a third mailbox: the same notice as a4 (Starlink writ
   msg('c2','Service Starlink suspendu',body.suspendu('ACC-DF-10000006-66666-66'),T0+260*MIN),
   msg('c1','Échec du paiement Starlink',body.echec(Z,'87 000,00'),T0+241*MIN)];
 // Fictitious invoice PDF built like Starlink's (Type0 / Identity-H font with a ToUnicode map, Flate streams, one text object per line)
-const zlib=require('zlib');
-const makePdf=rows=>{const chars=[...new Set(rows.join('').split(''))],gid=c=>chars.indexOf(c)+1,h4=n=>n.toString(16).toUpperCase().padStart(4,'0');
- let c='BT\n';rows.forEach((t,i)=>{c+=`/F1 12 Tf 1 0 0 -1 0 0 Tm\n75 ${-(100+i*25)} Td <${h4(gid(t[0]))}> Tj\n`;t.slice(1).split('').forEach(ch=>{c+=`6.5 0 Td <${h4(gid(ch))}> Tj\n`})});c+='ET\n';
- const cmap=`/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${chars.length} beginbfchar\n${chars.map(ch=>`<${h4(gid(ch))}> <${h4(ch.charCodeAt(0))}>`).join('\n')}\nendbfchar\nendcmap\nend\nend\n`;
- const st=(n,d)=>Buffer.concat([Buffer.from(`${n} 0 obj\n<< /Length ${d.length+1} /Filter /FlateDecode >>\nstream\n`,'latin1'),d,Buffer.from('\nendstream\nendobj\n','latin1')]);
- return Buffer.concat([Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/Contents 4 0 R\n/Resources 5 0 R\n>>\nendobj\n5 0 obj\n<<\n/Font <<\n/F1 6 0 R\n>>\n>>\nendobj\n6 0 obj\n<< /Type /Font\n/Subtype /Type0\n/BaseFont /Test\n/Encoding /Identity-H\n/ToUnicode 7 0 R>>\nendobj\n','latin1'),st(4,zlib.deflateSync(Buffer.from(c,'latin1'))),st(7,zlib.deflateSync(Buffer.from(cmap,'latin1'))),Buffer.from('%%EOF\n','latin1')]);};
+const { makePdf } = require('./pdf-fixture');
 const PDF=makePdf(['Attn: Alice Exemple','Emplacement : 1.2345,2.3456','Ville Test, Province Test','Facture','INV-DF-COD-000001-00001-01','Compte client: '+V,'Résidentiel | (lundi 19 octobre 2026 - mercredi 18 novembre 2026) 1 CDF 50 000,00','GB-EXEMPLE KIT123456789ABC','Prix total CDF 55 000,00']);
 BOX['a@example.test'].find(m=>m.id==='a6').payload.parts.push({filename:'INV-DF-COD-000001-00001-01.pdf',mimeType:'application/pdf',body:{attachmentId:'att1',size:PDF.length}});
 BOX['b@example.test'].push(msg('b0','Newsletter','x',T0,'Autre <news@example.test>'));
