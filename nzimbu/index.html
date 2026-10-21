@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NZIMBU</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#e8730c">
 <style>
   /* Palette inspired by the 50 FC note: orange dominant, teal and gold as harmonious companions */
   :root {
@@ -37,7 +41,7 @@
   .card b { font-size: 1.15rem; }
   .in { color: var(--in); } .out { color: var(--out); }
   nav { display: flex; gap: 6px; margin: 16px 0; padding: 4px; background: var(--line); border-radius: 12px; }
-  nav button { flex: 1; border-color: transparent; background: transparent; }
+  nav button { flex: 1; border-color: transparent; background: transparent; padding: 8px 4px; white-space: nowrap; }
   nav button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: var(--shadow); }
   form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
   form .wide { grid-column: 1 / -1; }
@@ -54,6 +58,13 @@
   .rule .row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .msg { font-size: .9rem; color: var(--muted); }
   .msg.bad { color: var(--warn); font-weight: 600; } .msg.ok { color: var(--in); }
+  .chart { display: flex; gap: 6px; }
+  .mcol { flex: 1; min-width: 0; }
+  .bars { height: 140px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); }
+  .bars i { flex: 1; min-height: 2px; border-radius: 4px 4px 0 0; }
+  .lbl { font-size: .7rem; text-align: center; color: var(--muted); margin-top: 4px; }
+  .legend { display: flex; gap: 12px; font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; }
   footer { margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: .85rem; }
   footer input[type=number] { width: 90px; }
   .fc { color: var(--muted); font-weight: 400; font-size: .8rem; margin-left: 4px; }
@@ -75,9 +86,10 @@
   </div>
 
   <nav role="tablist">
-    <button role="tab" data-tab="tx" aria-selected="true">Entrées / sorties</button>
+    <button role="tab" data-tab="tx" aria-selected="true">Opérations</button>
     <button role="tab" data-tab="debts" aria-selected="false">Dettes</button>
     <button role="tab" data-tab="rule" aria-selected="false">50-30-20</button>
+    <button role="tab" data-tab="months" aria-selected="false">Mois</button>
   </nav>
 
   <!-- Transactions -->
@@ -123,6 +135,11 @@
   <section id="tab-rule" hidden>
     <p class="msg">Base de calcul : tes entrées du mois. 50 % pour les besoins, 30 % pour les envies, 20 % pour l'épargne et le remboursement de dettes.</p>
     <div id="ruleBody"></div>
+  </section>
+
+  <!-- Mois -->
+  <section id="tab-months" hidden>
+    <div id="monthsBody"></div>
   </section>
 
   <footer>
@@ -208,9 +225,29 @@
     }).join('');
   }
 
+  // Month-by-month books: totals per month, running balance, and a bar chart of the last 12 months
+  const monthLabel = m => new Date(m + '-01T12:00:00').toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+  function renderMonths() {
+    const by = {};
+    data.tx.forEach(t => { const m = t.date.slice(0, 7), o = by[m] || (by[m] = { i: 0, o: 0 }); o[t.type === 'in' ? 'i' : 'o'] += t.amount; });
+    const keys = Object.keys(by).sort();
+    if (!keys.length) { $('monthsBody').innerHTML = '<p class="empty">Aucune opération pour le moment.</p>'; return; }
+    let cum = 0;
+    const rows = keys.map(m => { cum += by[m].i - by[m].o; return { m, i: by[m].i, o: by[m].o, bal: by[m].i - by[m].o, cum }; });
+    const recent = rows.slice(-12), max = Math.max(...recent.map(r => Math.max(r.i, r.o))) || 1;
+    $('monthsBody').innerHTML = `<div class="legend"><span><i style="background:var(--in)"></i>Entrées</span><span><i style="background:var(--out)"></i>Sorties</span></div>
+      <div class="chart">${recent.map(r => `<div class="mcol"><div class="bars">
+        <i style="height:${r.i / max * 100}%;background:var(--in)" title="Entrées : ${usd(r.i)}"></i>
+        <i style="height:${r.o / max * 100}%;background:var(--out)" title="Sorties : ${usd(r.o)}"></i></div><div class="lbl">${monthLabel(r.m)}</div></div>`).join('')}</div>
+      <h2>Bilan par mois</h2><ul>${rows.reverse().map(r => `<li>
+        <div class="grow"><b>${monthLabel(r.m)}</b><span>Entrées ${usd(r.i)} · Sorties ${usd(r.o)}</span><span>Cumul ${usd(r.cum)}</span></div>
+        <b class="${r.bal < 0 ? 'out' : 'in'}">${r.bal < 0 ? '−' : '+'}${fmt(Math.abs(r.bal))}</b>
+        <button class="small" data-month="${r.m}">Ouvrir</button></li>`).join('')}</ul>`;
+  }
+
   function render() {
     const list = monthTx();
-    renderSummary(list); renderTx(list); renderDebts(); renderRule(list);
+    renderSummary(list); renderTx(list); renderDebts(); renderRule(list); renderMonths();
     $('rate').value = data.rate;
     $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
   }
@@ -218,7 +255,7 @@
   // ---------- Controls ----------
   const showTab = name => {
     document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
-    ['tx', 'debts', 'rule'].forEach(t => $('tab-' + t).hidden = t !== name);
+    ['tx', 'debts', 'rule', 'months'].forEach(t => $('tab-' + t).hidden = t !== name);
   };
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
@@ -244,6 +281,7 @@
 
   document.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
     if (t.dataset.delTx && confirm('Supprimer cette opération ?')) data.tx = data.tx.filter(x => x.id !== t.dataset.delTx);
     else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
     else if (t.dataset.pay) {
@@ -286,6 +324,8 @@
 
   render();
   if (data.rateAuto) refreshRate();
+  // Offline support (needs http(s) or localhost; silently skipped on file://)
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 </body>

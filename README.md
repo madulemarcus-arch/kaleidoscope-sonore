@@ -23,6 +23,6 @@ Le panneau du bas permet aussi de régler la symétrie (2 à 16), la taille du p
 - La position horizontale règle le panoramique stéréo.
 - Un pinceau épais (> 10) utilise un timbre triangle au lieu d'une sinusoïde.
 
-## NZIMBU (`budget/index.html`)
+## NZIMBU (`nzimbu/index.html`)
 
-Application personnelle indépendante, dans un seul fichier. Les montants sont saisis en dollars (USD) et convertis automatiquement en francs congolais (taux en ligne, modifiable à la main). Fonctions : suivi des entrées et sorties du mois, dettes (« je dois » / « on me doit ») avec remboursements partiels, et répartition 50-30-20 (besoins / envies / épargne et dettes). Les données restent dans le navigateur (`localStorage`), avec export/import JSON.
+Application personnelle indépendante, dans un seul fichier. Les montants sont saisis en dollars (USD) et convertis automatiquement en francs congolais (taux en ligne, modifiable à la main). Fonctions : suivi des entrées et sorties avec bilan et graphique mois par mois, dettes (« je dois » / « on me doit ») avec remboursements partiels, et répartition 50-30-20 (besoins / envies / épargne et dettes). Les données restent dans le navigateur (`localStorage`), avec export/import JSON. Installable sur téléphone et utilisable hors ligne (à servir en https ou sur localhost).
