@@ -205,7 +205,7 @@
         if (pre.pfId) { const pf = pfs().find(x => x.id === pre.pfId); if (pf) { pf.status = 'converted'; pf.invoiceId = inv.id; } }
         App.save(); App.toast('Facture ' + inv.number + (pend ? ' créée — en attente' : ' créée')); App.go('invoice', { id: inv.id });
         const np = db.payments.find(x => x.invoiceId === inv.id);
-        if (np) setTimeout(() => App.receiptPrompt(np.id), 150);
+        if (np) queueMicrotask(() => App.receiptPrompt(np.id));
         if (np && App.invDue(inv) <= 0.004 && !inv.pending) App.celebrate();
       }, 'Créer la facture');
     // renewal is on by default only when the client already had a subscription invoice
@@ -457,7 +457,7 @@
         App.log(cid, `Paiement ${App.fmt(amt, App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
         if (i && $('f_neg').checked && !$('pp_negw').style.display) { i.agreed = Math.round(App.invPaid(i) * 100) / 100; App.log(cid, `Prix négocié sur ${i.number} : ${App.fmt(i.agreed, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); }
         const np = db.payments[db.payments.length - 1]; App.save(); App.refresh();
-        setTimeout(() => App.receiptPrompt(np.id), 150);
+        queueMicrotask(() => App.receiptPrompt(np.id));
         if (i && bal(i) <= 0.004) App.celebrate();
       }, 'Enregistrer le paiement');
     // live balance + quick buttons (works for old invoices too)
