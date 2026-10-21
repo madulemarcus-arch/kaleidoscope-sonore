@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon budget</title>
+<style>
+  :root {
+    --bg: #f5f6fa; --card: #fff; --text: #1d2030; --muted: #6b7088; --line: #e3e5ee;
+    --accent: #4f46e5; --in: #16a34a; --out: #dc2626; --warn: #d97706;
+    --besoins: #3b82f6; --envies: #a855f7; --epargne: #10b981;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1117; --card: #181b25; --text: #e8eaf2; --muted: #8b90a8; --line: #2a2e3d; --accent: #818cf8; --in: #4ade80; --out: #f87171; --warn: #fbbf24; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.3rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 20px 0 8px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  input, select, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.small { padding: 4px 8px; font-size: .85rem; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .card small { color: var(--muted); display: block; }
+  .card b { font-size: 1.15rem; }
+  .in { color: var(--in); } .out { color: var(--out); }
+  nav { display: flex; gap: 6px; margin: 16px 0; }
+  nav button { flex: 1; }
+  nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  form .wide { grid-column: 1 / -1; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 6px; }
+  li .grow { flex: 1; min-width: 0; }
+  li .grow span { display: block; color: var(--muted); font-size: .85rem; }
+  li.done { opacity: .55; }
+  .tag { font-size: .75rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+  .empty { color: var(--muted); text-align: center; padding: 16px; }
+  .bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 6px 0; }
+  .bar i { display: block; height: 100%; }
+  .rule { margin-bottom: 8px; }
+  .rule .row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .msg { font-size: .9rem; color: var(--muted); }
+  .msg.bad { color: var(--warn); } .msg.ok { color: var(--in); }
+  footer { margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: .85rem; }
+  footer input[type=text] { width: 70px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>💰 Mon budget</h1>
+    <input type="month" id="month" aria-label="Mois affiché">
+  </header>
+
+  <div class="cards">
+    <div class="card"><small>Entrées</small><b class="in" id="sumIn"></b></div>
+    <div class="card"><small>Sorties</small><b class="out" id="sumOut"></b></div>
+    <div class="card"><small>Solde</small><b id="sumBal"></b></div>
+  </div>
+
+  <nav role="tablist">
+    <button role="tab" data-tab="tx" aria-selected="true">Entrées / sorties</button>
+    <button role="tab" data-tab="debts" aria-selected="false">Dettes</button>
+    <button role="tab" data-tab="rule" aria-selected="false">50-30-20</button>
+  </nav>
+
+  <!-- Transactions -->
+  <section id="tab-tx">
+    <form id="txForm">
+      <select id="txType" aria-label="Type"><option value="out">Sortie</option><option value="in">Entrée</option></select>
+      <select id="txCat" aria-label="Catégorie">
+        <option value="besoins">Besoins (50 %)</option>
+        <option value="envies">Envies (30 %)</option>
+        <option value="epargne">Épargne &amp; dettes (20 %)</option>
+      </select>
+      <input id="txLabel" placeholder="Libellé" required class="wide">
+      <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="Montant" required>
+      <input id="txDate" type="date" required>
+      <button class="primary wide">Ajouter</button>
+    </form>
+    <ul id="txList"></ul>
+  </section>
+
+  <!-- Dettes -->
+  <section id="tab-debts" hidden>
+    <div class="cards">
+      <div class="card"><small>Je dois</small><b class="out" id="dOwe"></b></div>
+      <div class="card"><small>On me doit</small><b class="in" id="dOwed"></b></div>
+      <div class="card"><small>Net</small><b id="dNet"></b></div>
+    </div>
+    <h2>Nouvelle dette</h2>
+    <form id="debtForm">
+      <select id="dDir" aria-label="Sens"><option value="owe">Je dois à…</option><option value="owed">Me doit…</option></select>
+      <input id="dWho" placeholder="Personne" required>
+      <input id="dAmount" type="number" min="0.01" step="0.01" placeholder="Montant" required>
+      <input id="dDue" type="date" aria-label="Échéance (facultatif)" title="Échéance (facultatif)">
+      <input id="dNote" placeholder="Note (facultatif)" class="wide">
+      <button class="primary wide">Ajouter</button>
+    </form>
+    <h2>Je dois</h2><ul id="oweList"></ul>
+    <h2>On me doit</h2><ul id="owedList"></ul>
+  </section>
+
+  <!-- 50-30-20 -->
+  <section id="tab-rule" hidden>
+    <p class="msg">Base de calcul : tes entrées du mois. 50 % pour les besoins, 30 % pour les envies, 20 % pour l'épargne et le remboursement de dettes.</p>
+    <div id="ruleBody"></div>
+  </section>
+
+  <footer>
+    <span>Devise :</span><input type="text" id="cur" maxlength="6" aria-label="Devise">
+    <button class="small" id="export">Exporter</button>
+    <button class="small" id="importBtn">Importer</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+    <span>Données stockées dans ce navigateur uniquement.</span>
+  </footer>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'budget-v1';
+  const CATS = { besoins: ['Besoins', 0.5, 'var(--besoins)'], envies: ['Envies', 0.3, 'var(--envies)'], epargne: ['Épargne & dettes', 0.2, 'var(--epargne)'] };
+
+  // ---------- Data ----------
+  const data = { tx: [], debts: [], cur: '€' };
+  try { Object.assign(data, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  const fmt = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n) + ' ' + data.cur;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const sum = a => a.reduce((t, x) => t + x, 0);
+  const rest = d => Math.max(0, Math.round((d.amount - d.paid) * 100) / 100);
+  const dateFr = s => s.split('-').reverse().join('/');
+
+  // ---------- Rendering ----------
+  const monthTx = () => data.tx.filter(t => t.date.startsWith($('month').value)).sort((a, b) => b.date.localeCompare(a.date));
+
+  function renderSummary(list) {
+    const i = sum(list.filter(t => t.type === 'in').map(t => t.amount)), o = sum(list.filter(t => t.type === 'out').map(t => t.amount));
+    $('sumIn').textContent = fmt(i); $('sumOut').textContent = fmt(o);
+    $('sumBal').textContent = fmt(i - o); $('sumBal').className = i - o < 0 ? 'out' : 'in';
+  }
+
+  function renderTx(list) {
+    $('txList').innerHTML = list.length ? list.map(t => `<li>
+      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}</span></div>
+      <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount)}</b>
+      <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
+  }
+
+  function debtItem(d) {
+    const left = rest(d), late = d.due && left > 0 && d.due < today();
+    return `<li class="${left ? '' : 'done'}">
+      <div class="grow"><b>${esc(d.who)}</b><span>${left ? `Reste ${fmt(left)} sur ${fmt(d.amount)}` : `Soldée (${fmt(d.amount)})`}${d.due ? ` · échéance ${dateFr(d.due)}${late ? ' ⚠️ dépassée' : ''}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span></div>
+      ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
+      <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></li>`;
+  }
+
+  function renderDebts() {
+    const owe = data.debts.filter(d => d.dir === 'owe'), owed = data.debts.filter(d => d.dir === 'owed');
+    const a = sum(owe.map(rest)), b = sum(owed.map(rest));
+    $('dOwe').textContent = fmt(a); $('dOwed').textContent = fmt(b);
+    $('dNet').textContent = fmt(b - a); $('dNet').className = b - a < 0 ? 'out' : 'in';
+    const empty = '<li class="empty">Rien ici.</li>';
+    $('oweList').innerHTML = owe.length ? owe.map(debtItem).join('') : empty;
+    $('owedList').innerHTML = owed.length ? owed.map(debtItem).join('') : empty;
+  }
+
+  function renderRule(list) {
+    const income = sum(list.filter(t => t.type === 'in').map(t => t.amount));
+    if (!income) { $('ruleBody').innerHTML = '<p class="empty">Ajoute au moins une entrée ce mois-ci pour calculer la répartition.</p>'; return; }
+    $('ruleBody').innerHTML = Object.entries(CATS).map(([k, [name, pct, color]]) => {
+      const target = income * pct, actual = sum(list.filter(t => t.type === 'out' && t.cat === k).map(t => t.amount));
+      const diff = actual - target, saving = k === 'epargne';
+      const bad = saving ? diff < 0 : diff > 0;
+      const msg = saving
+        ? (bad ? `Il manque ${fmt(-diff)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(diff)} de marge.`)
+        : (bad ? `Dépassement de ${fmt(diff)}.` : `Il te reste ${fmt(-diff)} à dépenser.`);
+      return `<div class="card rule"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual)} / ${fmt(target)}</span></div>
+        <div class="bar"><i style="width:${Math.min(100, actual / target * 100)}%;background:${color}"></i></div>
+        <div class="msg ${bad ? 'bad' : 'ok'}">${msg} (${Math.round(actual / income * 100)} % de tes entrées)</div></div>`;
+    }).join('');
+  }
+
+  function render() {
+    const list = monthTx();
+    renderSummary(list); renderTx(list); renderDebts(); renderRule(list);
+    $('cur').value = data.cur;
+  }
+
+  // ---------- Controls ----------
+  const showTab = name => {
+    document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
+    ['tx', 'debts', 'rule'].forEach(t => $('tab-' + t).hidden = t !== name);
+  };
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+  $('month').value = today().slice(0, 7);
+  $('txDate').value = today();
+  $('month').onchange = render;
+  $('txType').onchange = () => $('txCat').hidden = $('txType').value === 'in';
+
+  $('txForm').onsubmit = e => {
+    e.preventDefault();
+    const type = $('txType').value;
+    data.tx.push({ id: uid(), type, label: $('txLabel').value.trim(), amount: +$('txAmount').value, date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null });
+    $('txLabel').value = ''; $('txAmount').value = '';
+    $('month').value = data.tx[data.tx.length - 1].date.slice(0, 7);
+    save(); render();
+  };
+
+  $('debtForm').onsubmit = e => {
+    e.preventDefault();
+    data.debts.push({ id: uid(), dir: $('dDir').value, who: $('dWho').value.trim(), amount: +$('dAmount').value, paid: 0, due: $('dDue').value, note: $('dNote').value.trim() });
+    e.target.reset(); save(); render();
+  };
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.delTx && confirm('Supprimer cette opération ?')) data.tx = data.tx.filter(x => x.id !== t.dataset.delTx);
+    else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
+    else if (t.dataset.pay) {
+      const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
+      const v = parseFloat(String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left}) :`, left) || '').replace(',', '.'));
+      if (!(v > 0)) return;
+      const amt = Math.min(v, left);
+      d.paid += amt;
+      // Repayment is also recorded as a transaction so the monthly totals stay accurate
+      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null });
+    } else return;
+    save(); render();
+  });
+
+  $('cur').onchange = () => { data.cur = $('cur').value.trim() || '€'; save(); render(); };
+
+  $('export').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    a.download = `budget-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(txt => {
+      const d = JSON.parse(txt);
+      if (!Array.isArray(d.tx) || !Array.isArray(d.debts)) throw 0;
+      if (!confirm('Remplacer toutes les données actuelles ?')) return;
+      Object.assign(data, { cur: '€' }, d); save(); render();
+    }).catch(() => alert('Fichier invalide.'));
+    e.target.value = '';
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
