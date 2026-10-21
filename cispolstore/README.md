@@ -216,6 +216,14 @@ La facture imprimée (impression, PDF, Word) reprend le modèle de la facture Wo
 
 Paramètres → Entreprise : *Sous-titre*, *Ville* (case « Lieu ») et *Mode de règlement* de la facture se modifient (valeurs par défaut : « SOLUTIONS TECHNOLOGIQUES ET CONNECTIVITE », « Kinshasa », « Virement bancaire ou espèces. »). La colonne *Référence* reprend la référence du produit en stock (« — » sinon). Le tampon est le fichier `stamp.png` (fond transparent). Comme avant, la facture imprimée montre toujours le prix complet, sans paiement ni reste.
 
+## Pro forma (Plus → Factures)
+
+Certains clients (entreprises surtout) demandent un **pro forma avant la facture**. Dans **Factures**, le bouton « 📋 Nouveau pro forma » (ou la case « 📋 Pro forma » en haut du formulaire d'une nouvelle facture) ouvre le même formulaire qu'une facture : mêmes types, client, devise, taux, lignes (stock ou libres) et mêmes références P0001, P0002…
+
+- Un pro forma n'est **pas une vente** : aucun paiement, aucune sortie de stock, aucun abonnement renouvelé, et il n'entre pas dans les totaux ni les impayés. Il a son propre numéro `PRO-AAAA-NNNN`.
+- Le document imprimé s'intitule « FACTURE PRO FORMA » (total pro forma, mention « sans valeur de facture », sans QR de paiement). Fichier : `Client - Pro forma PRO-…`. Imprimer, PDF et WhatsApp sont proposés.
+- Les pro forma se retrouvent dans le filtre **Pro forma** de la liste des factures. « 🧾 Transformer en facture » ouvre le formulaire de facture avec les mêmes lignes (modifiables) : les règles habituelles s'appliquent alors (paiement, stock, renouvellement) et le pro forma passe à « Facturé ».
+
 ## Facture en attente
 
 Quand un client demande seulement la facture et peut ne pas prendre le produit, cochez **⏳ Facture en attente** à la création. La facture est remise au client (prix complet) mais **rien n'est déduit du stock**, elle **ne compte ni dans les ventes, ni dans les rapports, ni dans les impayés** (filtre « En attente » dans la liste des factures), et l'abonnement ou l'installation liés ne sont pas appliqués. Sur sa page : **✅ Le client prend le produit** valide la vente (le stock est déduit, l'abonnement renouvelé, l'installation créée) puis ouvre l'encaissement ; **✖ Le client n'en veut plus** annule la facture sans toucher au stock. Si le client a déjà donné de l'argent, saisissez-le dans le cadre **« Acompte reçu du client »** à la création (champ « Le client a donné », vide par défaut) ou plus tard avec **💰 Recevoir un acompte** sur la page de la facture : l'acompte entre dans la caisse mais pas dans les ventes tant que la vente n'est pas validée ; à la validation, il reste à encaisser le solde. Si le client n'en veut plus, l'application rappelle de lui rendre l'acompte et le retire de la caisse. Dans la liste, glissez une facture en attente vers la gauche : **🗑 Supprimer** apparaît directement.
