@@ -50,6 +50,7 @@
         ${App.remindCard()}
         ${App.fold('sync', 'Synchronisation entre appareils', App.syncCard().replace(/^<h2 class="sec">.*?<\/h2>/, ''))}
         ${App.driveCard ? App.fold('drive', 'Sauvegarde Google Drive', App.driveCard().replace(/^<h2 class="sec">.*?<\/h2>/, '')) : ''}
+        ${App.slmailCard ? App.fold('slmail', 'E-mails Starlink (Gmail)', App.slmailCard().replace(/^<h2 class="sec">.*?<\/h2>/, '')) : ''}
         ${App.fold('data', 'Données, sauvegarde et exports', `<div class="list">
           ${row('Stockage interne', `Les données sont enregistrées dans la mémoire de cet appareil, même sans internet. Protection contre l'effacement : <b class="${App.persisted ? 'ok' : 'warn'}">${App.persisted ? 'activée' : App.persisted === false ? 'non garantie (installez l\'application)' : 'en cours…'}</b>`)}
           ${row('Sauvegarde', `Dernière sauvegarde : <b class="${warn ? 'warn' : ''}">${lastB ? App.fdate(lastB) : 'jamais'}</b>${warn ? ' — pensez à en faire une.' : ''}`, '<button class="btn sm" data-act="backup">Sauvegarder</button>')}
