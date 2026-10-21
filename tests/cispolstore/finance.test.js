@@ -4,7 +4,8 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); const ctx = await b.newContext({ ...devices['Pixel 5'] }); const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.addInitScript(()=>{document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{const d=document.querySelector('dialog');if(d&&d.open&&/Envoyez le reçu au client/.test(d.textContent))d.close()}).observe(document,{subtree:true,childList:true,attributes:true,characterData:true}))}); // these tests are not about the receipt window: close it as soon as it opens
+await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   await p.evaluate(() => { const t = App.today(), A = n => App.addDays(t, n), d = App.db;
     d.clients.push({ id: 'c1', code: 'CL-1', type: 'mat', first: 'Awa', last: 'Diop', name: 'Awa Diop', phone: '0812345678', subs: [], created: t });
     d.suppliers.push({ id: 's1', name: 'Starlink RDC', phone: '', address: '', goods: '', notes: '' });
@@ -31,7 +32,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   await p.click('[data-act=recprint][data-id=pa2]'); await p.waitForTimeout(400); ok('printing creates the print frame', await p.evaluate(() => !!document.querySelector('iframe') && /REÇU DE PAIEMENT/.test(document.querySelector('iframe').srcdoc)));
   // payment form offers the receipt
   await p.evaluate(() => App.paymentForm({ clientId: 'c1' })); await p.fill('#f_amt', '5'); await p.click('#dok'); await p.waitForTimeout(300);
-  ok('after saving a payment: bar with "Imprimer le reçu"', /Paiement enregistré/.test(await p.innerText('#undo')) && /reçu/i.test(await p.innerText('#undogo')));
+  ok('after saving a payment: the receipt is flagged « à envoyer »', await p.evaluate(() => App.rcptTodo().length === 1));
   await p.evaluate(() => { App.db.payments.pop(); App.save(); });
   // ================= finance tab
   await p.evaluate(() => App.go('finance'));

@@ -26,7 +26,7 @@
     if (!inv.pending) App.invMoves(inv);
     const pa = +inv.payAmount > 0 ? { amount: +inv.payAmount, cur: inv.payCur || inv.currency, ref: inv.payRef || '' } : paid > 0 ? { amount: paid, cur: inv.currency, ref: '' } : null;
     delete inv.payAmount; delete inv.payCur; delete inv.payRef;
-    if (pa) db.payments.push({ id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: pa.amount, currency: pa.cur, rate: inv.rate, mode: inv.payMode, ref: pa.ref, comment: '' });
+    if (pa) db.payments.push({ rcpt: 'todo', id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: pa.amount, currency: pa.cur, rate: inv.rate, mode: inv.payMode, ref: pa.ref, comment: '' });
     App.log(inv.clientId, `Facture ${inv.number} : ${App.fmt(App.invTotal(inv), inv.currency)}`);
     return inv;
   };
@@ -39,13 +39,39 @@
   App.proOpenCount = () => pfs().filter(p => p.status === 'open').length;
   const proRow = p => `<button class="item" data-act="pro_open" data-id="${p.id}"><span class="avatar ${p.status === 'open' ? 'warn' : 'ok'}" style="width:38px;height:38px;font-size:17px">📋</span><div class="grow"><b>${esc(p.number)}</b><small>${esc(App.cname(App.client(p.clientId)))} · ${App.fdate(p.date)}</small></div><div class="end"><b>${App.fmt(App.invTotal(p), p.currency)}</b><span class="pill ${p.status === 'open' ? 'warn' : 'ok'}">${p.status === 'open' ? 'Pro forma' : 'Facturé'}</span></div></button>`;
 
+  // ---------- Receipt to send: a payment recorded from now on stays « à envoyer » until the receipt is printed, shared or sent ----------
+  App.rcptTodo = () => App.db.payments.filter(p => p.rcpt === 'todo');
+  const rcptInvoices = () => { const ids = new Set(App.rcptTodo().map(p => p.invoiceId)); return App.db.invoices.filter(i => ids.has(i.id)); };
+  App.rcptSent = id => { const p = App.db.payments.find(x => x.id === id); if (p && p.rcpt === 'todo') { p.rcpt = 'sent'; p.recSent = Date.now(); App.save(); App.refresh(); } };
+  const rcptPill = p => p.rcpt === 'todo' ? '<span class="pill bad">🧾 Reçu à envoyer</span>' : p.rcpt === 'sent' ? '<span class="pill ok">✅ Reçu envoyé</span>' : '';
+  // big window right after a payment: the receipt is the next step
+  App.receiptPrompt = id => {
+    const p = App.db.payments.find(x => x.id === id); if (!p) return; const i = App.invoice(p.invoiceId), c = App.client(p.clientId);
+    App.modal('✅ Paiement enregistré',
+      `<div style="text-align:center;padding:16px 10px;border:3px solid var(--ok,#1f9d55);border-radius:16px"><div style="font-size:42px">🧾</div><div style="font-size:21px;font-weight:800;margin:4px 0">Envoyez le reçu au client</div>
+        <div><b>${esc(App.cname(c))}</b> a payé <b style="font-size:18px">${App.fmt(p.amount, p.currency)}</b>${i ? ` pour la facture <b>${esc(i.number)}</b>` : ''}</div><div class="mut" style="margin-top:4px">Reçu n° ${esc(App.receiptNo(p))}</div></div>
+       <div style="display:grid;gap:10px;margin-top:14px"><button type="button" class="btn" style="font-size:17px;padding:14px" data-act="recshare" data-id="${p.id}">📤 Envoyer le reçu (PDF)</button>
+         <button type="button" class="btn" style="font-size:16px;padding:12px" data-act="recwa" data-id="${p.id}">💬 Message WhatsApp</button>
+         <button type="button" class="btn sec" data-act="recprint" data-id="${p.id}">🖨️ Imprimer le reçu</button></div>
+       <p class="mut" style="font-size:12px;text-align:center;margin:10px 0 0">Si vous fermez cette fenêtre, le reçu reste signalé « à envoyer » sur la facture, dans Paiements et sur l'accueil.</p>`);
+  };
+  App.actions.recwa = d => {
+    const p = App.db.payments.find(x => x.id === d.id), c = p && App.client(p.clientId); if (!p) return; const i = App.invoice(p.invoiceId), co = App.db.settings.company;
+    if (!c || !c.phone) return App.toast('Pas de numéro de téléphone pour ce client : utilisez « Envoyer le reçu (PDF) »');
+    const left = i ? Math.max(0, App.invDue(i)) : 0;
+    window.open(App.waUrl(c.phone, `Bonjour ${c.first || App.cname(c)},\nNous avons bien reçu votre paiement de ${App.fmt(p.amount, p.currency)}${i ? ` pour la facture ${i.number}` : ''} le ${App.fdate(p.date)}.\nReçu n° ${App.receiptNo(p)}${i ? (left > 0.004 ? `\nReste à payer : ${App.fmt(left, i.currency)}` : '\nLa facture est soldée.') : ''}\nMerci pour votre confiance.\n${co.name}`), '_blank', 'noopener');
+    App.rcptSent(p.id);
+  };
+  App.actions.recskip = d => { const p = App.db.payments.find(x => x.id === d.id); if (p) { p.rcpt = 'skip'; App.save(); App.refresh(); App.toast('Pas de reçu pour ce paiement'); } };
+  App.actions.rcpt_go = () => { st.f = 'rcpt'; App.go('invoices'); };
+
   // ---------- Invoice list ----------
   // pending invoices left undecided for a few days: the client should either take the product or drop it
   const PEND_DAYS = 3, pendAge = i => Math.max(0, App.diff(i.date, App.today()));
   App.stalePending = () => App.db.invoices.filter(i => i.pending && pendAge(i) >= PEND_DAYS).sort((a, b) => a.date.localeCompare(b.date));
   App.actions.pend_go = () => { st.f = 'pending'; App.go('invoices'); };
   const st = { f: 'all', q: '', sel: false, picked: new Set() };
-  const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || App.invStatus(i) === st.f) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
+  const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || (st.f === 'rcpt' ? rcptInvoices().includes(i) : App.invStatus(i) === st.f)) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
   const drawList = () => {
     if (st.f === 'pro') {
       const k = st.q.toLowerCase(), pl = pfs().filter(p => !k || (p.number + ' ' + App.cname(App.client(p.clientId))).toLowerCase().includes(k)).sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0));
@@ -57,7 +83,7 @@
     if ($('ibar')) $('ibar').innerHTML = !App.guard('delinvs') ? '' : st.sel ? `<button class="btn sm sec" data-act="inv_all">☑ Tout</button><button class="btn sm del" data-act="delinvs">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="inv_sel">Terminer</button>` : '<button class="btn sm sec" data-act="inv_sel">☑ Sélectionner pour supprimer</button>';
     let lastDay = '';
     const irow = i => { const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pc = { ok: 'ok', warn: 'warn', bad: 'bad' }[k] || 'mut';
-      const body = `${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<span class="avatar ${pc}" style="width:38px;height:38px;font-size:17px">🧾</span><div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.invTypes[i.type]}${i.pending ? ` · <span class="${pendAge(i) >= PEND_DAYS ? 'bad' : 'warn'}">⏳ ${pendAge(i)} j</span>` : ''}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div>`;
+      const body = `${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<span class="avatar ${pc}" style="width:38px;height:38px;font-size:17px">🧾</span><div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.invTypes[i.type]}${i.pending ? ` · <span class="${pendAge(i) >= PEND_DAYS ? 'bad' : 'warn'}">⏳ ${pendAge(i)} j</span>` : ''}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span>${App.db.payments.some(x => x.invoiceId === i.id && x.rcpt === 'todo') ? '<span class="pill bad">🧾 Reçu à envoyer</span>' : ''}</div>`;
       if (st.sel) return `<button class="item rw t-${pc}" data-act="inv_pick" data-v="invoice" data-id="${i.id}">${body}</button>`;
       const acts = []; if (due > 0.004 && !i.pending && App.guard('newpay')) acts.push(`<button class="sw sw-pay" data-act="newpay" data-iid="${i.id}"><span>💰</span>Encaisser</button>`); acts.push(`<button class="sw sw-print" data-act="invprint" data-id="${i.id}"><span>🖨️</span>Imprimer</button>`); if (i.pending) acts.push(`<button class="sw sw-del" data-act="invcancel" data-id="${i.id}"><span>🗑</span>Supprimer</button>`);
       return App.rowSwipe(acts.length, acts.join(''), `<div class="item rw t-${pc}" role="button" tabindex="0" data-act="go" data-v="invoice" data-id="${i.id}">${body}</div>`); };
@@ -69,7 +95,7 @@
       title: 'Factures', sub: `${db.invoices.length} facture(s)`, back: 'more', nav: 'more',
       html: `<div class="grid two"><div class="stat"><small>Total facturé</small><b>${App.fmt(tot)}</b></div><div class="stat"><small>Reste à encaisser</small><b class="${due ? 'warn' : ''}">${App.fmt(due)}</b></div></div>
         <div class="search"><input id="iq" placeholder="Rechercher un numéro, un client…" value="${esc(st.q)}" autocomplete="off"></div>
-        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées'], ['pending', 'En attente'], ['pro', 'Pro forma' + (App.proOpenCount() ? ` (${App.proOpenCount()})` : '')]].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
+        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées'], ['pending', 'En attente'], ['pro', 'Pro forma' + (App.proOpenCount() ? ` (${App.proOpenCount()})` : '')], ...(App.rcptTodo().length ? [['rcpt', '🧾 Reçus à envoyer (' + App.rcptTodo().length + ')']] : [])].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
         <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button><button class="btn sec full" data-act="newpro" style="margin-top:8px">📋 Nouveau pro forma</button>${App.canView('importf') ? '<button class="btn sec full" data-act="go" data-v="importf" style="margin-top:8px">📥 Importer des factures (Word / PDF)</button>' : ''}`,
       after: () => { drawList(); $('iq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
@@ -179,7 +205,7 @@
         if (pre.pfId) { const pf = pfs().find(x => x.id === pre.pfId); if (pf) { pf.status = 'converted'; pf.invoiceId = inv.id; } }
         App.save(); App.toast('Facture ' + inv.number + (pend ? ' créée — en attente' : ' créée')); App.go('invoice', { id: inv.id });
         const np = db.payments.find(x => x.invoiceId === inv.id);
-        if (np) App.undoBar('Paiement enregistré : ' + App.fmt(np.amount, np.currency), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
+        if (np) setTimeout(() => App.receiptPrompt(np.id), 150);
         if (np && App.invDue(inv) <= 0.004 && !inv.pending) App.celebrate();
       }, 'Créer la facture');
     // renewal is on by default only when the client already had a subscription invoice
@@ -301,7 +327,7 @@
     f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
-  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) printRaw(App.recFileName(p), App.receiptDoc(p, await logoData(), await stampData())); };
+  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) App.rcptSent(p.id); if (p) printRaw(App.recFileName(p), App.receiptDoc(p, await logoData(), await stampData())); };
   App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
     App.download(`${App.recFileName(p)}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.recFileName(p))}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}</body></html>`, 'application/msword'); };
 
@@ -341,10 +367,11 @@
           ${i.clientId && App.client(i.clientId) ? `<button class="chip" data-act="go" data-v="client" data-id="${i.clientId}">👤 ${esc(App.cname(App.client(i.clientId)))} ›</button>` : ''}</section>
         <div class="card" style="margin-bottom:10px"><div class="spread"><span>Total de la facture imprimée</span><b>${App.fmt(App.invTotal(i), i.currency)}</b></div>${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<div class="spread"><span>Prix convenu (négocié)</span><b>${App.fmt(App.invAgreed(i), i.currency)}</b></div>` : ''}<div class="spread"><span>Reçu du client</span><b class="ok">${App.fmt(App.invPaid(i), i.currency)}</b></div><div class="spread"><span>Reste à payer</span><b class="${due > 0.004 ? 'bad' : 'ok'}">${App.fmt(due, i.currency)}</b></div></div>
         ${splitCardInv(i)}
+        ${pays.some(x => x.rcpt === 'todo') ? `<div class="card noprint" style="margin-bottom:10px;border:3px solid var(--bad,#d93025)"><div style="font-size:18px;font-weight:800">🧾 Reçu à envoyer au client</div><p class="mut" style="margin:6px 0">${esc(App.cname(App.client(i.clientId)))} a payé : envoyez-lui le reçu pour qu'il ait la preuve de son paiement.</p><div class="bar"><button class="btn" data-act="recshare" data-id="${pays.find(x => x.rcpt === 'todo').id}">📤 Envoyer le reçu (PDF)</button><button class="btn sec" data-act="recwa" data-id="${pays.find(x => x.rcpt === 'todo').id}">💬 WhatsApp</button><button class="btn sm sec" data-act="recskip" data-id="${pays.find(x => x.rcpt === 'todo').id}">Pas de reçu</button></div></div>` : ''}
         ${i.pending ? `<div class="card noprint" style="margin-bottom:10px;border:2px solid var(--warn,#e8a317)"><b>⏳ Facture en attente</b><p class="mut" style="margin:6px 0">Le client a la facture mais la vente n'est pas encore faite : le stock n'est pas déduit, rien n'est compté dans les ventes ni dans les impayés.</p><div class="bar"><button class="btn sec" data-act="newpay" data-iid="${i.id}">💰 Recevoir un acompte</button><button class="btn" data-act="invvalid" data-id="${i.id}">✅ Le client prend le produit</button><button class="btn del" data-act="invcancel" data-id="${i.id}">✖ Le client n'en veut plus</button></div></div>` : ''}
         <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}${due > 0.004 && App.invPaid(i) > 0.004 ? `<button class="btn sec" data-act="invneg" data-id="${i.id}">🤝 Solder au prix négocié</button>` : ''}${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<button class="btn sec" data-act="invunneg" data-id="${i.id}">↩ Annuler le prix négocié</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button><button class="btn sec" data-act="invshare" data-id="${i.id}">📤 Partager en PDF</button></div>
         ${App.invoiceDoc(i)}
-        ${pays.length ? `<h2 class="sec noprint">Paiements reçus</h2><div class="list noprint">${App.invPayments(i).map(({ p: x, n, left }) => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(App.receiptNo(x))}${x.ref ? ' · ' + esc(x.ref) : ''} · reste ${App.fmt(left, i.currency)}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${x.id}" title="Imprimer le reçu">🧾</button><button class="btn sm sec" data-act="recshare" data-id="${x.id}" title="Partager le reçu en PDF">📤</button></div>`).join('')}</div>` : ''}
+        ${pays.length ? `<h2 class="sec noprint">Paiements reçus</h2><div class="list noprint">${App.invPayments(i).map(({ p: x, n, left }) => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(App.receiptNo(x))}${x.ref ? ' · ' + esc(x.ref) : ''} · reste ${App.fmt(left, i.currency)}</small>${rcptPill(x)}</div><b class="ok">${App.fmt(x.amount, x.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${x.id}" title="Imprimer le reçu">🧾</button><button class="btn sm sec" data-act="recshare" data-id="${x.id}" title="Partager le reçu en PDF">📤</button></div>`).join('')}</div>` : ''}
         <div class="bar" style="margin-top:14px">${i.clientId ? `<button class="btn sec" data-act="go" data-v="client" data-id="${i.clientId}">Voir le client</button>` : ''}<button class="btn del" data-act="delinv" data-id="${i.id}">Supprimer la facture</button></div>`
     };
   };
@@ -426,11 +453,11 @@
         const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
         if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > bal(i) + 0.004 && bal(i) > 0.004) amt = Math.round(App.conv(bal(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
         if (rate !== App.rate()) App.setRate(rate);
-        db.payments.push({ id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
+        db.payments.push({ rcpt: 'todo', id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
         App.log(cid, `Paiement ${App.fmt(amt, App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
         if (i && $('f_neg').checked && !$('pp_negw').style.display) { i.agreed = Math.round(App.invPaid(i) * 100) / 100; App.log(cid, `Prix négocié sur ${i.number} : ${App.fmt(i.agreed, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); }
         const np = db.payments[db.payments.length - 1]; App.save(); App.refresh();
-        App.undoBar('Paiement enregistré : ' + App.fmt(amt, App.v('f_cur')), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
+        setTimeout(() => App.receiptPrompt(np.id), 150);
         if (i && bal(i) <= 0.004) App.celebrate();
       }, 'Enregistrer le paiement');
     // live balance + quick buttons (works for old invoices too)
@@ -460,7 +487,7 @@
       title: 'Paiements', sub: `${all.length} paiement(s)`, back: 'more', nav: 'more',
       html: `<div class="bar"><button class="btn" data-act="newpay">+ Paiement</button></div>
         <div class="chips"><button class="chip ${pq.mode === 'all' ? 'on' : ''}" data-act="paymode" data-m="all">Tous</button>${App.PAY_MODES.filter(m => by[m]).map(m => `<button class="chip ${pq.mode === m ? 'on' : ''}" data-act="paymode" data-m="${esc(m)}">${esc(m)} · ${App.fmt(by[m])}</button>`).join('')}</div>
-        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small></div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${p.id}" title="Imprimer le reçu">🧾</button><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
+        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small>${rcptPill(p)}</div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${p.id}" title="Imprimer le reçu">🧾</button><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
     };
   };
   App.actions.paymode = d => { pq.mode = d.m; App.refresh(); };

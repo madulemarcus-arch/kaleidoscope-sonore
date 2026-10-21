@@ -216,6 +216,16 @@ La facture imprimée (impression, PDF, Word) reprend le modèle de la facture Wo
 
 Paramètres → Entreprise : *Sous-titre*, *Ville* (case « Lieu ») et *Mode de règlement* de la facture se modifient (valeurs par défaut : « SOLUTIONS TECHNOLOGIQUES ET CONNECTIVITE », « Kinshasa », « Virement bancaire ou espèces. »). La colonne *Référence* reprend la référence du produit en stock (« — » sinon). Le tampon est le fichier `stamp.png` (fond transparent). Comme avant, la facture imprimée montre toujours le prix complet, sans paiement ni reste.
 
+## Reçu à envoyer (très visible)
+
+Quand un client **paie**, l'application insiste pour que son **reçu lui soit envoyé** :
+
+- juste après l'enregistrement du paiement (formulaire Paiement, ou facture créée avec un paiement), une **grande fenêtre** « Envoyez le reçu au client » propose **📤 Envoyer le reçu (PDF)**, **💬 Message WhatsApp** (paiement, facture, n° de reçu, reste à payer) et **🖨️ Imprimer** ;
+- tant que le reçu n'est pas envoyé, le paiement reste signalé **🧾 Reçu à envoyer** (pastille rouge) : carte rouge « N reçu(s) à envoyer aux clients » en tête de l'accueil, filtre **Reçus à envoyer** dans les factures, pastille sur la ligne de la facture, grand bandeau sur la facture et pastille sur chaque paiement (écran Paiements) ;
+- le reçu passe à **✅ Reçu envoyé** dès qu'il est partagé en PDF, envoyé par WhatsApp ou imprimé ; **Pas de reçu** retire l'alerte si le client n'en veut pas.
+
+Seuls les paiements enregistrés à partir de cette version sont signalés : les anciens paiements ne déclenchent aucune alerte.
+
 ## Pro forma (Plus → Factures)
 
 Certains clients (entreprises surtout) demandent un **pro forma avant la facture**. Dans **Factures**, le bouton « 📋 Nouveau pro forma » (ou la case « 📋 Pro forma » en haut du formulaire d'une nouvelle facture) ouvre le même formulaire qu'une facture : mêmes types, client, devise, taux, lignes (stock ou libres) et mêmes références P0001, P0002…

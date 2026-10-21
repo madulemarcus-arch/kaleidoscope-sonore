@@ -28,7 +28,7 @@ const c=await p.evaluate(()=>({inv:App.db.invoices.map(i=>({n:i.number,t:App.inv
 ok('the invoice is created with its own FAC number, paid, stock deducted; the pro forma becomes « Facturé » and points to it',c.inv.length===1&&/^FAC-/.test(c.inv[0].n)&&c.inv[0].t===80&&c.pay===1&&c.qty===8&&c.pf.status==='converted'&&c.pf.invoiceId===(await p.evaluate(()=>App.db.invoices[0].id)),JSON.stringify(c));
 // a second one is numbered 0002; a converted one cannot be converted twice; delete
 await p.evaluate(()=>{const o=App.db.proformas[0];App.db.proformas.push({...o,id:'pfx',number:'PRO-'+o.date.slice(0,4)+'-0002',status:'open',invoiceId:''});App.save();App.go('invoices')});await p.waitForTimeout(300);
-await p.evaluate(()=>App.actions.pro_convert({id:App.db.proformas[0].id}));await p.waitForTimeout(300);
+await p.evaluate(()=>{App.close();App.actions.pro_convert({id:App.db.proformas[0].id})});await p.waitForTimeout(300);
 ok('a pro forma already invoiced cannot be converted again',await p.evaluate(()=>!document.querySelector('dialog').open));
 await p.evaluate(()=>App.actions.pro_del({id:'pfx'}));await p.waitForTimeout(200);
 ok('delete removes the pro forma only',await p.evaluate(()=>App.db.proformas.length===1&&App.db.invoices.length===1));
