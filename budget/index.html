@@ -55,7 +55,9 @@
   .msg { font-size: .9rem; color: var(--muted); }
   .msg.bad { color: var(--warn); font-weight: 600; } .msg.ok { color: var(--in); }
   footer { margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: .85rem; }
-  footer input[type=text] { width: 70px; }
+  footer input[type=number] { width: 90px; }
+  .fc { color: var(--muted); font-weight: 400; font-size: .8rem; margin-left: 4px; }
+  .card .fc { display: block; margin: 0; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -88,7 +90,7 @@
         <option value="epargne">Épargne &amp; dettes (20 %)</option>
       </select>
       <input id="txLabel" placeholder="Libellé" required class="wide">
-      <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="Montant" required>
+      <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="Montant ($)" required>
       <input id="txDate" type="date" required>
       <button class="primary wide">Ajouter</button>
     </form>
@@ -106,7 +108,7 @@
     <form id="debtForm">
       <select id="dDir" aria-label="Sens"><option value="owe">Je dois à…</option><option value="owed">Me doit…</option></select>
       <input id="dWho" placeholder="Personne" required>
-      <input id="dAmount" type="number" min="0.01" step="0.01" placeholder="Montant" required>
+      <input id="dAmount" type="number" min="0.01" step="0.01" placeholder="Montant ($)" required>
       <input id="dDue" type="date" aria-label="Échéance (facultatif)" title="Échéance (facultatif)">
       <input id="dNote" placeholder="Note (facultatif)" class="wide">
       <button class="primary wide">Ajouter</button>
@@ -122,7 +124,8 @@
   </section>
 
   <footer>
-    <span>Devise :</span><input type="text" id="cur" maxlength="6" aria-label="Devise">
+    <span>1 $ =</span><input type="number" id="rate" min="1" step="any" aria-label="Taux en francs congolais"><span>FC</span>
+    <button class="small" id="rateAuto">Taux automatique</button><span id="rateInfo"></span>
     <button class="small" id="export">Exporter</button>
     <button class="small" id="importBtn">Importer</button>
     <input type="file" id="importFile" accept="application/json" hidden>
@@ -137,12 +140,15 @@
   const CATS = { besoins: ['Besoins', 0.5, 'var(--besoins)'], envies: ['Envies', 0.3, 'var(--envies)'], epargne: ['Épargne & dettes', 0.2, 'var(--epargne)'] };
 
   // ---------- Data ----------
-  const data = { tx: [], debts: [], cur: '€' };
+  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true };
   try { Object.assign(data, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-  const fmt = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n) + ' ' + data.cur;
+  // Amounts are stored in USD; the CDF equivalent is derived from data.rate
+  const usd = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n) + ' $';
+  const fc = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n * data.rate) + ' FC';
+  const fmt = n => `${usd(n)} <small class="fc">≈ ${fc(n)}</small>`;
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const sum = a => a.reduce((t, x) => t + x, 0);
   const rest = d => Math.max(0, Math.round((d.amount - d.paid) * 100) / 100);
@@ -153,8 +159,8 @@
 
   function renderSummary(list) {
     const i = sum(list.filter(t => t.type === 'in').map(t => t.amount)), o = sum(list.filter(t => t.type === 'out').map(t => t.amount));
-    $('sumIn').textContent = fmt(i); $('sumOut').textContent = fmt(o);
-    $('sumBal').textContent = fmt(i - o); $('sumBal').className = i - o < 0 ? 'out' : 'in';
+    $('sumIn').innerHTML = fmt(i); $('sumOut').innerHTML = fmt(o);
+    $('sumBal').innerHTML = fmt(i - o); $('sumBal').className = i - o < 0 ? 'out' : 'in';
   }
 
   function renderTx(list) {
@@ -175,8 +181,8 @@
   function renderDebts() {
     const owe = data.debts.filter(d => d.dir === 'owe'), owed = data.debts.filter(d => d.dir === 'owed');
     const a = sum(owe.map(rest)), b = sum(owed.map(rest));
-    $('dOwe').textContent = fmt(a); $('dOwed').textContent = fmt(b);
-    $('dNet').textContent = fmt(b - a); $('dNet').className = b - a < 0 ? 'out' : 'in';
+    $('dOwe').innerHTML = fmt(a); $('dOwed').innerHTML = fmt(b);
+    $('dNet').innerHTML = fmt(b - a); $('dNet').className = b - a < 0 ? 'out' : 'in';
     const empty = '<li class="empty">Rien ici.</li>';
     $('oweList').innerHTML = owe.length ? owe.map(debtItem).join('') : empty;
     $('owedList').innerHTML = owed.length ? owed.map(debtItem).join('') : empty;
@@ -201,7 +207,8 @@
   function render() {
     const list = monthTx();
     renderSummary(list); renderTx(list); renderDebts(); renderRule(list);
-    $('cur').value = data.cur;
+    $('rate').value = data.rate;
+    $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
   }
 
   // ---------- Controls ----------
@@ -237,7 +244,7 @@
     else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
     else if (t.dataset.pay) {
       const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
-      const v = parseFloat(String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left}) :`, left) || '').replace(',', '.'));
+      const v = parseFloat(String(prompt(`Montant en $ ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left}) :`, left) || '').replace(',', '.'));
       if (!(v > 0)) return;
       const amt = Math.min(v, left);
       d.paid += amt;
@@ -247,7 +254,13 @@
     save(); render();
   });
 
-  $('cur').onchange = () => { data.cur = $('cur').value.trim() || '€'; save(); render(); };
+  $('rate').onchange = () => { const v = parseFloat($('rate').value); if (v > 0) { data.rate = v; data.rateAuto = false; data.rateDate = data.rateDate || today(); save(); } render(); };
+  // Live USD→CDF rate (free endpoint, no key); falls back to the stored rate when offline
+  const refreshRate = () => fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json()).then(j => {
+    const v = j.rates && j.rates.CDF;
+    if (v > 0) { Object.assign(data, { rate: Math.round(v * 100) / 100, rateDate: today(), rateAuto: true }); save(); render(); }
+  }).catch(() => {});
+  $('rateAuto').onclick = () => { data.rateAuto = true; refreshRate(); };
 
   $('export').onclick = () => {
     const a = document.createElement('a');
@@ -261,12 +274,13 @@
       const d = JSON.parse(txt);
       if (!Array.isArray(d.tx) || !Array.isArray(d.debts)) throw 0;
       if (!confirm('Remplacer toutes les données actuelles ?')) return;
-      Object.assign(data, { cur: '€' }, d); save(); render();
+      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true }, d); save(); render();
     }).catch(() => alert('Fichier invalide.'));
     e.target.value = '';
   };
 
   render();
+  if (data.rateAuto) refreshRate();
 })();
 </script>
 </body>
