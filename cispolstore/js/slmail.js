@@ -138,7 +138,7 @@
       const tc = google.accounts.oauth2.initTokenClient({
         client_id: clientId(), scope: SCOPE, login_hint: email || undefined,
         callback: r => r.error ? ko(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : ok({ tok: r.access_token, exp: Date.now() + ((+r.expires_in || 3600) - 60) * 1000 }),
-        error_callback: e => ko(Object.assign(new Error(e && e.type === 'popup_closed' ? 'Fenêtre Google fermée avant la fin' : e && e.type === 'popup_failed_to_open' ? 'Le navigateur a bloqué la fenêtre Google : autorisez les fenêtres surgissantes pour ce site (icône dans la barre d\'adresse) ou ouvrez l\'application dans Chrome, puis réessayez.' : 'Connexion Google impossible (' + ((e && e.type) || 'erreur') + ')'), { code: (e && e.type) || 'popup' }))
+        error_callback: e => ko(Object.assign(new Error(e && e.type === 'popup_closed' ? 'Fenêtre Google fermée avant la fin (si Google affichait « The OAuth client was not found », l\'ID client est faux : vérifiez-le dans « Identifiant Google »)' : e && e.type === 'popup_failed_to_open' ? 'Le navigateur a bloqué la fenêtre Google : autorisez les fenêtres surgissantes pour ce site (icône dans la barre d\'adresse) ou ouvrez l\'application dans Chrome, puis réessayez.' : 'Connexion Google impossible (' + ((e && e.type) || 'erreur') + ')'), { code: (e && e.type) || 'popup' }))
       });
       tc.requestAccessToken({ prompt: interactive ? (email ? '' : 'select_account') : 'none' });
     });
@@ -195,7 +195,7 @@
         + row('Ajouter une boîte Gmail', 'Vous pouvez en lier plusieurs (par exemple la boîte qui reçoit les e-mails de paiement et celle qui reçoit les suspensions).', '<button class="btn sm" data-act="slm_add">+ Gmail</button>')
         + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Lecture automatique</b><small style="white-space:normal">À l'ouverture de l'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.</small></div><select id="slm_every" style="width:100%">${App.opts(EVERY, everyH())}</select></div>`
         + row('Alertes et journal', `${L.count()} alerte(s) en cours`, '<button class="btn sm sec" data-act="go" data-v="slmail">Ouvrir</button>')
-        + row('Identifiant Google', esc(clientId().slice(0, 18)) + '…', '<button class="btn sm sec" data-act="slm_setup">Modifier</button>');
+        + row('Identifiant Google', `<span style="word-break:break-all;user-select:all">${esc(clientId())}</span><br>Si Google affiche « The OAuth client was not found », cet identifiant n'existe pas dans votre console Google : vérifiez-le (ou recréez-le) puis remplacez-le.`, `<div style="display:grid;gap:6px"><button class="btn sm sec" data-act="slm_setup">Modifier</button><button class="btn sm sec" data-act="copy" data-t="${esc(clientId())}">Copier</button></div>`);
     }
     return `<h2 class="sec">E-mails Starlink (Gmail)</h2><div class="list">${body}</div>`;
   };
@@ -211,8 +211,8 @@
        ${F.text('slm_cid', 'ID client Google', clientId(), 'placeholder="123456789-abc….apps.googleusercontent.com" autocapitalize="none" autocomplete="off"')}
        <p class="mut" style="font-size:13px">L'application ne lit que les e-mails venant de starlink.com. Elle ne peut ni envoyer, ni modifier, ni supprimer de message.</p><p id="slm_msg" class="warn"></p>`,
       () => {
-        const id = App.v('slm_cid');
-        if (!/^\S+\.apps\.googleusercontent\.com$/.test(id)) { $('slm_msg').textContent = "Cet identifiant ne ressemble pas à un ID client Google (il finit par .apps.googleusercontent.com)."; return false; }
+        const id = App.v('slm_cid').replace(/\s+/g, ''); // a paste often carries a line break or a space
+        if (!/^\d{5,}-[a-z0-9_-]+\.apps\.googleusercontent\.com$/i.test(id)) { $('slm_msg').textContent = "Cet identifiant n'a pas le format d'un ID client Google : une suite de chiffres, un tiret, des lettres et chiffres, puis .apps.googleusercontent.com (exemple : 123456789012-abc123….apps.googleusercontent.com). Copiez-le en entier."; return false; }
         cfg.clientId = id; shareCfg(); App.close(); App.refresh();
       }, 'Enregistrer');
   };
