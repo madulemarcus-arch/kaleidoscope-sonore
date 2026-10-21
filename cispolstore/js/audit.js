@@ -18,6 +18,7 @@
     deposits: o => `le dépôt de ${cl(o.clientId)} (${fm(o.amount, o.currency)})`,
     penalties: o => `la pénalité de ${cl(o.clientId)} (${fm(o.amount, o.currency)})`,
     quotes: o => `le devis ${o.no}`,
+    proformas: o => `le pro forma ${o.number}`,
     cmodels: o => `le modèle de contrat ${o.name}`,
     contracts: o => `le contrat ${o.no} (${o.clientId ? cl(o.clientId) : (o.party && o.party.name) || '—'})`,
     slpays: o => `un reversement à Starlink (${fm(o.amount, o.currency)})`,

@@ -31,6 +31,14 @@
     return inv;
   };
 
+  // ---------- Pro forma: the document some clients ask for before the invoice ----------
+  // Same lines, currency, rate and layout as an invoice, but it is not a sale: no payment, no stock movement, no subscription renewal, not in the totals.
+  // Once the client agrees, « Transformer en facture » opens the normal invoice form with these lines, so every invoice rule applies then.
+  const pfs = () => (App.db.proformas = App.db.proformas || []);
+  const proNo = year => { let m = 0; pfs().forEach(p => { const x = /^PRO-(\d{4})-(\d+)$/.exec(p.number || ''); if (x && x[1] === year) m = Math.max(m, +x[2]); }); return `PRO-${year}-${String(m + 1).padStart(4, '0')}`; };
+  App.proOpenCount = () => pfs().filter(p => p.status === 'open').length;
+  const proRow = p => `<button class="item" data-act="pro_open" data-id="${p.id}"><span class="avatar ${p.status === 'open' ? 'warn' : 'ok'}" style="width:38px;height:38px;font-size:17px">📋</span><div class="grow"><b>${esc(p.number)}</b><small>${esc(App.cname(App.client(p.clientId)))} · ${App.fdate(p.date)}</small></div><div class="end"><b>${App.fmt(App.invTotal(p), p.currency)}</b><span class="pill ${p.status === 'open' ? 'warn' : 'ok'}">${p.status === 'open' ? 'Pro forma' : 'Facturé'}</span></div></button>`;
+
   // ---------- Invoice list ----------
   // pending invoices left undecided for a few days: the client should either take the product or drop it
   const PEND_DAYS = 3, pendAge = i => Math.max(0, App.diff(i.date, App.today()));
@@ -39,6 +47,12 @@
   const st = { f: 'all', q: '', sel: false, picked: new Set() };
   const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || App.invStatus(i) === st.f) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
   const drawList = () => {
+    if (st.f === 'pro') {
+      const k = st.q.toLowerCase(), pl = pfs().filter(p => !k || (p.number + ' ' + App.cname(App.client(p.clientId))).toLowerCase().includes(k)).sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0));
+      if ($('ibar')) $('ibar').innerHTML = '';
+      $('ilist').innerHTML = pl.length ? `<div class="list">${pl.map(proRow).join('')}</div>` : `<div class="empty big"><div class="ei">📋</div><b>Aucun pro forma</b><p class="mut">Le pro forma se remet au client avant la facture. Une fois qu'il est d'accord, vous le transformez en facture en un tap.</p></div>`;
+      return;
+    }
     const l = visibleInvoices();
     if ($('ibar')) $('ibar').innerHTML = !App.guard('delinvs') ? '' : st.sel ? `<button class="btn sm sec" data-act="inv_all">☑ Tout</button><button class="btn sm del" data-act="delinvs">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="inv_sel">Terminer</button>` : '<button class="btn sm sec" data-act="inv_sel">☑ Sélectionner pour supprimer</button>';
     let lastDay = '';
@@ -55,24 +69,25 @@
       title: 'Factures', sub: `${db.invoices.length} facture(s)`, back: 'more', nav: 'more',
       html: `<div class="grid two"><div class="stat"><small>Total facturé</small><b>${App.fmt(tot)}</b></div><div class="stat"><small>Reste à encaisser</small><b class="${due ? 'warn' : ''}">${App.fmt(due)}</b></div></div>
         <div class="search"><input id="iq" placeholder="Rechercher un numéro, un client…" value="${esc(st.q)}" autocomplete="off"></div>
-        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées'], ['pending', 'En attente']].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
-        <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button>${App.canView('importf') ? '<button class="btn sec full" data-act="go" data-v="importf" style="margin-top:8px">📥 Importer des factures (Word / PDF)</button>' : ''}`,
+        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées'], ['pending', 'En attente'], ['pro', 'Pro forma' + (App.proOpenCount() ? ` (${App.proOpenCount()})` : '')]].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
+        <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button><button class="btn sec full" data-act="newpro" style="margin-top:8px">📋 Nouveau pro forma</button>${App.canView('importf') ? '<button class="btn sec full" data-act="go" data-v="importf" style="margin-top:8px">📥 Importer des factures (Word / PDF)</button>' : ''}`,
       after: () => { drawList(); $('iq').oninput = e => { st.q = e.target.value; drawList(); }; }
     };
   };
   App.actions.invfilter = d => { st.f = d.f; App.refresh(); };
   App.actions.newinv = d => App.invoiceStart(d.cid);
+  App.actions.newpro = d => App.invoiceStart(d.cid, true);
 
   // ---------- New invoice: type then form ----------
   const TYPE_INFO = [['materiel', '📦', 'Matériel uniquement', 'Starlink, câble, routeur…'], ['abonnement', '📡', 'Abonnement uniquement', "Facture d'abonnement Starlink"], ['installation', '🔧', 'Installation uniquement', 'Main-d\'œuvre et configuration'], ['complete', '🧾', 'Facture complète', 'Kit + installation + abonnement + accessoires']];
-  App.invoiceStart = cid => App.modal('Choisissez le type de facture', TYPE_INFO.map(([k, i, t, s]) => `<button class="opt" data-act="invtype" data-t="${k}" data-cid="${cid || ''}"><span class="ico">${i}</span><span><b>${t}</b><small>${s}</small></span></button>`).join(''));
-  App.actions.invtype = d => App.invoiceForm(d.t, { clientId: d.cid });
+  App.invoiceStart = (cid, pf) => App.modal(pf ? 'Pro forma : choisissez le type' : 'Choisissez le type de facture', TYPE_INFO.map(([k, i, t, s]) => `<button class="opt" data-act="invtype" data-t="${k}" data-cid="${cid || ''}" data-pf="${pf ? 1 : ''}"><span class="ico">${i}</span><span><b>${t}</b><small>${s}</small></span></button>`).join(''));
+  App.actions.invtype = d => App.invoiceForm(d.t, { clientId: d.cid, pf: !!d.pf });
 
   let draft = null;
   const needsClient = t => t !== 'materiel';
   App.invoiceForm = (type, pre = {}) => {
     const db = App.db, S = db.settings;
-    draft = { type, lines: [], paidTouched: false };
+    draft = { type, lines: (pre.lines || []).map(l => ({ ...l })), paidTouched: false };
     const total = () => draft.lines.reduce((a, l) => a + l.qty * l.price, 0);
     const cur = () => App.v('f_cur') || 'USD';
     const draw = () => {
@@ -108,7 +123,8 @@
     const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.text('f_obs', 'Observations', '')}</div>` : '';
     App.modal('Nouvelle facture · ' + App.invTypes[type],
       `${App.clientFinder('f_cl')}${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
-       <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div>
+       ${pre.pfId ? `<p class="mut" style="margin:8px 0 0">Facture établie à partir du pro forma, avec les mêmes lignes : vous pouvez encore les modifier.</p>` : `<label class="chk" style="display:block;margin-top:10px;padding:10px;border:2px dashed var(--acc);border-radius:10px"><input type="checkbox" id="f_pf"${pre.pf ? ' checked' : ''}> <b>📋 Pro forma</b> : le client veut un document avant la facture. Aucun paiement, aucune sortie de stock, aucun abonnement renouvelé ; il porte son propre numéro (PRO-…) et se transforme ensuite en facture.</label>`}
+       <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, pre.cur || 'USD')}</div>
        ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}<p class="mut" style="font-size:12px;margin:2px 0 0">Le taux est enregistré sur cette facture. Si vous le changez ici, il devient le taux du jour.</p>
        <h2 class="sec">Lignes de la facture</h2><div id="cart"></div>
        <div class="card" style="margin-top:10px">
@@ -121,7 +137,7 @@
        <div class="card" id="paycard" style="margin-top:14px;border:2px solid var(--acc)">
          <h2 class="sec" style="margin:0 0 6px" id="p_title">💰 Paiement du client</h2>
          <div class="spread"><span>Total à payer</span><b id="p_total" style="font-size:18px"></b></div>
-         <div class="row">${F.num('f_paid', 'Le client a donné', '')}${F.sel('f_pcur', 'En', CUR, 'USD')}</div>
+         <div class="row">${F.num('f_paid', 'Le client a donné', '')}${F.sel('f_pcur', 'En', CUR, pre.cur || 'USD')}</div>
          <div class="bar"><button type="button" class="btn sm sec" id="p_all">Tout payé</button><button type="button" class="btn sm sec" id="p_half">La moitié</button><button type="button" class="btn sm sec" id="p_none">Rien pour l'instant</button></div>
          <div class="row">${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}${F.text('f_ref', 'Référence (n° transaction)', '')}</div>
          <div id="p_sum" style="margin-top:8px;font-weight:700"></div>
@@ -142,6 +158,11 @@
           const s = App.sub(c); // not renewing: the invoice covers the current period
           lines.forEach(l => { if (/^abonnement/i.test(l.desc) && !l.desc.includes('(')) l.desc += ` (${App.fdate(s.start)} → ${App.fdate(s.end)})`; });
         }
+        if ($('f_pf') && $('f_pf').checked) {
+          const pf = { id: App.uid(), number: proNo(date.slice(0, 4)), date, ts: Date.now(), type, clientId: cid, currency: curr, rate: frate(), lines, note: '', status: 'open', invoiceId: '' };
+          pfs().push(pf); App.log(cid, `Pro forma ${pf.number} : ${App.fmt(App.invTotal(pf), curr)}`); App.save(); App.toast('Pro forma ' + pf.number + ' créé');
+          st.f = 'pro'; App.go('invoices'); setTimeout(() => App.actions.pro_open({ id: pf.id }), 80); return;
+        }
         const total = lines.reduce((a, l) => a + l.qty * l.price, 0);
         const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
         const pc = App.v('f_pcur') || curr, given = App.n('f_paid'), gInv = App.conv(given, pc, curr, rate), payAmount = given > 0 ? (gInv > total ? round(App.conv(total, curr, pc, rate), pc) : given) : 0;
@@ -155,6 +176,7 @@
         }
         if (inv.pending) inv.fx = fx; else App.applyFx(inv, fx);
         if (!pend && $('f_neg') && $('f_neg').checked && gInv > 0 && gInv < total - 0.004) { inv.agreed = Math.round(gInv * 100) / 100; App.log(cid, `Prix négocié sur ${inv.number} : ${App.fmt(inv.agreed, curr)} au lieu de ${App.fmt(total, curr)}`); }
+        if (pre.pfId) { const pf = pfs().find(x => x.id === pre.pfId); if (pf) { pf.status = 'converted'; pf.invoiceId = inv.id; } }
         App.save(); App.toast('Facture ' + inv.number + (pend ? ' créée — en attente' : ' créée')); App.go('invoice', { id: inv.id });
         const np = db.payments.find(x => x.invoiceId === inv.id);
         if (np) App.undoBar('Paiement enregistré : ' + App.fmt(np.amount, np.currency), () => App.actions.recprint({ id: np.id }), '🧾 Imprimer le reçu');
@@ -187,7 +209,7 @@
     $('f_prod').onchange = () => { const p = App.prod($('f_prod').value); if (p) { $('f_desc').value = p.name; $('f_price').value = App.conv(p.price, 'USD', cur(), frate()); } };
     // subscription invoice: the line follows the chosen client's plan and price
     const autoSub = () => {
-      if (type !== 'abonnement') return;
+      if (type !== 'abonnement' || pre.lines) return;
       draft.lines = draft.lines.filter(l => !l.auto); const c = App.client(App.v('f_cl'));
       if (c && c.type === 'gere' && c.price > 0) draft.lines.unshift({ auto: true, pid: '', desc: 'Abonnement ' + (c.plan || 'Starlink'), qty: 1, price: App.conv(c.price, 'USD', cur(), frate()), cost: 0, unit: '' });
       else if (c) $('f_addsub').click();
@@ -204,12 +226,15 @@
     $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'Starlink'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur(), frate()) : ''; $('f_price').focus(); };
     $('f_addinst').onclick = () => { $('f_prod').value = ''; $('f_desc').value = 'Installation Starlink'; $('f_qty').value = 1; $('f_price').value = ''; $('f_price').focus(); };
     $('f_pend').onchange = () => { const pn = $('f_pend').checked; $('p_title').textContent = pn ? '💰 Acompte reçu du client (facultatif)' : '💰 Paiement du client'; $('p_all').style.display = pn ? 'none' : ''; draft.paidTouched = pn; if (pn) $('f_paid').value = ''; else { draft.paidTouched = false; draw(); } paySync(); }; $('f_neg').onchange = paySync; $('f_paid').oninput = () => { draft.paidTouched = true; paySync(); };
+    // pro forma: nothing to collect, nothing leaves the stock, no renewal
+    const pfSync = () => { const on = !!($('f_pf') && $('f_pf').checked); $('paycard').hidden = on; $('f_pend').closest('label').style.display = on ? 'none' : 'block'; if ($('renwrap')) $('renwrap').style.display = on ? 'none' : ''; $('dok').textContent = on ? 'Créer le pro forma' : 'Créer la facture'; };
+    if ($('f_pf')) { $('f_pf').onchange = pfSync; pfSync(); }
     $('f_pcur').onchange = () => { draft.paidTouched = false; draw(); };
     $('p_all').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total(), cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
     $('p_half').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total() / 2, cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
     $('p_none').onclick = () => { draft.paidTouched = true; $('f_paid').value = 0; paySync(); };
-    if (type === 'abonnement') autoSub();
-    if (type === 'installation') $('f_addinst').click();
+    if (type === 'abonnement' && !pre.lines) autoSub();
+    if (type === 'installation' && !pre.lines) $('f_addinst').click();
     draw();
   };
   App.actions.rmline = d => { draft.lines.splice(+d.i, 1); const ev = new Event('change'); $('f_cur').dispatchEvent(ev); };
@@ -250,12 +275,12 @@
     const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), cur = i.currency === 'CDF' ? 'CDF' : 'USD', other = cur === 'USD' ? 'CDF' : 'USD', unit = cur === 'CDF' ? 'CDF' : 'USD';
     const rows = i.lines.map((l, n) => { const pr = l.pid && App.prod(l.pid); return `<tr><td>${esc(l.ref || (pr && pr.ref) || App.lineRef(n))}</td><td>${esc(l.desc).replace(/ \(/, '<br>(')}</td><td class="r">${money(l.price, cur)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${money(l.qty * l.price, cur)}</td></tr>`; }).join('');
     return `<div class="paper">${paperHead(co, logo)}
-      ${twoBoxes('FACTURE', [['Numéro', `<b>${esc(i.number)}</b>`], ['Date', App.fdate(i.date)], co.city && ['Lieu', esc(co.city)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], ['Adresse', esc(c ? (c.address || c.installAddr || '—') : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
+      ${twoBoxes(i.proforma ? 'FACTURE PRO FORMA' : 'FACTURE', [['Numéro', `<b>${esc(i.number)}</b>`], ['Date', App.fdate(i.date)], co.city && ['Lieu', esc(co.city)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], ['Adresse', esc(c ? (c.address || c.installAddr || '—') : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
       <table class="items"><thead><tr><th style="width:13%">Référence</th><th>Description</th><th class="r" style="width:15%">P.U. (${unit})</th><th class="r" style="width:8%">Qté</th><th class="r" style="width:20%">Montant (${unit})</th></tr></thead><tbody>${rows}</tbody></table>
-      <table class="tots"><tr><td><b>Total TTC :</b></td><td>${money(tot, cur)}</td></tr><tr class="net"><td>NET À PAYER :</td><td>${money(tot, cur)}</td></tr></table>
+      <table class="tots"><tr><td><b>Total TTC :</b></td><td>${money(tot, cur)}</td></tr><tr class="net"><td>${i.proforma ? 'TOTAL PRO FORMA :' : 'NET À PAYER :'}</td><td>${money(tot, cur)}</td></tr></table>
       <div class="rate">Taux appliqué : 1 $ = ${App.nf(App.rateOf(i), 0)} CDF · équivalent ${money(App.conv(tot, cur, other, App.rateOf(i)), other)}</div>
-      <div class="wb"><b>Arrêtée la présente facture à la somme de : ${esc(App.amountWords(tot, cur))}</b>.<br><b>Mode de règlement : </b>${esc(co.payTerms || '')}</div>
-      ${paperFoot(stamp, false, qrCell(i, cur, tot))}</div>`;
+      <div class="wb"><b>Arrêtée la présente facture${i.proforma ? ' pro forma' : ''} à la somme de : ${esc(App.amountWords(tot, cur))}</b>.<br><b>Mode de règlement : </b>${esc(co.payTerms || '')}${i.proforma ? '<br><i>Document sans valeur de facture : il ne constitue ni une preuve de paiement ni une réservation du stock. La facture définitive sera établie après votre accord.</i>' : ''}</div>
+      ${paperFoot(stamp, false, i.proforma ? '' : qrCell(i, cur, tot))}</div>`;
   };
   // ---------- Payment receipt ----------
   App.receiptDoc = (p, logo, stamp) => {
@@ -326,6 +351,30 @@
   App.actions.invpdf = d => { App.toast('Choisissez « Enregistrer au format PDF »'); printDoc(App.invoice(d.id)); };
   App.actions.invprint = d => printDoc(App.invoice(d.id));
   App.actions.invword = d => wordDoc(App.invoice(d.id));
+
+  // pro forma: detail, print, PDF, WhatsApp, conversion
+  App.proDoc = (p, logo, stamp) => App.invoiceDoc({ ...p, proforma: true }, logo, stamp);
+  App.proFileName = p => App.docName(App.cname(App.client(p.clientId)), 'Pro forma ' + p.number);
+  App.actions.pro_open = d => {
+    const p = pfs().find(x => x.id === d.id); if (!p) return; const inv = p.invoiceId && App.invoice(p.invoiceId), open = p.status === 'open';
+    App.modal('Pro forma ' + p.number,
+      `<div class="card" style="margin:0 0 10px"><div class="spread"><b>${esc(App.cname(App.client(p.clientId)))}</b><span class="pill ${open ? 'warn' : 'ok'}">${open ? 'Pro forma' : 'Facturé'}</span></div><div class="mut">${App.invTypes[p.type]} · ${App.fdate(p.date)}</div>
+        <div class="list" style="margin-top:8px">${p.lines.map(l => `<div class="spread"><span>${esc(l.desc)} <small class="mut">× ${App.nf(l.qty, 2)}</small></span><b>${App.fmt(l.qty * l.price, p.currency)}</b></div>`).join('')}</div>
+        <div class="spread" style="margin-top:8px"><b>Total</b><b style="font-size:20px">${App.fmt(App.invTotal(p), p.currency)}</b></div></div>
+       <div class="bar"><button type="button" class="btn sec" data-act="pro_print" data-id="${p.id}">🖨️ Imprimer</button><button type="button" class="btn sec" data-act="pro_pdf" data-id="${p.id}">📤 PDF</button><button type="button" class="btn sec" data-act="pro_wa" data-id="${p.id}">💬 WhatsApp</button></div>
+       ${inv ? `<div class="bar"><button type="button" class="btn" data-act="go" data-v="invoice" data-id="${inv.id}">🧾 Voir la facture ${esc(inv.number)}</button></div>` : ''}
+       ${open ? `<div class="bar"><button type="button" class="btn" data-act="pro_convert" data-id="${p.id}">🧾 Transformer en facture</button></div>` : ''}
+       <div class="bar"><button type="button" class="btn sm del" data-act="pro_del" data-id="${p.id}">Supprimer</button></div>`);
+  };
+  App.actions.pro_print = async d => { const p = pfs().find(x => x.id === d.id); if (p) printRaw(App.proFileName(p), App.proDoc(p, await logoData(), await stampData())); };
+  App.actions.pro_pdf = async d => { const p = pfs().find(x => x.id === d.id); if (p) App.sharePdf(`${App.proFileName(p)}.pdf`, App.proDoc(p, await logoData(), await stampData())); };
+  App.actions.pro_wa = d => {
+    const p = pfs().find(x => x.id === d.id), c = p && p.clientId && App.client(p.clientId); if (!p) return; const co = App.db.settings.company;
+    const txt = `Bonjour ${(c && c.first) || App.cname(c)},\nVoici notre pro forma ${p.number} : ${p.lines.map(l => `${l.desc} × ${App.nf(l.qty, 2)}`).join(', ')}.\nTotal : ${App.fmt(App.invTotal(p), p.currency)}.\nDès votre accord, nous établissons la facture.\n${co.name}`;
+    window.open(c && c.phone ? App.waUrl(c.phone, txt) : 'https://wa.me/?text=' + encodeURIComponent(txt), '_blank', 'noopener');
+  };
+  App.actions.pro_convert = d => { const p = pfs().find(x => x.id === d.id); if (!p || p.status !== 'open') return; App.close(); setTimeout(() => App.invoiceForm(p.type, { clientId: p.clientId, lines: p.lines, cur: p.currency, pfId: p.id }), 40); };
+  App.actions.pro_del = d => { const p = pfs().find(x => x.id === d.id); if (!p || !App.confirm(`Supprimer le pro forma ${p.number} ?`)) return; App.db.proformas = pfs().filter(x => x !== p); App.save(); App.close(); App.refresh(); };
   // Removes invoices (stock put back, linked payments / installations removed, a renewal undone) with a 12-second "Annuler" bar
   App.removeInvoices = ids => {
     const db = App.db, list = ids.map(App.invoice).filter(Boolean); if (!list.length) return;
