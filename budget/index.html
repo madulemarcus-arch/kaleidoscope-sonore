@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NZIMBU</title>
 <style>
+  /* Palette inspired by the 50 FC note: beige/brown paper with purple accents (to be confirmed) */
   :root {
-    --bg: #f5f6fa; --card: #fff; --text: #1d2030; --muted: #6b7088; --line: #e3e5ee;
-    --accent: #4f46e5; --in: #16a34a; --out: #dc2626; --warn: #d97706;
-    --besoins: #3b82f6; --envies: #a855f7; --epargne: #10b981;
+    --bg: #f1e6d0; --card: #fbf6ea; --text: #3a2a1c; --muted: #7a6650; --line: #dccdb0;
+    --accent: #6b3fa0; --in: #3f7d3a; --out: #b3392f; --warn: #b7791f;
+    --besoins: #8a5a2b; --envies: #6b3fa0; --epargne: #3f7d3a;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0f1117; --card: #181b25; --text: #e8eaf2; --muted: #8b90a8; --line: #2a2e3d; --accent: #818cf8; --in: #4ade80; --out: #f87171; --warn: #fbbf24; }
+    :root { --bg: #1e1710; --card: #2a2016; --text: #f0e6d2; --muted: #a8977c; --line: #3d2f20; --accent: #b58be0; --in: #7fc47a; --out: #ef8a80; --warn: #e8b04a; --besoins: #c48a4c; --envies: #b58be0; --epargne: #7fc47a; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
@@ -21,7 +22,7 @@
   header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   input, select, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
   button { cursor: pointer; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
   button.small { padding: 4px 8px; font-size: .85rem; }
   .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
@@ -30,7 +31,7 @@
   .in { color: var(--in); } .out { color: var(--out); }
   nav { display: flex; gap: 6px; margin: 16px 0; }
   nav button { flex: 1; }
-  nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
   form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
   form .wide { grid-column: 1 / -1; }
   ul { list-style: none; margin: 0; padding: 0; }
