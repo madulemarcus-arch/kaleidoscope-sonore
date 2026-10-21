@@ -23,6 +23,6 @@ Le panneau du bas permet aussi de régler la symétrie (2 à 16), la taille du p
 - La position horizontale règle le panoramique stéréo.
 - Un pinceau épais (> 10) utilise un timbre triangle au lieu d'une sinusoïde.
 
-## Mon budget (`budget/index.html`)
+## NZIMBU (`budget/index.html`)
 
 Application personnelle indépendante, dans un seul fichier : suivi des entrées et sorties du mois, dettes (« je dois » / « on me doit ») avec remboursements partiels, et répartition 50-30-20 (besoins / envies / épargne et dettes). Les données restent dans le navigateur (`localStorage`), avec export/import JSON.
