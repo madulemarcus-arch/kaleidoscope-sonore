@@ -172,6 +172,8 @@ ok('mailboxes, client ID and frequency are published in the synced settings (no 
 // ---- reading frequency: 1 / 2 times a day, or only by hand
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(600);
 ok('« Lecture automatique » choice in the e-mail card, 2 times a day by default',await p.evaluate(()=>{const s=document.getElementById('slm_every');return !!s&&s.value==='12'&&[...s.options].length===3}));
+await p.evaluate(()=>{const d=document.querySelector('details[data-fold=slmail]');if(d)d.open=true});await p.waitForTimeout(200);
+ok('phone layout: the explanation keeps the full width (not squeezed into a column by the select)',await p.evaluate(()=>{const g=document.getElementById('slm_every').closest('.item').querySelector('.grow').getBoundingClientRect();return g.width>200&&g.height<140}));
 const pick=async v=>{await p.evaluate(()=>{const d=document.querySelector('details[data-fold=slmail]');if(d)d.open=true});await p.selectOption('#slm_every',v)};
 const setLast=async h=>{await p.evaluate(h=>{const k='cispolstore-gmail',c=JSON.parse(localStorage.getItem(k));c.lastCheck=Date.now()-h*3600e3;localStorage.setItem(k,JSON.stringify(c))},h)};
 const reopen=async()=>{await p.reload();await p.waitForTimeout(800);await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(3200)};

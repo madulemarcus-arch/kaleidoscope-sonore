@@ -193,7 +193,7 @@
       body = row('État', `<b class="${cls}">${st}</b><br>Dernière vérification : <b>${when(cfg.lastCheck)}</b>`, cfg.accounts.length ? '<button class="btn sm" data-act="slm_check">Vérifier maintenant</button>' : '')
         + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.err === 'reconnect' ? '<span class="warn">Reconnexion nécessaire : touchez « Vérifier maintenant »</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last), `<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button>`)).join('')
         + row('Ajouter une boîte Gmail', 'Vous pouvez en lier plusieurs (par exemple la boîte qui reçoit les e-mails de paiement et celle qui reçoit les suspensions).', '<button class="btn sm" data-act="slm_add">+ Gmail</button>')
-        + row('Lecture automatique', 'À l\'ouverture de l\'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.', `<select id="slm_every" style="width:auto">${App.opts(EVERY, everyH())}</select>`)
+        + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Lecture automatique</b><small style="white-space:normal">À l'ouverture de l'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.</small></div><select id="slm_every" style="width:100%">${App.opts(EVERY, everyH())}</select></div>`
         + row('Alertes et journal', `${L.count()} alerte(s) en cours`, '<button class="btn sm sec" data-act="go" data-v="slmail">Ouvrir</button>')
         + row('Identifiant Google', esc(clientId().slice(0, 18)) + '…', '<button class="btn sm sec" data-act="slm_setup">Modifier</button>');
     }
