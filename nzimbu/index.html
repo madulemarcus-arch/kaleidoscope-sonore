@@ -109,7 +109,8 @@
       <input id="txAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
       <select id="txCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
       <input id="txDate" type="date" required>
-      <button class="primary wide">Ajouter</button>
+      <button class="primary wide" id="txSubmit">Ajouter</button>
+      <button type="button" class="wide" id="txCancel" hidden>Annuler la modification</button>
     </form>
     <ul id="txList"></ul>
   </section>
@@ -192,6 +193,7 @@
     $('txList').innerHTML = list.length ? list.map(t => `<li>
       <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}</span></div>
       <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount)}</b>
+      ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
       <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
   }
 
@@ -228,6 +230,7 @@
         <div class="bar"><i style="width:${target ? Math.min(100, actual / target * 100) : 0}%;background:${color}"></i></div>
         <div class="msg ${bad ? 'bad' : 'ok'}">${msg}${share}</div>
         <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}</span></div><b class="out">−${fmt(t.amount)}</b>
+          ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
           <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>
         <form class="quick" data-cat="${k}">
           <input name="label" placeholder="Dépense (${name.toLowerCase()})" required class="wide">
@@ -279,11 +282,28 @@
   $('txForm').onsubmit = e => {
     e.preventDefault();
     const type = $('txType').value;
-    data.tx.push({ id: uid(), type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null });
-    $('txLabel').value = ''; $('txAmount').value = '';
-    $('month').value = data.tx[data.tx.length - 1].date.slice(0, 7);
-    save(); render();
+    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null };
+    const old = editId && data.tx.find(x => x.id === editId);
+    if (old) Object.assign(old, fields); else data.tx.push({ id: uid(), ...fields });
+    $('month').value = fields.date.slice(0, 7);
+    endEdit(); save(); render();
   };
+
+  // Editing an operation reuses the main form: it is filled in (amount shown in USD, as stored) and saved over the original
+  let editId = null;
+  const endEdit = () => {
+    editId = null; $('txLabel').value = ''; $('txAmount').value = ''; $('txCur').value = 'usd'; $('txDate').value = today();
+    $('txSubmit').textContent = 'Ajouter'; $('txCancel').hidden = true;
+  };
+  const startEdit = id => {
+    const t = data.tx.find(x => x.id === id); if (!t) return;
+    editId = id; showTab('tx');
+    $('txType').value = t.type; $('txType').onchange(); $('txCat').value = t.cat || 'besoins';
+    $('txLabel').value = t.label; $('txAmount').value = +t.amount.toFixed(6); $('txCur').value = 'usd'; $('txDate').value = t.date;
+    $('txSubmit').textContent = 'Enregistrer'; $('txCancel').hidden = false;
+    $('txForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('txLabel').focus();
+  };
+  $('txCancel').onclick = endEdit;
 
   // Spending straight from a 50-30-20 compartment; dated today, or the 1st of the month being viewed
   document.addEventListener('submit', e => {
@@ -303,7 +323,8 @@
   document.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
-    if (t.dataset.delTx && confirm('Supprimer cette opération ?')) data.tx = data.tx.filter(x => x.id !== t.dataset.delTx);
+    if (t.dataset.editTx) { startEdit(t.dataset.editTx); return; }
+    if (t.dataset.delTx && confirm('Supprimer cette opération ?')) { if (editId === t.dataset.delTx) endEdit(); data.tx = data.tx.filter(x => x.id !== t.dataset.delTx); }
     else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
     else if (t.dataset.pay) {
       const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
@@ -313,7 +334,7 @@
       const amt = Math.min(v, left);
       d.paid += amt;
       // Repayment is also recorded as a transaction so the monthly totals stay accurate
-      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null });
+      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, debt: true });
     } else return;
     save(); render();
   });
