@@ -169,6 +169,22 @@
   .set h3 { margin: 12px 0 6px; font: 700 .8rem Georgia, serif; letter-spacing: .08em; text-transform: uppercase; color: var(--gold-deep); }
   .set .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; color: var(--muted); font-size: .9rem; }
   .set input[type=number] { width: 100px; }
+  .tools { display: grid; gap: 8px; margin-bottom: 10px; } .tools input { width: 100%; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips button { padding: 7px 14px; border-radius: 99px; font-size: .85rem; }
+  .chips button[aria-pressed=true] { background: var(--metal); border-color: var(--gold-deep); font-weight: 700; }
+  .tpl { margin: 0 0 10px; }
+  .dayh { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin: 14px 2px 6px; }
+  li button.small { min-width: 42px; min-height: 42px; font-size: 1rem; }
+  .daily { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--gold-border); color: var(--muted); font-size: .9rem; line-height: 1.45; }
+  .daily b { color: var(--text); } .daily .fc { display: inline; }
+  li.debt .grow .amt { font-size: 1.05rem; font-weight: 700; color: var(--text); margin: 2px 0; }
+  li.debt .bar { height: 8px; margin: 6px 0 2px; } li.debt.done .bar { display: none; }
+  .tag { font-style: normal; font-size: .72rem; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); margin-left: 6px; vertical-align: middle; }
+  .tag.late { color: var(--out); border-color: var(--out); } .tag.soon { color: var(--warn); border-color: var(--warn); }
+  .wallets { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0 0 14px; }
+  #welcome ol { padding-left: 20px; line-height: 1.7; margin: 8px 0 14px; }
+  #shareMonth { width: 100%; margin-bottom: 12px; padding: 10px; }
   body.noscroll { overflow: hidden; }
   html.locked .fab, html.locked .sheet { display: none; }
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
@@ -198,6 +214,8 @@
     <div class="card"><small>Solde</small><b id="sumBal"></b></div>
   </div>
 
+  <div id="daily" class="daily" hidden></div>
+
   <nav role="tablist">
     <button role="tab" data-tab="tx" aria-selected="true">Opérations</button>
     <button role="tab" data-tab="debts" aria-selected="false">Dettes</button>
@@ -207,7 +225,11 @@
 
   <!-- Transactions -->
   <section id="tab-tx">
-    <ul id="txList"></ul>
+    <div class="tools">
+      <input id="txSearch" type="search" placeholder="🔍 Rechercher une opération" aria-label="Rechercher une opération">
+      <div class="chips" id="txFilter"><button type="button" data-f="all" aria-pressed="true">Tout</button><button type="button" data-f="in" aria-pressed="false">Entrées</button><button type="button" data-f="out" aria-pressed="false">Sorties</button></div>
+    </div>
+    <div id="txList"></div>
   </section>
 
   <!-- Dettes -->
@@ -239,6 +261,8 @@
 
   <!-- Mois -->
   <section id="tab-months" hidden>
+    <button type="button" id="shareMonth">📤 Partager le bilan du mois affiché</button>
+    <div id="walletBody"></div>
     <div id="monthsBody"></div>
   </section>
 
@@ -251,6 +275,7 @@
   <div class="sheet-back" data-close-panel></div>
   <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="sheet-head"><h2 id="sheetTitle">Nouvelle opération</h2><button type="button" class="iconbtn" data-close-panel aria-label="Fermer">✕</button></div>
+  <div id="tpl" class="chips tpl" hidden></div>
   <form id="txForm">
     <select id="txType" aria-label="Type"><option value="out">Sortie</option><option value="in">Entrée</option></select>
     <select id="txCat" aria-label="Catégorie">
@@ -259,6 +284,7 @@
       <option value="epargne">Épargne &amp; dettes (20 %)</option>
     </select>
     <select id="txSub" class="sub" aria-label="Catégorie de dépense"></select>
+    <select id="txWallet" class="wallet wide" aria-label="Portefeuille"></select>
     <input id="txLabel" placeholder="Libellé" required class="wide">
     <input id="txAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
     <select id="txCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
@@ -267,6 +293,21 @@
     <button class="primary wide" id="txSubmit">Ajouter</button>
     <button type="button" class="wide" id="txCancel" hidden>Annuler la modification</button>
   </form>
+  </div>
+</div>
+
+<!-- Bienvenue (première ouverture) -->
+<div id="welcome" class="sheet" hidden>
+  <div class="sheet-back" data-close-panel></div>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="welTitle">
+    <div class="sheet-head"><h2 id="welTitle">Bienvenue sur NZIMBU</h2><button type="button" class="iconbtn" data-close-panel aria-label="Fermer">✕</button></div>
+    <ol>
+      <li>Appuie sur <b>+</b> pour noter une entrée ou une sortie (en $ ou en FC).</li>
+      <li>Choisis le compartiment <b>50-30-20</b> de chaque dépense pour suivre ton budget.</li>
+      <li>L'onglet <b>Dettes</b> garde qui te doit et à qui tu dois, avec des rappels.</li>
+      <li>Dans <b>⚙ Réglages</b> : code secret, sauvegarde et taux de change.</li>
+    </ol>
+    <button type="button" class="primary wide" id="welcomeGo" style="width:100%">Commencer</button>
   </div>
 </div>
 
@@ -341,7 +382,8 @@
     envies: ['Loisirs & sorties', 'Vêtements', 'Restaurants', 'Cadeaux', 'Voyages'],
     epargne: ['Épargne', 'Remboursement de dettes', 'Investissement', 'Tontine']
   };
-  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)) };
+  const DEFAULT_WALLETS = ['Espèces', 'Mobile money', 'Banque'];
+  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)), wallets: DEFAULT_WALLETS.slice() };
   try { Object.assign(data, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -364,6 +406,10 @@
   const dateFr = s => s.split('-').reverse().join('/');
   const monthLong = m => new Date(m + '-01T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const shiftMonth = (m, n) => { const [y, mo] = m.split('-').map(Number), d = new Date(y, mo - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+  const walletOptions = sel => {
+    const l = (data.wallets || []).slice(); if (sel && !l.includes(sel)) l.push(sel);
+    return '<option value="">Portefeuille…</option>' + l.map(n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('') + '<option value="__new">+ Nouveau portefeuille…</option>';
+  };
   const subList = k => data.subs[k] || DEFAULT_SUBS[k];
   const subOptions = (k, sel) => {
     const l = subList(k).slice(); if (sel && !l.includes(sel)) l.push(sel);
@@ -389,12 +435,42 @@
     $('sumBal').className = i - o < 0 ? 'out' : 'in';
   }
 
+  // Operations are grouped by day; the search box and the In/Out chips filter them without recomputing the totals
+  let txFilter = 'all';
+  const dayTitle = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   function renderTx(list) {
-    $('txList').innerHTML = list.length ? list.map(t => `<li>
-      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span></div>
+    const q = $('txSearch').value.trim().toLowerCase();
+    const rows = list.filter(t => (txFilter === 'all' || t.type === txFilter) && (!q || [t.label, t.sub, t.wallet, t.cat && CATS[t.cat][0]].join(' ').toLowerCase().includes(q)));
+    if (!rows.length) { $('txList').innerHTML = `<ul><li class="empty">${list.length ? 'Aucun résultat.' : 'Aucune opération ce mois-ci.'}</li></ul>`; return; }
+    const days = []; rows.forEach(t => { const g = days[days.length - 1]; if (g && g.d === t.date) g.l.push(t); else days.push({ d: t.date, l: [t] }); });
+    $('txList').innerHTML = days.map(g => {
+      const net = sum(g.l.map(t => t.type === 'in' ? t.amount : -t.amount));
+      return `<div class="dayh"><span>${dayTitle(g.d)}</span><span>${net < 0 ? '−' : '+'}${usd(Math.abs(net))}</span></div><ul>${g.l.map(t => `<li>
+      <div class="grow">${esc(t.label)}<span>${t.cat ? CATS[t.cat][0] : 'Entrée'}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.wallet ? ` · ${esc(t.wallet)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span></div>
       <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount, fcOf(t))}</b>
       ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
-      <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
+      <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>`;
+    }).join('');
+  }
+
+  // Budget per day: what is left this month divided by the days remaining (current month only)
+  function renderDaily(list) {
+    const el = $('daily'), m = $('month').value, now = today();
+    const inc = sum(list.filter(t => t.type === 'in').map(t => t.amount)), left = inc - sum(list.filter(t => t.type === 'out').map(t => t.amount));
+    if (m !== now.slice(0, 7) || !inc) { el.hidden = true; return; }
+    const [y, mo] = m.split('-').map(Number), days = new Date(y, mo, 0).getDate() - Number(now.slice(8)) + 1;
+    el.hidden = false;
+    el.innerHTML = left > 0 ? `📅 Il te reste <b>${usd(left)}</b> ce mois-ci : environ <b>${usd(left / days)}</b> par jour pendant ${days} j <small class="fc">≈ ${fc(left / days)} / j</small>` : '⚠️ Tu as déjà dépensé tout ce que tu as reçu ce mois-ci.';
+  }
+
+  // Frequent operations become one-tap templates in the form (computed from the history, nothing extra stored)
+  let tpls = [];
+  function renderTpl() {
+    const by = {};
+    data.tx.filter(t => !t.debt).sort((a, b) => a.date.localeCompare(b.date)).forEach(t => { const k = t.type + '|' + t.label.trim().toLowerCase(), o = by[k] || (by[k] = { n: 0 }); o.n++; o.t = t; });
+    tpls = Object.values(by).filter(o => o.n >= 2).sort((a, b) => b.n - a.n).slice(0, 6).map(o => o.t);
+    const box = $('tpl'); box.hidden = editId || !tpls.length;
+    box.innerHTML = tpls.map((t, i) => `<button type="button" data-tpl="${i}">${esc(t.label)} · ${usd(t.amount)}</button>`).join('');
   }
 
   // Due-date reminders: overdue, due today, or due within a week (unpaid debts only)
@@ -444,9 +520,13 @@
   }
 
   function debtItem(d) {
-    const left = rest(d), info = dueInfo(d);
-    return `<li class="${left ? '' : 'done'} ${info ? info.cls : ''}">
-      <div class="grow"><b>${esc(d.who)}</b><span>${left ? `Reste ${fmt(left)} sur ${fmt(d.amount)}` : `Soldée (${fmt(d.amount)})`}${d.due ? ` · échéance ${dateFr(d.due)}${info ? ` · ${info.txt}` : ''}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span></div>
+    const left = rest(d), info = dueInfo(d), pct = d.amount ? Math.min(100, Math.round(d.paid / d.amount * 100)) : 0;
+    return `<li class="debt ${left ? '' : 'done'} ${info ? info.cls : ''}">
+      <div class="grow"><b>${esc(d.who)}</b>${info ? `<em class="tag ${info.cls}">${info.txt}</em>` : ''}
+        <span class="amt">${left ? `Reste ${fmt(left)}` : `Soldée ✅ (${usd(d.amount)})`}</span>
+        <span>${left && d.paid ? `${usd(d.paid)} ${d.dir === 'owe' ? 'remboursés' : 'reçus'} sur ${usd(d.amount)}` : left ? `Montant ${usd(d.amount)}` : ''}${d.due ? `${left ? ' · ' : ''}échéance ${dateFr(d.due)}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span>
+        <div class="bar"><i style="width:${pct}%;background:var(--in)"></i></div></div>
+      ${left && d.dir === 'owed' ? `<button class="small" data-wa="${d.id}" aria-label="Relancer sur WhatsApp" title="Relancer sur WhatsApp">💬</button>` : ''}
       ${left ? `<button class="small" data-due="${d.id}" aria-label="Modifier l'échéance" title="Modifier l'échéance">📅</button>` : ''}
       ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
       <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></li>`;
@@ -513,9 +593,27 @@
         <button class="small" data-month="${r.m}">Ouvrir</button></li>`).join('')}</ul>`;
   }
 
+  // Balance of each wallet (all time); operations without a wallet are grouped apart once wallets are in use
+  function renderWallets() {
+    if (!data.tx.some(t => t.wallet)) { $('walletBody').innerHTML = ''; return; }
+    const by = {}; data.tx.forEach(t => { const k = t.wallet || '', o = by[k] || (by[k] = [0, 0]), sg = t.type === 'in' ? 1 : -1; o[0] += sg * t.amount; o[1] += sg * fcOf(t); });
+    $('walletBody').innerHTML = '<h2>Portefeuilles</h2><div class="wallets">' + Object.entries(by).sort((a, b) => b[1][0] - a[1][0]).map(([k, v]) => `<div class="card"><small>${k ? esc(k) : 'Sans portefeuille'}</small><b class="${v[0] < 0 ? 'out' : 'in'}">${fmt(v[0], v[1])}</b></div>`).join('') + '</div>';
+  }
+  // Text summary of the month on screen, shared through the system share sheet (WhatsApp...) or copied
+  function monthReport() {
+    const m = $('month').value, list = monthTx(), ins = list.filter(t => t.type === 'in'), outs = list.filter(t => t.type === 'out');
+    const i = sum(ins.map(t => t.amount)), o = sum(outs.map(t => t.amount)), fi = sum(ins.map(fcOf)), fo = sum(outs.map(fcOf));
+    const L = [`📊 Bilan de ${monthLong(m)} — NZIMBU`, '', `Entrées : ${usd(i)} (≈ ${fcNum(fi)})`, `Sorties : ${usd(o)} (≈ ${fcNum(fo)})`, `Solde : ${i - o < 0 ? '−' : ''}${usd(Math.abs(i - o))} (≈ ${fcNum(fi - fo)})`];
+    if (i) { L.push('', 'Règle 50-30-20 :'); Object.entries(CATS).forEach(([k, [n, pct]]) => { const a = sum(outs.filter(t => t.cat === k).map(t => t.amount)); L.push(`• ${n} : ${usd(a)} (${Math.round(a / i * 100)} % des entrées, objectif ${pct * 100} %)`); }); }
+    const by = {}; outs.forEach(t => { const n = t.sub || t.label; by[n] = (by[n] || 0) + t.amount; });
+    const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (top.length) L.push('', 'Plus grosses dépenses :', ...top.map(([n, v]) => `• ${n} : ${usd(v)}`));
+    return L.join('\n');
+  }
+
   function render() {
     const list = monthTx();
-    renderSummary(list); renderTx(list); renderDebts(); renderAlerts([...debtAlerts(), backupAlert()].filter(Boolean)); renderRule(list); renderMonths();
+    renderSummary(list); renderTx(list); renderDebts(); renderAlerts([...debtAlerts(), backupAlert()].filter(Boolean)); renderRule(list); renderMonths(); renderWallets(); renderDaily(list);
     $('monthLabel').textContent = monthLong($('month').value); $('monthNow').hidden = $('month').value === today().slice(0, 7);
     $('rate').value = data.rate; $('txRate').placeholder = `Taux (${rateTxt(data.rate)})`;
     const pinOn = !!getPin(); $('pinBtn').hidden = pinOn; $('pinChange').hidden = $('pinOff').hidden = !pinOn;
@@ -547,6 +645,17 @@
   $('txType').onchange = () => $('txCat').hidden = $('txSub').hidden = $('txType').value === 'in';
   $('txCat').onchange = () => $('txSub').innerHTML = subOptions($('txCat').value, '');
   $('txSub').innerHTML = subOptions($('txCat').value, '');
+  $('txWallet').innerHTML = walletOptions('');
+  $('txWallet').onchange = () => {
+    if ($('txWallet').value !== '__new') return;
+    const name = (prompt('Nouveau portefeuille (ex. Airtel Money, Tontine) :') || '').trim();
+    data.wallets = data.wallets || [];
+    const same = data.wallets.find(n => n.toLowerCase() === name.toLowerCase());
+    if (name && !same) { data.wallets.push(name); save(); }
+    $('txWallet').innerHTML = walletOptions(name ? same || name : '');
+  };
+  $('txSearch').oninput = () => renderTx(monthTx());
+  $('txFilter').onclick = e => { const b = e.target.closest('button'); if (!b) return; txFilter = b.dataset.f; document.querySelectorAll('#txFilter button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderTx(monthTx()); };
   // "+ Nouvelle catégorie…" in any category select adds a category to its compartment
   document.addEventListener('change', e => {
     const sel = e.target; if (!sel.classList.contains('sub') || sel.value !== '__new') return;
@@ -557,7 +666,7 @@
     e.preventDefault();
     const type = $('txType').value;
     const cur = $('txCur').value, rate = ownRate($('txRate').value);
-    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, cur, rate || data.rate), rate: rate || (cur === 'fc' ? data.rate : undefined), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null, sub: type === 'out' ? $('txSub').value : '' };
+    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, cur, rate || data.rate), rate: rate || (cur === 'fc' ? data.rate : undefined), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null, sub: type === 'out' ? $('txSub').value : '', wallet: $('txWallet').value && $('txWallet').value !== '__new' ? $('txWallet').value : undefined };
     const old = editId && data.tx.find(x => x.id === editId);
     if (old) Object.assign(old, fields); else data.tx.push({ id: uid(), ...fields });
     $('month').value = fields.date.slice(0, 7);
@@ -565,9 +674,9 @@
   };
 
   // Bottom sheets: the operation form and the settings
-  const PANELS = ['sheet', 'settings'];
-  const openPanel = id => { PANELS.forEach(p => $(p).hidden = p !== id); document.body.classList.add('noscroll'); NZ.tick(); };
-  const closePanels = () => { PANELS.forEach(p => $(p).hidden = true); document.body.classList.remove('noscroll'); if (editId) endEdit(); };
+  const PANELS = ['sheet', 'settings', 'welcome'], WKEY = 'budget-welcome-v1';
+  const openPanel = id => { if (id === 'sheet') renderTpl(); PANELS.forEach(p => $(p).hidden = p !== id); document.body.classList.add('noscroll'); NZ.tick(); };
+  const closePanels = () => { if (!$('welcome').hidden) wr(WKEY, 1); PANELS.forEach(p => $(p).hidden = true); document.body.classList.remove('noscroll'); if (editId) endEdit(); };
   document.querySelectorAll('[data-close-panel]').forEach(x => x.onclick = closePanels);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && PANELS.some(p => !$(p).hidden)) closePanels(); });
   $('fab').onclick = () => { endEdit(); openPanel('sheet'); $('txLabel').focus(); };
@@ -578,13 +687,13 @@
   const endEdit = () => {
     editId = null; $('txLabel').value = ''; $('txAmount').value = ''; $('txRate').value = ''; $('txCur').value = 'usd'; $('txDate').value = today();
     $('txSub').innerHTML = subOptions($('txCat').value, '');
-    $('txSubmit').textContent = 'Ajouter'; $('txCancel').hidden = true; $('sheetTitle').textContent = 'Nouvelle opération';
+    $('txWallet').innerHTML = walletOptions(''); $('txSubmit').textContent = 'Ajouter'; $('txCancel').hidden = true; $('sheetTitle').textContent = 'Nouvelle opération';
   };
   const startEdit = id => {
     const t = data.tx.find(x => x.id === id); if (!t) return;
     editId = id;
     $('txType').value = t.type; $('txType').onchange(); $('txCat').value = t.cat || 'besoins'; $('txSub').innerHTML = subOptions($('txCat').value, t.sub || '');
-    $('txLabel').value = t.label; $('txAmount').value = +t.amount.toFixed(6); $('txCur').value = 'usd'; $('txDate').value = t.date; $('txRate').value = t.rate || '';
+    $('txLabel').value = t.label; $('txAmount').value = +t.amount.toFixed(6); $('txCur').value = 'usd'; $('txDate').value = t.date; $('txRate').value = t.rate || ''; $('txWallet').innerHTML = walletOptions(t.wallet || '');
     $('txSubmit').textContent = 'Enregistrer'; $('txCancel').hidden = false; $('sheetTitle').textContent = "Modifier l'opération";
     openPanel('sheet'); $('txLabel').focus();
   };
@@ -608,6 +717,16 @@
   document.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
     if ('alerts' in t.dataset) { alertsOpen = !alertsOpen; render(); return; }
+    if (t.dataset.tpl !== undefined) {
+      const p = tpls[+t.dataset.tpl]; if (!p) return;
+      $('txType').value = p.type; $('txType').onchange(); $('txCat').value = p.cat || 'besoins'; $('txSub').innerHTML = subOptions($('txCat').value, p.sub || '');
+      $('txLabel').value = p.label; $('txAmount').value = +p.amount.toFixed(6); $('txCur').value = 'usd'; $('txWallet').innerHTML = walletOptions(p.wallet || ''); $('txAmount').focus(); return;
+    }
+    if (t.dataset.wa) {
+      const d = data.debts.find(x => x.id === t.dataset.wa); if (!d) return;
+      const msg = `Bonjour ${d.who}, petit rappel amical : il me reste ${usd(rest(d))} (≈ ${fc(rest(d))}) à recevoir de ta part${d.due ? `, prévu le ${dateFr(d.due)}` : ''}. Merci ! 🙏`;
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener'); return;
+    }
     if (t.dataset.go) { showTab(t.dataset.go); return; }
     if (t.dataset.backup) { if (t.dataset.backup === 'now') exportData(); else { saveBk({ snooze: today() }); render(); } return; }
     if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
@@ -636,6 +755,13 @@
     if (t.dataset.pay) { const d = data.debts.find(x => x.id === t.dataset.pay); if (d && !rest(d)) NZ.celebrate(d.dir === 'owe' ? `🎉 Dette soldée : ${d.who}` : `🎉 ${d.who} t'a tout remboursé`); else checkGoal(); }
   });
 
+  $('shareMonth').onclick = () => {
+    const text = monthReport();
+    if (navigator.share) navigator.share({ text }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => NZ.toast('📋 Bilan copié'), () => prompt('Copie ce bilan :', text));
+    else prompt('Copie ce bilan :', text);
+  };
+  $('welcomeGo').onclick = closePanels;
   $('rate').onchange = () => { const v = parseFloat($('rate').value); if (v > 0) { data.rate = v; data.rateAuto = false; data.rateDate = data.rateDate || today(); save(); } render(); };
   // Live USD→CDF rate (free endpoint, no key); falls back to the stored rate when offline
   const refreshRate = () => fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json()).then(j => {
@@ -660,7 +786,7 @@
       const d = JSON.parse(txt);
       if (!Array.isArray(d.tx) || !Array.isArray(d.debts)) throw 0;
       if (!confirm('Remplacer toutes les données actuelles ?')) return;
-      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)) }, d); save(); render();
+      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)), wallets: DEFAULT_WALLETS.slice() }, d); save(); render();
     }).catch(() => alert('Fichier invalide.'));
     e.target.value = '';
   };
@@ -756,6 +882,7 @@
 
   render();
   lockApp();
+  if (!root.classList.contains('locked') && !data.tx.length && !data.debts.length && !rd(WKEY)) openPanel('welcome');
   document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
   if (data.rateAuto) refreshRate();
   // Offline support (needs http(s) or localhost; silently skipped on file://)
