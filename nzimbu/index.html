@@ -66,6 +66,8 @@
   .rem { text-align: left; font-weight: 600; border-left-width: 4px; }
   .rem.late, li.late { border-left-color: var(--out); } .rem.late { color: var(--out); }
   .rem.soon, li.soon { border-left-color: var(--warn); } .rem.soon { color: var(--warn); }
+  .subs { margin-top: 8px; display: grid; gap: 3px; }
+  .subrow { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; padding: 3px 8px; border-radius: 6px; }
   .chart { display: flex; gap: 6px; }
   .mcol { flex: 1; min-width: 0; }
   .bars { height: 140px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); }
@@ -111,6 +113,7 @@
         <option value="envies">Envies (30 %)</option>
         <option value="epargne">Épargne &amp; dettes (20 %)</option>
       </select>
+      <select id="txSub" class="sub" aria-label="Catégorie de dépense"></select>
       <input id="txLabel" placeholder="Libellé" required class="wide">
       <input id="txAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
       <select id="txCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
@@ -170,7 +173,13 @@
   const CATS = { besoins: ['Besoins', 0.5, 'var(--besoins)'], envies: ['Envies', 0.3, 'var(--envies)'], epargne: ['Épargne & dettes', 0.2, 'var(--epargne)'] };
 
   // ---------- Data ----------
-  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true };
+  // Default spending categories per compartment; the user can add more (stored in data.subs)
+  const DEFAULT_SUBS = {
+    besoins: ['Logement', 'Nourriture', 'Transport', 'Santé', 'Éducation', 'Électricité & eau', 'Communication', 'Famille'],
+    envies: ['Loisirs & sorties', 'Vêtements', 'Restaurants', 'Cadeaux', 'Voyages'],
+    epargne: ['Épargne', 'Remboursement de dettes', 'Investissement', 'Tontine']
+  };
+  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)) };
   try { Object.assign(data, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -185,6 +194,18 @@
   // Entered amounts may be in USD or FC; everything is stored in USD
   const toUsd = (v, c) => Math.round((c === 'fc' ? v / data.rate : v) * 1e6) / 1e6;
   const dateFr = s => s.split('-').reverse().join('/');
+  const subList = k => data.subs[k] || DEFAULT_SUBS[k];
+  const subOptions = (k, sel) => {
+    const l = subList(k).slice(); if (sel && !l.includes(sel)) l.push(sel);
+    return '<option value="">Catégorie…</option>' + l.map(n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('') + '<option value="__new">+ Nouvelle catégorie…</option>';
+  };
+  const addSub = (sel, cat) => {
+    const name = (prompt(`Nouvelle catégorie (${CATS[cat][0]}) :`) || '').trim();
+    const list = data.subs[cat] = subList(cat).slice();
+    const same = list.find(n => n.toLowerCase() === name.toLowerCase());
+    if (name && !same) { list.push(name); save(); }
+    sel.innerHTML = subOptions(cat, name ? same || name : '');
+  };
 
   // ---------- Rendering ----------
   const monthTx = () => data.tx.filter(t => t.date.startsWith($('month').value)).sort((a, b) => b.date.localeCompare(a.date));
@@ -197,7 +218,7 @@
 
   function renderTx(list) {
     $('txList').innerHTML = list.length ? list.map(t => `<li>
-      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}</span></div>
+      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}${t.sub ? ` · ${esc(t.sub)}` : ''}</span></div>
       <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount)}</b>
       ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
       <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
@@ -252,14 +273,19 @@
       const msg = !income ? '' : saving
         ? (bad ? `Il manque ${fmt(-diff)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(diff)} de marge.`)
         : (bad ? `Dépassement de ${fmt(diff)}.` : `Il te reste ${fmt(-diff)} à dépenser.`);
+      const bySub = {}; exp.forEach(t => { const n = t.sub || 'Sans catégorie'; bySub[n] = (bySub[n] || 0) + t.amount; });
+      const breakdown = Object.entries(bySub).sort((a, b) => b[1] - a[1]).map(([n, v]) => { const w = Math.round(v / actual * 100);
+        return `<div class="subrow" style="background:linear-gradient(90deg, color-mix(in srgb, ${color} 22%, transparent) ${w}%, transparent ${w}%)"><span>${esc(n)}</span><span>${usd(v)} · ${w} %</span></div>`; }).join('');
       const share = income ? ` (${Math.round(actual / income * 100)} % de tes entrées)` : '';
       return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual)} / ${fmt(target)}</span></div>
         <div class="bar"><i style="width:${target ? Math.min(100, actual / target * 100) : 0}%;background:${color}"></i></div>
         <div class="msg ${bad ? 'bad' : 'ok'}">${msg}${share}</div>
-        <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}</span></div><b class="out">−${fmt(t.amount)}</b>
+        ${breakdown ? `<div class="subs">${breakdown}</div>` : ''}
+        <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.sub ? ` · ${esc(t.sub)}` : ''}</span></div><b class="out">−${fmt(t.amount)}</b>
           ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
           <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>
         <form class="quick" data-cat="${k}">
+          <select name="sub" class="sub wide" aria-label="Catégorie de dépense">${subOptions(k, '')}</select>
           <input name="label" placeholder="Dépense (${name.toLowerCase()})" required class="wide">
           <input name="amount" type="number" min="0.01" step="any" placeholder="Montant" required>
           <select name="cur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
@@ -304,12 +330,19 @@
   $('month').value = today().slice(0, 7);
   $('txDate').value = today();
   $('month').onchange = render;
-  $('txType').onchange = () => $('txCat').hidden = $('txType').value === 'in';
+  $('txType').onchange = () => $('txCat').hidden = $('txSub').hidden = $('txType').value === 'in';
+  $('txCat').onchange = () => $('txSub').innerHTML = subOptions($('txCat').value, '');
+  $('txSub').innerHTML = subOptions($('txCat').value, '');
+  // "+ Nouvelle catégorie…" in any category select adds a category to its compartment
+  document.addEventListener('change', e => {
+    const sel = e.target; if (!sel.classList.contains('sub') || sel.value !== '__new') return;
+    addSub(sel, sel.id === 'txSub' ? $('txCat').value : sel.form.dataset.cat);
+  });
 
   $('txForm').onsubmit = e => {
     e.preventDefault();
     const type = $('txType').value;
-    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null };
+    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null, sub: type === 'out' ? $('txSub').value : '' };
     const old = editId && data.tx.find(x => x.id === editId);
     if (old) Object.assign(old, fields); else data.tx.push({ id: uid(), ...fields });
     $('month').value = fields.date.slice(0, 7);
@@ -320,12 +353,13 @@
   let editId = null;
   const endEdit = () => {
     editId = null; $('txLabel').value = ''; $('txAmount').value = ''; $('txCur').value = 'usd'; $('txDate').value = today();
+    $('txSub').innerHTML = subOptions($('txCat').value, '');
     $('txSubmit').textContent = 'Ajouter'; $('txCancel').hidden = true;
   };
   const startEdit = id => {
     const t = data.tx.find(x => x.id === id); if (!t) return;
     editId = id; showTab('tx');
-    $('txType').value = t.type; $('txType').onchange(); $('txCat').value = t.cat || 'besoins';
+    $('txType').value = t.type; $('txType').onchange(); $('txCat').value = t.cat || 'besoins'; $('txSub').innerHTML = subOptions($('txCat').value, t.sub || '');
     $('txLabel').value = t.label; $('txAmount').value = +t.amount.toFixed(6); $('txCur').value = 'usd'; $('txDate').value = t.date;
     $('txSubmit').textContent = 'Enregistrer'; $('txCancel').hidden = false;
     $('txForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('txLabel').focus();
@@ -337,7 +371,7 @@
     const f = e.target; if (!f.classList.contains('quick')) return;
     e.preventDefault();
     const m = $('month').value, el = f.elements;
-    data.tx.push({ id: uid(), type: 'out', label: el.label.value.trim(), amount: toUsd(+el.amount.value, el.cur.value), date: today().startsWith(m) ? today() : m + '-01', cat: f.dataset.cat });
+    data.tx.push({ id: uid(), type: 'out', label: el.label.value.trim(), amount: toUsd(+el.amount.value, el.cur.value), date: today().startsWith(m) ? today() : m + '-01', cat: f.dataset.cat, sub: el.sub.value === '__new' ? '' : el.sub.value });
     save(); render();
   });
 
@@ -370,7 +404,7 @@
       const amt = Math.min(v, left);
       d.paid += amt;
       // Repayment is also recorded as a transaction so the monthly totals stay accurate
-      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, debt: true });
+      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true });
     } else return;
     save(); render();
   });
@@ -395,7 +429,7 @@
       const d = JSON.parse(txt);
       if (!Array.isArray(d.tx) || !Array.isArray(d.debts)) throw 0;
       if (!confirm('Remplacer toutes les données actuelles ?')) return;
-      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true }, d); save(); render();
+      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)) }, d); save(); render();
     }).catch(() => alert('Fichier invalide.'));
     e.target.value = '';
   };
