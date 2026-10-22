@@ -1,5 +1,5 @@
-const CACHE = 'nzimbu-v3';
-const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'nzimbu-v4';
+const FILES = ['./', 'index.html', 'fx.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 // Caches are shared by every app of this origin (CISPOLstore, WiFi Zone): only delete NZIMBU's own old ones.
