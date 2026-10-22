@@ -181,7 +181,7 @@ dialog form > .end { display:flex; justify-content:flex-end; gap:8px; margin-top
   .paper { max-width:860px; margin:0 auto; font-size:14px; }
   #toast { bottom:30px; }
   #upd, #undo { bottom:24px; left:calc(248px + 12px); }
-  #clist .list, #ilist .list, #plist .list { display:grid; grid-template-columns:repeat(2,1fr); }
+  #clist .list, #ilist .list, #plist .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(520px,1fr)); }
   #clist .item, #ilist .item, #plist .item { border-right:1px solid var(--line); }
   dialog { width:min(620px,92vw); }
 }
@@ -483,7 +483,6 @@ kbd { font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace; padding:3px 6
 @media (min-width:1280px) {
   #view { max-width:1480px; }
   .dash { grid-template-columns:1.05fr 1.25fr 1fr; grid-template-areas:"a b d" "a b c"; gap:0 26px; }
-  #clist .list, #ilist .list, #plist .list { grid-template-columns:repeat(3,1fr); }
   .hero-main { align-items:flex-end; } .hero .spark { max-width:520px; }
   .kpis { display:grid; grid-template-columns:repeat(2,1fr); overflow:visible; }
   .kpis .stat { min-width:0; }
