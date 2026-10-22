@@ -1,9 +1,9 @@
-# Publie CISPOLstore Manager (racine du site) et WiFi Zone Manager (/wifizone/) sur GitHub Pages.
+# Publie CISPOLstore Manager (racine du site), WiFi Zone Manager (/wifizone/) et NZIMBU (/nzimbu/) sur GitHub Pages.
 name: Publier CISPOLstore et WiFi Zone
 on:
   push:
     branches: [main]
-    paths: ['cispolstore/**', 'wifizone/**']
+    paths: ['cispolstore/**', 'wifizone/**', 'nzimbu/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +26,7 @@ jobs:
           mkdir _site
           cp -r cispolstore/. _site/
           cp -r wifizone _site/wifizone
+          cp -r nzimbu _site/nzimbu
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
