@@ -62,6 +62,10 @@
   .rule .row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .msg { font-size: .9rem; color: var(--muted); }
   .msg.bad { color: var(--warn); font-weight: 600; } .msg.ok { color: var(--in); }
+  #reminders { display: grid; gap: 6px; margin-bottom: 12px; }
+  .rem { text-align: left; font-weight: 600; border-left-width: 4px; }
+  .rem.late, li.late { border-left-color: var(--out); } .rem.late { color: var(--out); }
+  .rem.soon, li.soon { border-left-color: var(--warn); } .rem.soon { color: var(--warn); }
   .chart { display: flex; gap: 6px; }
   .mcol { flex: 1; min-width: 0; }
   .bars { height: 140px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); }
@@ -82,6 +86,8 @@
     <h1>💰 NZIMBU</h1>
     <input type="month" id="month" aria-label="Mois affiché">
   </header>
+
+  <div id="reminders" hidden></div>
 
   <div class="cards">
     <div class="card"><small>Entrées</small><b class="in" id="sumIn"></b></div>
@@ -197,10 +203,31 @@
       <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
   }
 
+  // Due-date reminders: overdue, due today, or due within a week (unpaid debts only)
+  const dayDiff = due => Math.round((new Date(due + 'T12:00:00') - new Date(today() + 'T12:00:00')) / 864e5);
+  const dueInfo = d => {
+    if (!d.due || !rest(d)) return null;
+    const n = dayDiff(d.due);
+    return n < 0 ? { cls: 'late', txt: `en retard de ${-n} j` } : n === 0 ? { cls: 'soon', txt: "aujourd'hui" } : n <= 7 ? { cls: 'soon', txt: `dans ${n} j` } : null;
+  };
+  const parseDate = raw => {
+    raw = raw.trim(); if (!raw) return '';
+    const m = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/), iso = m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : raw;
+    const d = new Date(iso + 'T12:00:00');
+    return /^\d{4}-\d{2}-\d{2}$/.test(iso) && !isNaN(d) && d.toISOString().slice(0, 10) === iso ? iso : null;
+  };
+  function renderReminders() {
+    const items = data.debts.map(d => ({ d, i: dueInfo(d) })).filter(x => x.i).sort((a, b) => dayDiff(a.d.due) - dayDiff(b.d.due));
+    $('reminders').hidden = !items.length;
+    $('reminders').innerHTML = items.map(({ d, i }) => `<button class="rem ${i.cls}" data-go="debts">${i.cls === 'late' ? '⚠️' : '⏰'} ${d.dir === 'owe' ? `Tu dois ${usd(rest(d))} à ${esc(d.who)}` : `${esc(d.who)} te doit ${usd(rest(d))}`} · ${i.cls === 'late' ? i.txt : 'échéance ' + i.txt}</button>`).join('');
+    document.querySelector('[data-tab=debts]').textContent = items.length ? `Dettes (${items.length})` : 'Dettes';
+  }
+
   function debtItem(d) {
-    const left = rest(d), late = d.due && left > 0 && d.due < today();
-    return `<li class="${left ? '' : 'done'}">
-      <div class="grow"><b>${esc(d.who)}</b><span>${left ? `Reste ${fmt(left)} sur ${fmt(d.amount)}` : `Soldée (${fmt(d.amount)})`}${d.due ? ` · échéance ${dateFr(d.due)}${late ? ' ⚠️ dépassée' : ''}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span></div>
+    const left = rest(d), info = dueInfo(d);
+    return `<li class="${left ? '' : 'done'} ${info ? info.cls : ''}">
+      <div class="grow"><b>${esc(d.who)}</b><span>${left ? `Reste ${fmt(left)} sur ${fmt(d.amount)}` : `Soldée (${fmt(d.amount)})`}${d.due ? ` · échéance ${dateFr(d.due)}${info ? ` · ${info.txt}` : ''}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span></div>
+      ${left ? `<button class="small" data-due="${d.id}" aria-label="Modifier l'échéance" title="Modifier l'échéance">📅</button>` : ''}
       ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
       <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></li>`;
   }
@@ -262,7 +289,7 @@
 
   function render() {
     const list = monthTx();
-    renderSummary(list); renderTx(list); renderDebts(); renderRule(list); renderMonths();
+    renderSummary(list); renderTx(list); renderDebts(); renderReminders(); renderRule(list); renderMonths();
     $('rate').value = data.rate;
     $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
   }
@@ -322,10 +349,19 @@
 
   document.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.go) { showTab(t.dataset.go); return; }
     if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
     if (t.dataset.editTx) { startEdit(t.dataset.editTx); return; }
     if (t.dataset.delTx && confirm('Supprimer cette opération ?')) { if (editId === t.dataset.delTx) endEdit(); data.tx = data.tx.filter(x => x.id !== t.dataset.delTx); }
     else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
+    else if (t.dataset.due) {
+      const d = data.debts.find(x => x.id === t.dataset.due);
+      const raw = prompt(`Échéance de la dette de ${d.who} (JJ/MM/AAAA, vide pour la retirer) :`, d.due ? dateFr(d.due) : '');
+      if (raw === null) return;
+      const v = parseDate(raw);
+      if (v === null) { alert('Date non reconnue. Exemple : 25/12/2026'); return; }
+      d.due = v;
+    }
     else if (t.dataset.pay) {
       const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
       const raw = String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left} $, ou ${Math.round(left * data.rate)} FC). Ajoute « FC » pour des francs congolais :`, left) || '');
@@ -365,6 +401,7 @@
   };
 
   render();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
   if (data.rateAuto) refreshRate();
   // Offline support (needs http(s) or localhost; silently skipped on file://)
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
