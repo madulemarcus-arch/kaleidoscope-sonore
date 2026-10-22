@@ -22,3 +22,7 @@ Le panneau du bas permet aussi de régler la symétrie (2 à 16), la taille du p
 - Plus le tracé est proche du centre, plus la note est aiguë (3 octaves à partir de sol 3).
 - La position horizontale règle le panoramique stéréo.
 - Un pinceau épais (> 10) utilise un timbre triangle au lieu d'une sinusoïde.
+
+## NZIMBU (`nzimbu/index.html`)
+
+Application personnelle indépendante (page `index.html` + fichiers d'installation hors ligne). Les montants sont saisis en dollars (USD) et convertis automatiquement en francs congolais (taux en ligne, modifiable à la main). Fonctions : suivi des entrées et sorties avec bilan et graphique mois par mois, dettes (« je dois » / « on me doit ») avec remboursements partiels, et répartition 50-30-20 (besoins / envies / épargne et dettes). Les données restent dans le navigateur (`localStorage`), avec export/import JSON. Installable sur téléphone et utilisable hors ligne (à servir en https ou sur localhost).

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NZIMBU</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#e8730c">
+<style>
+  /* Palette inspired by the 50 FC note: orange dominant, teal and gold as harmonious companions */
+  :root {
+    --bg: #fdf3e4; --card: #fffaf2; --text: #3b2410; --muted: #8a6b50; --line: #f0dcc0;
+    --accent: #e8730c; --accent2: #f5a524; --on-accent: #fff;
+    --in: #1f7a5c; --out: #c0452b; --warn: #b7791f;
+    --besoins: #e8730c; --envies: #0f766e; --epargne: #d9a21b;
+    --shadow: 0 2px 10px rgba(120, 70, 20, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b120a; --card: #28190d; --text: #fbeedd; --muted: #b89878; --line: #44301b; --accent: #ff9a3d; --accent2: #ffc062; --on-accent: #1b120a; --in: #4fd1a5; --out: #ff8f75; --warn: #f0b84f; --besoins: #ff9a3d; --envies: #2dd4bf; --epargne: #f2c14e; --shadow: 0 2px 10px rgba(0, 0, 0, .35); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.5rem; margin: 0; letter-spacing: .12em; }
+  h2 { font-size: 1rem; margin: 20px 0 8px; color: var(--accent); }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; padding: 16px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: var(--shadow); }
+  header h1 { text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+  header input { background: rgba(255, 255, 255, .9); color: #3b2410; border-color: transparent; }
+  input, select, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  button.small { padding: 4px 8px; font-size: .85rem; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; box-shadow: var(--shadow); border-top: 4px solid var(--accent); }
+  .cards .card:nth-child(1) { border-top-color: var(--in); }
+  .cards .card:nth-child(2) { border-top-color: var(--out); }
+  .card small { color: var(--muted); display: block; }
+  .card b { font-size: 1.15rem; }
+  .in { color: var(--in); } .out { color: var(--out); }
+  nav { display: flex; gap: 6px; margin: 16px 0; padding: 4px; background: var(--line); border-radius: 12px; }
+  nav button { flex: 1; border-color: transparent; background: transparent; padding: 8px 4px; white-space: nowrap; }
+  nav button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: var(--shadow); }
+  form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  form .wide { grid-column: 1 / -1; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent2); border-radius: 10px; padding: 10px; margin-bottom: 6px; box-shadow: var(--shadow); }
+  li .grow { flex: 1; min-width: 0; }
+  li .grow span { display: block; color: var(--muted); font-size: .85rem; }
+  li.done { opacity: .55; }
+  li.empty { border-left-color: var(--line); box-shadow: none; }
+  .empty { color: var(--muted); text-align: center; padding: 16px; justify-content: center; }
+  .bar { height: 12px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 6px 0; }
+  .bar i { display: block; height: 100%; border-radius: 99px; }
+  .rule { margin-bottom: 8px; }
+  .rule .row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .msg { font-size: .9rem; color: var(--muted); }
+  .msg.bad { color: var(--warn); font-weight: 600; } .msg.ok { color: var(--in); }
+  .chart { display: flex; gap: 6px; }
+  .mcol { flex: 1; min-width: 0; }
+  .bars { height: 140px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); }
+  .bars i { flex: 1; min-height: 2px; border-radius: 4px 4px 0 0; }
+  .lbl { font-size: .7rem; text-align: center; color: var(--muted); margin-top: 4px; }
+  .legend { display: flex; gap: 12px; font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; }
+  footer { margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: .85rem; }
+  footer input[type=number] { width: 90px; }
+  .fc { color: var(--muted); font-weight: 400; font-size: .8rem; margin-left: 4px; }
+  .card .fc { display: block; margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>💰 NZIMBU</h1>
+    <input type="month" id="month" aria-label="Mois affiché">
+  </header>
+
+  <div class="cards">
+    <div class="card"><small>Entrées</small><b class="in" id="sumIn"></b></div>
+    <div class="card"><small>Sorties</small><b class="out" id="sumOut"></b></div>
+    <div class="card"><small>Solde</small><b id="sumBal"></b></div>
+  </div>
+
+  <nav role="tablist">
+    <button role="tab" data-tab="tx" aria-selected="true">Opérations</button>
+    <button role="tab" data-tab="debts" aria-selected="false">Dettes</button>
+    <button role="tab" data-tab="rule" aria-selected="false">50-30-20</button>
+    <button role="tab" data-tab="months" aria-selected="false">Mois</button>
+  </nav>
+
+  <!-- Transactions -->
+  <section id="tab-tx">
+    <form id="txForm">
+      <select id="txType" aria-label="Type"><option value="out">Sortie</option><option value="in">Entrée</option></select>
+      <select id="txCat" aria-label="Catégorie">
+        <option value="besoins">Besoins (50 %)</option>
+        <option value="envies">Envies (30 %)</option>
+        <option value="epargne">Épargne &amp; dettes (20 %)</option>
+      </select>
+      <input id="txLabel" placeholder="Libellé" required class="wide">
+      <input id="txAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
+      <select id="txCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+      <input id="txDate" type="date" required>
+      <button class="primary wide">Ajouter</button>
+    </form>
+    <ul id="txList"></ul>
+  </section>
+
+  <!-- Dettes -->
+  <section id="tab-debts" hidden>
+    <div class="cards">
+      <div class="card"><small>Je dois</small><b class="out" id="dOwe"></b></div>
+      <div class="card"><small>On me doit</small><b class="in" id="dOwed"></b></div>
+      <div class="card"><small>Net</small><b id="dNet"></b></div>
+    </div>
+    <h2>Nouvelle dette</h2>
+    <form id="debtForm">
+      <select id="dDir" aria-label="Sens"><option value="owe">Je dois à…</option><option value="owed">Me doit…</option></select>
+      <input id="dWho" placeholder="Personne" required>
+      <input id="dAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
+      <select id="dCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+      <input id="dDue" type="date" aria-label="Échéance (facultatif)" title="Échéance (facultatif)">
+      <input id="dNote" placeholder="Note (facultatif)" class="wide">
+      <button class="primary wide">Ajouter</button>
+    </form>
+    <h2>Je dois</h2><ul id="oweList"></ul>
+    <h2>On me doit</h2><ul id="owedList"></ul>
+  </section>
+
+  <!-- 50-30-20 -->
+  <section id="tab-rule" hidden>
+    <p class="msg">Base de calcul : tes entrées du mois. 50 % pour les besoins, 30 % pour les envies, 20 % pour l'épargne et le remboursement de dettes.</p>
+    <div id="ruleBody"></div>
+  </section>
+
+  <!-- Mois -->
+  <section id="tab-months" hidden>
+    <div id="monthsBody"></div>
+  </section>
+
+  <footer>
+    <span>1 $ =</span><input type="number" id="rate" min="1" step="any" aria-label="Taux en francs congolais"><span>FC</span>
+    <button class="small" id="rateAuto">Taux automatique</button><span id="rateInfo"></span>
+    <button class="small" id="export">Exporter</button>
+    <button class="small" id="importBtn">Importer</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+    <span>Données stockées dans ce navigateur uniquement.</span>
+  </footer>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'budget-v1';
+  const CATS = { besoins: ['Besoins', 0.5, 'var(--besoins)'], envies: ['Envies', 0.3, 'var(--envies)'], epargne: ['Épargne & dettes', 0.2, 'var(--epargne)'] };
+
+  // ---------- Data ----------
+  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true };
+  try { Object.assign(data, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  // Amounts are stored in USD; the CDF equivalent is derived from data.rate
+  const usd = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n) + ' $';
+  const fc = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n * data.rate) + ' FC';
+  const fmt = n => `${usd(n)} <small class="fc">≈ ${fc(n)}</small>`;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const sum = a => a.reduce((t, x) => t + x, 0);
+  const rest = d => Math.max(0, Math.round((d.amount - d.paid) * 100) / 100);
+  // Entered amounts may be in USD or FC; everything is stored in USD
+  const toUsd = (v, c) => Math.round((c === 'fc' ? v / data.rate : v) * 1e6) / 1e6;
+  const dateFr = s => s.split('-').reverse().join('/');
+
+  // ---------- Rendering ----------
+  const monthTx = () => data.tx.filter(t => t.date.startsWith($('month').value)).sort((a, b) => b.date.localeCompare(a.date));
+
+  function renderSummary(list) {
+    const i = sum(list.filter(t => t.type === 'in').map(t => t.amount)), o = sum(list.filter(t => t.type === 'out').map(t => t.amount));
+    $('sumIn').innerHTML = fmt(i); $('sumOut').innerHTML = fmt(o);
+    $('sumBal').innerHTML = fmt(i - o); $('sumBal').className = i - o < 0 ? 'out' : 'in';
+  }
+
+  function renderTx(list) {
+    $('txList').innerHTML = list.length ? list.map(t => `<li>
+      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}</span></div>
+      <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount)}</b>
+      <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
+  }
+
+  function debtItem(d) {
+    const left = rest(d), late = d.due && left > 0 && d.due < today();
+    return `<li class="${left ? '' : 'done'}">
+      <div class="grow"><b>${esc(d.who)}</b><span>${left ? `Reste ${fmt(left)} sur ${fmt(d.amount)}` : `Soldée (${fmt(d.amount)})`}${d.due ? ` · échéance ${dateFr(d.due)}${late ? ' ⚠️ dépassée' : ''}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span></div>
+      ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
+      <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></li>`;
+  }
+
+  function renderDebts() {
+    const owe = data.debts.filter(d => d.dir === 'owe'), owed = data.debts.filter(d => d.dir === 'owed');
+    const a = sum(owe.map(rest)), b = sum(owed.map(rest));
+    $('dOwe').innerHTML = fmt(a); $('dOwed').innerHTML = fmt(b);
+    $('dNet').innerHTML = fmt(b - a); $('dNet').className = b - a < 0 ? 'out' : 'in';
+    const empty = '<li class="empty">Rien ici.</li>';
+    $('oweList').innerHTML = owe.length ? owe.map(debtItem).join('') : empty;
+    $('owedList').innerHTML = owed.length ? owed.map(debtItem).join('') : empty;
+  }
+
+  function renderRule(list) {
+    const income = sum(list.filter(t => t.type === 'in').map(t => t.amount));
+    if (!income) { $('ruleBody').innerHTML = '<p class="empty">Ajoute au moins une entrée ce mois-ci pour calculer la répartition.</p>'; return; }
+    $('ruleBody').innerHTML = Object.entries(CATS).map(([k, [name, pct, color]]) => {
+      const target = income * pct, actual = sum(list.filter(t => t.type === 'out' && t.cat === k).map(t => t.amount));
+      const diff = actual - target, saving = k === 'epargne';
+      const bad = saving ? diff < 0 : diff > 0;
+      const msg = saving
+        ? (bad ? `Il manque ${fmt(-diff)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(diff)} de marge.`)
+        : (bad ? `Dépassement de ${fmt(diff)}.` : `Il te reste ${fmt(-diff)} à dépenser.`);
+      return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual)} / ${fmt(target)}</span></div>
+        <div class="bar"><i style="width:${Math.min(100, actual / target * 100)}%;background:${color}"></i></div>
+        <div class="msg ${bad ? 'bad' : 'ok'}">${msg} (${Math.round(actual / income * 100)} % de tes entrées)</div></div>`;
+    }).join('');
+  }
+
+  // Month-by-month books: totals per month, running balance, and a bar chart of the last 12 months
+  const monthLabel = m => new Date(m + '-01T12:00:00').toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+  function renderMonths() {
+    const by = {};
+    data.tx.forEach(t => { const m = t.date.slice(0, 7), o = by[m] || (by[m] = { i: 0, o: 0 }); o[t.type === 'in' ? 'i' : 'o'] += t.amount; });
+    const keys = Object.keys(by).sort();
+    if (!keys.length) { $('monthsBody').innerHTML = '<p class="empty">Aucune opération pour le moment.</p>'; return; }
+    let cum = 0;
+    const rows = keys.map(m => { cum += by[m].i - by[m].o; return { m, i: by[m].i, o: by[m].o, bal: by[m].i - by[m].o, cum }; });
+    const recent = rows.slice(-12), max = Math.max(...recent.map(r => Math.max(r.i, r.o))) || 1;
+    $('monthsBody').innerHTML = `<div class="legend"><span><i style="background:var(--in)"></i>Entrées</span><span><i style="background:var(--out)"></i>Sorties</span></div>
+      <div class="chart">${recent.map(r => `<div class="mcol"><div class="bars">
+        <i style="height:${r.i / max * 100}%;background:var(--in)" title="Entrées : ${usd(r.i)}"></i>
+        <i style="height:${r.o / max * 100}%;background:var(--out)" title="Sorties : ${usd(r.o)}"></i></div><div class="lbl">${monthLabel(r.m)}</div></div>`).join('')}</div>
+      <h2>Bilan par mois</h2><ul>${rows.reverse().map(r => `<li>
+        <div class="grow"><b>${monthLabel(r.m)}</b><span>Entrées ${usd(r.i)} · Sorties ${usd(r.o)}</span><span>Cumul ${usd(r.cum)}</span></div>
+        <b class="${r.bal < 0 ? 'out' : 'in'}">${r.bal < 0 ? '−' : '+'}${fmt(Math.abs(r.bal))}</b>
+        <button class="small" data-month="${r.m}">Ouvrir</button></li>`).join('')}</ul>`;
+  }
+
+  function render() {
+    const list = monthTx();
+    renderSummary(list); renderTx(list); renderDebts(); renderRule(list); renderMonths();
+    $('rate').value = data.rate;
+    $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
+  }
+
+  // ---------- Controls ----------
+  const showTab = name => {
+    document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
+    ['tx', 'debts', 'rule', 'months'].forEach(t => $('tab-' + t).hidden = t !== name);
+  };
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+  $('month').value = today().slice(0, 7);
+  $('txDate').value = today();
+  $('month').onchange = render;
+  $('txType').onchange = () => $('txCat').hidden = $('txType').value === 'in';
+
+  $('txForm').onsubmit = e => {
+    e.preventDefault();
+    const type = $('txType').value;
+    data.tx.push({ id: uid(), type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null });
+    $('txLabel').value = ''; $('txAmount').value = '';
+    $('month').value = data.tx[data.tx.length - 1].date.slice(0, 7);
+    save(); render();
+  };
+
+  $('debtForm').onsubmit = e => {
+    e.preventDefault();
+    data.debts.push({ id: uid(), dir: $('dDir').value, who: $('dWho').value.trim(), amount: toUsd(+$('dAmount').value, $('dCur').value), paid: 0, due: $('dDue').value, note: $('dNote').value.trim() });
+    e.target.reset(); save(); render();
+  };
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
+    if (t.dataset.delTx && confirm('Supprimer cette opération ?')) data.tx = data.tx.filter(x => x.id !== t.dataset.delTx);
+    else if (t.dataset.delDebt && confirm('Supprimer cette dette ?')) data.debts = data.debts.filter(x => x.id !== t.dataset.delDebt);
+    else if (t.dataset.pay) {
+      const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
+      const raw = String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left} $, ou ${Math.round(left * data.rate)} FC). Ajoute « FC » pour des francs congolais :`, left) || '');
+      const v = toUsd(parseFloat(raw.replace(',', '.')), /fc|cdf/i.test(raw) ? 'fc' : 'usd');
+      if (!(v > 0)) return;
+      const amt = Math.min(v, left);
+      d.paid += amt;
+      // Repayment is also recorded as a transaction so the monthly totals stay accurate
+      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null });
+    } else return;
+    save(); render();
+  });
+
+  $('rate').onchange = () => { const v = parseFloat($('rate').value); if (v > 0) { data.rate = v; data.rateAuto = false; data.rateDate = data.rateDate || today(); save(); } render(); };
+  // Live USD→CDF rate (free endpoint, no key); falls back to the stored rate when offline
+  const refreshRate = () => fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json()).then(j => {
+    const v = j.rates && j.rates.CDF;
+    if (v > 0) { Object.assign(data, { rate: Math.round(v * 100) / 100, rateDate: today(), rateAuto: true }); save(); render(); }
+  }).catch(() => {});
+  $('rateAuto').onclick = () => { data.rateAuto = true; refreshRate(); };
+
+  $('export').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    a.download = `budget-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(txt => {
+      const d = JSON.parse(txt);
+      if (!Array.isArray(d.tx) || !Array.isArray(d.debts)) throw 0;
+      if (!confirm('Remplacer toutes les données actuelles ?')) return;
+      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true }, d); save(); render();
+    }).catch(() => alert('Fichier invalide.'));
+    e.target.value = '';
+  };
+
+  render();
+  if (data.rateAuto) refreshRate();
+  // Offline support (needs http(s) or localhost; silently skipped on file://)
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
