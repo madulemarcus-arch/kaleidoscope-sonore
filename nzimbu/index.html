@@ -116,26 +116,26 @@
   .card .fc { display: block; margin: 0; }
   /* Animation layers (fx.js): a golden sky behind the app, sparkles in the header, toast and confetti on top */
   #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-  .hsky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-  header > h1, header > input { position: relative; z-index: 1; }
+  .hsky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  header > h1, header > input { position: relative; z-index: 2; }
+  header { min-height: 150px; align-content: space-between; }
+  header h1 { text-shadow: 0 1px 0 rgba(255, 255, 255, .75), 0 0 12px rgba(255, 238, 170, .95); }
   main { position: relative; z-index: 1; }
   #confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 150; pointer-events: none; }
   .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 200; max-width: calc(100% - 32px); padding: 11px 18px; border-radius: 99px; font-weight: 700; text-align: center; color: var(--gold-ink); background: var(--metal-flat); border: 1px solid #c58612; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 8px 24px rgba(120, 70, 5, .4); animation: toastIn .35s cubic-bezier(.2, .9, .3, 1.2) both; }
   .toast.out { animation: toastOut .45s ease both; }
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 24px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0); } }
   @keyframes toastOut { to { opacity: 0; transform: translate(-50%, 16px); } }
-  /* Photo background (fx.js): money photos glide in glass cards behind the whole app, under a soft veil for readability */
-  #photobg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-  #photobg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 14%, transparent), color-mix(in srgb, var(--bg) 28%, transparent)); }
-  #photobg .hbg { position: absolute; inset: 0; }
+  /* Photo cards (fx.js): money photos glide in glass cards inside the golden header */
+  header .hbg { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; -webkit-mask-image: radial-gradient(130% 130% at 50% 50%, #000 58%, transparent 100%); mask-image: radial-gradient(130% 130% at 50% 50%, #000 58%, transparent 100%); }
   .hcard { position: absolute; left: 0; top: 0; border-radius: 12px; overflow: hidden; background: #6f5a3a center/cover no-repeat; box-shadow: 0 0 0 1px rgba(255, 236, 170, .45) inset, 0 8px 22px rgba(var(--gc, 245, 197, 66), .4), 0 3px 8px rgba(0, 0, 0, .4); opacity: 0; will-change: transform, opacity; }
   .hcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(140deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, 0) 30%, rgba(40, 20, 5, .45) 100%); }
   .hcard::before { content: ""; position: absolute; top: -10%; bottom: -10%; left: 0; width: 42%; z-index: 1; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5), transparent); transform: translateX(-140%) skewX(-18deg); animation: hsheen 3.6s ease-in-out var(--sd, 0s) infinite; }
   @keyframes hsheen { 0% { transform: translateX(-140%) skewX(-18deg); } 55%, 100% { transform: translateX(330%) skewX(-18deg); } }
   /* Glass cards over the sky */
-  .card, li, .backup { background: linear-gradient(180deg, var(--sheen), transparent 45%), color-mix(in srgb, var(--card) 78%, transparent); }
-  .card, .backup { -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px); }
-  .cards .card:nth-child(3) { background: var(--hilite), color-mix(in srgb, var(--card) 78%, transparent); }
+  .card, li, .backup { background: linear-gradient(180deg, var(--sheen), transparent 45%), color-mix(in srgb, var(--card) 84%, transparent); }
+  .card, .backup { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .cards .card:nth-child(3) { background: var(--hilite), color-mix(in srgb, var(--card) 84%, transparent); }
   /* Entrances and feedback */
   section:not([hidden]) { animation: rise .35s ease both; }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
