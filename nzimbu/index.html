@@ -55,6 +55,10 @@
   .bar { height: 12px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 6px 0; }
   .bar i { display: block; height: 100%; border-radius: 99px; }
   .rule { margin-bottom: 8px; }
+  .rule ul { margin-top: 8px; }
+  .rule li { box-shadow: none; }
+  .rule .msg .fc { display: inline; margin-left: 4px; }
+  .quick { margin: 8px 0 0; }
   .rule .row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .msg { font-size: .9rem; color: var(--muted); }
   .msg.bad { color: var(--warn); font-weight: 600; } .msg.ok { color: var(--in); }
@@ -133,7 +137,7 @@
 
   <!-- 50-30-20 -->
   <section id="tab-rule" hidden>
-    <p class="msg">Base de calcul : tes entrées du mois. 50 % pour les besoins, 30 % pour les envies, 20 % pour l'épargne et le remboursement de dettes.</p>
+    <p class="msg">Base de calcul : tes entrées du mois. Dépense directement dans le compartiment voulu : 50 % besoins, 30 % envies, 20 % épargne et remboursement de dettes.</p>
     <div id="ruleBody"></div>
   </section>
 
@@ -209,19 +213,27 @@
     $('owedList').innerHTML = owed.length ? owed.map(debtItem).join('') : empty;
   }
 
+  // Each compartment shows its budget, its expenses of the month and a quick form to spend from it
   function renderRule(list) {
     const income = sum(list.filter(t => t.type === 'in').map(t => t.amount));
-    if (!income) { $('ruleBody').innerHTML = '<p class="empty">Ajoute au moins une entrée ce mois-ci pour calculer la répartition.</p>'; return; }
-    $('ruleBody').innerHTML = Object.entries(CATS).map(([k, [name, pct, color]]) => {
-      const target = income * pct, actual = sum(list.filter(t => t.type === 'out' && t.cat === k).map(t => t.amount));
-      const diff = actual - target, saving = k === 'epargne';
-      const bad = saving ? diff < 0 : diff > 0;
-      const msg = saving
+    const hint = income ? '' : '<p class="empty">Ajoute au moins une entrée ce mois-ci pour calculer les montants à ne pas dépasser.</p>';
+    $('ruleBody').innerHTML = hint + Object.entries(CATS).map(([k, [name, pct, color]]) => {
+      const exp = list.filter(t => t.type === 'out' && t.cat === k), target = income * pct, actual = sum(exp.map(t => t.amount));
+      const diff = actual - target, saving = k === 'epargne', bad = saving ? diff < 0 : diff > 0;
+      const msg = !income ? '' : saving
         ? (bad ? `Il manque ${fmt(-diff)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(diff)} de marge.`)
         : (bad ? `Dépassement de ${fmt(diff)}.` : `Il te reste ${fmt(-diff)} à dépenser.`);
+      const share = income ? ` (${Math.round(actual / income * 100)} % de tes entrées)` : '';
       return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual)} / ${fmt(target)}</span></div>
-        <div class="bar"><i style="width:${Math.min(100, actual / target * 100)}%;background:${color}"></i></div>
-        <div class="msg ${bad ? 'bad' : 'ok'}">${msg} (${Math.round(actual / income * 100)} % de tes entrées)</div></div>`;
+        <div class="bar"><i style="width:${target ? Math.min(100, actual / target * 100) : 0}%;background:${color}"></i></div>
+        <div class="msg ${bad ? 'bad' : 'ok'}">${msg}${share}</div>
+        <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}</span></div><b class="out">−${fmt(t.amount)}</b>
+          <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>
+        <form class="quick" data-cat="${k}">
+          <input name="label" placeholder="Dépense (${name.toLowerCase()})" required class="wide">
+          <input name="amount" type="number" min="0.01" step="any" placeholder="Montant" required>
+          <select name="cur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+          <button class="primary wide">Dépenser ici</button></form></div>`;
     }).join('');
   }
 
@@ -272,6 +284,15 @@
     $('month').value = data.tx[data.tx.length - 1].date.slice(0, 7);
     save(); render();
   };
+
+  // Spending straight from a 50-30-20 compartment; dated today, or the 1st of the month being viewed
+  document.addEventListener('submit', e => {
+    const f = e.target; if (!f.classList.contains('quick')) return;
+    e.preventDefault();
+    const m = $('month').value, el = f.elements;
+    data.tx.push({ id: uid(), type: 'out', label: el.label.value.trim(), amount: toUsd(+el.amount.value, el.cur.value), date: today().startsWith(m) ? today() : m + '-01', cat: f.dataset.cat });
+    save(); render();
+  });
 
   $('debtForm').onsubmit = e => {
     e.preventDefault();
