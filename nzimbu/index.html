@@ -8,6 +8,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#e8730c">
+<script>try { if (localStorage.getItem('budget-pin-v1')) document.documentElement.classList.add('locked'); } catch (e) {}</script>
 <style>
   /* Palette inspired by the 50 FC note: orange dominant, teal and gold as harmonious companions */
   :root {
@@ -68,6 +69,17 @@
   .rem.soon, li.soon { border-left-color: var(--warn); } .rem.soon { color: var(--warn); }
   .subs { margin-top: 8px; display: grid; gap: 3px; }
   .subrow { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; padding: 3px 8px; border-radius: 6px; }
+  html.locked main { display: none; }
+  #lock { display: none; position: fixed; inset: 0; z-index: 100; background: var(--bg); align-items: center; justify-content: center; padding: 16px; }
+  #lock.open, html.locked #lock { display: flex; }
+  .lockbox { width: 100%; max-width: 300px; text-align: center; }
+  .lockbox h2 { color: var(--text); font-size: 1.2rem; margin: 4px 0; }
+  #dots { display: flex; justify-content: center; gap: 14px; margin: 16px 0; }
+  #dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); }
+  #dots i.on { background: var(--accent); }
+  #pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 auto 12px; }
+  #pad button { font-size: 1.4rem; padding: 14px 0; border-radius: 14px; }
+  .linkbtn { border: 0; background: none; color: var(--muted); text-decoration: underline; padding: 6px; }
   .chart { display: flex; gap: 6px; }
   .mcol { flex: 1; min-width: 0; }
   .bars { height: 140px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); }
@@ -161,10 +173,31 @@
     <button class="small" id="rateAuto">Taux automatique</button><span id="rateInfo"></span>
     <button class="small" id="export">Exporter</button>
     <button class="small" id="importBtn">Importer</button>
+    <button class="small" id="pinBtn">🔒 Activer le code secret</button>
+    <button class="small" id="pinChange" hidden>🔒 Changer le code</button>
+    <button class="small" id="pinOff" hidden>Désactiver le code</button>
     <input type="file" id="importFile" accept="application/json" hidden>
     <span>Données stockées dans ce navigateur uniquement.</span>
   </footer>
 </main>
+
+<!-- Code secret : clavier numérique, utilisé pour le verrouillage et pour régler le code -->
+<div id="lock" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+  <div class="lockbox">
+    <div style="font-size:2rem">🔒</div>
+    <h2 id="lockTitle">NZIMBU</h2>
+    <p class="msg" id="lockMsg" aria-live="polite"></p>
+    <div id="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div id="pad">
+      <button type="button" data-d="1">1</button><button type="button" data-d="2">2</button><button type="button" data-d="3">3</button>
+      <button type="button" data-d="4">4</button><button type="button" data-d="5">5</button><button type="button" data-d="6">6</button>
+      <button type="button" data-d="7">7</button><button type="button" data-d="8">8</button><button type="button" data-d="9">9</button>
+      <span></span><button type="button" data-d="0">0</button><button type="button" data-d="back" aria-label="Effacer">⌫</button>
+    </div>
+    <button type="button" class="linkbtn" id="lockCancel" hidden>Annuler</button>
+    <button type="button" class="linkbtn" id="lockForgot" hidden>Code oublié ?</button>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -317,6 +350,7 @@
     const list = monthTx();
     renderSummary(list); renderTx(list); renderDebts(); renderReminders(); renderRule(list); renderMonths();
     $('rate').value = data.rate;
+    const pinOn = !!getPin(); $('pinBtn').hidden = pinOn; $('pinChange').hidden = $('pinOff').hidden = !pinOn;
     $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
   }
 
@@ -434,7 +468,97 @@
     e.target.value = '';
   };
 
+  // ---------- Secret code ----------
+  // A 4-digit screen lock: only a salted PBKDF2 hash is kept (outside the exported data). It keeps casual snoopers out;
+  // it does not encrypt the data stored in the browser.
+  const PINKEY = 'budget-pin-v1', FAILKEY = 'budget-pin-fail-v1', root = document.documentElement;
+  const rd = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+  const wr = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const getPin = () => rd(PINKEY);
+  const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+  const unhex = h => new Uint8Array(h.match(/../g).map(x => parseInt(x, 16)));
+  const hashPin = async (pin, salt) => {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+    return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: unhex(salt), iterations: 150000, hash: 'SHA-256' }, key, 256));
+  };
+  // Returns an error message, or null when the code is right. 5 wrong codes in a row = a wait that doubles each time (max 15 min).
+  const checkPin = async code => {
+    const f = rd(FAILKEY) || { n: 0, until: 0 }, wait = Math.ceil((f.until - Date.now()) / 1000);
+    if (wait > 0) return `Trop d'essais. Réessaie dans ${wait} s.`;
+    const rec = getPin();
+    if (rec && await hashPin(code, rec.salt) === rec.hash) { wr(FAILKEY, null); return null; }
+    f.n++;
+    if (f.n % 5 === 0) f.until = Date.now() + Math.min(900, 30 * 2 ** (f.n / 5 - 1)) * 1000;
+    wr(FAILKEY, f);
+    return f.until > Date.now() ? `Code incorrect. Réessaie dans ${Math.ceil((f.until - Date.now()) / 1000)} s.` : 'Code incorrect.';
+  };
+  const storePin = async code => {
+    const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+    wr(PINKEY, { salt, hash: await hashPin(code, salt) }); wr(FAILKEY, null);
+  };
+
+  let buf = '', onCode = null;
+  const dots = () => document.querySelectorAll('#dots i').forEach((d, i) => d.classList.toggle('on', i < buf.length));
+  const closePad = () => { $('lock').classList.remove('open'); buf = ''; onCode = null; dots(); };
+  // Opens the keypad; cb receives each 4-digit code. cancellable adds "Annuler", lockScreen adds "Code oublié ?"
+  const showPad = (title, msg, cb, { cancellable = false, forgot = false } = {}) => {
+    $('lockTitle').textContent = title; $('lockMsg').textContent = msg || '';
+    $('lockCancel').hidden = !cancellable; $('lockForgot').hidden = !forgot;
+    buf = ''; dots(); onCode = cb; $('lock').classList.add('open');
+  };
+  const press = d => {
+    if (!onCode) return;
+    if (d === 'back') buf = buf.slice(0, -1); else if (buf.length < 4) buf += d;
+    dots();
+    if (buf.length === 4) { const code = buf, cb = onCode; buf = ''; setTimeout(() => { dots(); cb(code); }, 120); }
+  };
+  document.querySelectorAll('#pad [data-d]').forEach(b => b.onclick = () => press(b.dataset.d));
+  document.addEventListener('keydown', e => {
+    if (!$('lock').classList.contains('open') && !root.classList.contains('locked')) return;
+    if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('back');
+  });
+  $('lockCancel').onclick = closePad;
+
+  const lockScreen = msg => showPad('Code secret', msg, async code => {
+    const err = await checkPin(code);
+    if (err) return lockScreen(err);
+    root.classList.remove('locked'); closePad(); render();
+  }, { forgot: true });
+  const lockApp = () => { if (getPin()) { root.classList.add('locked'); lockScreen(); } };
+  $('lockForgot').onclick = () => {
+    if (confirm("Pour supprimer le code, toutes les données de NZIMBU sur cet appareil seront effacées (tu pourras réimporter une sauvegarde exportée). Continuer ?") && confirm('Dernière confirmation : tout effacer ?')) {
+      [KEY, PINKEY, FAILKEY].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); location.reload();
+    }
+  };
+
+  const secure = () => { if (crypto && crypto.subtle) return true; alert("Le code secret demande une page en https (ou localhost)."); return false; };
+  const setupPin = msg => showPad('Choisis un code à 4 chiffres', msg, c1 => showPad('Confirme le code', '', async c2 => {
+    if (c1 !== c2) return setupPin('Les deux codes ne correspondaient pas. Recommence.');
+    await storePin(c1); closePad(); render();
+  }, { cancellable: true }), { cancellable: true });
+  const verifyThen = (next, msg) => showPad('Code actuel', msg, async code => {
+    const err = await checkPin(code);
+    if (err) return verifyThen(next, err);
+    next();
+  }, { cancellable: true });
+  $('pinBtn').onclick = () => { if (secure()) setupPin(); };
+  $('pinChange').onclick = () => verifyThen(() => setupPin());
+  $('pinOff').onclick = () => verifyThen(() => { wr(PINKEY, null); wr(FAILKEY, null); closePad(); render(); });
+  // Tick: keeps the "wait" message of the lock screen up to date
+  setInterval(() => {
+    if (!root.classList.contains('locked')) return;
+    const f = rd(FAILKEY), wait = f ? Math.ceil((f.until - Date.now()) / 1000) : 0;
+    if (wait > 0) $('lockMsg').textContent = `Trop d'essais. Réessaie dans ${wait} s.`; else if (/Trop d'essais|Réessaie/.test($('lockMsg').textContent)) $('lockMsg').textContent = '';
+  }, 1000);
+  // Lock again after 30 s in the background
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) hiddenAt = Date.now();
+    else if (hiddenAt && Date.now() - hiddenAt > 30000) lockApp();
+  });
+
   render();
+  lockApp();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
   if (data.rateAuto) refreshRate();
   // Offline support (needs http(s) or localhost; silently skipped on file://)
