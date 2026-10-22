@@ -114,6 +114,33 @@
   footer input[type=number] { width: 90px; }
   .fc { color: var(--muted); font-weight: 400; font-size: .8rem; margin-left: 4px; }
   .card .fc { display: block; margin: 0; }
+  /* Animation layers (fx.js): a golden sky behind the app, sparkles in the header, toast and confetti on top */
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  .hsky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  header > h1, header > input { position: relative; z-index: 1; }
+  main { position: relative; z-index: 1; }
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 150; pointer-events: none; }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 200; max-width: calc(100% - 32px); padding: 11px 18px; border-radius: 99px; font-weight: 700; text-align: center; color: var(--gold-ink); background: var(--metal-flat); border: 1px solid #c58612; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 8px 24px rgba(120, 70, 5, .4); animation: toastIn .35s cubic-bezier(.2, .9, .3, 1.2) both; }
+  .toast.out { animation: toastOut .45s ease both; }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 24px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @keyframes toastOut { to { opacity: 0; transform: translate(-50%, 16px); } }
+  /* Glass cards over the sky */
+  .card, li, .backup { background: linear-gradient(180deg, var(--sheen), transparent 45%), color-mix(in srgb, var(--card) 84%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .cards .card:nth-child(3) { background: var(--hilite), color-mix(in srgb, var(--card) 84%, transparent); }
+  /* Entrances and feedback */
+  section:not([hidden]) { animation: rise .35s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .cards .card { animation: rise .5s ease both; }
+  .cards .card:nth-child(2) { animation-delay: .08s; } .cards .card:nth-child(3) { animation-delay: .16s; }
+  .bar i { transform-origin: left; animation: growx .9s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes growx { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .bars i { transform-origin: bottom; animation: growy .8s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes growy { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  .coin { animation: coinFloat 4.5s ease-in-out infinite; }
+  @keyframes coinFloat { 50% { transform: translateY(-2px) rotate(-4deg); } }
+  button { transition: transform .1s, filter .15s, box-shadow .15s; }
+  button:active { transform: scale(.97); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -202,6 +229,9 @@
     <select id="backupEvery" aria-label="Rappel de sauvegarde">
       <option value="7">Rappel : 7 jours</option><option value="14">Rappel : 14 jours</option><option value="30">Rappel : 30 jours</option><option value="0">Rappel : jamais</option>
     </select>
+    <select id="fxLevel" aria-label="Animation">
+      <option value="balanced">Animation : normale</option><option value="calm">Animation : calme</option><option value="off">Animation : aucune</option>
+    </select>
     <button class="small" id="pinBtn">🔒 Activer le code secret</button>
     <button class="small" id="pinChange" hidden>🔒 Changer le code</button>
     <button class="small" id="pinOff" hidden>Désactiver le code</button>
@@ -228,9 +258,12 @@
   </div>
 </div>
 
+<script src="fx.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  // Animations live in fx.js; if it is missing the app still works (no effects)
+  const NZ = window.NZ || { count: (el, f, t, r) => { el.innerHTML = r(t); }, celebrate() {}, tick() {}, toast() {}, fx: { mode: () => 'off', set() {} } };
   const KEY = 'budget-v1';
   const CATS = { besoins: ['Besoins', 0.5, 'var(--besoins)'], envies: ['Envies', 0.3, 'var(--envies)'], epargne: ['Épargne & dettes', 0.2, 'var(--epargne)'] };
 
@@ -281,8 +314,10 @@
   function renderSummary(list) {
     const ins = list.filter(t => t.type === 'in'), outs = list.filter(t => t.type === 'out');
     const i = sum(ins.map(t => t.amount)), o = sum(outs.map(t => t.amount)), fi = sum(ins.map(fcOf)), fo = sum(outs.map(fcOf));
-    $('sumIn').innerHTML = fmt(i, fi); $('sumOut').innerHTML = fmt(o, fo);
-    $('sumBal').innerHTML = fmt(i - o, fi - fo); $('sumBal').className = i - o < 0 ? 'out' : 'in';
+    // numbers count up from the previous values (from 0 on the first display)
+    const prev = renderSummary.prev || { i: [0, 0], o: [0, 0], b: [0, 0] }, cur = { i: [i, fi], o: [o, fo], b: [i - o, fi - fo] }; renderSummary.prev = cur;
+    ['i:sumIn', 'o:sumOut', 'b:sumBal'].forEach(x => { const [k, id] = x.split(':'); NZ.count($(id), prev[k], cur[k], v => fmt(v[0], v[1])); });
+    $('sumBal').className = i - o < 0 ? 'out' : 'in';
   }
 
   function renderTx(list) {
@@ -407,7 +442,16 @@
   }
 
   // ---------- Controls ----------
+  // Once per month, celebrate when the savings compartment reaches its 20 % goal
+  function checkGoal() {
+    const m = $('month').value, list = monthTx(), income = sum(list.filter(t => t.type === 'in').map(t => t.amount));
+    const saved = sum(list.filter(t => t.type === 'out' && t.cat === 'epargne').map(t => t.amount));
+    const done = rd(GOALKEY) || {};
+    if (income > 0 && saved >= income * 0.2 && !done[m]) { done[m] = 1; wr(GOALKEY, done); NZ.celebrate("🏆 Objectif d'épargne atteint !"); }
+  }
+  const GOALKEY = 'budget-goal-v1';
   const showTab = name => {
+    NZ.tick();
     document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
     ['tx', 'debts', 'rule', 'months'].forEach(t => $('tab-' + t).hidden = t !== name);
   };
@@ -433,7 +477,7 @@
     const old = editId && data.tx.find(x => x.id === editId);
     if (old) Object.assign(old, fields); else data.tx.push({ id: uid(), ...fields });
     $('month').value = fields.date.slice(0, 7);
-    endEdit(); save(); render();
+    endEdit(); save(); render(); checkGoal();
   };
 
   // Editing an operation reuses the main form: it is filled in (amount shown in USD, as stored) and saved over the original
@@ -459,7 +503,7 @@
     e.preventDefault();
     const m = $('month').value, el = f.elements;
     data.tx.push({ id: uid(), type: 'out', label: el.label.value.trim(), amount: toUsd(+el.amount.value, el.cur.value, ownRate(el.rate.value) || data.rate), rate: ownRate(el.rate.value) || (el.cur.value === 'fc' ? data.rate : undefined), date: today().startsWith(m) ? today() : m + '-01', cat: f.dataset.cat, sub: el.sub.value === '__new' ? '' : el.sub.value });
-    save(); render();
+    save(); render(); checkGoal();
   });
 
   $('debtForm').onsubmit = e => {
@@ -495,6 +539,7 @@
       data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, rate: inFc ? data.rate : undefined, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true });
     } else return;
     save(); render();
+    if (t.dataset.pay) { const d = data.debts.find(x => x.id === t.dataset.pay); if (d && !rest(d)) NZ.celebrate(d.dir === 'owe' ? `🎉 Dette soldée : ${d.who}` : `🎉 ${d.who} t'a tout remboursé`); else checkGoal(); }
   });
 
   $('rate').onchange = () => { const v = parseFloat($('rate').value); if (v > 0) { data.rate = v; data.rateAuto = false; data.rateDate = data.rateDate || today(); save(); } render(); };
@@ -512,6 +557,7 @@
     saveBk({ last: today(), snooze: '' }); render();
   };
   $('export').onclick = exportData;
+  $('fxLevel').value = NZ.fx.mode(); $('fxLevel').onchange = () => NZ.fx.set($('fxLevel').value);
   $('backupEvery').onchange = () => { saveBk({ every: parseInt($('backupEvery').value, 10) }); render(); };
   $('importBtn').onclick = () => $('importFile').click();
   $('importFile').onchange = e => {
