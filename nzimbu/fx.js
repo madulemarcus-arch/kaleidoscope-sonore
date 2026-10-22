@@ -1,6 +1,6 @@
 // NZIMBU animations, in the spirit of CISPOLstore Manager: a golden sky (twinkling stars linked like a network, drifting glows,
 // a changing sequence of scenes such as a coin rain), a sparkle layer inside the header, count-up numbers, a coin confetti,
-// money photos gliding in random directions inside the golden header (like the photo cards of CISPOLstore), a small haptic tick and a toast. Everything stops when the screen is locked or hidden, with "reduce motion" or data saver.
+// cut-out banknotes gliding in random directions inside the golden header (like the photo cards of CISPOLstore), a small haptic tick and a toast. Everything stops when the screen is locked or hidden, with "reduce motion" or data saver.
 (() => {
   'use strict';
   const KEY = 'budget-fx-v1', root = document.documentElement;
@@ -128,9 +128,10 @@
 
 
   // ---------- Photo cards in the header ----------
-  // Inside the golden NZIMBU banner, glass cards with money photos pass in a random direction each time:
+  // Inside the golden NZIMBU banner, cut-out banknotes (no photo background) pass in a random direction each time:
   // left to right, right to left, falling, rising, or flying out from the centre (never the same direction twice in a row).
-  const PHOTOS = Array.from({ length: 9 }, (_, i) => `photos/argent-${i + 1}.jpg`);
+  // r = width / height of each cut-out (transparent WebP, see photos/)
+  const NOTES = [{ src: 'photos/billet-1.webp', r: 1.305 }, { src: 'photos/billet-2.webp', r: 1.783 }, { src: 'photos/billet-3.webp', r: 1.296 }, { src: 'photos/billet-4.webp', r: 1.551 }];
   const DIRS = ['ltr', 'rtl', 'ttb', 'btt', 'center'];
   const band = { el: null, bg: null, anims: [], timer: 0, seq: 0, pool: [], last: '', running: false, sig: '', static: false };
   const bandEl = () => {
@@ -142,13 +143,13 @@
   };
   const bandPause = () => { clearTimeout(band.timer); band.seq++; band.anims.forEach(a => a.cancel()); band.anims = []; if (band.bg) band.bg.textContent = ''; band.running = false; band.static = false; };
   const bandRemove = () => { bandPause(); if (band.el) band.el.remove(); band.el = band.bg = null; };
-  const card = (w, hh, dp) => { // far = small and faint, near = big and brighter
-    if (!band.pool.length) band.pool = PHOTOS.slice().sort(() => Math.random() - .5);
-    const c = document.createElement('i'); c.className = 'hcard'; c.style.width = Math.round(w * dp) + 'px'; c.style.height = Math.round(hh * dp) + 'px'; c.style.zIndex = dp < 1 ? 0 : dp > 1 ? 2 : 1;
-    c.style.backgroundImage = `url(${band.pool.pop()})`; c.style.setProperty('--gc', pick(['245,197,66', '232,115,12', '255,236,170'])); c.style.setProperty('--sd', rnd(0, 3).toFixed(2) + 's');
-    band.bg.appendChild(c); return c;
+  const card = (ch, dp) => { // far = small and faint, near = big and bright
+    if (!band.pool.length) { band.pool = NOTES.slice().sort(() => Math.random() - .5); if (band.pool[band.pool.length - 1] === band.lastNote) band.pool.reverse(); }
+    const n = band.lastNote = band.pool.pop(), c = document.createElement('i'); c.className = 'hcard note';
+    c._h = Math.round(ch * dp); c._w = Math.round(c._h * n.r); c.style.width = c._w + 'px'; c.style.height = c._h + 'px'; c.style.zIndex = dp < 1 ? 0 : dp > 1 ? 2 : 1;
+    c.style.backgroundImage = `url(${n.src})`; band.bg.appendChild(c); return c;
   };
-  const depth = () => pick([.76, 1, 1.18]), op = dp => dp < 1 ? .45 : dp > 1 ? .95 : .75;
+  const depth = () => pick([.76, 1, 1.18]), op = dp => dp < 1 ? .55 : dp > 1 ? 1 : .85;
   // moves a card and fades it in and out softly at the ends of its trip
   const go = (c, frames, ms, delay, dp) => {
     const o = op(dp);
@@ -160,33 +161,33 @@
     if (document.hidden) { band.timer = setTimeout(() => pass(), 1000); return; }
     band.anims.forEach(a => a.cancel()); band.anims = []; bg.textContent = '';
     let dir = force; if (!dir) { do dir = pick(DIRS); while (dir === band.last); } band.last = dir;
-    const w = bg.clientWidth, hh = bg.clientHeight, id = ++band.seq, ch = Math.round(hh * .58), cw = Math.round(ch * 1.5), tilt = () => rnd(-5, 5), lv = level(), T = lv.tempo, dn = Math.max(.6, lv.dens), sf = 1 / dn;
-    if (dir === 'ltr' || dir === 'rtl') { // a row of cards, zigzag, crossing the width at different speeds (parallax)
+    const w = bg.clientWidth, hh = bg.clientHeight, id = ++band.seq, ch = Math.round(hh * .62), cw = Math.round(ch * 1.5), tilt = () => rnd(-8, 8), lv = level(), T = lv.tempo, dn = Math.max(.6, lv.dens), sf = 1 / dn;
+    if (dir === 'ltr' || dir === 'rtl') { // a row of notes, zigzag, crossing the width at different speeds (parallax)
       const sp = 150 * T, n = Math.max(4, Math.ceil(w / ((cw + 16) * sf)) + 3);
       for (let i = 0; i < n; i++) {
-        const dp = depth(), c = card(cw, ch, dp), cwd = cw * dp, y = hh * .5 - ch * dp / 2 + (i % 2 ? 1 : -1) * hh * .07, rot = tilt(), xa = dir === 'ltr' ? -cwd : w, xb = dir === 'ltr' ? w : -cwd, v = sp * (dp < 1 ? .7 : dp > 1 ? 1.25 : 1);
+        const dp = depth(), c = card(ch, dp), cwd = c._w, y = hh * .5 - c._h / 2 + (i % 2 ? 1 : -1) * hh * .08, rot = tilt(), xa = dir === 'ltr' ? -cwd : w, xb = dir === 'ltr' ? w : -cwd, v = sp * (dp < 1 ? .7 : dp > 1 ? 1.25 : 1);
         go(c, [{ transform: `translate(${xa}px,${y}px) rotate(${rot}deg)` }, { transform: `translate(${xb}px,${y}px) rotate(${rot}deg)` }], (w + cwd) / v * 1000, i * (cw + 16) * sf / sp * 1000, dp);
       }
-    } else if (dir === 'ttb' || dir === 'btt') { // columns of cards falling or rising
+    } else if (dir === 'ttb' || dir === 'btt') { // columns of notes falling or rising
       const lanes = Math.max(2, Math.min(5, Math.round(w / (cw + 20) * Math.sqrt(dn)))), sp = 120 * T;
       for (let i = 0; i < lanes * 2; i++) {
-        const dp = depth(), c = card(cw - 20, ch, dp), chd = ch * dp, ms = (hh + chd) / (sp * (dp < 1 ? .7 : dp > 1 ? 1.25 : 1)) * 1000, x = ((i % lanes) + .5) * w / lanes - (cw - 20) * dp / 2 + rnd(-10, 10), rot = tilt(), ya = dir === 'ttb' ? -chd : hh, yb = dir === 'ttb' ? hh : -chd;
+        const dp = depth(), c = card(ch, dp), chd = c._h, ms = (hh + chd) / (sp * (dp < 1 ? .7 : dp > 1 ? 1.25 : 1)) * 1000, x = ((i % lanes) + .5) * w / lanes - c._w / 2 + rnd(-10, 10), rot = tilt(), ya = dir === 'ttb' ? -chd : hh, yb = dir === 'ttb' ? hh : -chd;
         go(c, [{ transform: `translate(${x}px,${ya}px) rotate(${rot}deg)` }, { transform: `translate(${x}px,${yb}px) rotate(${rot}deg)` }], ms, ((i % lanes) * 450 + Math.floor(i / lanes) * (ms * .55) + rnd(0, 250)) * sf, dp);
       }
-    } else { // from the centre: the cards grow and fly out in every direction
+    } else { // from the centre: the notes grow and fly out in every direction
       const n = Math.max(4, Math.round(6 * dn)), off = rnd(0, 6.28);
       for (let i = 0; i < n; i++) {
-        const dp = depth(), c = card(cw, ch, dp), cx = w / 2 - cw * dp / 2, cy = hh / 2 - ch * dp / 2, a = off + i / n * 6.283 + rnd(-.3, .3), dx = Math.cos(a) * w * .7, dy = Math.sin(a) * hh * .75, rot = rnd(-12, 12), o = op(dp);
+        const dp = depth(), c = card(ch, dp), cx = w / 2 - c._w / 2, cy = hh / 2 - c._h / 2, a = off + i / n * 6.283 + rnd(-.3, .3), dx = Math.cos(a) * w * .7, dy = Math.sin(a) * hh * .75, rot = rnd(-14, 14), o = op(dp);
         go(c, [{ transform: `translate(${cx}px,${cy}px) scale(.15) rotate(0deg)`, opacity: 0 }, { opacity: o, offset: .3 }, { transform: `translate(${cx + dx}px,${cy + dy}px) scale(1.15) rotate(${rot}deg)`, opacity: 0 }], 2800 / T, i * 330 / T * sf, dp);
       }
     }
     Promise.all(band.anims.map(a => a.finished.catch(() => null))).then(() => { if (id === band.seq && bg.isConnected) band.timer = setTimeout(() => pass(), rnd(300, 900) * lv.gap); });
   };
-  // "Reduce motion": three still cards
+  // "Reduce motion": three still notes
   const bandStatic = () => {
     if (band.static) return; bandPause(); band.static = true;
-    const w = band.bg.clientWidth, hh = band.bg.clientHeight, ch = Math.round(hh * .58), cw = Math.round(ch * 1.5);
-    for (let i = 0; i < 3; i++) { const c = card(cw, ch, 1); c.style.opacity = .85; c.style.transform = `translate(${(i + .5) * w / 3 - cw / 2}px,${hh * .2}px) rotate(${(i - 1) * 3}deg)`; }
+    const w = band.bg.clientWidth, hh = band.bg.clientHeight, ch = Math.round(hh * .62);
+    for (let i = 0; i < 3; i++) { const c = card(ch, 1); c.style.opacity = .9; c.style.transform = `translate(${(i + .5) * w / 3 - c._w / 2}px,${hh * .5 - c._h / 2}px) rotate(${(i - 1) * 5}deg)`; }
   };
   const bandSync = () => {
     if (mode() === 'off') return bandRemove();
