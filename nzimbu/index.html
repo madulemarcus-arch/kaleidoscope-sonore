@@ -63,6 +63,9 @@
   .rule .row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .msg { font-size: .9rem; color: var(--muted); }
   .msg.bad { color: var(--warn); font-weight: 600; } .msg.ok { color: var(--in); }
+  .backup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .backup span { flex: 1; min-width: 180px; }
+  footer select { padding: 4px 8px; font-size: .85rem; }
   #reminders { display: grid; gap: 6px; margin-bottom: 12px; }
   .rem { text-align: left; font-weight: 600; border-left-width: 4px; }
   .rem.late, li.late { border-left-color: var(--out); } .rem.late { color: var(--out); }
@@ -101,6 +104,7 @@
     <input type="month" id="month" aria-label="Mois affiché">
   </header>
 
+  <div id="backupBanner" class="backup" hidden></div>
   <div id="reminders" hidden></div>
 
   <div class="cards">
@@ -174,6 +178,10 @@
     <button class="small" id="rateAuto">Taux automatique</button><span id="rateInfo"></span>
     <button class="small" id="export">Exporter</button>
     <button class="small" id="importBtn">Importer</button>
+    <span id="backupInfo"></span>
+    <select id="backupEvery" aria-label="Rappel de sauvegarde">
+      <option value="7">Rappel : 7 jours</option><option value="14">Rappel : 14 jours</option><option value="30">Rappel : 30 jours</option><option value="0">Rappel : jamais</option>
+    </select>
     <button class="small" id="pinBtn">🔒 Activer le code secret</button>
     <button class="small" id="pinChange" hidden>🔒 Changer le code</button>
     <button class="small" id="pinOff" hidden>Désactiver le code</button>
@@ -285,6 +293,21 @@
     document.querySelector('[data-tab=debts]').textContent = items.length ? `Dettes (${items.length})` : 'Dettes';
   }
 
+  // Backup reminder: when there is data and the last export is older than the chosen delay (or there never was one)
+  const BKEY = 'budget-backup-v1';
+  const bk = () => Object.assign({ last: '', snooze: '', every: 7 }, rd(BKEY));
+  const saveBk = patch => wr(BKEY, Object.assign(bk(), patch));
+  function renderBackup() {
+    const b = bk(), hasData = data.tx.length || data.debts.length;
+    const age = b.last ? Math.round((new Date(today() + 'T12:00:00') - new Date(b.last + 'T12:00:00')) / 864e5) : null;
+    const due = hasData && b.every > 0 && b.snooze !== today() && (age === null || age >= b.every);
+    $('backupBanner').hidden = !due;
+    $('backupBanner').innerHTML = due ? `<span>💾 ${age === null ? 'Tes données ne sont pas encore sauvegardées.' : `Dernière sauvegarde il y a ${age} j.`}</span>
+      <button class="small primary" data-backup="now">Exporter maintenant</button><button class="small" data-backup="later">Plus tard</button>` : '';
+    $('backupInfo').textContent = b.last ? `Dernière sauvegarde : ${dateFr(b.last)}` : 'Jamais sauvegardé';
+    $('backupEvery').value = String(b.every);
+  }
+
   function debtItem(d) {
     const left = rest(d), info = dueInfo(d);
     return `<li class="${left ? '' : 'done'} ${info ? info.cls : ''}">
@@ -357,7 +380,7 @@
 
   function render() {
     const list = monthTx();
-    renderSummary(list); renderTx(list); renderDebts(); renderReminders(); renderRule(list); renderMonths();
+    renderSummary(list); renderTx(list); renderDebts(); renderReminders(); renderBackup(); renderRule(list); renderMonths();
     $('rate').value = data.rate; $('txRate').placeholder = `Taux (${rateTxt(data.rate)})`;
     const pinOn = !!getPin(); $('pinBtn').hidden = pinOn; $('pinChange').hidden = $('pinOff').hidden = !pinOn;
     $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
@@ -428,6 +451,7 @@
   document.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.go) { showTab(t.dataset.go); return; }
+    if (t.dataset.backup) { if (t.dataset.backup === 'now') exportData(); else { saveBk({ snooze: today() }); render(); } return; }
     if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
     if (t.dataset.editTx) { startEdit(t.dataset.editTx); return; }
     if (t.dataset.delTx && confirm('Supprimer cette opération ?')) { if (editId === t.dataset.delTx) endEdit(); data.tx = data.tx.filter(x => x.id !== t.dataset.delTx); }
@@ -461,11 +485,14 @@
   }).catch(() => {});
   $('rateAuto').onclick = () => { data.rateAuto = true; refreshRate(); };
 
-  $('export').onclick = () => {
+  const exportData = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    a.download = `budget-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
+    a.download = `nzimbu-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
+    saveBk({ last: today(), snooze: '' }); render();
   };
+  $('export').onclick = exportData;
+  $('backupEvery').onchange = () => { saveBk({ every: parseInt($('backupEvery').value, 10) }); render(); };
   $('importBtn').onclick = () => $('importFile').click();
   $('importFile').onchange = e => {
     const f = e.target.files[0]; if (!f) return;
