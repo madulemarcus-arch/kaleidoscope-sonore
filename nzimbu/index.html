@@ -130,6 +130,7 @@
       <input id="txAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
       <select id="txCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
       <input id="txDate" type="date" required>
+      <input id="txRate" type="number" min="1" step="any" aria-label="Taux de cette opération (facultatif)" title="Taux de cette opération : francs congolais pour 1 $ (facultatif)">
       <button class="primary wide" id="txSubmit">Ajouter</button>
       <button type="button" class="wide" id="txCancel" hidden>Annuler la modification</button>
     </form>
@@ -219,13 +220,19 @@
   const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
   // Amounts are stored in USD; the CDF equivalent is derived from data.rate
   const usd = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n) + ' $';
-  const fc = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n * data.rate) + ' FC';
-  const fmt = n => `${usd(n)} <small class="fc">≈ ${fc(n)}</small>`;
+  const fcNum = v => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(v) + ' FC';
+  const fc = n => fcNum(n * data.rate);
+  // fmt(n) converts at the current rate; fmt(n, f) shows an exact FC value (operations keep their own rate)
+  const fmt = (n, f) => `${usd(n)} <small class="fc">≈ ${f == null ? fc(n) : fcNum(f)}</small>`;
+  const fcOf = t => t.amount * (t.rate || data.rate);
+  const rateTxt = r => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(r);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const sum = a => a.reduce((t, x) => t + x, 0);
   const rest = d => Math.max(0, Math.round((d.amount - d.paid) * 100) / 100);
   // Entered amounts may be in USD or FC; everything is stored in USD
-  const toUsd = (v, c) => Math.round((c === 'fc' ? v / data.rate : v) * 1e6) / 1e6;
+  const toUsd = (v, c, r = data.rate) => Math.round((c === 'fc' ? v / r : v) * 1e6) / 1e6;
+  // Optional per-operation rate (FC per 1 $): used for FC entries, and kept so the FC value of the operation never moves
+  const ownRate = v => { v = parseFloat(v); return v > 0 ? v : undefined; };
   const dateFr = s => s.split('-').reverse().join('/');
   const subList = k => data.subs[k] || DEFAULT_SUBS[k];
   const subOptions = (k, sel) => {
@@ -244,15 +251,16 @@
   const monthTx = () => data.tx.filter(t => t.date.startsWith($('month').value)).sort((a, b) => b.date.localeCompare(a.date));
 
   function renderSummary(list) {
-    const i = sum(list.filter(t => t.type === 'in').map(t => t.amount)), o = sum(list.filter(t => t.type === 'out').map(t => t.amount));
-    $('sumIn').innerHTML = fmt(i); $('sumOut').innerHTML = fmt(o);
-    $('sumBal').innerHTML = fmt(i - o); $('sumBal').className = i - o < 0 ? 'out' : 'in';
+    const ins = list.filter(t => t.type === 'in'), outs = list.filter(t => t.type === 'out');
+    const i = sum(ins.map(t => t.amount)), o = sum(outs.map(t => t.amount)), fi = sum(ins.map(fcOf)), fo = sum(outs.map(fcOf));
+    $('sumIn').innerHTML = fmt(i, fi); $('sumOut').innerHTML = fmt(o, fo);
+    $('sumBal').innerHTML = fmt(i - o, fi - fo); $('sumBal').className = i - o < 0 ? 'out' : 'in';
   }
 
   function renderTx(list) {
     $('txList').innerHTML = list.length ? list.map(t => `<li>
-      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}${t.sub ? ` · ${esc(t.sub)}` : ''}</span></div>
-      <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount)}</b>
+      <div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.cat ? ` · ${CATS[t.cat][0]}` : ''}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span></div>
+      <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount, fcOf(t))}</b>
       ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
       <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucune opération ce mois-ci.</li>';
   }
@@ -301,7 +309,7 @@
     const income = sum(list.filter(t => t.type === 'in').map(t => t.amount));
     const hint = income ? '' : '<p class="empty">Ajoute au moins une entrée ce mois-ci pour calculer les montants à ne pas dépasser.</p>';
     $('ruleBody').innerHTML = hint + Object.entries(CATS).map(([k, [name, pct, color]]) => {
-      const exp = list.filter(t => t.type === 'out' && t.cat === k), target = income * pct, actual = sum(exp.map(t => t.amount));
+      const exp = list.filter(t => t.type === 'out' && t.cat === k), target = income * pct, actual = sum(exp.map(t => t.amount)), actualFc = sum(exp.map(fcOf));
       const diff = actual - target, saving = k === 'epargne', bad = saving ? diff < 0 : diff > 0;
       const msg = !income ? '' : saving
         ? (bad ? `Il manque ${fmt(-diff)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(diff)} de marge.`)
@@ -310,11 +318,11 @@
       const breakdown = Object.entries(bySub).sort((a, b) => b[1] - a[1]).map(([n, v]) => { const w = Math.round(v / actual * 100);
         return `<div class="subrow" style="background:linear-gradient(90deg, color-mix(in srgb, ${color} 22%, transparent) ${w}%, transparent ${w}%)"><span>${esc(n)}</span><span>${usd(v)} · ${w} %</span></div>`; }).join('');
       const share = income ? ` (${Math.round(actual / income * 100)} % de tes entrées)` : '';
-      return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual)} / ${fmt(target)}</span></div>
+      return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual, actualFc)} / ${fmt(target)}</span></div>
         <div class="bar"><i style="width:${target ? Math.min(100, actual / target * 100) : 0}%;background:${color}"></i></div>
         <div class="msg ${bad ? 'bad' : 'ok'}">${msg}${share}</div>
         ${breakdown ? `<div class="subs">${breakdown}</div>` : ''}
-        <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.sub ? ` · ${esc(t.sub)}` : ''}</span></div><b class="out">−${fmt(t.amount)}</b>
+        <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span></div><b class="out">−${fmt(t.amount, fcOf(t))}</b>
           ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
           <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>
         <form class="quick" data-cat="${k}">
@@ -322,6 +330,7 @@
           <input name="label" placeholder="Dépense (${name.toLowerCase()})" required class="wide">
           <input name="amount" type="number" min="0.01" step="any" placeholder="Montant" required>
           <select name="cur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+          <input name="rate" type="number" min="1" step="any" placeholder="Taux (facultatif)" aria-label="Taux de cette opération (facultatif)" class="wide">
           <button class="primary wide">Dépenser ici</button></form></div>`;
     }).join('');
   }
@@ -330,11 +339,11 @@
   const monthLabel = m => new Date(m + '-01T12:00:00').toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
   function renderMonths() {
     const by = {};
-    data.tx.forEach(t => { const m = t.date.slice(0, 7), o = by[m] || (by[m] = { i: 0, o: 0 }); o[t.type === 'in' ? 'i' : 'o'] += t.amount; });
+    data.tx.forEach(t => { const m = t.date.slice(0, 7), o = by[m] || (by[m] = { i: 0, o: 0, fi: 0, fo: 0 }); o[t.type === 'in' ? 'i' : 'o'] += t.amount; o[t.type === 'in' ? 'fi' : 'fo'] += fcOf(t); });
     const keys = Object.keys(by).sort();
     if (!keys.length) { $('monthsBody').innerHTML = '<p class="empty">Aucune opération pour le moment.</p>'; return; }
     let cum = 0;
-    const rows = keys.map(m => { cum += by[m].i - by[m].o; return { m, i: by[m].i, o: by[m].o, bal: by[m].i - by[m].o, cum }; });
+    const rows = keys.map(m => { cum += by[m].i - by[m].o; return { m, i: by[m].i, o: by[m].o, bal: by[m].i - by[m].o, fbal: by[m].fi - by[m].fo, cum }; });
     const recent = rows.slice(-12), max = Math.max(...recent.map(r => Math.max(r.i, r.o))) || 1;
     $('monthsBody').innerHTML = `<div class="legend"><span><i style="background:var(--in)"></i>Entrées</span><span><i style="background:var(--out)"></i>Sorties</span></div>
       <div class="chart">${recent.map(r => `<div class="mcol"><div class="bars">
@@ -342,14 +351,14 @@
         <i style="height:${r.o / max * 100}%;background:var(--out)" title="Sorties : ${usd(r.o)}"></i></div><div class="lbl">${monthLabel(r.m)}</div></div>`).join('')}</div>
       <h2>Bilan par mois</h2><ul>${rows.reverse().map(r => `<li>
         <div class="grow"><b>${monthLabel(r.m)}</b><span>Entrées ${usd(r.i)} · Sorties ${usd(r.o)}</span><span>Cumul ${usd(r.cum)}</span></div>
-        <b class="${r.bal < 0 ? 'out' : 'in'}">${r.bal < 0 ? '−' : '+'}${fmt(Math.abs(r.bal))}</b>
+        <b class="${r.bal < 0 ? 'out' : 'in'}">${r.bal < 0 ? '−' : '+'}${fmt(Math.abs(r.bal), Math.abs(r.fbal))}</b>
         <button class="small" data-month="${r.m}">Ouvrir</button></li>`).join('')}</ul>`;
   }
 
   function render() {
     const list = monthTx();
     renderSummary(list); renderTx(list); renderDebts(); renderReminders(); renderRule(list); renderMonths();
-    $('rate').value = data.rate;
+    $('rate').value = data.rate; $('txRate').placeholder = `Taux (${rateTxt(data.rate)})`;
     const pinOn = !!getPin(); $('pinBtn').hidden = pinOn; $('pinChange').hidden = $('pinOff').hidden = !pinOn;
     $('rateInfo').textContent = !data.rateDate ? 'Taux par défaut' : data.rateAuto ? `Taux automatique du ${dateFr(data.rateDate)}` : 'Taux manuel';
   }
@@ -376,7 +385,8 @@
   $('txForm').onsubmit = e => {
     e.preventDefault();
     const type = $('txType').value;
-    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, $('txCur').value), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null, sub: type === 'out' ? $('txSub').value : '' };
+    const cur = $('txCur').value, rate = ownRate($('txRate').value);
+    const fields = { type, label: $('txLabel').value.trim(), amount: toUsd(+$('txAmount').value, cur, rate || data.rate), rate: rate || (cur === 'fc' ? data.rate : undefined), date: $('txDate').value, cat: type === 'out' ? $('txCat').value : null, sub: type === 'out' ? $('txSub').value : '' };
     const old = editId && data.tx.find(x => x.id === editId);
     if (old) Object.assign(old, fields); else data.tx.push({ id: uid(), ...fields });
     $('month').value = fields.date.slice(0, 7);
@@ -386,7 +396,7 @@
   // Editing an operation reuses the main form: it is filled in (amount shown in USD, as stored) and saved over the original
   let editId = null;
   const endEdit = () => {
-    editId = null; $('txLabel').value = ''; $('txAmount').value = ''; $('txCur').value = 'usd'; $('txDate').value = today();
+    editId = null; $('txLabel').value = ''; $('txAmount').value = ''; $('txRate').value = ''; $('txCur').value = 'usd'; $('txDate').value = today();
     $('txSub').innerHTML = subOptions($('txCat').value, '');
     $('txSubmit').textContent = 'Ajouter'; $('txCancel').hidden = true;
   };
@@ -394,7 +404,7 @@
     const t = data.tx.find(x => x.id === id); if (!t) return;
     editId = id; showTab('tx');
     $('txType').value = t.type; $('txType').onchange(); $('txCat').value = t.cat || 'besoins'; $('txSub').innerHTML = subOptions($('txCat').value, t.sub || '');
-    $('txLabel').value = t.label; $('txAmount').value = +t.amount.toFixed(6); $('txCur').value = 'usd'; $('txDate').value = t.date;
+    $('txLabel').value = t.label; $('txAmount').value = +t.amount.toFixed(6); $('txCur').value = 'usd'; $('txDate').value = t.date; $('txRate').value = t.rate || '';
     $('txSubmit').textContent = 'Enregistrer'; $('txCancel').hidden = false;
     $('txForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('txLabel').focus();
   };
@@ -405,7 +415,7 @@
     const f = e.target; if (!f.classList.contains('quick')) return;
     e.preventDefault();
     const m = $('month').value, el = f.elements;
-    data.tx.push({ id: uid(), type: 'out', label: el.label.value.trim(), amount: toUsd(+el.amount.value, el.cur.value), date: today().startsWith(m) ? today() : m + '-01', cat: f.dataset.cat, sub: el.sub.value === '__new' ? '' : el.sub.value });
+    data.tx.push({ id: uid(), type: 'out', label: el.label.value.trim(), amount: toUsd(+el.amount.value, el.cur.value, ownRate(el.rate.value) || data.rate), rate: ownRate(el.rate.value) || (el.cur.value === 'fc' ? data.rate : undefined), date: today().startsWith(m) ? today() : m + '-01', cat: f.dataset.cat, sub: el.sub.value === '__new' ? '' : el.sub.value });
     save(); render();
   });
 
@@ -433,12 +443,12 @@
     else if (t.dataset.pay) {
       const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
       const raw = String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left} $, ou ${Math.round(left * data.rate)} FC). Ajoute « FC » pour des francs congolais :`, left) || '');
-      const v = toUsd(parseFloat(raw.replace(',', '.')), /fc|cdf/i.test(raw) ? 'fc' : 'usd');
+      const inFc = /fc|cdf/i.test(raw), v = toUsd(parseFloat(raw.replace(',', '.')), inFc ? 'fc' : 'usd');
       if (!(v > 0)) return;
       const amt = Math.min(v, left);
       d.paid += amt;
       // Repayment is also recorded as a transaction so the monthly totals stay accurate
-      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true });
+      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, rate: inFc ? data.rate : undefined, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true });
     } else return;
     save(); render();
   });
