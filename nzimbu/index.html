@@ -197,6 +197,7 @@
   .dbody { padding-top: 6px; } .dbody .grow { margin-bottom: 8px; }
   .dact { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
   li.debt.open { padding-bottom: 12px; }
+  .pays { font-size: .8rem; }
   #shareMonth { width: 100%; margin-bottom: 12px; padding: 10px; }
   body.noscroll { overflow: hidden; }
   html.locked .fab, html.locked .sheet { display: none; }
@@ -330,6 +331,24 @@
   </div>
 </div>
 
+<!-- Paiement d'une dette (partiel ou total) -->
+<div id="paySheet" class="sheet" hidden>
+  <div class="sheet-back" data-close-panel></div>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+    <div class="sheet-head"><h2 id="payTitle">Paiement</h2><button type="button" class="iconbtn" data-close-panel aria-label="Fermer">✕</button></div>
+    <p class="msg" id="payRecap"></p>
+    <form id="payForm">
+      <div class="chips wide" id="payQuick"></div>
+      <input id="pAmount" type="number" min="0.01" step="any" placeholder="Montant payé (une partie ou tout)" required>
+      <select id="pCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+      <select id="pWallet" class="wide" aria-label="Portefeuille"></select>
+      <input id="pDate" type="date" required class="wide">
+      <p class="msg wide" id="pInfo" aria-live="polite"></p>
+      <button class="primary wide">Enregistrer le paiement</button>
+    </form>
+  </div>
+</div>
+
 <!-- Bienvenue (première ouverture) -->
 <div id="welcome" class="sheet" hidden>
   <div class="sheet-back" data-close-panel></div>
@@ -441,9 +460,9 @@
   const dateFr = s => s.split('-').reverse().join('/');
   const monthLong = m => new Date(m + '-01T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const shiftMonth = (m, n) => { const [y, mo] = m.split('-').map(Number), d = new Date(y, mo - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-  const walletOptions = sel => {
+  const walletOptions = (sel, noNew) => {
     const l = (data.wallets || []).slice(); if (sel && !l.includes(sel)) l.push(sel);
-    return '<option value="">Portefeuille…</option>' + l.map(n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('') + '<option value="__new">+ Nouveau portefeuille…</option>';
+    return '<option value="">Portefeuille…</option>' + l.map(n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('') + (noNew ? '' : '<option value="__new">+ Nouveau portefeuille…</option>');
   };
   const subList = k => data.subs[k] || DEFAULT_SUBS[k];
   const subOptions = (k, sel) => {
@@ -564,11 +583,12 @@
         <div class="grow">${info ? `<em class="tag ${info.cls}">${info.txt}</em>` : ''}
           <span class="amt">${left ? `Reste ${fmt(left)}` : `Soldée ✅ (${usd(d.amount)})`}</span>
           <span>${left && d.paid ? `${usd(d.paid)} ${d.dir === 'owe' ? 'remboursés' : 'reçus'} sur ${usd(d.amount)}` : left ? `Montant ${usd(d.amount)}` : ''}${d.due ? `${left ? ' · ' : ''}échéance ${dateFr(d.due)}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span>
+          ${(d.pays || []).length ? `<span class="pays">${d.dir === 'owe' ? 'Remboursements' : 'Paiements reçus'} : ${d.pays.map(x => `${dateFr(x.date)} ${usd(x.amount)}`).join(' · ')}</span>` : ''}
           <div class="bar"><i style="width:${pct}%;background:var(--in)"></i></div></div>
         <div class="dact">
           ${left && d.dir === 'owed' ? `<button class="small" data-wa="${d.id}" aria-label="Relancer sur WhatsApp" title="Relancer sur WhatsApp">💬</button>` : ''}
           ${left ? `<button class="small" data-due="${d.id}" aria-label="Modifier l'échéance" title="Modifier l'échéance">📅</button>` : ''}
-          ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
+          ${left ? `<button class="small" data-pay="${d.id}">+ Paiement</button>` : ''}
           <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></div>
       </div></li>`;
   }
@@ -739,7 +759,7 @@
   };
 
   // Bottom sheets: the operation form and the settings
-  const PANELS = ['sheet', 'settings', 'welcome', 'moveSheet'], WKEY = 'budget-welcome-v1';
+  const PANELS = ['sheet', 'settings', 'welcome', 'moveSheet', 'paySheet'], WKEY = 'budget-welcome-v1';
   const openPanel = id => { if (id === 'sheet') renderTpl(); PANELS.forEach(p => $(p).hidden = p !== id); document.body.classList.add('noscroll'); NZ.tick(); };
   const closePanels = () => { if (!$('welcome').hidden) wr(WKEY, 1); PANELS.forEach(p => $(p).hidden = true); document.body.classList.remove('noscroll'); if (editId) endEdit(); };
   document.querySelectorAll('[data-close-panel]').forEach(x => x.onclick = closePanels);
@@ -792,6 +812,8 @@
       const msg = `Bonjour ${d.who}, petit rappel amical : il me reste ${usd(rest(d))} (≈ ${fc(rest(d))}) à recevoir de ta part${d.due ? `, prévu le ${dateFr(d.due)}` : ''}. Merci ! 🙏`;
       window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener'); return;
     }
+    if (t.dataset.pay) { openPay(t.dataset.pay); return; }
+    if (t.dataset.payq) { const c = payCalc(); if (c) { $('pAmount').value = +(c.left * +t.dataset.payq).toFixed(2); $('pCur').value = 'usd'; payPreview(); } return; }
     if (t.dataset.toggleDebt) {
       const id = t.dataset.toggleDebt, li = t.closest('li'), open = !openDebts.has(id);
       open ? openDebts.add(id) : openDebts.delete(id);
@@ -824,18 +846,8 @@
       if (v === null) { alert('Date non reconnue. Exemple : 25/12/2026'); return; }
       d.due = v;
     }
-    else if (t.dataset.pay) {
-      const d = data.debts.find(x => x.id === t.dataset.pay), left = rest(d);
-      const raw = String(prompt(`Montant ${d.dir === 'owe' ? 'remboursé à' : 'reçu de'} ${d.who} (reste ${left} $, ou ${Math.round(left * data.rate)} FC). Ajoute « FC » pour des francs congolais :`, left) || '');
-      const inFc = /fc|cdf/i.test(raw), v = toUsd(parseFloat(raw.replace(',', '.')), inFc ? 'fc' : 'usd');
-      if (!(v > 0)) return;
-      const amt = Math.min(v, left);
-      d.paid += amt;
-      // Repayment is also recorded as a transaction so the monthly totals stay accurate
-      data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, rate: inFc ? data.rate : undefined, date: today(), cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true });
-    } else return;
+    else return;
     save(); render();
-    if (t.dataset.pay) { const d = data.debts.find(x => x.id === t.dataset.pay); if (d && !rest(d)) NZ.celebrate(d.dir === 'owe' ? `🎉 Dette soldée : ${d.who}` : `🎉 ${d.who} t'a tout remboursé`); else checkGoal(); }
   });
 
   // Wallets and transfers
@@ -859,6 +871,33 @@
     const cur = $('mCur').value;
     (data.moves = data.moves || []).push({ id: uid(), from, to, amount: toUsd(v, cur), rate: cur === 'fc' ? data.rate : undefined, date: $('mDate').value });
     closePanels(); save(); render(); NZ.toast('⇄ Transfert enregistré');
+  };
+  // Paying a debt: any part of what is left, or all of it; each payment is dated, recorded in a wallet and kept in the debt's history
+  let payId = null;
+  const payCalc = () => { const d = data.debts.find(x => x.id === payId); return d ? { d, left: rest(d), v: toUsd(+$('pAmount').value, $('pCur').value) } : null; };
+  function payPreview() {
+    const c = payCalc(); if (!c) return;
+    $('pInfo').textContent = !(c.v > 0) ? '' : c.v >= c.left ? `${c.v > c.left + 1e-9 ? `Montant limité au reste (${usd(c.left)}). ` : ''}La dette sera soldée ✅` : `Après ce paiement, il restera ${usd(c.left - c.v)} (≈ ${fc(c.left - c.v)}).`;
+  }
+  function openPay(id) {
+    const d = data.debts.find(x => x.id === id); if (!d) return;
+    payId = id; const left = rest(d);
+    $('payTitle').textContent = d.dir === 'owe' ? `Rembourser ${d.who}` : `Reçu de ${d.who}`;
+    $('payRecap').innerHTML = `Reste <b>${usd(left)}</b> (≈ ${fc(left)}) sur ${usd(d.amount)}${d.paid ? `, déjà ${usd(d.paid)}` : ''}.`;
+    $('payQuick').innerHTML = `<button type="button" data-payq="1">Tout (${usd(left)})</button><button type="button" data-payq="0.5">Moitié (${usd(left / 2)})</button>`;
+    $('pAmount').value = ''; $('pCur').value = 'usd'; $('pWallet').innerHTML = walletOptions('', true); $('pDate').value = today();
+    payPreview(); openPanel('paySheet'); $('pAmount').focus();
+  }
+  $('pAmount').oninput = $('pCur').onchange = payPreview;
+  $('payForm').onsubmit = e => {
+    e.preventDefault();
+    const c = payCalc(); if (!c || !(c.v > 0)) return;
+    const { d, left } = c, amt = Math.min(c.v, left), inFc = $('pCur').value === 'fc', date = $('pDate').value || today(), rate = inFc ? data.rate : undefined;
+    d.paid += amt; (d.pays = d.pays || []).push({ date, amount: amt, rate });
+    // The payment is also an operation so the monthly totals and the wallet balances stay accurate
+    data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, rate, date, cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true, wallet: $('pWallet').value || undefined });
+    closePanels(); save(); render();
+    if (!rest(d)) NZ.celebrate(d.dir === 'owe' ? `🎉 Dette soldée : ${d.who}` : `🎉 ${d.who} t'a tout remboursé`); else { NZ.toast(`✅ Paiement enregistré, reste ${usd(rest(d))}`); checkGoal(); }
   };
   $('shareMonth').onclick = () => {
     const text = monthReport();
