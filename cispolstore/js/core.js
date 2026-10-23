@@ -23,7 +23,7 @@
   App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Commission technicien', 'Internet / Abonnement', 'Marketing', 'Autre'];
   App.PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   App.KITS = ['Starlink Mini', 'Starlink Standard'];
-  App.BUILD = 'v143'; // keep equal to CACHE in sw.js
+  App.BUILD = 'v144'; // keep equal to CACHE in sw.js
   App.typeName = c => c.type === 'gere' && c.aboOnly ? 'Abonnement seulement' : App.TYPES[c.type];
   App.TYPES = { gere: 'Client géré', mat: 'Matériel uniquement', install: 'Installation uniquement' };
 
@@ -190,12 +190,13 @@
 
   // ---------- French number to words (invoice) ----------
   const U = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
-  const T = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante'];
+  const T = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'septante', 'quatre-vingt', 'nonante'];
+  // Belgian / Congolese forms: septante (70) and nonante (90); 80 stays quatre-vingt(s)
   const b100 = (n, fin) => {
     if (n < 20) return U[n];
-    if (n < 70) { const t = Math.floor(n / 10), u = n % 10; return T[t] + (u === 1 ? ' et un' : u ? '-' + U[u] : ''); }
-    if (n < 80) { const u = n - 60; return 'soixante' + (u === 11 ? ' et onze' : '-' + U[u]); }
-    const u = n - 80; return u === 0 ? (fin ? 'quatre-vingts' : 'quatre-vingt') : 'quatre-vingt-' + U[u];
+    const t = Math.floor(n / 10), u = n % 10;
+    if (t === 8) return u === 0 ? (fin ? 'quatre-vingts' : 'quatre-vingt') : 'quatre-vingt-' + U[u];
+    return T[t] + (u === 1 ? ' et un' : u ? '-' + U[u] : '');
   };
   const b1000 = (n, fin) => {
     const h = Math.floor(n / 100), r = n % 100;
