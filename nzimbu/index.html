@@ -184,6 +184,13 @@
   .tag.late { color: var(--out); border-color: var(--out); } .tag.soon { color: var(--warn); border-color: var(--warn); }
   .wallets { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0 0 14px; }
   #welcome ol { padding-left: 20px; line-height: 1.7; margin: 8px 0 14px; }
+  nav button { font-size: .92rem; padding: 8px 2px; }
+  .wcard { padding: 12px; } .wcard .top { display: flex; align-items: center; gap: 6px; } .wcard .top b { flex: 1; font-size: 1rem; }
+  .wcard .bal { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+  .wcard .bar { height: 8px; } .wcard .sub { color: var(--muted); font-size: .8rem; }
+  .moneytop { text-align: center; padding: 14px; margin-bottom: 12px; }
+  .moneytop .bal { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .moneyact { display: flex; gap: 8px; margin: 0 0 14px; } .moneyact button { flex: 1; padding: 11px; }
   #shareMonth { width: 100%; margin-bottom: 12px; padding: 10px; }
   body.noscroll { overflow: hidden; }
   html.locked .fab, html.locked .sheet { display: none; }
@@ -221,6 +228,7 @@
     <button role="tab" data-tab="debts" aria-selected="false">Dettes</button>
     <button role="tab" data-tab="rule" aria-selected="false">50-30-20</button>
     <button role="tab" data-tab="months" aria-selected="false">Mois</button>
+    <button role="tab" data-tab="money" aria-selected="false">Argent</button>
   </nav>
 
   <!-- Transactions -->
@@ -262,8 +270,12 @@
   <!-- Mois -->
   <section id="tab-months" hidden>
     <button type="button" id="shareMonth">📤 Partager le bilan du mois affiché</button>
-    <div id="walletBody"></div>
     <div id="monthsBody"></div>
+  </section>
+
+  <!-- Argent : où se trouve l'argent -->
+  <section id="tab-money" hidden>
+    <div id="moneyBody"></div>
   </section>
 
 </main>
@@ -296,6 +308,22 @@
   </div>
 </div>
 
+<!-- Transfert entre portefeuilles -->
+<div id="moveSheet" class="sheet" hidden>
+  <div class="sheet-back" data-close-panel></div>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="moveTitle">
+    <div class="sheet-head"><h2 id="moveTitle">Transfert d'argent</h2><button type="button" class="iconbtn" data-close-panel aria-label="Fermer">✕</button></div>
+    <form id="moveForm">
+      <select id="mFrom" aria-label="Depuis"></select>
+      <select id="mTo" aria-label="Vers"></select>
+      <input id="mAmount" type="number" min="0.01" step="any" placeholder="Montant" required>
+      <select id="mCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+      <input id="mDate" type="date" required class="wide">
+      <button class="primary wide">Transférer</button>
+    </form>
+  </div>
+</div>
+
 <!-- Bienvenue (première ouverture) -->
 <div id="welcome" class="sheet" hidden>
   <div class="sheet-back" data-close-panel></div>
@@ -305,6 +333,7 @@
       <li>Appuie sur <b>+</b> pour noter une entrée ou une sortie (en $ ou en FC).</li>
       <li>Choisis le compartiment <b>50-30-20</b> de chaque dépense pour suivre ton budget.</li>
       <li>L'onglet <b>Dettes</b> garde qui te doit et à qui tu dois, avec des rappels.</li>
+      <li>L'onglet <b>Argent</b> montre où il se trouve : espèces, mobile money, banque.</li>
       <li>Dans <b>⚙ Réglages</b> : code secret, sauvegarde et taux de change.</li>
     </ol>
     <button type="button" class="primary wide" id="welcomeGo" style="width:100%">Commencer</button>
@@ -383,7 +412,7 @@
     epargne: ['Épargne', 'Remboursement de dettes', 'Investissement', 'Tontine']
   };
   const DEFAULT_WALLETS = ['Espèces', 'Mobile money', 'Banque'];
-  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)), wallets: DEFAULT_WALLETS.slice() };
+  const data = { tx: [], debts: [], rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)), wallets: DEFAULT_WALLETS.slice(), moves: [], openings: {} };
   try { Object.assign(data, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -593,11 +622,35 @@
         <button class="small" data-month="${r.m}">Ouvrir</button></li>`).join('')}</ul>`;
   }
 
-  // Balance of each wallet (all time); operations without a wallet are grouped apart once wallets are in use
-  function renderWallets() {
-    if (!data.tx.some(t => t.wallet)) { $('walletBody').innerHTML = ''; return; }
-    const by = {}; data.tx.forEach(t => { const k = t.wallet || '', o = by[k] || (by[k] = [0, 0]), sg = t.type === 'in' ? 1 : -1; o[0] += sg * t.amount; o[1] += sg * fcOf(t); });
-    $('walletBody').innerHTML = '<h2>Portefeuilles</h2><div class="wallets">' + Object.entries(by).sort((a, b) => b[1][0] - a[1][0]).map(([k, v]) => `<div class="card"><small>${k ? esc(k) : 'Sans portefeuille'}</small><b class="${v[0] < 0 ? 'out' : 'in'}">${fmt(v[0], v[1])}</b></div>`).join('') + '</div>';
+  // Where the money is: balance of each wallet = starting balance + its operations + transfers in/out (all time).
+  // Operations without a wallet are kept apart under '' so nothing is lost from the total.
+  function walletBalances() {
+    const by = {}, add = (k, u, f) => { const o = by[k] || (by[k] = [0, 0, 0]); o[0] += u; o[1] += f; };
+    (data.wallets || []).forEach(k => by[k] = [0, 0, 0]);
+    Object.entries(data.openings || {}).forEach(([k, o]) => add(k, o.amount, o.amount * (o.rate || data.rate)));
+    data.tx.forEach(t => { const sg = t.type === 'in' ? 1 : -1; add(t.wallet || '', sg * t.amount, sg * fcOf(t)); by[t.wallet || ''][2]++; });
+    (data.moves || []).forEach(m => { const f = fcOf(m); add(m.from, -m.amount, -f); add(m.to, m.amount, f); by[m.from][2]++; by[m.to][2]++; });
+    return by;
+  }
+  const walletNames = by => [...new Set([...(data.wallets || []), ...Object.keys(by)])].filter(k => k);
+  function renderMoney() {
+    const by = walletBalances(), names = walletNames(by), loose = by[''] && by[''][2] ? by[''] : null;
+    const all = names.map(k => [k, by[k]]).concat(loose ? [['', loose]] : []);
+    const tot = sum(all.map(x => x[1][0])), totFc = sum(all.map(x => x[1][1])), pos = sum(all.filter(x => x[1][0] > 0).map(x => x[1][0]));
+    const card = ([k, v]) => {
+      const used = v[2] || (data.openings || {})[k], w = pos > 0 && v[0] > 0 ? Math.round(v[0] / pos * 100) : 0;
+      return `<div class="card wcard"><div class="top"><b>${k ? esc(k) : 'À classer'}</b>
+        ${k ? `<button class="small" data-trace="${esc(k)}" aria-label="Voir les opérations" title="Voir les opérations">🔎</button><button class="small" data-open="${esc(k)}" aria-label="Solde de départ" title="Solde de départ">✎</button>${used ? '' : `<button class="small" data-delw="${esc(k)}" aria-label="Supprimer" title="Supprimer">✕</button>`}` : ''}</div>
+        <div class="bal ${v[0] < 0 ? 'out' : ''}">${fmt(v[0], v[1])}</div>
+        <div class="bar"><i style="width:${w}%;background:var(--gold-mid)"></i></div>
+        <div class="sub">${k ? `${w} % de mon argent · ${v[2]} mouvement${v[2] > 1 ? 's' : ''}` : 'Opérations sans portefeuille : choisis-en un en les modifiant.'}</div></div>`;
+    };
+    const moves = (data.moves || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+    $('moneyBody').innerHTML = `<div class="card moneytop"><small>Total de mon argent</small><div class="bal ${tot < 0 ? 'out' : ''}">${fmt(tot, totFc)}</div></div>
+      <div class="moneyact"><button type="button" id="moveBtn">⇄ Transférer</button><button type="button" id="walletAdd">+ Portefeuille</button></div>
+      <div class="wallets">${all.map(card).join('')}</div>
+      <h2>Transferts</h2><ul>${moves.length ? moves.map(m => `<li><div class="grow">${esc(m.from)} → ${esc(m.to)}<span>${dateFr(m.date)}</span></div><b>${fmt(m.amount, fcOf(m))}</b><button class="small" data-del-move="${m.id}" aria-label="Supprimer">✕</button></li>`).join('') : '<li class="empty">Aucun transfert.</li>'}</ul>`;
+    $('moveBtn').onclick = openMove; $('walletAdd').onclick = addWallet;
   }
   // Text summary of the month on screen, shared through the system share sheet (WhatsApp...) or copied
   function monthReport() {
@@ -613,7 +666,7 @@
 
   function render() {
     const list = monthTx();
-    renderSummary(list); renderTx(list); renderDebts(); renderAlerts([...debtAlerts(), backupAlert()].filter(Boolean)); renderRule(list); renderMonths(); renderWallets(); renderDaily(list);
+    renderSummary(list); renderTx(list); renderDebts(); renderAlerts([...debtAlerts(), backupAlert()].filter(Boolean)); renderRule(list); renderMonths(); renderMoney(); renderDaily(list);
     $('monthLabel').textContent = monthLong($('month').value); $('monthNow').hidden = $('month').value === today().slice(0, 7);
     $('rate').value = data.rate; $('txRate').placeholder = `Taux (${rateTxt(data.rate)})`;
     const pinOn = !!getPin(); $('pinBtn').hidden = pinOn; $('pinChange').hidden = $('pinOff').hidden = !pinOn;
@@ -632,7 +685,7 @@
   const showTab = name => {
     NZ.tick();
     document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
-    ['tx', 'debts', 'rule', 'months'].forEach(t => $('tab-' + t).hidden = t !== name);
+    ['tx', 'debts', 'rule', 'months', 'money'].forEach(t => $('tab-' + t).hidden = t !== name);
     $('fab').hidden = name === 'debts';
   };
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
@@ -674,7 +727,7 @@
   };
 
   // Bottom sheets: the operation form and the settings
-  const PANELS = ['sheet', 'settings', 'welcome'], WKEY = 'budget-welcome-v1';
+  const PANELS = ['sheet', 'settings', 'welcome', 'moveSheet'], WKEY = 'budget-welcome-v1';
   const openPanel = id => { if (id === 'sheet') renderTpl(); PANELS.forEach(p => $(p).hidden = p !== id); document.body.classList.add('noscroll'); NZ.tick(); };
   const closePanels = () => { if (!$('welcome').hidden) wr(WKEY, 1); PANELS.forEach(p => $(p).hidden = true); document.body.classList.remove('noscroll'); if (editId) endEdit(); };
   document.querySelectorAll('[data-close-panel]').forEach(x => x.onclick = closePanels);
@@ -727,6 +780,19 @@
       const msg = `Bonjour ${d.who}, petit rappel amical : il me reste ${usd(rest(d))} (≈ ${fc(rest(d))}) à recevoir de ta part${d.due ? `, prévu le ${dateFr(d.due)}` : ''}. Merci ! 🙏`;
       window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener'); return;
     }
+    if (t.dataset.trace) { $('txSearch').value = t.dataset.trace; showTab('tx'); render(); return; }
+    if (t.dataset.open) {
+      const k = t.dataset.open, cur = (data.openings || {})[k];
+      const raw = prompt(`Solde de départ de « ${k} » (ce qu'il y avait avant la première opération). En $, ou ajoute « FC » pour des francs congolais :`, cur ? +cur.amount.toFixed(2) : '');
+      if (raw === null) return;
+      const inFc = /fc|cdf/i.test(raw), n = parseFloat(raw.replace(',', '.').replace(/[^\d.\-]/g, ''));
+      if (raw.trim() && isNaN(n)) { alert('Montant non reconnu.'); return; }
+      data.openings = data.openings || {};
+      if (!n) delete data.openings[k]; else data.openings[k] = { amount: toUsd(n, inFc ? 'fc' : 'usd'), rate: inFc ? data.rate : undefined };
+      save(); render(); return;
+    }
+    if (t.dataset.delw) { if (confirm(`Supprimer le portefeuille « ${t.dataset.delw} » ?`)) { data.wallets = data.wallets.filter(n => n !== t.dataset.delw); save(); render(); } return; }
+    if (t.dataset.delMove) { if (confirm('Supprimer ce transfert ?')) { data.moves = data.moves.filter(m => m.id !== t.dataset.delMove); save(); render(); } return; }
     if (t.dataset.go) { showTab(t.dataset.go); return; }
     if (t.dataset.backup) { if (t.dataset.backup === 'now') exportData(); else { saveBk({ snooze: today() }); render(); } return; }
     if (t.dataset.month) { $('month').value = t.dataset.month; showTab('tx'); render(); return; }
@@ -755,6 +821,28 @@
     if (t.dataset.pay) { const d = data.debts.find(x => x.id === t.dataset.pay); if (d && !rest(d)) NZ.celebrate(d.dir === 'owe' ? `🎉 Dette soldée : ${d.who}` : `🎉 ${d.who} t'a tout remboursé`); else checkGoal(); }
   });
 
+  // Wallets and transfers
+  function addWallet() {
+    const name = (prompt('Nouveau portefeuille (ex. Airtel Money, Tontine) :') || '').trim();
+    if (!name || (data.wallets || []).some(n => n.toLowerCase() === name.toLowerCase())) return;
+    (data.wallets = data.wallets || []).push(name); save(); render();
+  }
+  function openMove() {
+    const by = walletBalances(), names = walletNames(by).sort((a, b) => by[b][0] - by[a][0]);
+    if (names.length < 2) { alert('Ajoute au moins deux portefeuilles pour transférer.'); return; }
+    const opts = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    $('mFrom').innerHTML = $('mTo').innerHTML = opts; $('mFrom').value = names[0]; $('mTo').value = names[1];
+    $('mAmount').value = ''; $('mCur').value = 'usd'; $('mDate').value = today(); openPanel('moveSheet'); $('mAmount').focus();
+  }
+  $('moveForm').onsubmit = e => {
+    e.preventDefault();
+    const from = $('mFrom').value, to = $('mTo').value, v = +$('mAmount').value;
+    if (from === to) { alert('Choisis deux portefeuilles différents.'); return; }
+    if (!(v > 0)) return;
+    const cur = $('mCur').value;
+    (data.moves = data.moves || []).push({ id: uid(), from, to, amount: toUsd(v, cur), rate: cur === 'fc' ? data.rate : undefined, date: $('mDate').value });
+    closePanels(); save(); render(); NZ.toast('⇄ Transfert enregistré');
+  };
   $('shareMonth').onclick = () => {
     const text = monthReport();
     if (navigator.share) navigator.share({ text }).catch(() => {});
@@ -786,7 +874,7 @@
       const d = JSON.parse(txt);
       if (!Array.isArray(d.tx) || !Array.isArray(d.debts)) throw 0;
       if (!confirm('Remplacer toutes les données actuelles ?')) return;
-      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)), wallets: DEFAULT_WALLETS.slice() }, d); save(); render();
+      Object.assign(data, { rate: 2800, rateDate: '', rateAuto: true, subs: JSON.parse(JSON.stringify(DEFAULT_SUBS)), wallets: DEFAULT_WALLETS.slice(), moves: [], openings: {} }, d); save(); render();
     }).catch(() => alert('Fichier invalide.'));
     e.target.value = '';
   };
