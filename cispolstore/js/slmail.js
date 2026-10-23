@@ -174,9 +174,11 @@
     adopt(); if (busy || !cfg.accounts.length) return 0; busy = true; L.status = 'busy'; redraw();
     let added = 0; const errs = [];
     for (const a of (only ? [only] : cfg.accounts.filter(x => !x.skip))) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
-    const re = rematch(); cfg.lastCheck = Date.now(); saveCfg(); App.save();
+    let auto = 0; try { auto = await L.autoLink(interactive); } catch (e) {}
+    const re = rematch();
+    cfg.lastCheck = Date.now(); saveCfg(); App.save();
     L.status = errs.length ? 'error' : 'idle'; L.error = errs.join(' · '); busy = false;
-    if (interactive) App.toast(errs.length ? errs[0] : added ? `${added} e-mail(s) Starlink lu(s)` + (re ? `, ${re} rapproché(s)` : '') : 'Aucun nouvel e-mail Starlink');
+    if (interactive) App.toast(errs.length ? errs[0] : added || auto ? `${added} e-mail(s) Starlink lu(s)` + (re ? `, ${re} rapproché(s)` : '') + (auto ? ` · ${auto} ACC lié(s) automatiquement` : '') : 'Aucun nouvel e-mail Starlink');
     App.refresh(); return added;
   };
   L.needsAttention = () => cfg.accounts.some(a => !a.skip && a.err === 'reconnect');
@@ -269,7 +271,7 @@
   };
   const RES = { ok: ['✅', 'Appliqué'], ancien: ['🕓', 'Ancien : un e-mail plus récent est déjà appliqué'], 'sans-client': ['❓', 'Aucun client avec cet ACC'], ambigu: ['❗', 'Plusieurs clients ont cet ACC'], inconnu: ['📨', 'Type d\'e-mail non reconnu'], annule: ['↩️', 'Annulé'] };
   App.views.slmail = () => {
-    const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), unk = L.unknown(), odd = lg.filter(e => e.res === 'inconnu'), nTodo = unk.length + odd.length;
+    const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), unk = L.unknown(), odd = lg.filter(e => e.res === 'inconnu'), autoL = L.autoLinked(), nTodo = unk.length + odd.length + autoL.length;
     if (rematch()) App.save();
     const chip = (k, t) => `<button class="chip ${tab === k ? 'on' : ''}" data-act="slm_tab" data-v="${k}">${t}</button>`;
     const cnt = k => al.filter(c => c.slm.state === k).length;
@@ -281,12 +283,17 @@
     const logRow = e => { const r = RES[e.res] || ['', e.res], k = STATES[e.kind], c = App.client(e.clientId);
       return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : e.kind === 'programme' ? '📅 Paiement programmé' + (e.due ? ' pour le ' + App.fdate(e.due) : '') : '📨 ' + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}${(e.also || []).length ? ' · aussi reçu dans ' + e.also.map(esc).join(', ') : ''}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
     const evLabel = e => STATES[e.kind] ? STATES[e.kind][0] + ' ' + STATES[e.kind][1] : e.kind === 'programme' ? '📅 Paiement programmé' : '📨 ' + esc(e.subject);
+    const autoRow = c => `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill ok">ACC lié automatiquement</span></div><small class="mono" style="word-break:break-all">${esc(c.acc)}</small>
+        <div class="mut" style="margin-top:4px;white-space:normal">${when(c.accAuto.ts)} · reconnu par : ${esc(c.accAuto.how)}${c.accAuto.name ? ' · facture au nom de « ' + esc(c.accAuto.name) + ' »' : ''}. Vérifiez que c'est bien ce client.</div>
+        <div class="bar"><button class="btn sm" data-act="slm_ok" data-id="${c.id}">✔ C'est bon</button><button class="btn sm sec" data-act="slm_unlink" data-id="${c.id}">↩ Annuler le lien</button><button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche</button></div></div>`;
     const unkRow = o => { const e = o.last, cs = App.db.clients.filter(c => accKey(c.acc) === accKey(o.acc));
       return `<div class="card"><div class="spread"><b class="mono" style="word-break:break-all">${esc(o.acc)}</b><span class="pill ${o.ambiguous ? 'bad' : 'warn'}">${o.ambiguous ? 'Plusieurs clients' : 'Non enregistré'}</span></div>
         <div class="mut" style="margin-top:4px;white-space:normal">Dernier e-mail : ${evLabel(e)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''} · ${when(e.ts)}<br>${o.events.length} e-mail(s) · boîte(s) : ${[...o.boxes].map(esc).join(', ')}</div>
+        ${e.inv || o.last.inv ? `<div style="margin-top:6px;white-space:normal;font-size:13px">📄 Facture lue : <b>${esc((o.events.find(x => x.inv) || e).inv.name || '—')}</b>${(o.events.find(x => x.inv) || e).inv.serial ? ' · kit <span class="mono">' + esc((o.events.find(x => x.inv) || e).inv.serial) + '</span>' : ''}</div>` : ''}
+        ${(() => { const sg = o.events.map(x => x.sug).find(Boolean), sc = sg && App.client(sg.id); return sc ? `<div class="card warn" style="margin:8px 0 0;white-space:normal">💡 C'est peut-être <b>${esc(App.cname(sc))}</b> (${esc(sg.how)}).<div class="bar"><button class="btn sm" data-act="slm_sug" data-acc="${esc(o.acc)}" data-id="${sc.id}">🔗 Lier à ${esc(App.cname(sc))}</button></div></div>` : ''; })()}
         <div class="bar">${o.ambiguous ? cs.map(c => `<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche : ${esc(App.cname(c))}</button>`).join('') : `<button class="btn sm" data-act="slm_link" data-acc="${esc(o.acc)}">🔗 Associer à un client</button><button class="btn sm sec" data-act="slm_new" data-acc="${esc(o.acc)}">➕ Nouveau client</button>`}<button class="btn sm sec" data-act="copy" data-t="${esc(o.acc)}">Copier ACC</button></div></div>`; };
     const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
-      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${(() => { const k = unk.filter(o => !o.ambiguous).length; return k ? `<div class="bar"><button class="btn" data-act="slm_createall">➕ Créer ${k > 1 ? 'les ' + k + ' clients manquants' : 'le client manquant'}</button></div>` : ''; })()}${(() => { const n = L.pending().length; return n ? `<div class="bar"><button class="btn sec" data-act="slm_pdf">📄 Compléter ${n} fiche(s) depuis les factures PDF</button></div>` : ''; })()}${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
+      : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${(() => { const k = unk.filter(o => !o.ambiguous).length; return k ? `<div class="bar"><button class="btn" data-act="slm_createall">➕ Créer ${k > 1 ? 'les ' + k + ' clients manquants' : 'le client manquant'}</button></div>` : ''; })()}${(() => { const n = L.pending().length; return n ? `<div class="bar"><button class="btn sec" data-act="slm_pdf">📄 Compléter ${n} fiche(s) depuis les factures PDF</button></div>` : ''; })()}${autoL.length ? `<h2 class="sec">🔗 ACC liés automatiquement (${autoL.length})</h2>${autoL.map(autoRow).join('')}` : ''}${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
     return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📧 Clients à suivre</small><div class="hero-num">${al.length}</div></div></div>
@@ -304,7 +311,15 @@
   App.actions.slm_pick = d => {
     const c = App.client(d.id); if (!c || !linkAcc) return;
     if (c.acc && accKey(c.acc) !== accKey(linkAcc) && !App.confirm(`${App.cname(c)} a déjà l'ACC ${c.acc}. Le remplacer par ${linkAcc} ?`)) return;
-    c.acc = linkAcc; const n = rematch(); App.save(); App.close(); App.toast('ACC associé à ' + App.cname(c) + (n ? ` · ${n} e-mail(s) appliqué(s)` : '')); App.refresh();
+    log().forEach(e => { if (accKey(e.acc) === accKey(linkAcc)) delete e.sug; }); c.acc = linkAcc; const n = rematch(); App.save(); App.close(); App.toast('ACC associé à ' + App.cname(c) + (n ? ` · ${n} e-mail(s) appliqué(s)` : '')); App.refresh();
+  };
+  App.actions.slm_sug = d => { linkAcc = d.acc; App.actions.slm_pick({ id: d.id }); };
+  App.actions.slm_ok = d => { const c = App.client(d.id); if (!c || !c.accAuto) return; c.accAuto.ok = true; App.save(); App.refresh(); App.toast('Lien confirmé'); };
+  // undo an automatic link: the e-mails go back to « À vérifier » (and the alert state they had set on the client is restored), and the account is not linked automatically again
+  App.actions.slm_unlink = d => {
+    const c = App.client(d.id); if (!c || !c.accAuto) return; const k = accKey(c.acc);
+    log().filter(e => accKey(e.acc) === k && e.clientId === c.id).sort((a, b) => b.ts - a.ts).forEach(e => { const fld = e.field || 'slm'; if (e.res === 'ok' && c[fld] && c[fld].mid === e.id) { if (e.prev) c[fld] = e.prev; else delete c[fld]; } e.res = 'sans-client'; delete e.clientId; delete e.field; delete e.prev; e.noauto = true; });
+    App.log(c.id, "Lien automatique de l'ACC " + c.acc + ' annulé'); c.acc = ''; delete c.accAuto; App.save(); App.refresh(); App.toast("Lien annulé : l'ACC repasse dans « À vérifier »");
   };
   App.actions.slm_new = d => { App.clientForm(null, 'gere'); const el = $('f_acc'); if (el) el.value = d.acc; };
   // a client created from an ACC alone (« Compte … »): the name and the phone are completed later
@@ -343,8 +358,8 @@
   const pdfPart = payload => { let r = null; const walk = x => { if (!r && x.filename && /\.pdf$/i.test(x.filename) && x.body && (x.body.attachmentId || x.body.data)) r = x; (x.parts || []).forEach(walk); }; walk(payload || {}); return r; };
   const bytesOf = d => Uint8Array.from(atob(String(d).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
   // the invoice of a client: tries its e-mails (payment reminders first, newest first) until one carries a PDF
-  const fetchInvoice = async (c, interactive) => {
-    const k = accKey(c.acc), es = log().filter(e => accKey(e.acc) === k).sort((a, b) => (b.kind === 'programme') - (a.kind === 'programme') || b.ts - a.ts).slice(0, 5);
+  const fetchInvoiceAcc = async (acc, interactive) => {
+    const k = accKey(acc), es = log().filter(e => accKey(e.acc) === k).sort((a, b) => (b.kind === 'programme') - (a.kind === 'programme') || b.ts - a.ts).slice(0, 5);
     for (const e of es) {
       const box = e.mailbox, gid = e.id.slice(box.length + 1), tok = await getToken(box, interactive), part = pdfPart((await gq(`${API}/messages/${gid}?format=full`, tok)).payload);
       if (!part) continue;
@@ -353,6 +368,45 @@
     }
     return null;
   };
+  const fetchInvoice = (c, interactive) => fetchInvoiceAcc(c.acc, interactive);
+
+  // ---------- an unknown ACC found in an e-mail: link it to the client it belongs to ----------
+  // The e-mail only carries the ACC; the name (« Attn ») and the kit serial are on the invoice attached to it. They are compared with the clients that have no ACC yet:
+  // same kit serial or same full name (accents, case and word order ignored) with ONE client = linked at once (and can be undone); a close name = only a suggestion.
+  const nameTok = x => fold(x).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length > 1);
+  const serialKey = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const sameWords = (a, b) => a.length > 1 && a.length === b.length && a.slice().sort().join(' ') === b.slice().sort().join(' ');
+  L.match = v => {
+    const cs = App.db.clients.filter(c => !accKey(c.acc) && !/^Compte /.test(c.name || '')), sk = serialKey(v.serial), tk = nameTok(v.name);
+    const bySerial = sk.length >= 8 ? cs.filter(c => serialKey(c.serial) === sk || serialKey(c.kit) === sk) : [], byName = cs.filter(c => sameWords(nameTok(App.cname(c)), tk));
+    const s = bySerial.length === 1 ? bySerial[0] : null, n = byName.length === 1 ? byName[0] : null;
+    if (s && (!n || n === s)) return { c: s, how: 'numéro de série du kit', sure: true };
+    if (n && !bySerial.length) return { c: n, how: 'nom identique', sure: true };
+    if (s) return { c: s, how: 'numéro de série du kit', sure: false };
+    const sc = cs.map(c => { const a = nameTok(App.cname(c)), common = a.filter(w => tk.includes(w)).length; return { c, v: tk.length && a.length ? common / Math.max(tk.length, a.length) : 0 }; }).filter(x => x.v >= .5).sort((a, b) => b.v - a.v);
+    return sc.length && (sc.length === 1 || sc[0].v > sc[1].v) ? { c: sc[0].c, how: 'nom proche', sure: false } : null;
+  };
+  const RETRY_MS = 12 * 3600e3, MAX_READ = 6; // an invoice is looked for again after 12 h if there was none; at most 6 invoices read per check
+  L.autoLink = async interactive => {
+    let linked = 0, reads = 0;
+    for (const o of L.unknown().filter(x => !x.ambiguous && !x.events.some(e => e.noauto))) {
+      let inv = (o.events.find(e => e.inv) || {}).inv;
+      if (!inv) {
+        if (reads >= MAX_READ || o.events.some(e => e.tried && Date.now() - e.tried < RETRY_MS)) continue;
+        reads++; o.events.forEach(e => { e.tried = Date.now(); });
+        let v = null; try { v = await fetchInvoiceAcc(o.acc, interactive); } catch (e) { if (NEED_LOGIN.includes(e.code) || e.code === 'quota' || e.code === 'config') break; continue; }
+        if (L.pace) await L.delay(L.pace);
+        if (!v || !(v.name || v.serial)) continue; inv = o.last.inv = { name: cleanName(v.name), serial: v.serial || '', place: v.place || '' };
+      }
+      const m = L.match(inv); delete o.last.sug;
+      if (!m) continue;
+      if (m.sure) { m.c.acc = o.acc; m.c.accAuto = { ts: Date.now(), how: m.how, name: inv.name }; App.log(m.c.id, `ACC ${o.acc} lié automatiquement (${m.how}) d'après la facture Starlink`); linked++; }
+      else o.last.sug = { id: m.c.id, how: m.how };
+    }
+    if (linked) App.save();
+    return linked;
+  };
+  L.autoLinked = () => App.db.clients.filter(c => c.accAuto && !c.accAuto.ok);
   const applyInvoice = (c, v) => {
     const S = App.db.settings, ch = [];
     if (v.name && /^Compte /.test(c.name || '')) { const w = cleanName(v.name).split(' '); c.first = w.length > 1 ? w[0] : ''; c.last = w.length > 1 ? w.slice(1).join(' ') : w[0]; c.name = cleanName(v.name); c.nameCheck = true; ch.push('nom'); }
