@@ -278,6 +278,14 @@ Complète la synchronisation Supabase (qui reste active) : deux fichiers `cispol
 
 Limites : l'application ne voit que les fichiers qu'elle a créés (`drive.file`) ; les sauvegardes sont du JSON lisible (non chiffré) ; l'autorisation silencieuse peut demander une reconnexion. Le service worker ne met jamais en cache les appels vers Google ou Supabase.
 
+## ACC inconnu : lien automatique avec le client
+
+Quand un e-mail Starlink arrive avec un ACC qu'aucun client ne porte, l'application lit la **facture PDF** jointe (nom « Attn » et numéro de série du kit) et la compare aux clients **sans ACC** :
+
+- **Sûr** : même numéro de série de kit, ou même nom complet (accents, majuscules et ordre des mots ignorés) avec **un seul** client → l'ACC est lié tout de suite et l'e-mail en attente est appliqué. Le lien apparaît dans Alertes Starlink → **À vérifier** avec **✔ C'est bon** ou **↩ Annuler le lien** (l'état précédent est restauré et l'ACC n'est plus lié automatiquement).
+- **Pas sûr** (nom proche, deux clients du même nom, aucune facture) : rien n'est lié ; si un client ressemble, une suggestion « 💡 C'est peut-être … » avec un bouton **Lier à …** s'affiche.
+- Les clients qui ont déjà un ACC ou qui s'appellent « Compte … » ne sont jamais touchés. Au plus 6 factures sont lues par vérification, et une facture introuvable n'est cherchée à nouveau qu'après 12 h.
+
 ## Prévu plus tard
 
 Rappels WhatsApp automatiques (un lien de rappel prérempli existe déjà sur la fiche client), Mobile Money, WiFi Zone (tickets, Mikrotik), profils utilisateurs (comptable, technicien, vendeur).
