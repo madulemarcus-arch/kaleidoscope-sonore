@@ -30,7 +30,7 @@
 
   // ---------- reading one e-mail ----------
   // state shown on the client: kind of the last Starlink e-mail received for its ACC
-  const STATES = { echec: ['⚠️', 'Paiement échoué', 'warn', 1], avis: ['⏳', 'Suspension imminente', 'bad', 2], suspendu: ['⛔', 'Suspendu', 'bad', 3], actif: ['✅', 'Réactivé', 'ok', 0] };
+  const STATES = { echec: ['⚠️', 'Paiement échoué', 'warn', 1], avis: ['⏳', 'Suspension imminente', 'bad', 2], suspendu: ['⛔', 'Suspendu', 'bad', 3], actif: ['✅', 'Réactivé', 'ok', 0], paye: ['💳', 'Paiement traité', 'ok', 0] };
   const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   // ACC-DF-16170842-48858-58 : may be cut by a line break, glued to the previous word, or written with another hyphen
   const extractAcc = text => {
@@ -47,6 +47,7 @@
     if (/^suspension de votre service/.test(s) || /sera suspendu dans/.test(b) || /avis de suspension/.test(b)) return 'avis';
     if (/service (starlink )?suspendu/.test(s) || /service starlink a ete suspendu|service a ete suspendu/.test(b)) return 'suspendu';
     if (/reactiv/.test(s) || /reactiv/.test(b)) return 'actif';
+    if (/paiement (a (bien )?ete )?(traite|recu|reussi|effectue|accepte)|(traitement|reception) (de votre|du) paiement|merci pour votre paiement|nous avons (bien )?recu votre paiement/.test(s) || /paiement (a (bien )?ete )?(traite|recu|reussi|effectue|accepte)|nous avons (bien )?recu votre paiement|merci pour votre paiement/.test(b)) return 'paye'; // the payment went through: closes a failed payment / suspension notice
     if (/rappel de paiement automatique/.test(s) || /paiement programme/.test(b)) return 'programme'; // information only: next automatic debit
     return '';
   };
@@ -271,7 +272,7 @@
   };
   const RES = { ok: ['✅', 'Appliqué'], ancien: ['🕓', 'Ancien : un e-mail plus récent est déjà appliqué'], 'sans-client': ['❓', 'Aucun client avec cet ACC'], ambigu: ['❗', 'Plusieurs clients ont cet ACC'], inconnu: ['📨', 'Type d\'e-mail non reconnu'], annule: ['↩️', 'Annulé'] };
   App.views.slmail = () => {
-    const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), unk = L.unknown(), odd = lg.filter(e => e.res === 'inconnu'), autoL = L.autoLinked(), nTodo = unk.length + odd.length + autoL.length;
+    const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), unk = L.unknown(), odd = lg.filter(e => e.res === 'inconnu'), okEv = lg.filter(e => e.kind === 'paye' || e.kind === 'actif'), autoL = L.autoLinked(), nTodo = unk.length + odd.length + autoL.length;
     if (rematch()) App.save();
     const chip = (k, t) => `<button class="chip ${tab === k ? 'on' : ''}" data-act="slm_tab" data-v="${k}">${t}</button>`;
     const cnt = k => al.filter(c => c.slm.state === k).length;
@@ -292,7 +293,8 @@
         ${e.inv || o.last.inv ? `<div style="margin-top:6px;white-space:normal;font-size:13px">📄 Facture lue : <b>${esc((o.events.find(x => x.inv) || e).inv.name || '—')}</b>${(o.events.find(x => x.inv) || e).inv.serial ? ' · kit <span class="mono">' + esc((o.events.find(x => x.inv) || e).inv.serial) + '</span>' : ''}</div>` : ''}
         ${(() => { const sg = o.events.map(x => x.sug).find(Boolean), sc = sg && App.client(sg.id); return sc ? `<div class="card warn" style="margin:8px 0 0;white-space:normal">💡 C'est peut-être <b>${esc(App.cname(sc))}</b> (${esc(sg.how)}).<div class="bar"><button class="btn sm" data-act="slm_sug" data-acc="${esc(o.acc)}" data-id="${sc.id}">🔗 Lier à ${esc(App.cname(sc))}</button></div></div>` : ''; })()}
         <div class="bar">${o.ambiguous ? cs.map(c => `<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche : ${esc(App.cname(c))}</button>`).join('') : `<button class="btn sm" data-act="slm_link" data-acc="${esc(o.acc)}">🔗 Associer à un client</button><button class="btn sm sec" data-act="slm_new" data-acc="${esc(o.acc)}">➕ Nouveau client</button>`}<button class="btn sm sec" data-act="copy" data-t="${esc(o.acc)}">Copier ACC</button></div></div>`; };
-    const body = tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
+    const body = tab === 'regles' ? `<p class="mut" style="font-size:13px">Paiements traités et services réactivés annoncés par Starlink, du plus récent au plus ancien.</p><div class="list">${okEv.length ? okEv.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun paiement traité ni service réactivé lu pour le moment.</div>'}</div>`
+      : tab === 'journal' ? `<div class="list">${lg.length ? lg.slice(0, 100).map(logRow).join('') : '<div class="empty">Aucun e-mail lu pour le moment.</div>'}</div>`
       : tab === 'todo' ? `<p class="mut" style="font-size:13px">Comptes Starlink vus dans vos e-mails (une ligne par ACC, même s'il est dans plusieurs boîtes) mais absents de la liste des clients : rien n'a été modifié. Associez-les à un client existant ou créez-le : les e-mails sont appliqués tout de suite.</p>${(() => { const k = unk.filter(o => !o.ambiguous).length; return k ? `<div class="bar"><button class="btn" data-act="slm_createall">➕ Créer ${k > 1 ? 'les ' + k + ' clients manquants' : 'le client manquant'}</button></div>` : ''; })()}${(() => { const n = L.pending().length; return n ? `<div class="bar"><button class="btn sec" data-act="slm_pdf">📄 Compléter ${n} fiche(s) depuis les factures PDF</button></div>` : ''; })()}${autoL.length ? `<h2 class="sec">🔗 ACC liés automatiquement (${autoL.length})</h2>${autoL.map(autoRow).join('')}` : ''}${unk.map(unkRow).join('')}${odd.length ? `<h2 class="sec">E-mails non reconnus (${odd.length})</h2><div class="list">${odd.map(logRow).join('')}</div>` : ''}${nTodo ? '' : '<div class="card"><div class="empty">Rien à vérifier 🎉</div></div>'}`
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
     return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
@@ -300,7 +302,7 @@
         <div class="cstats"><div><b>${cnt('echec')}</b><small>paiement échoué</small></div><div><b>${cnt('avis')}</b><small>suspension imminente</small></div><div><b>${cnt('suspendu')}</b><small>suspendus</small></div></div></section>
         <div class="bar"><button class="btn" data-act="slm_check" ${cfg.accounts.length ? '' : 'disabled'}>🔄 Vérifier les e-mails</button>${cfg.accounts.length ? '' : '<button class="btn sec" data-act="go" data-v="clients">Configurer Gmail</button>'}</div>
         <p class="mut" style="font-size:13px;margin:0 0 8px">Dernière vérification : ${when(cfg.lastCheck)} · ${cfg.accounts.length} boîte(s) Gmail liée(s)</p>
-        <div class="chips">${chip('alerts', `Alertes (${al.length})`)}${chip('journal', 'Journal')}${chip('todo', `À vérifier (${nTodo})`)}</div>${body}` };
+        <div class="chips">${chip('alerts', `Alertes (${al.length})`)}${chip('regles', `Réglés (${okEv.length})`)}${chip('journal', 'Journal')}${chip('todo', `À vérifier (${nTodo})`)}</div>${body}` };
   };
   // link an unknown ACC to a client: search a client, or create one with the ACC already filled in
   let linkAcc = '';
