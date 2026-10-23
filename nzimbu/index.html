@@ -191,6 +191,12 @@
   .moneytop { text-align: center; padding: 14px; margin-bottom: 12px; }
   .moneytop .bal { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .moneyact { display: flex; gap: 8px; margin: 0 0 14px; } .moneyact button { flex: 1; padding: 11px; }
+  li.debt { flex-direction: column; align-items: stretch; gap: 0; }
+  .dhead { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; background: none; box-shadow: none; padding: 6px 2px; font-size: 1.05rem; text-align: left; }
+  .dhead i { font-style: normal; color: var(--muted); }
+  .dbody { padding-top: 6px; } .dbody .grow { margin-bottom: 8px; }
+  .dact { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  li.debt.open { padding-bottom: 12px; }
   #shareMonth { width: 100%; margin-bottom: 12px; padding: 10px; }
   body.noscroll { overflow: hidden; }
   html.locked .fab, html.locked .sheet { display: none; }
@@ -548,17 +554,23 @@
       <button class="small primary" data-backup="now">Exporter maintenant</button><button class="small" data-backup="later">Plus tard</button></div>` } : null;
   }
 
+  // Debt rows show only the name; a tap unfolds the details and the actions (state kept across redraws)
+  const openDebts = new Set();
   function debtItem(d) {
-    const left = rest(d), info = dueInfo(d), pct = d.amount ? Math.min(100, Math.round(d.paid / d.amount * 100)) : 0;
-    return `<li class="debt ${left ? '' : 'done'} ${info ? info.cls : ''}">
-      <div class="grow"><b>${esc(d.who)}</b>${info ? `<em class="tag ${info.cls}">${info.txt}</em>` : ''}
-        <span class="amt">${left ? `Reste ${fmt(left)}` : `Soldée ✅ (${usd(d.amount)})`}</span>
-        <span>${left && d.paid ? `${usd(d.paid)} ${d.dir === 'owe' ? 'remboursés' : 'reçus'} sur ${usd(d.amount)}` : left ? `Montant ${usd(d.amount)}` : ''}${d.due ? `${left ? ' · ' : ''}échéance ${dateFr(d.due)}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span>
-        <div class="bar"><i style="width:${pct}%;background:var(--in)"></i></div></div>
-      ${left && d.dir === 'owed' ? `<button class="small" data-wa="${d.id}" aria-label="Relancer sur WhatsApp" title="Relancer sur WhatsApp">💬</button>` : ''}
-      ${left ? `<button class="small" data-due="${d.id}" aria-label="Modifier l'échéance" title="Modifier l'échéance">📅</button>` : ''}
-      ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
-      <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></li>`;
+    const left = rest(d), info = dueInfo(d), pct = d.amount ? Math.min(100, Math.round(d.paid / d.amount * 100)) : 0, open = openDebts.has(d.id);
+    return `<li class="debt ${left ? '' : 'done'} ${info ? info.cls : ''}${open ? ' open' : ''}">
+      <button type="button" class="dhead" data-toggle-debt="${d.id}" aria-expanded="${open}"><b>${esc(d.who)}</b><i>${open ? '▴' : '▾'}</i></button>
+      <div class="dbody"${open ? '' : ' hidden'}>
+        <div class="grow">${info ? `<em class="tag ${info.cls}">${info.txt}</em>` : ''}
+          <span class="amt">${left ? `Reste ${fmt(left)}` : `Soldée ✅ (${usd(d.amount)})`}</span>
+          <span>${left && d.paid ? `${usd(d.paid)} ${d.dir === 'owe' ? 'remboursés' : 'reçus'} sur ${usd(d.amount)}` : left ? `Montant ${usd(d.amount)}` : ''}${d.due ? `${left ? ' · ' : ''}échéance ${dateFr(d.due)}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</span>
+          <div class="bar"><i style="width:${pct}%;background:var(--in)"></i></div></div>
+        <div class="dact">
+          ${left && d.dir === 'owed' ? `<button class="small" data-wa="${d.id}" aria-label="Relancer sur WhatsApp" title="Relancer sur WhatsApp">💬</button>` : ''}
+          ${left ? `<button class="small" data-due="${d.id}" aria-label="Modifier l'échéance" title="Modifier l'échéance">📅</button>` : ''}
+          ${left ? `<button class="small" data-pay="${d.id}">${d.dir === 'owe' ? 'Rembourser' : 'Reçu'}</button>` : ''}
+          <button class="small" data-del-debt="${d.id}" aria-label="Supprimer">✕</button></div>
+      </div></li>`;
   }
 
   function renderDebts() {
@@ -779,6 +791,11 @@
       const d = data.debts.find(x => x.id === t.dataset.wa); if (!d) return;
       const msg = `Bonjour ${d.who}, petit rappel amical : il me reste ${usd(rest(d))} (≈ ${fc(rest(d))}) à recevoir de ta part${d.due ? `, prévu le ${dateFr(d.due)}` : ''}. Merci ! 🙏`;
       window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener'); return;
+    }
+    if (t.dataset.toggleDebt) {
+      const id = t.dataset.toggleDebt, li = t.closest('li'), open = !openDebts.has(id);
+      open ? openDebts.add(id) : openDebts.delete(id);
+      li.classList.toggle('open', open); li.querySelector('.dbody').hidden = !open; t.setAttribute('aria-expanded', open); t.querySelector('i').textContent = open ? '▴' : '▾'; NZ.tick(); return;
     }
     if (t.dataset.trace) { $('txSearch').value = t.dataset.trace; showTab('tx'); render(); return; }
     if (t.dataset.open) {
