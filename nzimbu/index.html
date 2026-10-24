@@ -184,7 +184,12 @@
   .tag.late { color: var(--out); border-color: var(--out); } .tag.soon { color: var(--warn); border-color: var(--warn); }
   .wallets { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0 0 14px; }
   #welcome ol { padding-left: 20px; line-height: 1.7; margin: 8px 0 14px; }
-  nav button { font-size: .92rem; padding: 8px 2px; }
+  nav { overflow-x: auto; scrollbar-width: none; } nav::-webkit-scrollbar { display: none; }
+  nav button { font-size: .92rem; padding: 8px 12px; flex: 1 0 auto; }
+  .dchart { display: flex; align-items: flex-end; gap: 2px; height: 90px; border-bottom: 1px solid var(--gold-border); margin: 6px 0 2px; }
+  .dchart i { flex: 1; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--out); opacity: .75; } .dchart i.today { background: var(--gold-mid); opacity: 1; }
+  .card > .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .dlbl { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); margin-bottom: 12px; }
   .wcard { padding: 12px; } .wcard .top { display: flex; align-items: center; gap: 6px; } .wcard .top b { flex: 1; font-size: 1rem; }
   .wcard .bal { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
   .wcard .bar { height: 8px; } .wcard .sub { color: var(--muted); font-size: .8rem; }
@@ -232,6 +237,7 @@
 
   <nav role="tablist">
     <button role="tab" data-tab="tx" aria-selected="true">Opérations</button>
+    <button role="tab" data-tab="spend" aria-selected="false">Dépenses</button>
     <button role="tab" data-tab="debts" aria-selected="false">Dettes</button>
     <button role="tab" data-tab="rule" aria-selected="false">50-30-20</button>
     <button role="tab" data-tab="months" aria-selected="false">Mois</button>
@@ -245,6 +251,21 @@
       <div class="chips" id="txFilter"><button type="button" data-f="all" aria-pressed="true">Tout</button><button type="button" data-f="in" aria-pressed="false">Entrées</button><button type="button" data-f="out" aria-pressed="false">Sorties</button></div>
     </div>
     <div id="txList"></div>
+  </section>
+
+  <!-- Dépenses : ce qu'on dépense chaque jour et où va l'argent -->
+  <section id="tab-spend" hidden>
+    <div id="spendToday" class="card moneytop"></div>
+    <form id="spendForm">
+      <input id="sAmount" type="number" min="0.01" step="any" placeholder="Montant dépensé" required>
+      <select id="sCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
+      <select id="sCat" class="wide" aria-label="Catégorie"></select>
+      <input id="sLabel" placeholder="Détail (facultatif) : taxi, pain…" class="wide">
+      <select id="sWallet" aria-label="Portefeuille"></select>
+      <input id="sDate" type="date" required aria-label="Date">
+      <button class="primary wide">Noter la dépense</button>
+    </form>
+    <div id="spendBody"></div>
   </section>
 
   <!-- Dettes -->
@@ -358,6 +379,7 @@
       <li>Appuie sur <b>+</b> pour noter une entrée ou une sortie (en $ ou en FC).</li>
       <li>Choisis le compartiment <b>50-30-20</b> de chaque dépense pour suivre ton budget.</li>
       <li>L'onglet <b>Dettes</b> garde qui te doit et à qui tu dois, avec des rappels.</li>
+      <li>L'onglet <b>Dépenses</b> : note chaque jour ce que tu dépenses et vois où va l'argent.</li>
       <li>L'onglet <b>Argent</b> montre où il se trouve : espèces, mobile money, banque.</li>
       <li>Dans <b>⚙ Réglages</b> : code secret, sauvegarde et taux de change.</li>
     </ol>
@@ -696,9 +718,37 @@
     return L.join('\n');
   }
 
+  // Spending tab: quick daily entry, where the month's money went (by category), and day by day
+  const catOptions = () => Object.keys(CATS).map(k => `<optgroup label="${CATS[k][0]}">${subList(k).map(n => `<option value="${k}|${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>`).join('');
+  function renderSpend() {
+    const keep = [$('sCat').value, $('sWallet').value];
+    $('sCat').innerHTML = catOptions(); if (keep[0]) $('sCat').value = keep[0];
+    $('sWallet').innerHTML = walletOptions('', true); $('sWallet').value = keep[1] || '';
+    const m = $('month').value, outs = data.tx.filter(t => t.type === 'out'), mo = outs.filter(t => t.date.startsWith(m)).sort((a, b) => b.date.localeCompare(a.date));
+    const tod = outs.filter(t => t.date === today());
+    $('spendToday').innerHTML = `<small>Aujourd'hui</small><div class="bal">${fmt(sum(tod.map(t => t.amount)), sum(tod.map(fcOf)))}</div><small>${tod.length ? `${tod.length} dépense${tod.length > 1 ? 's' : ''} notée${tod.length > 1 ? 's' : ''}` : 'Rien de noté pour le moment'}</small>`;
+    if (!mo.length) { $('spendBody').innerHTML = `<p class="empty">Aucune dépense en ${monthLong(m)}.</p>`; return; }
+    const total = sum(mo.map(t => t.amount)), totalFc = sum(mo.map(fcOf)), by = {};
+    mo.forEach(t => { const n = t.sub || (t.cat ? CATS[t.cat][0] : 'Autre'), o = by[n] || (by[n] = { v: 0, c: t.cat }); o.v += t.amount; });
+    const rows = Object.entries(by).sort((a, b) => b[1].v - a[1].v).map(([n, o]) => { const w = Math.round(o.v / total * 100), color = o.c ? CATS[o.c][2] : 'var(--gold-mid)';
+      return `<div class="subrow" style="background:linear-gradient(90deg, color-mix(in srgb, ${color} 25%, transparent) ${w}%, transparent ${w}%)"><span>${esc(n)}</span><span>${usd(o.v)} · ${w} %</span></div>`; }).join('');
+    const [y, mon] = m.split('-').map(Number), dim = new Date(y, mon, 0).getDate(), perDay = Array.from({ length: dim }, () => 0);
+    mo.forEach(t => perDay[+t.date.slice(8) - 1] += t.amount);
+    const max = Math.max(...perDay) || 1, tdy = today().startsWith(m) ? +today().slice(8) : 0;
+    const chart = `<div class="dchart">${perDay.map((v, i) => `<i${i + 1 === tdy ? ' class="today"' : ''} style="height:${v / max * 100}%" title="${i + 1} : ${usd(v)}"></i>`).join('')}</div><div class="dlbl"><span>1</span><span>${dim}</span></div>`;
+    const days = []; mo.forEach(t => { const g = days[days.length - 1]; if (g && g.d === t.date) g.l.push(t); else days.push({ d: t.date, l: [t] }); });
+    $('spendBody').innerHTML = `<h2>Où va l'argent</h2><div class="card"><div class="row"><b>${monthLong(m)}</b><span>${fmt(total, totalFc)}</span></div><div class="subs">${rows}</div></div>
+      <h2>Jour par jour</h2>${chart}
+      ${days.map(g => `<div class="dayh"><span>${dayTitle(g.d)}</span><span>−${usd(sum(g.l.map(t => t.amount)))}</span></div><ul>${g.l.map(t => `<li>
+        <div class="grow">${esc(t.label)}<span>${t.sub ? esc(t.sub) : t.cat ? CATS[t.cat][0] : ''}${t.wallet ? ` · ${esc(t.wallet)}` : ''}</span></div>
+        <b class="out">−${fmt(t.amount, fcOf(t))}</b>
+        ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
+        <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>`).join('')}`;
+  }
+
   function render() {
     const list = monthTx();
-    renderSummary(list); renderTx(list); renderDebts(); renderAlerts([...debtAlerts(), backupAlert()].filter(Boolean)); renderRule(list); renderMonths(); renderMoney(); renderDaily(list);
+    renderSummary(list); renderTx(list); renderDebts(); renderAlerts([...debtAlerts(), backupAlert()].filter(Boolean)); renderRule(list); renderMonths(); renderMoney(); renderSpend(); renderDaily(list);
     $('monthLabel').textContent = monthLong($('month').value); $('monthNow').hidden = $('month').value === today().slice(0, 7);
     $('rate').value = data.rate; $('txRate').placeholder = `Taux (${rateTxt(data.rate)})`;
     const pinOn = !!getPin(); $('pinBtn').hidden = pinOn; $('pinChange').hidden = $('pinOff').hidden = !pinOn;
@@ -717,8 +767,9 @@
   const showTab = name => {
     NZ.tick();
     document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
-    ['tx', 'debts', 'rule', 'months', 'money'].forEach(t => $('tab-' + t).hidden = t !== name);
-    $('fab').hidden = name === 'debts';
+    ['tx', 'spend', 'debts', 'rule', 'months', 'money'].forEach(t => $('tab-' + t).hidden = t !== name);
+    $('fab').hidden = name === 'debts' || name === 'spend';
+    const cur = document.querySelector(`nav [data-tab=${name}]`); if (cur && cur.scrollIntoView) cur.scrollIntoView({ inline: 'center', block: 'nearest' });
   };
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
@@ -898,6 +949,14 @@
     data.tx.push({ id: uid(), type: d.dir === 'owe' ? 'out' : 'in', label: `${d.dir === 'owe' ? 'Remboursement à' : 'Remboursement de'} ${d.who}`, amount: amt, rate, date, cat: d.dir === 'owe' ? 'epargne' : null, sub: d.dir === 'owe' ? 'Remboursement de dettes' : '', debt: true, wallet: $('pWallet').value || undefined });
     closePanels(); save(); render();
     if (!rest(d)) NZ.celebrate(d.dir === 'owe' ? `🎉 Dette soldée : ${d.who}` : `🎉 ${d.who} t'a tout remboursé`); else { NZ.toast(`✅ Paiement enregistré, reste ${usd(rest(d))}`); checkGoal(); }
+  };
+  $('sDate').value = today();
+  $('spendForm').onsubmit = e => {
+    e.preventDefault();
+    const v = $('sCat').value, i = v.indexOf('|'), cat = v.slice(0, i), sub = v.slice(i + 1), cur = $('sCur').value, date = $('sDate').value || today();
+    data.tx.push({ id: uid(), type: 'out', label: $('sLabel').value.trim() || sub, amount: toUsd(+$('sAmount').value, cur), rate: cur === 'fc' ? data.rate : undefined, date, cat, sub, wallet: $('sWallet').value || undefined });
+    $('month').value = date.slice(0, 7); $('sAmount').value = ''; $('sLabel').value = '';
+    save(); render(); NZ.toast('✅ Dépense notée'); checkGoal(); $('sAmount').focus();
   };
   $('shareMonth').onclick = () => {
     const text = monthReport();
