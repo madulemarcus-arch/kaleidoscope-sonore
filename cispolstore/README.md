@@ -47,7 +47,7 @@ Application de gestion d'entreprise pour CISPOLstore : clients, comptes Starlink
 - **Abonnement** : fin = début + durée (30 jours par défaut) ; sursis = du lendemain de la fin à fin + sursis (15 jours par défaut, réglable par client). Statut automatique : actif → en sursis → inactif.
 - **Renouvellement** : nouvelle période à partir de la fin actuelle (ou d'aujourd'hui si le client est inactif), avec facture et paiement optionnels.
 - **Factures** : numéro `FAC-AAAA-0001` automatique et sans doublon ; les lignes du stock font sortir le stock (câble en mètres). Montant en lettres (formes belges : **septante**, **nonante**, mais quatre-vingts) et équivalent CDF (taux réglable). Export PDF (via l'impression du navigateur), Word (.doc) et impression.
-- **Stock** : entrées / sorties journalisées, fournisseurs, alertes de stock bas, câble restant sur le tableau de bord.
+- **Stock** : entrées / sorties journalisées, fournisseurs, alertes de stock bas, câble restant sur le tableau de bord. Le bouton **💰 Trier par valeur** (écran Stock) classe les produits du plus gros au plus petit en valeur (quantité × prix d'achat ; prix de vente si les coûts sont masqués) et affiche, pour chacun, sa valeur et sa part du stock total.
 - **Bénéfice** = prix de vente − prix d'achat (par ligne) − dépenses. Les montants des rapports sont convertis en dollars.
 - **Nouveau client depuis une facture** : bouton « ＋ Nouveau client » dans le formulaire de facture (sans perdre la facture en cours). Pour une facture d'abonnement, seuls les clients gérés sont proposés et la ligne d'abonnement reprend l'offre et le prix du client.
 - **Partage** : « Partager l'application » (menu Plus et Paramètres) ouvre le partage Android avec le lien de l'application.
