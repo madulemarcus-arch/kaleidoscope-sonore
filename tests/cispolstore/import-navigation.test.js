@@ -4,9 +4,9 @@ const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
 await p.evaluate(()=>App.go('clients'));await p.waitForTimeout(300);
 ok('Clients: import button',/Importer des clients \(Excel\)/.test(await p.innerText('#view')));
-await p.click('[data-act=go][data-v=importc]');await p.waitForTimeout(300);ok('opens client import',/Importer des clients/.test(await p.innerText('#title')));
+await p.click('#view [data-act=go][data-v=importc]');await p.waitForTimeout(300);ok('opens client import',/Importer des clients/.test(await p.innerText('#title')));
 await p.evaluate(()=>App.go('invoices'));await p.waitForTimeout(300);ok('Factures: import button',/Importer des factures \(Word/.test(await p.innerText('#view')));
-await p.click('[data-act=go][data-v=importf]');await p.waitForTimeout(300);ok('opens invoice import',/Importer des factures/.test(await p.innerText('#title')));
+await p.click('#view [data-act=go][data-v=importf]');await p.waitForTimeout(300);ok('opens invoice import',/Importer des factures/.test(await p.innerText('#title')));
 await p.evaluate(()=>App.go('more'));await p.waitForTimeout(300);const v=await p.innerText('#view');ok('Plus menu has both',/Importer des clients/.test(v)&&/Importer des factures/.test(v));
 await p.evaluate(()=>{App.db.settings.users=[{id:'c',name:'C',role:'comptable',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.go('more')});await p.waitForTimeout(300);ok('comptable: no import entries',!/Importer des/.test(await p.innerText('#view')));
 console.log(errs);await b.close();process.exit(f?1:0)})();

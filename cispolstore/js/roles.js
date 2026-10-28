@@ -43,6 +43,7 @@
     $('searchBtn').hidden = !r.views.includes('clients');
     if (r.solo) { $('searchBtn').hidden = true; $('syncBtn').hidden = true; }
     document.querySelectorAll('#side nav [data-v]').forEach(b => { b.hidden = !App.canView(b.dataset.v); });
+    document.querySelectorAll('#side nav .sgrp').forEach(h => { let n = h.nextElementSibling, any = false; while (n && !n.classList.contains('sgrp')) { if (!n.hidden) any = true; n = n.nextElementSibling; } h.hidden = !any; });
     let who = $('who'); if (!who) { who = document.createElement('div'); who.id = 'who'; who.className = 'sfoot'; $('side').appendChild(who); }
     who.innerHTML = App.multi() && m ? `<small>${r.icon} ${esc(m.name)} · ${r.label}</small>` : '';
     if (!App.canView(App.state.view)) App.go(r.home, {}, true);
