@@ -9,14 +9,17 @@
   const prodOpts = (only) => App.db.products.filter(p => !only || App.tracked(p)).sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, `${p.name}${App.tracked(p) ? ` (${qtyText(p)})` : ''}`]);
 
   // ---------- Stock list ----------
-  const st = { cat: 'all', q: '', f: 'all' };
+  const st = { cat: 'all', q: '', f: 'all', byVal: false };
+  // value of a product in stock: quantity x purchase price (sale price when the costs are hidden), same basis as the total on top of the screen
+  const stockVal = p => App.tracked(p) ? (+p.qty || 0) * (App.can('costs') ? +p.cost || 0 : +p.price || 0) : 0;
   const FILT = { all: ['Tous', () => true], stock: ['En stock', p => App.tracked(p) && p.qty > 0], low: ['Stock bas', p => App.tracked(p) && p.qty <= (p.min || 0)], out: ['Épuisés', p => App.tracked(p) && p.qty <= 0], nostock: ['Sans stock', p => !App.tracked(p)] };
   const drawList = () => {
     const q = st.q.toLowerCase();
-    const l = App.db.products.filter(p => (st.cat === 'all' || p.cat === st.cat) && FILT[st.f][1](p) && (!q || (p.name + ' ' + p.ref + ' ' + p.cat).toLowerCase().includes(q))).sort((a, b) => a.name.localeCompare(b.name));
+    const l = App.db.products.filter(p => (st.cat === 'all' || p.cat === st.cat) && FILT[st.f][1](p) && (!q || (p.name + ' ' + p.ref + ' ' + p.cat).toLowerCase().includes(q))).sort((a, b) => st.byVal ? stockVal(b) - stockVal(a) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
+    const total = App.db.products.reduce((a, x) => a + stockVal(x), 0);
     $('plist').innerHTML = l.length ? `<div class="list">${l.map(p => {
       const sup = App.supplier(p.supplierId);
-      return `<div class="item" role="button" tabindex="0" data-act="go" data-v="product" data-id="${p.id}"><div class="grow"><b>${esc(p.name)}</b><small>${esc(p.cat)}${p.ref ? ' · ' + esc(p.ref) : ''}${sup ? ' · ' + esc(sup.name) : ''}</small><small>${App.can('costs') ? 'Achat : ' + App.fmt(p.cost) + ' | ' : ''}Vente : ${App.fmt(p.price)}${p.unit === 'm' ? ' / m' : ''}</small></div>
+      return `<div class="item" role="button" tabindex="0" data-act="go" data-v="product" data-id="${p.id}"><div class="grow"><b>${esc(p.name)}</b><small>${esc(p.cat)}${p.ref ? ' · ' + esc(p.ref) : ''}${sup ? ' · ' + esc(sup.name) : ''}</small><small>${App.can('costs') ? 'Achat : ' + App.fmt(p.cost) + ' | ' : ''}Vente : ${App.fmt(p.price)}${p.unit === 'm' ? ' / m' : ''}</small>${st.byVal && App.tracked(p) ? `<small><b>Valeur : ${App.fmt(stockVal(p))}</b> · ${total > 0 ? Math.round(stockVal(p) / total * 1000) / 10 : 0} % du stock</small>` : ''}</div>
         <div class="end"><span class="pill ${stClass(p)}" style="font-size:13px">${App.tracked(p) ? 'En stock : ' + qtyText(p) : 'Sans stock'}</span>
         ${App.can('stockedit') ? `<span><button class="btn sm sec" data-act="stin" data-id="${p.id}">＋</button> <button class="btn sm sec" data-act="stout" data-id="${p.id}">－</button> <button class="btn sm sec" data-act="editprod" data-id="${p.id}">✎</button></span>` : ''}</div></div>`;
     }).join('')}</div>` : '<div class="empty">Aucun produit. Ajoutez par exemple « Starlink Mini », « Câble Cat6 (m) », « Routeur »…</div>';
@@ -33,7 +36,7 @@
           <div class="cstats"><button data-act="stfilt" data-f="all"><b data-count="${db.products.length}" data-int="1">${db.products.length}</b><small>produits</small></button><button class="${low.length ? 'bad' : ''}" data-act="stfilt" data-f="low"><b>${low.length}</b><small>stock bas</small></button><button data-act="stfilt" data-f="stock"><b>${db.products.filter(x => App.tracked(x) && x.qty > 0).length}</b><small>en stock</small></button><button class="${db.products.some(x => App.tracked(x) && x.qty <= 0) ? 'bad' : ''}" data-act="stfilt" data-f="out"><b>${db.products.filter(x => App.tracked(x) && x.qty <= 0).length}</b><small>épuisés</small></button></div></section>
         <div class="search"><input id="pq" placeholder="Rechercher un produit, une référence…" value="${esc(st.q)}" autocomplete="off"></div>
         <div class="chips"><button class="chip ${st.cat === 'all' ? 'on' : ''}" data-act="stcat" data-c="all">Tous</button>${App.CATS.filter(c => db.products.some(p => p.cat === c)).map(c => `<button class="chip ${st.cat === c ? 'on' : ''}" data-act="stcat" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-        <div class="chips" id="stf">${Object.entries(FILT).map(([k, [t]]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="stfilt" data-f="${k}">${t}</button>`).join('')}</div>
+        <div class="chips" id="stf">${Object.entries(FILT).map(([k, [t]]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="stfilt" data-f="${k}">${t}</button>`).join('')}<button class="chip ${st.byVal ? 'on' : ''}" data-act="stsort" aria-pressed="${st.byVal}">💰 Trier par valeur</button></div>
         ${low.length && st.f === 'all' ? `<div class="card" style="margin-bottom:10px"><b class="warn">⚠ Stock bas :</b> ${low.map(x => esc(x.name) + ' (' + qtyText(x) + ')').join(', ')}</div>` : ''}
         <div id="plist"></div>
         <div class="bar" style="margin-top:14px"><button class="btn" data-act="newprod">+ Produit</button><button class="btn sec" data-act="stin">📥 Entrée</button><button class="btn sec" data-act="stout">📤 Sortie</button><button class="btn sec" data-csv="produits">CSV</button></div>
@@ -75,6 +78,7 @@
     };
   };
   App.actions.stcat = d => { st.cat = d.c; App.refresh(); };
+  App.actions.stsort = () => { st.byVal = !st.byVal; App.refresh(); };
   App.actions.stfilt = d => { st.f = d.f; App.refresh(); const el = $('plist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   App.actions.newprod = () => App.productForm();
   App.actions.editprod = d => App.productForm(App.prod(d.id));
