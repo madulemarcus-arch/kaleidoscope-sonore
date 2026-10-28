@@ -8,6 +8,10 @@
   const st = { f: 'wait' };
   const list = () => (App.db.deposits = App.db.deposits || []);
   const out = d => (d.uses || []).reduce((a, u) => a + (+u.amount || 0), 0);
+  // « À payer avant le … » = end of the client's grace period (nothing for a client without subscription or already inactive)
+  const payBefore = c => { const s = c && App.sub(c); return s && s.gEnd >= App.today() ? 'À payer avant le ' + App.fdate(s.gEnd) : ''; };
+  // the line shown for a deposit: its own note, or, for a deposit still waiting to be paid and written without a note, the live deadline of the client
+  const noteOf = d => d.note || (App.depBalance(d) > 0.004 ? payBefore(App.client(d.clientId)) : '');
   App.depBalance = d => Math.max(0, Math.round(((+d.amount || 0) - out(d)) * 100) / 100);
   App.depStatus = d => App.depBalance(d) <= 0.004 ? ((d.uses || []).some(u => u.type === 'refund') && !(d.uses || []).some(u => u.type === 'paid') ? 'refunded' : 'done') : (d.uses || []).length ? 'part' : 'wait';
   const STAT = { wait: ['En attente', 'warn'], part: ['Partiel', 'blue'], done: ['Payé', 'ok'], refunded: ['Remboursé', 'ok'] };
@@ -35,7 +39,7 @@
     const byC = {}; H.forEach(d => { byC[d.currency] = (byC[d.currency] || 0) + App.depBalance(d); });
     const clients = new Set(H.map(d => d.clientId)).size, oldest = H.length ? Math.max(...H.map(days)) : 0;
     const row = d => { const c = App.client(d.clientId), s = STAT[App.depStatus(d)], b = App.depBalance(d);
-      return `<button class="item" data-act="dep_open" data-id="${d.id}"><span class="avatar ${s[1] === 'warn' ? 'warn' : s[1] === 'ok' ? 'ok' : ''}">${PICO[d.purpose] || '💼'}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${App.fdate(d.date)} · ${esc(d.purpose || 'Autre')} · ${esc(d.mode || 'Cash')}${b > 0.004 ? ' · depuis ' + days(d) + ' j' : ''}</small>${d.note ? `<small>${esc(d.note)}</small>` : ''}</div><div class="end"><b>${money(b > 0.004 ? b : d.amount, d.currency)}</b><span class="pill ${s[1]}">${s[0]}</span>${b > 0.004 && b < d.amount - 0.004 ? `<small>sur ${money(d.amount, d.currency)}</small>` : ''}</div></button>`; };
+      return `<button class="item" data-act="dep_open" data-id="${d.id}"><span class="avatar ${s[1] === 'warn' ? 'warn' : s[1] === 'ok' ? 'ok' : ''}">${PICO[d.purpose] || '💼'}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${App.fdate(d.date)} · ${esc(d.purpose || 'Autre')} · ${esc(d.mode || 'Cash')}${b > 0.004 ? ' · depuis ' + days(d) + ' j' : ''}</small>${noteOf(d) ? `<small>${esc(noteOf(d))}</small>` : ''}</div><div class="end"><b>${money(b > 0.004 ? b : d.amount, d.currency)}</b><span class="pill ${s[1]}">${s[0]}</span>${b > 0.004 && b < d.amount - 0.004 ? `<small>sur ${money(d.amount, d.currency)}</small>` : ''}</div></button>`; };
     return {
       title: 'Fonds en attente', sub: `${H.length} dépôt(s) à payer`, back: 'more', nav: 'more',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>💼 À payer pour les clients</small><div class="hero-num" data-count="${tot}">${money(tot)}</div></div></div>
@@ -57,7 +61,7 @@
   const clientOpts = (q, keep) => { const n = norm(q), l = App.db.clients.filter(c => c.type === 'gere' || c.id === keep).filter(c => !n || norm([App.cname(c), c.acc, c.phone, c.phone2, c.code].join(' ')).includes(n));
     return [['', l.length ? '— Choisir (' + l.length + ') —' : 'Aucun client trouvé'], ...l.map(c => [c.id, `${App.cname(c)}${c.acc ? ' · ' + c.acc : ''}${c.phone ? ' · ' + c.phone : ''}`])]; };
   const wireSearch = () => { const q = $('f_dq'), s = $('f_dc'); if (!q || !s) return;
-    q.oninput = () => { const cur = s.value; s.innerHTML = clientOpts(q.value, cur).map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (cur && [...s.options].some(o => o.value === cur)) s.value = cur; else if (s.options.length === 2) s.selectedIndex = 1; }; };
+    q.oninput = () => { const cur = s.value; s.innerHTML = clientOpts(q.value, cur).map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (cur && [...s.options].some(o => o.value === cur)) s.value = cur; else if (s.options.length === 2) s.selectedIndex = 1; s.dispatchEvent(new Event('change')); }; };
 
   App.depositForm = (dep, cid) => {
     if (!App.can('finance')) return App.toast('Action réservée au gérant ou au comptable');
@@ -77,6 +81,10 @@
         else { if (o.currency !== d.currency) o.rate = App.rate(); Object.assign(d, o); App.log(cl, `Dépôt modifié : ${money(amt, o.currency)}`); }
         App.save(); App.toast(isNew ? 'Dépôt enregistré : ' + money(amt, o.currency) : 'Dépôt modifié'); App.refresh();
       }, isNew ? 'Enregistrer le dépôt' : 'Enregistrer'); wireSearch();
+    // « À payer avant le … » : the note is filled in with the end of the client's grace period (kept if the manager wrote something else)
+    let lastAuto = '';
+    const autoNote = () => { const n = $('f_dn'), c = App.client($('f_dc').value); if (!n) return; const want = payBefore(c); if (n.value === '' || n.value === lastAuto) { n.value = want; lastAuto = want; } };
+    $('f_dc').addEventListener('change', autoNote); autoNote();
   };
 
   // printed / shared receipt of a deposit, with what has been paid for the client since and what is still held
@@ -98,7 +106,7 @@
   App.actions.dep_open = x => {
     const d = list().find(y => y.id === x.id); if (!d) return; const c = App.client(d.clientId), s = STAT[App.depStatus(d)], b = App.depBalance(d), fin = App.can('finance');
     App.modal('Dépôt · ' + App.cname(c),
-      `<div class="card" style="margin:0 0 10px"><div class="spread"><span>Reçu le ${App.fdate(d.date)} (${esc(d.mode || 'Cash')})</span><b>${money(d.amount, d.currency)}</b></div><div class="spread"><span>Pour payer</span><b>${esc(d.purpose || 'Autre')}</b></div><div class="spread"><span>Reste à payer pour lui</span><b class="${b > 0.004 ? 'warn' : 'ok'}">${money(b, d.currency)}</b></div><div class="spread"><span>État</span><span class="pill ${s[1]}">${s[0]}</span></div>${d.note ? `<p class="mut" style="margin:8px 0 0">${esc(d.note)}</p>` : ''}${d.ref ? `<small class="mut">Réf. ${esc(d.ref)}</small>` : ''}</div>
+      `<div class="card" style="margin:0 0 10px"><div class="spread"><span>Reçu le ${App.fdate(d.date)} (${esc(d.mode || 'Cash')})</span><b>${money(d.amount, d.currency)}</b></div><div class="spread"><span>Pour payer</span><b>${esc(d.purpose || 'Autre')}</b></div><div class="spread"><span>Reste à payer pour lui</span><b class="${b > 0.004 ? 'warn' : 'ok'}">${money(b, d.currency)}</b></div><div class="spread"><span>État</span><span class="pill ${s[1]}">${s[0]}</span></div>${noteOf(d) ? `<p class="mut" style="margin:8px 0 0">${esc(noteOf(d))}</p>` : ''}${d.ref ? `<small class="mut">Réf. ${esc(d.ref)}</small>` : ''}</div>
        ${(d.uses || []).length ? `<h2 class="sec">Historique</h2><div class="list">${useRows(d)}</div>` : ''}
        <div class="bar noprint"><button type="button" class="btn sec" data-act="dep_print" data-id="${d.id}">🧾 Reçu</button><button type="button" class="btn sec" data-act="dep_pdf" data-id="${d.id}">📤 PDF</button></div>
        ${fin ? `<div class="bar">${b > 0.004 ? `<button type="button" class="btn" data-act="dep_use" data-id="${d.id}">✅ Payer pour le client</button><button type="button" class="btn sec" data-act="dep_refund" data-id="${d.id}">↩ Rendre au client</button>` : ''}<button type="button" class="btn sec" data-act="dep_edit" data-id="${d.id}">✎ Modifier</button><button type="button" class="btn del" data-act="dep_del" data-id="${d.id}">Supprimer</button></div>` : ''}${c ? `<div class="bar"><button type="button" class="btn sec" data-act="go" data-v="client" data-id="${c.id}">Voir le client</button></div>` : ''}`);
