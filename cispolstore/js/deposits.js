@@ -57,7 +57,7 @@
   const clientOpts = (q, keep) => { const n = norm(q), l = App.db.clients.filter(c => c.type === 'gere' || c.id === keep).filter(c => !n || norm([App.cname(c), c.acc, c.phone, c.phone2, c.code].join(' ')).includes(n));
     return [['', l.length ? '— Choisir (' + l.length + ') —' : 'Aucun client trouvé'], ...l.map(c => [c.id, `${App.cname(c)}${c.acc ? ' · ' + c.acc : ''}${c.phone ? ' · ' + c.phone : ''}`])]; };
   const wireSearch = () => { const q = $('f_dq'), s = $('f_dc'); if (!q || !s) return;
-    q.oninput = () => { const cur = s.value; s.innerHTML = clientOpts(q.value, cur).map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (cur && [...s.options].some(o => o.value === cur)) s.value = cur; else if (s.options.length === 2) s.selectedIndex = 1; }; };
+    q.oninput = () => { const cur = s.value; s.innerHTML = clientOpts(q.value, cur).map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (cur && [...s.options].some(o => o.value === cur)) s.value = cur; else if (s.options.length === 2) s.selectedIndex = 1; s.dispatchEvent(new Event('change')); }; };
 
   App.depositForm = (dep, cid) => {
     if (!App.can('finance')) return App.toast('Action réservée au gérant ou au comptable');
@@ -77,6 +77,10 @@
         else { if (o.currency !== d.currency) o.rate = App.rate(); Object.assign(d, o); App.log(cl, `Dépôt modifié : ${money(amt, o.currency)}`); }
         App.save(); App.toast(isNew ? 'Dépôt enregistré : ' + money(amt, o.currency) : 'Dépôt modifié'); App.refresh();
       }, isNew ? 'Enregistrer le dépôt' : 'Enregistrer'); wireSearch();
+    // « À payer avant le … » : the note is filled in with the end of the client's grace period (kept if the manager wrote something else)
+    let lastAuto = '';
+    const autoNote = () => { const n = $('f_dn'), c = App.client($('f_dc').value), s = c && App.sub(c); if (!n) return; const want = s && s.gEnd >= App.today() ? 'À payer avant le ' + App.fdate(s.gEnd) : ''; if (n.value === '' || n.value === lastAuto) { n.value = want; lastAuto = want; } };
+    $('f_dc').addEventListener('change', autoNote); autoNote();
   };
 
   // printed / shared receipt of a deposit, with what has been paid for the client since and what is still held

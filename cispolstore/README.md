@@ -406,6 +406,7 @@ Menu **Plus → Dû à Starlink** (administrateur et comptable) : suit l'argent 
 ## Dépôt client : recherche et clients gérés seulement
 
 Dans « Nouveau dépôt client », un champ **Rechercher un client** (nom, compte ACC, téléphone, sans tenir compte des accents) filtre la liste, et seuls les **clients gérés par CISPOLstore** y apparaissent. Quand un seul client correspond, il est choisi automatiquement.
+- **Note « À payer avant le … »** : dès qu'un client est choisi, la note se remplit toute seule avec la **fin du sursis** de son abonnement (par exemple « À payer avant le 15/11/2026 »). Elle ne se remplit pas pour un client sans abonnement ou déjà inactif (sursis dépassé), et une note déjà écrite à la main n'est jamais écrasée ; on peut aussi la modifier.
 
 ## Devis (étape 4 des améliorations)
 
