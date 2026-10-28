@@ -189,6 +189,9 @@
   .dchart { display: flex; align-items: flex-end; gap: 2px; height: 90px; border-bottom: 1px solid var(--gold-border); margin: 6px 0 2px; }
   .dchart i { flex: 1; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--out); opacity: .75; } .dchart i.today { background: var(--gold-mid); opacity: 1; }
   .card > .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .rule .row .fc { display: inline; margin-left: 4px; }
+  .rule .row { align-items: baseline; }
+  .hist { margin: 12px 0 6px; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
   .dlbl { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); margin-bottom: 12px; }
   .wcard { padding: 12px; } .wcard .top { display: flex; align-items: center; gap: 6px; } .wcard .top b { flex: 1; font-size: 1rem; }
   .wcard .bal { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
@@ -291,7 +294,7 @@
 
   <!-- 50-30-20 -->
   <section id="tab-rule" hidden>
-    <p class="msg">Base de calcul : tes entrées du mois. Dépense directement dans le compartiment voulu : 50 % besoins, 30 % envies, 20 % épargne et remboursement de dettes.</p>
+    <p class="msg">Chaque entrée est répartie automatiquement : 50 % besoins, 30 % envies, 20 % épargne et remboursement de dettes. Chaque compartiment garde l'historique de ce qui y entre (part des entrées) et de ce qui en sort (dépenses). Dépense directement dans le compartiment voulu.</p>
     <div id="ruleBody"></div>
   </section>
 
@@ -377,7 +380,7 @@
     <div class="sheet-head"><h2 id="welTitle">Bienvenue sur NZIMBU</h2><button type="button" class="iconbtn" data-close-panel aria-label="Fermer">✕</button></div>
     <ol>
       <li>Appuie sur <b>+</b> pour noter une entrée ou une sortie (en $ ou en FC).</li>
-      <li>Choisis le compartiment <b>50-30-20</b> de chaque dépense pour suivre ton budget.</li>
+      <li>Chaque entrée est répartie toute seule en <b>50-30-20</b> ; choisis le compartiment de chaque dépense.</li>
       <li>L'onglet <b>Dettes</b> garde qui te doit et à qui tu dois, avec des rappels.</li>
       <li>L'onglet <b>Dépenses</b> : note chaque jour ce que tu dépenses et vois où va l'argent.</li>
       <li>L'onglet <b>Argent</b> montre où il se trouve : espèces, mobile money, banque.</li>
@@ -522,7 +525,7 @@
     $('txList').innerHTML = days.map(g => {
       const net = sum(g.l.map(t => t.type === 'in' ? t.amount : -t.amount));
       return `<div class="dayh"><span>${dayTitle(g.d)}</span><span>${net < 0 ? '−' : '+'}${usd(Math.abs(net))}</span></div><ul>${g.l.map(t => `<li>
-      <div class="grow">${esc(t.label)}<span>${t.cat ? CATS[t.cat][0] : 'Entrée'}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.wallet ? ` · ${esc(t.wallet)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span></div>
+      <div class="grow">${esc(t.label)}<span>${t.cat ? CATS[t.cat][0] : 'Entrée'}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.wallet ? ` · ${esc(t.wallet)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span>${t.type === 'in' ? `<span>→ ${Object.values(CATS).map(([n, p]) => `${n.split(' ')[0]} ${usd(t.amount * p)}`).join(' · ')}</span>` : ''}</div>
       <b class="${t.type}">${t.type === 'in' ? '+' : '−'}${fmt(t.amount, fcOf(t))}</b>
       ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
       <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>`;
@@ -625,27 +628,39 @@
     $('owedList').innerHTML = owed.length ? owed.map(debtItem).join('') : empty;
   }
 
-  // Each compartment shows its budget, its expenses of the month and a quick form to spend from it
+  // Every entry is split 50/30/20 between the compartments. Each compartment shows what came in (its share of the
+  // month's entries), what went out (its expenses), the balance carried over from earlier months, and the history of both.
   function renderRule(list) {
-    const income = sum(list.filter(t => t.type === 'in').map(t => t.amount));
-    const hint = income ? '' : '<p class="empty">Ajoute au moins une entrée ce mois-ci pour calculer les montants à ne pas dépasser.</p>';
+    const m = $('month').value, ins = list.filter(t => t.type === 'in'), income = sum(ins.map(t => t.amount)), incomeFc = sum(ins.map(fcOf));
+    const hint = income ? '' : '<p class="empty">Ajoute une entrée ce mois-ci : elle sera répartie automatiquement entre les trois compartiments.</p>';
     $('ruleBody').innerHTML = hint + Object.entries(CATS).map(([k, [name, pct, color]]) => {
-      const exp = list.filter(t => t.type === 'out' && t.cat === k), target = income * pct, actual = sum(exp.map(t => t.amount)), actualFc = sum(exp.map(fcOf));
-      const diff = actual - target, saving = k === 'epargne', bad = saving ? diff < 0 : diff > 0;
-      const msg = !income ? '' : saving
-        ? (bad ? `Il manque ${fmt(-diff)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(diff)} de marge.`)
-        : (bad ? `Dépassement de ${fmt(diff)}.` : `Il te reste ${fmt(-diff)} à dépenser.`);
+      const exp = list.filter(t => t.type === 'out' && t.cat === k), saving = k === 'epargne';
+      const got = income * pct, gotFc = incomeFc * pct, actual = sum(exp.map(t => t.amount)), actualFc = sum(exp.map(fcOf));
+      const carry = data.tx.reduce((s, t) => t.date < m + '-01' ? s + (t.type === 'in' ? t.amount * pct : t.cat === k && t.type === 'out' ? -t.amount : 0) : s, 0);
+      const reste = carry + got - actual, avail = carry + got, bad = saving ? reste > 0.005 : reste < -0.005;
+      const msg = !income && !carry ? '' : saving
+        ? (bad ? `Il manque ${fmt(reste)} pour atteindre l'objectif.` : `Objectif atteint, +${fmt(-reste)} de marge.`)
+        : (!bad ? `Il te reste ${fmt(reste)} à dépenser.` : `Dépassement de ${fmt(-reste)}.`);
       const bySub = {}; exp.forEach(t => { const n = t.sub || 'Sans catégorie'; bySub[n] = (bySub[n] || 0) + t.amount; });
       const breakdown = Object.entries(bySub).sort((a, b) => b[1] - a[1]).map(([n, v]) => { const w = Math.round(v / actual * 100);
         return `<div class="subrow" style="background:linear-gradient(90deg, color-mix(in srgb, ${color} 22%, transparent) ${w}%, transparent ${w}%)"><span>${esc(n)}</span><span>${usd(v)} · ${w} %</span></div>`; }).join('');
       const share = income ? ` (${Math.round(actual / income * 100)} % de tes entrées)` : '';
-      return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual, actualFc)} / ${fmt(target)}</span></div>
-        <div class="bar"><i style="width:${target ? Math.min(100, actual / target * 100) : 0}%;background:${color}"></i></div>
+      const hist = ins.map(t => ({ d: t.date, id: t.id, label: t.label, v: t.amount * pct, f: fcOf(t) * pct, c: 1 }))
+        .concat(exp.map(t => ({ d: t.date, id: t.id, label: t.label, v: t.amount, f: fcOf(t), c: 0, sub: t.sub, rate: t.rate, debt: t.debt })))
+        .sort((a, b) => b.d.localeCompare(a.d) || b.c - a.c);
+      const histHtml = hist.length ? hist.map(h => `<li><div class="grow">${esc(h.label)}<span>${dateFr(h.d)} · ${h.c ? `${saving ? 'À mettre de côté' : 'Reçu'} (${pct * 100} % de l'entrée)` : `${saving ? 'Mis de côté' : 'Dépensé'}${h.sub ? ` · ${esc(h.sub)}` : ''}${h.rate ? ` · taux ${rateTxt(h.rate)}` : ''}`}</span></div>
+          <b class="${h.c ? 'in' : 'out'}">${h.c ? '+' : '−'}${fmt(h.v, h.f)}</b>
+          ${h.debt ? '' : `<button class="small" data-edit-tx="${h.id}" aria-label="Modifier">✎</button>`}
+          ${h.c ? '' : `<button class="small" data-del-tx="${h.id}" aria-label="Supprimer">✕</button>`}</li>`).join('') : '<li class="empty">Aucun mouvement ce mois-ci.</li>';
+      return `<div class="card rule" style="border-top-color:${color}"><div class="row"><b>${name} · ${pct * 100} %</b><span>${fmt(actual, actualFc)} / ${fmt(avail)}</span></div>
+        ${carry ? `<div class="row"><span>Report des mois précédents</span><span class="${carry < 0 ? 'out' : ''}">${carry < 0 ? '−' : '+'}${fmt(Math.abs(carry))}</span></div>` : ''}
+        <div class="row"><span>${pct * 100} % de tes entrées</span><b class="in">+${fmt(got, gotFc)}</b></div>
+        <div class="row"><span>${saving ? 'Mis de côté' : 'Dépensé'}</span><b class="out">−${fmt(actual, actualFc)}</b></div>
+        <div class="bar"><i style="width:${avail > 0 ? Math.min(100, actual / avail * 100) : actual ? 100 : 0}%;background:${color}"></i></div>
         <div class="msg ${bad ? 'bad' : 'ok'}">${msg}${share}</div>
         ${breakdown ? `<div class="subs">${breakdown}</div>` : ''}
-        <ul>${exp.map(t => `<li><div class="grow">${esc(t.label)}<span>${dateFr(t.date)}${t.sub ? ` · ${esc(t.sub)}` : ''}${t.rate ? ` · taux ${rateTxt(t.rate)}` : ''}</span></div><b class="out">−${fmt(t.amount, fcOf(t))}</b>
-          ${t.debt ? '' : `<button class="small" data-edit-tx="${t.id}" aria-label="Modifier">✎</button>`}
-          <button class="small" data-del-tx="${t.id}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>
+        <h4 class="hist">Historique des ajouts et retraits</h4>
+        <ul>${histHtml}</ul>
         <form class="quick" data-cat="${k}">
           <select name="sub" class="sub wide" aria-label="Catégorie de dépense">${subOptions(k, '')}</select>
           <input name="label" placeholder="Dépense (${name.toLowerCase()})" required class="wide">
@@ -806,7 +821,7 @@
     const old = editId && data.tx.find(x => x.id === editId);
     if (old) Object.assign(old, fields); else data.tx.push({ id: uid(), ...fields });
     $('month').value = fields.date.slice(0, 7);
-    const wasEdit = !!old; closePanels(); save(); render(); NZ.toast(wasEdit ? '✅ Opération modifiée' : '✅ Opération ajoutée'); checkGoal();
+    const wasEdit = !!old; closePanels(); save(); render(); NZ.toast(wasEdit ? '✅ Opération modifiée' : type === 'in' ? `✅ Entrée répartie : ${usd(fields.amount * .5)} · ${usd(fields.amount * .3)} · ${usd(fields.amount * .2)}` : '✅ Opération ajoutée'); checkGoal();
   };
 
   // Bottom sheets: the operation form and the settings
