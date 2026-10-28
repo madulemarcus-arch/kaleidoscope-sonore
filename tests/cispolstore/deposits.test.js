@@ -4,7 +4,7 @@ const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
 await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'Mukendi',name:'Jean Mukendi',phone:'09',acc:'ACC-1',plan:'Résidentiel',price:70,start:t,period:30,grace:15,subs:[],created:t,note:''},{id:'c2',code:'CL-2',type:'gere',first:'Paul',last:'K',name:'Paul K',phone:'08',created:t,note:''});App.save();App.go('more')});await p.waitForTimeout(500);
 ok('Plus has Fonds en attente',/Fonds en attente/.test(await p.innerText('#view')));
-await p.click('[data-act=go][data-v=deposits]');await p.waitForTimeout(500);ok('empty state',/Aucun fonds en attente/.test(await p.innerText('#view')));
+await p.click('#view [data-act=go][data-v=deposits]');await p.waitForTimeout(500);ok('empty state',/Aucun fonds en attente/.test(await p.innerText('#view')));
 await p.click('[data-act=dep_new]');await p.waitForTimeout(300);await p.selectOption('#f_dc','c1');await p.fill('#f_da','70');await p.fill('#f_dn','à payer à Starlink');await p.click('#dok');await p.waitForTimeout(1200);
 ok('deposit recorded: hero 70 $',/70 \$/.test(await p.innerText('.dhero'))&&await p.evaluate(()=>App.db.deposits.length===1&&App.db.deposits[0].amount===70));
 await p.screenshot({path:'d16-list.png'});
