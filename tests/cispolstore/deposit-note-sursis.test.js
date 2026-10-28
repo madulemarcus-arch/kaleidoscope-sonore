@@ -29,4 +29,19 @@ ok('search with a single match: client selected and note filled',await p.inputVa
 // the note is saved with the deposit
 await p.fill('#f_da','70');await p.click('#dok');await p.waitForTimeout(800);
 ok('the note is saved on the deposit',await p.evaluate(g=>App.db.deposits&&App.db.deposits.some(d=>d.clientId==='c1'&&d.note==='À payer avant le '+g)||Object.values(App.db).some(v=>Array.isArray(v)&&v.some(d=>d&&d.clientId==='c1'&&d.note==='À payer avant le '+g)),D.g1));
+// ---- deposits ALREADY in the list (written before, without a note): the deadline shows at once, nothing is rewritten
+await p.evaluate(()=>{const t=App.today();App.db.deposits=[
+ {id:'d1',clientId:'c2',date:t,amount:50,currency:'USD',mode:'Cash',purpose:'Abonnement Starlink',note:'',ref:'',uses:[],rate:2000,no:'D-1'},                 // waiting, no note
+ {id:'d2',clientId:'c1',date:t,amount:40,currency:'USD',mode:'Cash',purpose:'Abonnement Starlink',note:'note de la main',ref:'',uses:[],rate:2000,no:'D-2'}, // waiting, own note
+ {id:'d3',clientId:'c1',date:t,amount:30,currency:'USD',mode:'Cash',purpose:'Abonnement Starlink',note:'',ref:'',uses:[{id:'u1',date:t,amount:30,type:'paid',mode:'Cash',note:''}],rate:2000,no:'D-3'}, // fully paid
+ {id:'d4',clientId:'c3',date:t,amount:20,currency:'USD',mode:'Cash',purpose:'Abonnement Starlink',note:'',ref:'',uses:[],rate:2000,no:'D-4'}];       // inactive client
+ App.save();App.go('deposits')});await p.waitForTimeout(400);await p.click('[data-act=dep_f][data-f=all]');await p.waitForTimeout(400);
+const rowTxt=id=>p.$eval('[data-act=dep_open][data-id='+id+']',e=>e.innerText);
+ok('existing deposit without note, client active: « À payer avant le '+D.g2+' » appears at once',(await rowTxt('d1')).includes('À payer avant le '+D.g2),await rowTxt('d1'));
+ok('existing deposit with its own note: the note is kept, no automatic date',(await rowTxt('d2')).includes('note de la main')&&!(await rowTxt('d2')).includes('À payer avant'));
+ok('deposit already fully paid: no deadline',!(await rowTxt('d3')).includes('À payer avant'));
+ok('client already inactive: no deadline',!(await rowTxt('d4')).includes('À payer avant'));
+ok('nothing was written into the stored deposits',await p.evaluate(()=>App.db.deposits.every(d=>d.id==='d2'?d.note==='note de la main':!d.note)));
+await p.click('[data-act=dep_open][data-id=d1]');await p.waitForTimeout(300);
+ok('the deposit window shows the deadline too',(await p.innerText('dialog')).includes('À payer avant le '+D.g2));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
