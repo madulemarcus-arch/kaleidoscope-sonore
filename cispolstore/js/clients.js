@@ -199,7 +199,9 @@
   App.renewPicker = () => {
     const g = App.db.clients.filter(c => c.type === 'gere').sort((a, b) => (App.sub(a) || { left: 1e9 }).left - (App.sub(b) || { left: 1e9 }).left);
     if (!g.length) return App.toast('Aucun client géré');
-    App.modal('Renouveler un abonnement', F.sel('f_rc', 'Client', g.map(c => [c.id, `${App.cname(c)} — ${(App.sub(c) ? App.STATUS[App.sub(c).status][0] : 'sans abonnement')}`])), () => { const id = App.v('f_rc'); setTimeout(() => App.renewForm(id), 30); }, 'Continuer');
+    const opts = q => [['', '— Choisir un client —'], ...g.filter(c => App.clientMatch(c, q)).map(c => [c.id, `${App.cname(c)}${c.acc ? ' · ' + c.acc : ''} — ${(App.sub(c) ? App.STATUS[App.sub(c).status][0] : 'sans abonnement')}`])];
+    App.modal('Renouveler un abonnement', App.clientFinder('f_rc') + F.sel('f_rc', 'Client', opts(''), g[0].id), () => { const id = App.v('f_rc'); if (!id) return App.toast('Aucun client trouvé'); setTimeout(() => App.renewForm(id), 30); }, 'Continuer');
+    App.wireClientFinder('f_rc', opts);
   };
   App.renewForm = id => {
     const c = App.client(id), s = App.sub(c), today = App.today();
