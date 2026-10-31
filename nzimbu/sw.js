@@ -1,4 +1,4 @@
-const CACHE = 'nzimbu-v13';
+const CACHE = 'nzimbu-v14';
 const FILES = ['./', 'index.html', 'fx.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', ...Array.from({ length: 4 }, (_, i) => `photos/billet-${i + 1}.webp`)];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });

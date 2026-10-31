@@ -365,7 +365,7 @@
       <div class="chips wide" id="payQuick"></div>
       <input id="pAmount" type="number" min="0.01" step="any" placeholder="Montant payé (une partie ou tout)" required>
       <select id="pCur" aria-label="Devise du montant"><option value="usd">$</option><option value="fc">FC</option></select>
-      <select id="pWallet" class="wide" aria-label="Portefeuille"></select>
+      <select id="pWallet" class="wide" aria-label="Portefeuille" required></select>
       <input id="pDate" type="date" required class="wide">
       <p class="msg wide" id="pInfo" aria-live="polite"></p>
       <button class="primary wide">Enregistrer le paiement</button>
@@ -951,13 +951,23 @@
     $('payTitle').textContent = d.dir === 'owe' ? `Rembourser ${d.who}` : `Reçu de ${d.who}`;
     $('payRecap').innerHTML = `Reste <b>${usd(left)}</b> (≈ ${fc(left)}) sur ${usd(d.amount)}${d.paid ? `, déjà ${usd(d.paid)}` : ''}.`;
     $('payQuick').innerHTML = `<button type="button" data-payq="1">Tout (${usd(left)})</button><button type="button" data-payq="0.5">Moitié (${usd(left / 2)})</button>`;
-    $('pAmount').value = ''; $('pCur').value = 'usd'; $('pWallet').innerHTML = walletOptions('', true); $('pDate').value = today();
+    $('pAmount').value = ''; $('pCur').value = 'usd'; $('pWallet').innerHTML = walletOptions('', false).replace('<option value="">Portefeuille…</option>', `<option value="" disabled selected>${d.dir === 'owe' ? 'Payé depuis quel portefeuille ?' : 'Reçu dans quel portefeuille ?'}</option>`); $('pDate').value = today();
     payPreview(); openPanel('paySheet'); $('pAmount').focus();
   }
   $('pAmount').oninput = $('pCur').onchange = payPreview;
+  $('pWallet').onchange = () => {
+    if ($('pWallet').value !== '__new') return;
+    const name = (prompt('Nouveau portefeuille (ex. Airtel Money, Tontine) :') || '').trim();
+    data.wallets = data.wallets || [];
+    const same = data.wallets.find(n => n.toLowerCase() === name.toLowerCase());
+    if (name && !same) { data.wallets.push(name); save(); }
+    const d = data.debts.find(x => x.id === payId);
+    $('pWallet').innerHTML = walletOptions(name ? same || name : '').replace('<option value="">Portefeuille…</option>', `<option value="" disabled${name ? '' : ' selected'}>${d && d.dir === 'owe' ? 'Payé depuis quel portefeuille ?' : 'Reçu dans quel portefeuille ?'}</option>`);
+  };
   $('payForm').onsubmit = e => {
     e.preventDefault();
     const c = payCalc(); if (!c || !(c.v > 0)) return;
+    if (!$('pWallet').value || $('pWallet').value === '__new') { $('pWallet').focus(); return; }
     const { d, left } = c, amt = Math.min(c.v, left), inFc = $('pCur').value === 'fc', date = $('pDate').value || today(), rate = inFc ? data.rate : undefined;
     d.paid += amt; (d.pays = d.pays || []).push({ date, amount: amt, rate });
     // The payment is also an operation so the monthly totals and the wallet balances stay accurate
