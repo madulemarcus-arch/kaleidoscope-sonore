@@ -624,3 +624,5 @@ button.sbadge:active { transform:scale(.96); }
 .phth { position:relative; aspect-ratio:1; border-radius:12px; overflow:hidden; background:var(--card2); }
 .phth img { width:100%; height:100%; object-fit:cover; display:block; }
 .phth button { position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%; border:0; background:rgba(0,0,0,.6); color:#fff; font-size:12px; line-height:1; padding:0; }
+/* printed screens (day close, finance, monthly report): name the application at the bottom */
+@media print { #view::after { content:"Document généré par l'application CISPOLstore Manager"; display:block; margin-top:14px; text-align:right; font:italic 600 9.5pt/1.3 Georgia,serif; color:#2d3748; } }
