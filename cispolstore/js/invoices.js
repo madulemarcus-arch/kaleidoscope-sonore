@@ -279,7 +279,10 @@
 
   // Invoice / receipt look (modelled on the company's Word invoice): serif, navy #1A365D, orange note, round stamp. Table-based so Word keeps the layout.
   const PAPER_CSS = `.paper{font:10.5pt/1.45 Cambria,'Times New Roman',Georgia,serif;color:#1a202c;background:#fff}.paper table{width:100%;border-collapse:collapse}.paper td,.paper th{vertical-align:top}.paper .r{text-align:right}.paper .hd td{vertical-align:middle;padding:0}.paper .hd img{height:2.3cm}.paper .nm{font-size:20pt;font-weight:bold;color:#1A365D;letter-spacing:.5px}.paper .sub{font-size:8pt;color:#4A5568;letter-spacing:.8px;margin-top:2px}.paper .legal{margin:10px 0 16px;border-bottom:1px solid #1a202c}.paper .legal td{padding:0 0 9px;font-size:9.5pt;line-height:1.6;width:50%}.paper .two{margin:0 0 18px;border-collapse:separate;border-spacing:0;table-layout:fixed}.paper .box{width:47.5%;border:1px solid #E2E8F0;background:#F7FAFC;padding:10px 12px;line-height:1.6}.paper .gap{width:5%}.paper .bh{font-size:11pt;font-weight:bold;color:#1A365D;margin-bottom:6px}.paper .items{margin:0 0 16px}.paper .items th{background:#1A365D;color:#fff;padding:8px 9px;text-align:left;font-weight:bold}.paper .items th.r{text-align:right}.paper .items td{padding:8px 9px;border-bottom:1px solid #E2E8F0}.paper .tots td{padding:6px 9px;width:50%;text-align:right}.paper .tots .net td{background:#1A365D;color:#fff;font-weight:bold}.paper .rate{font-size:8.5pt;color:#4A5568;text-align:right;margin-top:5px}.paper .wb{margin:16px 0 0;border-left:4px solid #DD6B20;background:#FFFAF0;padding:10px 14px;line-height:1.7}.paper .foot{margin-top:20px;page-break-inside:avoid}.paper .foot td{vertical-align:middle}.paper .foot td.thx{text-align:center;padding-top:6px}.paper .hd .nm,.paper .hd .sub{text-align:center}.paper .foot img{width:4.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)}.paper .foot img.qr{width:2.6cm;transform:none;filter:none}.paper .thx{font-weight:bold;color:#1A365D;letter-spacing:.6px;font-size:11pt}.paper .pay{margin-top:14px}.paper .pay h4{margin:0 0 4px;color:#1A365D}.paper .pay th{background:#1A365D;color:#fff;padding:6px;text-align:left}.paper .pay td{padding:6px;font-size:9.5pt;border-bottom:1px solid #E2E8F0}.paper .sold{display:inline-block;margin-top:10px;padding:3px 10px;border:2px solid #1d8a4f;color:#1d8a4f;font-weight:bold;transform:rotate(-3deg)}.paper .sig{display:flex;gap:30px;margin-top:34px}.paper .sg{margin-top:14px;table-layout:fixed;page-break-inside:avoid}.paper .sg td{padding:0}.paper .sg .ln{border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .sg .gp{width:30px}.paper .sg .s2{height:3.2cm;text-align:center;vertical-align:bottom}.paper .sg .s2 img{height:3cm;width:3cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)}.paper .sig div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .rc{border-left:4px solid #DD6B20;background:#FFFAF0;padding:14px 16px;margin:0 0 16px;font-size:12pt;line-height:1.8}.paper .rc b.big{font-size:15pt;color:#DD6B20}.paper table,.paper tr{page-break-inside:avoid}@media (max-width:640px){.paper .hd td:first-child{width:36%!important}.paper .hd img{height:auto;max-width:100%}.paper .nm{font-size:14pt}.paper .legal td{display:block;width:auto;text-align:left}}.paper .cttl{text-align:center;font-size:15pt;font-weight:bold;color:#1A365D;margin:6px 0 2px;letter-spacing:.4px}.paper .ctno{text-align:center;font-size:9.5pt;color:#4A5568}.paper .ctt{font-weight:bold;color:#1A365D;margin:11px 0 2px;page-break-after:avoid}.paper .ctp{margin:0 0 4px;text-align:justify;line-height:1.5}.paper .ctsg{margin-top:14px;page-break-inside:avoid}.paper .ctsg small{font-weight:normal;font-size:8pt}`;
-  const DOC_CSS = `body{margin:0;background:#fff}@page{size:A4;margin:1.4cm 1.5cm}` + PAPER_CSS;
+  const MADE_CSS = `.made{margin-top:12px;padding-top:5px;border-top:1px solid #CBD5E0;text-align:center;font:italic 7.5pt/1.3 Cambria,'Times New Roman',Georgia,serif;color:#718096}`;
+  const DOC_CSS = `body{margin:0;background:#fff}@page{size:A4;margin:1.4cm 1.5cm}` + PAPER_CSS + MADE_CSS;
+  // line printed at the bottom of every document, whatever the company details: names the application that produced it
+  const made = () => `<div class="made">Document généré par l'application CISPOLstore Manager</div>`;
   { const st = document.createElement('style'); st.id = 'paperCss'; st.textContent = PAPER_CSS; document.head.appendChild(st); }
   // shared pieces of the printed documents
   const money = (n, cur) => cur === 'CDF' ? App.nf(n, 0) + ' CDF' : App.nf(n, 2) + ' $';
@@ -323,20 +326,20 @@
   const readyThen = (f, go) => Promise.all([...f.contentDocument.images].map(im => im.decode ? im.decode().catch(() => {}) : 0)).then(() => setTimeout(go, 300), () => setTimeout(go, 700));
   const printRaw = async (title, html) => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${DOC_CSS}</style>${html}`;
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${DOC_CSS}</style>${html}${made()}`;
     f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
   App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) App.rcptSent(p.id); if (p) printRaw(App.recFileName(p), App.receiptDoc(p, await logoData(), await stampData())); };
   App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
-    App.download(`${App.recFileName(p)}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.recFileName(p))}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}</body></html>`, 'application/msword'); };
+    App.download(`${App.recFileName(p)}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.recFileName(p))}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}${made()}</body></html>`, 'application/msword'); };
 
   const stampData = async () => { const cs = App.db.settings.company.stamp; if ((cs || '').startsWith('data:')) return cs; try { const b = await (await fetch('stamp.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; } };
   const logoData = async () => {
     const co = App.db.settings.company; if ((co.logo || '').startsWith('data:')) return co.logo;
     try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
   };
-  App.docKit = { DOC_CSS: () => PAPER_CSS, logoData, stampData, head: paperHead, boxes: twoBoxes, foot: paperFoot, money, print: printRaw };
+  App.docKit = { DOC_CSS: () => PAPER_CSS + MADE_CSS, made, logoData, stampData, head: paperHead, boxes: twoBoxes, foot: paperFoot, money, print: printRaw };
   // file name of an invoice: the client's name first, then the number (browsers use the page title when saving a print as PDF)
   // file name of a document: "Client name - Reference" (the client name comes first so that the files sort by client)
   App.docName = (who, ref) => { const n = String(who || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return n ? `${n} - ${ref}` : String(ref); };
@@ -344,12 +347,12 @@
   App.recFileName = p => { const i = App.invoice(p.invoiceId), c = App.client(p.clientId) || (i && App.client(i.clientId)); return App.docName(c ? App.cname(c) : '', 'Recu ' + App.receiptNo(p)); };
   const printDoc = async inv => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}`;
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}${made()}`;
     f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
   const wordDoc = async inv => {
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}</body></html>`;
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}${made()}</body></html>`;
     App.download(`${App.invFileName(inv)}.doc`, html, 'application/msword');
   };
 

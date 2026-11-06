@@ -26,7 +26,7 @@
   const render = async html => {
     const K = App.docKit, host = document.createElement('div');
     host.style.cssText = `position:fixed;left:-9999px;top:0;width:${W}px;box-sizing:border-box;padding:${PAD};background:#fff`;
-    host.innerHTML = `<style>${K.DOC_CSS()}</style>${html}`; document.body.appendChild(host);
+    host.innerHTML = `<style>${K.DOC_CSS()}</style>${html}${K.made()}`; document.body.appendChild(host);
     await Promise.all([...host.querySelectorAll('img')].map(im => im.decode ? im.decode().catch(() => {}) : 0));
     const H = Math.ceil(host.scrollHeight); host.style.position = 'static'; host.style.left = '0'; const xhtml = new XMLSerializer().serializeToString(host); host.remove();
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
