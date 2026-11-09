@@ -48,3 +48,9 @@ Rules:
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 - A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
+
+## CISPOLstore Business (`business/`) : application générale
+
+- Application de gestion générale (tous secteurs), même esprit que `cispolstore/` mais sans rien de Starlink. Tests : `cd tests && node business/run.js` (voir `tests/business/README.md`), workflow `.github/workflows/tests-business.yml`.
+- Mêmes règles : `CACHE` dans `business/sw.js` = `App.BUILD` dans `business/js/core.js` ; tout nouveau fichier `js/` va dans `index.html` ET dans `FILES` de `sw.js` ; ne jamais changer `id` ni `start_url` du manifeste.
+- Étapes : 1 socle (fait) · 2 clients · 3 stock/fournisseurs · 4 factures/paiements/impression · 5 finance/caisse/rapports · 6 profils/sauvegarde/synchro · 7 modules optionnels.

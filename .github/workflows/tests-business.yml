@@ -1,0 +1,33 @@
+# Lance les tests automatiques de CISPOLstore Business (contrôles statiques + parcours dans Chromium).
+name: Tests CISPOLstore Business
+on:
+  push:
+    branches: [main]
+    paths: ['business/**', 'tests/business/**', '.github/workflows/tests-business.yml']
+  pull_request:
+    paths: ['business/**', 'tests/business/**', '.github/workflows/tests-business.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tests-business-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - name: Installer Playwright et Chromium
+        working-directory: tests
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Lancer les tests
+        working-directory: tests
+        run: node business/run.js
