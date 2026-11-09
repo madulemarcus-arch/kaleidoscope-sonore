@@ -1,0 +1,18 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{App.db.clients.push({id:'cx1',type:'gere',name:'Marie Kabasele',phone:'0810000001',code:'CL-X1'},{id:'cx2',type:'gere',name:'Café "Le/Soleil": <Nord>',phone:'0810000002',code:'CL-X2'},{id:'cx3',type:'gere',name:'',phone:'0810000003',code:'CL-X3'});
+ window.__a=App.createInvoice({type:'materiel',clientId:'cx1',currency:'USD',payMode:'Cash',lines:[{desc:'Kit',qty:1,price:100,cost:30}]},0);
+ window.__b=App.createInvoice({type:'materiel',clientId:'cx2',currency:'USD',payMode:'Cash',lines:[{desc:'Kit',qty:1,price:100,cost:30}]},0);
+ window.__c=App.createInvoice({type:'materiel',clientId:'zzz',currency:'USD',payMode:'Cash',lines:[{desc:'Kit',qty:1,price:100,cost:30}]},0);App.save()});
+const n=await p.evaluate(()=>[App.invFileName(window.__a),App.invFileName(window.__b),App.invFileName(window.__c),window.__a.number,window.__c.number]);
+ok('file name = client name + number',n[0]==='Marie Kabasele - '+n[3],n[0]);
+ok('forbidden characters removed',!/[\\/:*?"<>|]/.test(n[1])&&/^Café/.test(n[1])&&n[1].endsWith(' - '+(await p.evaluate(()=>window.__b.number))),n[1]);
+ok('unknown client falls back on something with the number only or a name',n[2].endsWith(n[4]),n[2]);
+const got=await p.evaluate(async()=>{const r={};App.sharePdf=async(name)=>{r.pdf=name};App.download=(name)=>{r.doc=name};await App.actions.invshare({id:window.__a.id});await App.actions.invword({id:window.__a.id});await new Promise(r=>setTimeout(r,500));return r});
+ok('PDF named after the client',got.pdf==='Marie Kabasele - '+n[3]+'.pdf',JSON.stringify(got));
+ok('Word file named after the client',got.doc==='Marie Kabasele - '+n[3]+'.doc',JSON.stringify(got));
+const title=await p.evaluate(async()=>{await App.actions.invprint({id:window.__a.id});await new Promise(r=>setTimeout(r,500));const f=document.querySelector('iframe[srcdoc]');return f&&f.srcdoc.match(/<title>([^<]*)<\/title>/)[1]});
+ok('print title (used by Save as PDF) = client name + number',title==='Marie Kabasele - '+n[3],String(title));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();

@@ -1,0 +1,15 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');
+let f=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today(),A=n=>App.addDays(t,n);const C=(id,n,ph)=>App.db.clients.push({id,code:id,type:'mat',first:n,last:'X',name:n+' X',phone:ph,subs:[],created:t});C('a','Ana','0811111111');C('b','Bob','');C('c','Carl','0822222222');C('d','Dina','0833333333');
+['a','b','c','d'].forEach((id,k)=>App.createInvoice({type:'materiel',clientId:id,currency:'USD',payMode:'Cash',date:A(-10-k),lines:[{pid:'',desc:'K',qty:1,price:50+k,cost:0}]},0));
+App.db.invoices.find(i=>i.clientId==='d').lastRemind=t;App.save();App.go('impayes')});
+await p.waitForTimeout(300);ok('series card: 2 clients',/2 client\(s\) à relancer/.test(await p.innerText('#view')));
+await p.evaluate(()=>{window.__o=[];window.open=u=>{window.__o.push(u);return null}});await p.click('[data-act=dun_all]');ok('first = oldest with phone (Carl)',/Carl X/.test(await p.innerText('dialog')));
+await p.click('#qsend');ok('opens wa.me with phone',await p.evaluate(()=>/wa\.me\/243822222222|wa\.me\/0822222222|wa\.me\/.*822222222/.test(window.__o[0]||'')));
+ok('next is Ana',/Ana X/.test(await p.innerText('dialog')));await p.click('#qskip');
+ok('finished',/1 relance/.test(await p.innerText('dialog')));
+ok('Ana marked reminded',await p.evaluate(()=>App.db.invoices.find(i=>i.clientId==='c').lastRemind===App.today()&&!App.db.invoices.find(i=>i.clientId==='a').lastRemind));
+console.log(errs);await b.close();process.exit(f?1:0)})();

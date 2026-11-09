@@ -1,0 +1,34 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(600);await p.click('[data-lk=skip]').catch(()=>{});
+const J=()=>p.evaluate(()=>App.db.audit.map(e=>e.by+'|'+e.kind+'|'+e.text));
+await p.evaluate(()=>{App.save()});await p.waitForTimeout(100);
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'mat',first:'Jean',last:'K',name:'Jean K',phone:'0991',created:t,subs:[]});App.db.products.push({id:'p1',name:'Routeur',cat:'Routeurs',price:40,cost:25,qty:10,min:2});App.save()});
+let j=await J();ok('client + product creation logged',j.some(x=>/a créé le client Jean K/.test(x))&&j.some(x=>/a créé le produit Routeur/.test(x)),j.join(' ; '));
+await p.evaluate(()=>{App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:App.today(),lines:[{pid:'p1',desc:'Routeur',qty:1,price:40,cost:25}],payAmount:15},0);App.save()});
+j=await J();ok('invoice created + payment cashed logged',j.some(x=>/a créé la facture FAC-/.test(x))&&j.some(x=>/a encaissé 15 \$ de Jean K/.test(x)),j.slice(-3).join(' ; '));
+ok('stock qty change by sale not reported as product edit',!j.some(x=>/a modifié le produit Routeur/.test(x)));
+await p.evaluate(()=>{App.prod('p1').price=45;App.save()});
+const e=await p.evaluate(()=>App.db.audit.slice(-1)[0]);ok('edit logged with before/after',/a modifié le produit Routeur/.test(e.text)&&e.ch.some(c=>c[0]==='Prix'&&c[1]==='40'&&c[2]==='45'),JSON.stringify(e.ch));
+await p.evaluate(()=>{App.db.invoices=App.db.invoices.filter(i=>false);App.save()});
+j=await J();ok('deletion logged with description',j.some(x=>/a supprimé la facture FAC-.*Jean K/.test(x)),j.slice(-2).join(' ; '));
+await p.evaluate(()=>{App.db.settings.rate=2500;App.save()});j=await J();ok('rate change logged',j.some(x=>/taux du jour : 2400 → 2500/.test(x)));
+const n=(await J()).length;await p.evaluate(()=>{App.save();App.save()});ok('no noise on idle saves',(await J()).length===n);
+// profiles
+await p.evaluate(()=>{App.db.settings.users=[{id:'a',name:'Admin Z',role:'admin',active:true,salt:'s',hash:'h'},{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[1];App.applyRole&&App.applyRole();App.db.expenses.push({id:'e1',date:App.today(),label:'Transport',amount:5,currency:'USD',cat:'Transport',mode:'Cash'});App.save()});
+j=await J();ok('attributed to active profile',j.some(x=>/^Vic\|add\|a créé la dépense « Transport »/.test(x)),j.slice(-3).join(' ; '));
+ok('users creation logged',j.some(x=>/a créé le profil Vic \(vendeur\)/.test(x)));
+ok('vendeur cannot open journal',await p.evaluate(()=>!App.canView('journal')));
+await p.evaluate(()=>{App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('journal')});await p.waitForTimeout(1200);
+let t=await p.innerText('#view');ok('journal view lists entries with who',/Vic/.test(t)&&/Transport/.test(t));
+await p.click('[data-act=jr_f][data-k=kind][data-v=del]');await p.waitForTimeout(400);t=await p.innerText('#view');ok('filter Suppressions',/supprimé la facture/.test(t)&&!/Transport/.test(t));
+await p.click('[data-act=jr_f][data-k=kind][data-v=all]');await p.waitForTimeout(300);
+await p.click('[data-act=jr_f][data-k=who][data-v=Vic]');await p.waitForTimeout(400);t=await p.innerText('#view');ok('filter by person',/Transport/.test(t)&&!/Jean K/.test(t));
+await p.click('[data-act=jr_f][data-k=who][data-v=all]');await p.waitForTimeout(300);
+await p.fill('#jq','taux');await p.waitForTimeout(300);ok('search',/taux/.test(await p.innerText('#jlist')));await p.fill('#jq','');await p.waitForTimeout(200);
+await p.screenshot({path:'jr.png'});await p.click('[data-act=jr_open]',{timeout:5000});await p.waitForTimeout(300);ok('detail modal',/Détail/.test(await p.innerText('dialog')));await p.keyboard.press('Escape');
+// restore/sync re-baseline: no flood
+const before=(await J()).length;await p.evaluate(()=>{const o=App.exportData();o.invoices=[];o.clients=[];App.auditReset();App.db.clients=[];App.save()});
+ok('reset baseline then change still logs',(await J()).length>=before);
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();

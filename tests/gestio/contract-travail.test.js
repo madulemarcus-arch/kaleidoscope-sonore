@@ -1,0 +1,27 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{App.go('contracts')});await p.waitForTimeout(400);
+await p.click('[data-act=ct_new]');await p.waitForTimeout(400);await p.selectOption('#ct_type','travail');await p.waitForTimeout(200);
+ok('client select hidden, person fields shown',!(await p.isVisible('#ct_cl'))&&await p.isVisible('#ct_pname'));
+ok('defaults: essai 30, jour de paie 30, durée 6 mois, vendeur',await p.inputValue('#cf_trial')==='30'&&await p.inputValue('#cf_payday')==='30'&&await p.inputValue('#ct_months')==='6'&&await p.inputValue('#cf_job')==='Vendeur');
+const create=async()=>{await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer le contrat/.test(b.textContent)).click()});await p.waitForTimeout(800)};
+await p.fill('#ct_pname','Paul Mukendi');await p.fill('#cf_amount','250');await create();
+ok('refuses a CDD without motif',await p.evaluate(()=>App.db.contracts.length===0));
+await p.fill('#cf_motif','Remplacement d\'un vendeur absent');await p.fill('#cf_commission','2 % des ventes encaissées');await create();
+let c=await p.evaluate(()=>App.db.contracts[0]);
+ok('CDD created with 14 articles',c&&c.type==='travail'&&c.months===6&&(c.body.match(/^Article \d+ –/gm)||[]).length===14,String(c&&c.months));
+ok('CDD text: durée déterminée, motif, 6 mois, essai 30 jours, paie le 30, commission sur ventes encaissées',/à durée déterminée, pour une durée de 6 mois, jusqu'au/.test(c.body)&&/Remplacement d'un vendeur absent/.test(c.body)&&/essai de 30 jours/.test(c.body)&&/le 30 de chaque mois/.test(c.body)&&/250\s\$/.test(c.body)&&/2 % des ventes encaissées/.test(c.body)&&/ventes réellement encaissées/.test(c.body),c.body.slice(0,260));
+ok('caisse, stock, confidentialité, PIN and no automatic salary deduction',/Caisse et encaissements/.test(c.body)&&/Aucune somme n'est retenue sur le salaire sans respecter les règles légales/.test(c.body)&&/Stock, tickets et matériel confiés/.test(c.body)&&/Confidentialité/.test(c.body)&&/code PIN personnel/.test(c.body));
+ok('no broken grammar',!/\b(de|à) le (Employeur|Employé)/.test(c.body),(c.body.match(/\b(de|à) le \w+/g)||[]).join('|'));
+const doc=await p.evaluate(()=>App.contractDoc(App.db.contracts[0],'','s'));
+ok('document: title, employer/employee boxes, employee name',/CONTRAT DE TRAVAIL/.test(doc)&&/L(&#39;|')EMPLOYEUR/.test(doc)&&/L(&#39;|')EMPLOYÉ\(E\)/.test(doc)&&/Paul Mukendi/.test(doc));
+await p.keyboard.press('Escape');await p.waitForTimeout(300);
+// CDI: duration 0, no motif needed, no commission
+await p.click('[data-act=ct_new]');await p.waitForTimeout(300);await p.selectOption('#ct_type','travail');await p.waitForTimeout(200);
+await p.fill('#ct_pname','Marie T');await p.fill('#cf_amount','300');await p.fill('#ct_months','0');await p.fill('#cf_trial','0');await create();
+c=await p.evaluate(()=>App.db.contracts[1]);
+ok('CDI: indéterminée, no motif, no essai, no commission',c&&c.months===0&&/à durée indéterminée et prend effet/.test(c.body)&&!/motif suivant/.test(c.body)&&/ne comporte pas de période d'essai/.test(c.body)&&/ni commission ni prime/.test(c.body),c&&c.body.slice(0,200));
+ok('two texts kept',c.src==='auto'&&/Article 1 – Objet\n\nArticle 2/.test(c.alt));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();

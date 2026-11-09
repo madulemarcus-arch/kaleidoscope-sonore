@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12365d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+<title>Gestio Manager</title>
+</head>
+<body>
+<div id="lock" hidden></div>
+<aside id="side"></aside>
+<header id="top">
+  <button class="ib" id="backBtn" aria-label="Retour" hidden>←</button>
+  <img id="logo" src="logo.png" alt="Gestio">
+  <div id="title"></div>
+  <button class="ib" id="searchBtn" aria-label="Rechercher">🔎</button>
+  <button class="ib" id="lockBtn" aria-label="Verrouiller">🔒</button>
+  <button class="ib" id="menuBtn" aria-label="Plus d'options" aria-haspopup="true">⋯</button>
+  <div id="topmenu" hidden>
+    <button class="ib" id="syncBtn" aria-label="Synchronisation">☁️</button>
+    <button class="ib" id="themeBtn" aria-label="Changer de thème">🌙</button>
+  </div>
+</header>
+<main id="view"></main>
+<nav id="bottom">
+  <button data-act="go" data-v="home" data-nav="home"><span>🏠</span>Accueil</button>
+  <button data-act="go" data-v="clients" data-nav="clients"><span>👥</span>Clients</button>
+  <i></i>
+  <button data-act="go" data-v="stock" data-nav="stock"><span>📦</span>Stock</button>
+  <button data-act="go" data-v="more" data-nav="more"><span>☰</span>Plus</button>
+</nav>
+<button id="fab" aria-label="Action rapide" data-act="quick">+</button>
+<dialog id="dlg"></dialog>
+<script src="js/core.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/roles.js"></script>
+<script src="js/lists.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/clients.js"></script>
+<script src="js/photos.js"></script>
+<script src="js/stock.js"></script>
+<script src="js/techs.js"></script>
+<script src="js/plans.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="js/invoices.js"></script>
+<script src="js/share.js"></script>
+<script src="js/purchases.js"></script>
+<script src="js/delivery.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/monthly.js"></script>
+<script src="js/deposits.js"></script>
+<script src="js/supplier.js"></script>
+<script src="js/quotes.js"></script>
+<script src="js/contracts.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/finance.js"></script>
+<script src="js/daily.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/importc.js"></script>
+<script src="js/importf.js"></script>
+<script src="js/remind.js"></script>
+<script src="js/penalties.js"></script>
+<script src="js/unpaid.js"></script>
+<script src="js/export.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/keys.js"></script>
+<script src="js/clientstats.js"></script>
+<script src="js/accounting.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

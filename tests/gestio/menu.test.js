@@ -1,0 +1,13 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+ok('menu closed at start',!(await p.isVisible('#topmenu')));
+await p.click('#menuBtn');ok('menu opens with theme + sync rows',await p.isVisible('#themeBtn')&&/Changer de thème/.test(await p.innerText('#topmenu')+await p.getAttribute('#themeBtn','aria-label')));
+const t0=await p.evaluate(()=>document.documentElement.dataset.theme||'light');await p.click('#themeBtn');await p.waitForTimeout(200);
+const t1=await p.evaluate(()=>document.documentElement.dataset.theme||'light');ok('theme toggled from the menu',t0!==t1);
+ok('menu closes after a click',!(await p.isVisible('#topmenu')));
+await p.click('#menuBtn');await p.click('#view');await p.waitForTimeout(100);ok('closes on outside tap',!(await p.isVisible('#topmenu')));
+ok('five equal nav places, no spacer',await p.evaluate(()=>document.querySelectorAll('#bottom button').length===5&&!document.querySelector('#bottom i')));
+ok('fab no longer overlaps nav',await p.evaluate(()=>{const a=document.getElementById('fab').getBoundingClientRect(),n=document.getElementById('bottom').getBoundingClientRect();return a.bottom<=n.top+1}));
+console.log(errs);await b.close();process.exit(f?1:0)})();

@@ -1,0 +1,18 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const p=await (await b.newContext({...devices['Pixel 5']})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+const st=await p.evaluate(()=>{const t=App.today();const mk=(id,name,off)=>({id,code:id,type:'gere',first:name,last:'X',name:name+' X',phone:'0812',address:'',plan:'Résidentiel',price:70,start:App.addDays(t,off),period:30,grace:15,subs:[],created:t});
+App.db.clients.push(mk('a1','Alice',-5),mk('a2','Aaron',-20),mk('s1','Sonia',-35),mk('i1','Ivan',-80));App.save();App.go('subs');return App.db.clients.map(c=>[c.name,App.sub(c).status])});
+console.log(JSON.stringify(st));
+await p.waitForTimeout(300);
+ok('no list at start',!(await p.$('#sub_list')));
+await p.click('[data-act=subshow][data-v=actif]');await p.waitForTimeout(500);const L=()=>p.innerText('#sub_list + .list, #sub_list + .empty');let v=await p.innerText('#view');
+v=await L();ok('actifs list',/Alice/.test(v)&&/Aaron/.test(v)&&!/Sonia/.test(v)&&!/Ivan/.test(v));
+await p.click('[data-act=subshow][data-v=sursis]');await p.waitForTimeout(400);v=await L();ok('sursis list',/Sonia/.test(v)&&!/Alice/.test(v));
+await p.click('[data-act=subshow][data-v=inactif]');await p.waitForTimeout(400);v=await L();ok('inactifs list',/Ivan/.test(v)&&!/Sonia/.test(v));
+await p.click('#sub_list ~ .list [data-act=go]');await p.waitForTimeout(300);ok('tap client opens it',await p.evaluate(()=>App.state.view==='client'&&App.state.params.id==='i1'));
+await p.evaluate(()=>App.go('subs'));await p.waitForTimeout(300);
+await p.click('[data-act=subshow][data-v=actif]');await p.waitForTimeout(500);await p.screenshot({path:'subshow.png'});await p.click('[data-act=subshow][data-v=actif]');await p.waitForTimeout(300);ok('tap again closes',!(await p.$('#sub_list')));
+await p.screenshot({path:'subshow.png'});
+console.log(errs);await b.close();process.exit(f?1:0)})();

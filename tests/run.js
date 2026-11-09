@@ -4,7 +4,7 @@
 //   node tests/run.js roles pay    only the tests whose name contains one of the words
 // Browser tests need Playwright (npm install in tests/) and Chromium (npx playwright install chromium, or CHROMIUM_PATH=/path/to/chromium).
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), { spawn } = require('child_process');
-const ROOT = path.resolve(__dirname, '..', 'cispolstore'), DIR = path.join(__dirname, 'cispolstore');
+const APP = process.env.APP || 'cispolstore', ROOT = path.resolve(__dirname, '..', APP), DIR = path.join(__dirname, APP);
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => {
   const p = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]).replace(/\/$/, '/index.html'));

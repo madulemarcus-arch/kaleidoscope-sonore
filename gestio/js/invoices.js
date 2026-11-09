@@ -1,0 +1,516 @@
+// Invoices (4 types, automatic numbering, PDF/Word/print), payments and expenses.
+(() => {
+  'use strict';
+  const App = window.App, $ = App.$, esc = App.esc, F = App.f;
+  const CUR = [['USD', 'Dollar ($)'], ['CDF', 'Franc congolais (CDF)']];
+
+  // ---------- Creation (shared with subscription renewal) ----------
+  // stock leaves when the sale is real (at creation, or when a pending invoice is validated)
+  App.invMoves = inv => inv.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: -l.qty, invoiceId: inv.id, clientId: inv.clientId, date: inv.date, note: 'Facture ' + inv.number }); });
+  // subscription renewal + installation record that a sale triggers (kept in inv.fx while the invoice is pending)
+  App.applyFx = (inv, fx) => {
+    const db = App.db, c = App.client(inv.clientId), date = inv.date;
+    if (fx.renewed && c) {
+      inv.renew = { prev: fx.prevSub, ns: fx.renewed.ns, date };
+      if (c.start) (c.subs = c.subs || []).push({ start: c.start, days: c.period || fx.renewed.days, price: c.price || 0, date });
+      Object.assign(c, { start: fx.renewed.ns, period: fx.renewed.days }); App.log(c.id, `Abonnement renouvelé : ${App.fdate(fx.renewed.ns)} → ${App.fdate(fx.renewed.end)}`);
+    }
+    if (fx.inst && inv.clientId) { db.installs.push({ id: App.uid(), clientId: inv.clientId, date, kind: 'Installation', tech: fx.inst.tech, techId: App.techId(fx.inst.tech), price: App.conv(fx.inst.fee, inv.currency, 'USD', inv.rate), materials: fx.inst.mats, invoiceId: inv.id, obs: fx.inst.obs }); App.log(inv.clientId, 'Installation facturée ' + inv.number); }
+  };
+  App.validateInvoice = id => { const i = App.invoice(id); if (!i || !i.pending) return; const fx = i.fx || {}; delete i.pending; delete i.fx; i.validated = App.today(); App.invMoves(i); App.applyFx(i, fx); App.log(i.clientId, `Vente validée : ${i.number}`); App.save(); };
+  App.createInvoice = (inv, paid = 0) => {
+    const db = App.db, date = inv.date || App.today();
+    Object.assign(inv, { id: App.uid(), number: App.nextInvNumber(date.slice(0, 4)), date, ts: Date.now(), note: inv.note || '', rate: +inv.rate > 0 ? +inv.rate : App.rateOn(date) });
+    App.costSubLines(inv);
+    db.invoices.push(inv);
+    if (!inv.pending) App.invMoves(inv);
+    const pa = +inv.payAmount > 0 ? { amount: +inv.payAmount, cur: inv.payCur || inv.currency, ref: inv.payRef || '' } : paid > 0 ? { amount: paid, cur: inv.currency, ref: '' } : null;
+    delete inv.payAmount; delete inv.payCur; delete inv.payRef;
+    if (pa) db.payments.push({ rcpt: 'todo', id: App.uid(), date, clientId: inv.clientId, invoiceId: inv.id, amount: pa.amount, currency: pa.cur, rate: inv.rate, mode: inv.payMode, ref: pa.ref, comment: '' });
+    App.log(inv.clientId, `Facture ${inv.number} : ${App.fmt(App.invTotal(inv), inv.currency)}`);
+    return inv;
+  };
+
+  // ---------- Pro forma: the document some clients ask for before the invoice ----------
+  // Same lines, currency, rate and layout as an invoice, but it is not a sale: no payment, no stock movement, no subscription renewal, not in the totals.
+  // Once the client agrees, « Transformer en facture » opens the normal invoice form with these lines, so every invoice rule applies then.
+  const pfs = () => (App.db.proformas = App.db.proformas || []);
+  const proNo = year => { let m = 0; pfs().forEach(p => { const x = /^PRO-(\d{4})-(\d+)$/.exec(p.number || ''); if (x && x[1] === year) m = Math.max(m, +x[2]); }); return `PRO-${year}-${String(m + 1).padStart(4, '0')}`; };
+  App.proOpenCount = () => pfs().filter(p => p.status === 'open').length;
+  const proRow = p => `<button class="item" data-act="pro_open" data-id="${p.id}"><span class="avatar ${p.status === 'open' ? 'warn' : 'ok'}" style="width:38px;height:38px;font-size:17px">📋</span><div class="grow"><b>${esc(p.number)}</b><small>${esc(App.cname(App.client(p.clientId)))} · ${App.fdate(p.date)}</small></div><div class="end"><b>${App.fmt(App.invTotal(p), p.currency)}</b><span class="pill ${p.status === 'open' ? 'warn' : 'ok'}">${p.status === 'open' ? 'Pro forma' : 'Facturé'}</span></div></button>`;
+
+  // ---------- Receipt to send: a payment recorded from now on stays « à envoyer » until the receipt is printed, shared or sent ----------
+  App.rcptTodo = () => App.db.payments.filter(p => p.rcpt === 'todo');
+  const rcptInvoices = () => { const ids = new Set(App.rcptTodo().map(p => p.invoiceId)); return App.db.invoices.filter(i => ids.has(i.id)); };
+  App.rcptSent = id => { const p = App.db.payments.find(x => x.id === id); if (p && p.rcpt === 'todo') { p.rcpt = 'sent'; p.recSent = Date.now(); App.save(); App.refresh(); } };
+  const rcptPill = p => p.rcpt === 'todo' ? '<span class="pill bad">🧾 Reçu à envoyer</span>' : p.rcpt === 'sent' ? '<span class="pill ok">✅ Reçu envoyé</span>' : '';
+  // big window right after a payment: the receipt is the next step
+  App.receiptPrompt = id => {
+    const p = App.db.payments.find(x => x.id === id); if (!p) return; const i = App.invoice(p.invoiceId), c = App.client(p.clientId);
+    App.modal('✅ Paiement enregistré',
+      `<div style="text-align:center;padding:16px 10px;border:3px solid var(--ok,#1f9d55);border-radius:16px"><div style="font-size:42px">🧾</div><div style="font-size:21px;font-weight:800;margin:4px 0">Envoyez le reçu au client</div>
+        <div><b>${esc(App.cname(c))}</b> a payé <b style="font-size:18px">${App.fmt(p.amount, p.currency)}</b>${i ? ` pour la facture <b>${esc(i.number)}</b>` : ''}</div><div class="mut" style="margin-top:4px">Reçu n° ${esc(App.receiptNo(p))}</div></div>
+       <div style="display:grid;gap:10px;margin-top:14px"><button type="button" class="btn" style="font-size:17px;padding:14px" data-act="recshare" data-id="${p.id}">📤 Envoyer le reçu (PDF)</button>
+         <button type="button" class="btn" style="font-size:16px;padding:12px" data-act="recwa" data-id="${p.id}">💬 Message WhatsApp</button>
+         <button type="button" class="btn sec" data-act="recprint" data-id="${p.id}">🖨️ Imprimer le reçu</button></div>
+       <p class="mut" style="font-size:12px;text-align:center;margin:10px 0 0">Si vous fermez cette fenêtre, le reçu reste signalé « à envoyer » sur la facture, dans Paiements et sur l'accueil.</p>`);
+  };
+  App.actions.recwa = d => {
+    const p = App.db.payments.find(x => x.id === d.id), c = p && App.client(p.clientId); if (!p) return; const i = App.invoice(p.invoiceId), co = App.db.settings.company;
+    if (!c || !c.phone) return App.toast('Pas de numéro de téléphone pour ce client : utilisez « Envoyer le reçu (PDF) »');
+    const left = i ? Math.max(0, App.invDue(i)) : 0;
+    window.open(App.waUrl(c.phone, `Bonjour ${c.first || App.cname(c)},\nNous avons bien reçu votre paiement de ${App.fmt(p.amount, p.currency)}${i ? ` pour la facture ${i.number}` : ''} le ${App.fdate(p.date)}.\nReçu n° ${App.receiptNo(p)}${i ? (left > 0.004 ? `\nReste à payer : ${App.fmt(left, i.currency)}` : '\nLa facture est soldée.') : ''}\nMerci pour votre confiance.\n${co.name}`), '_blank', 'noopener');
+    App.rcptSent(p.id);
+  };
+  App.actions.recskip = d => { const p = App.db.payments.find(x => x.id === d.id); if (p) { p.rcpt = 'skip'; App.save(); App.refresh(); App.toast('Pas de reçu pour ce paiement'); } };
+  App.actions.rcpt_go = () => { st.f = 'rcpt'; App.go('invoices'); };
+
+  // ---------- Invoice list ----------
+  // pending invoices left undecided for a few days: the client should either take the product or drop it
+  const PEND_DAYS = 3, pendAge = i => Math.max(0, App.diff(i.date, App.today()));
+  App.stalePending = () => App.db.invoices.filter(i => i.pending && pendAge(i) >= PEND_DAYS).sort((a, b) => a.date.localeCompare(b.date));
+  App.actions.pend_go = () => { st.f = 'pending'; App.go('invoices'); };
+  const st = { f: 'all', q: '', sel: false, picked: new Set() };
+  const visibleInvoices = () => { const q = st.q.toLowerCase(); return App.db.invoices.filter(i => (st.f === 'all' || (st.f === 'rcpt' ? rcptInvoices().includes(i) : App.invStatus(i) === st.f)) && (!q || (i.number + ' ' + App.cname(App.client(i.clientId))).toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)); };
+  const drawList = () => {
+    if (st.f === 'pro') {
+      const k = st.q.toLowerCase(), pl = pfs().filter(p => !k || (p.number + ' ' + App.cname(App.client(p.clientId))).toLowerCase().includes(k)).sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0));
+      if ($('ibar')) $('ibar').innerHTML = '';
+      $('ilist').innerHTML = pl.length ? `<div class="list">${pl.map(proRow).join('')}</div>` : `<div class="empty big"><div class="ei">📋</div><b>Aucun pro forma</b><p class="mut">Le pro forma se remet au client avant la facture. Une fois qu'il est d'accord, vous le transformez en facture en un tap.</p></div>`;
+      return;
+    }
+    const l = visibleInvoices();
+    if ($('ibar')) $('ibar').innerHTML = !App.guard('delinvs') ? '' : st.sel ? `<button class="btn sm sec" data-act="inv_all">☑ Tout</button><button class="btn sm del" data-act="delinvs">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="inv_sel">Terminer</button>` : '<button class="btn sm sec" data-act="inv_sel">☑ Sélectionner pour supprimer</button>';
+    let lastDay = '';
+    const irow = i => { const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pc = { ok: 'ok', warn: 'warn', bad: 'bad' }[k] || 'mut';
+      const body = `${st.sel ? `<span style="font-size:20px">${st.picked.has(i.id) ? '☑️' : '⬜'}</span>` : ''}<span class="avatar ${pc}" style="width:38px;height:38px;font-size:17px">🧾</span><div class="grow"><b>${esc(i.number)}</b><small>${esc(App.cname(App.client(i.clientId)))} · ${App.invTypes[i.type]}${i.pending ? ` · <span class="${pendAge(i) >= PEND_DAYS ? 'bad' : 'warn'}">⏳ ${pendAge(i)} j</span>` : ''}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span>${App.db.payments.some(x => x.invoiceId === i.id && x.rcpt === 'todo') ? '<span class="pill bad">🧾 Reçu à envoyer</span>' : ''}</div>`;
+      if (st.sel) return `<button class="item rw t-${pc}" data-act="inv_pick" data-v="invoice" data-id="${i.id}">${body}</button>`;
+      const acts = []; if (due > 0.004 && !i.pending && App.guard('newpay')) acts.push(`<button class="sw sw-pay" data-act="newpay" data-iid="${i.id}"><span>💰</span>Encaisser</button>`); acts.push(`<button class="sw sw-print" data-act="invprint" data-id="${i.id}"><span>🖨️</span>Imprimer</button>`); if (i.pending) acts.push(`<button class="sw sw-del" data-act="invcancel" data-id="${i.id}"><span>🗑</span>Supprimer</button>`);
+      return App.rowSwipe(acts.length, acts.join(''), `<div class="item rw t-${pc}" role="button" tabindex="0" data-act="go" data-v="invoice" data-id="${i.id}">${body}</div>`); };
+    $('ilist').innerHTML = l.length ? `<div class="list">${l.map(i => { const h = i.date !== lastDay ? `<div class="lh">${App.dayLabel(i.date)}</div>` : ''; lastDay = i.date; return h + irow(i); }).join('')}</div>` : `<div class="empty big"><div class="ei">🧾</div><b>Aucune facture</b><p>Créez votre première facture avec le bouton ci-dessous.</p></div>`;
+  };
+  App.views.invoices = () => {
+    const db = App.db, tot = db.invoices.filter(App.live).reduce((a, i) => a + App.usd(App.invAgreed(i), i.currency, i), 0), due = db.invoices.reduce((a, i) => a + App.usd(App.invDue(i), i.currency, i), 0);
+    return {
+      title: 'Factures', sub: `${db.invoices.length} facture(s)`, back: 'more', nav: 'more',
+      html: `<div class="grid two"><div class="stat"><small>Total facturé</small><b>${App.fmt(tot)}</b></div><div class="stat"><small>Reste à encaisser</small><b class="${due ? 'warn' : ''}">${App.fmt(due)}</b></div></div>
+        <div class="search"><input id="iq" placeholder="Rechercher un numéro, un client…" value="${esc(st.q)}" autocomplete="off"></div>
+        <div class="chips">${[['all', 'Toutes'], ['unpaid', 'Impayées'], ['part', 'Partielles'], ['paid', 'Payées'], ['pending', 'En attente'], ['pro', 'Pro forma' + (App.proOpenCount() ? ` (${App.proOpenCount()})` : '')], ...(App.rcptTodo().length ? [['rcpt', '🧾 Reçus à envoyer (' + App.rcptTodo().length + ')']] : [])].map(([k, t]) => `<button class="chip ${st.f === k ? 'on' : ''}" data-act="invfilter" data-f="${k}">${t}</button>`).join('')}</div>
+        <div class="bar" id="ibar" style="margin-bottom:6px"></div><div id="ilist"></div><button class="btn full" data-act="newinv" style="margin-top:14px">+ Nouvelle facture</button><button class="btn sec full" data-act="newpro" style="margin-top:8px">📋 Nouveau pro forma</button>${App.canView('importf') ? '<button class="btn sec full" data-act="go" data-v="importf" style="margin-top:8px">📥 Importer des factures (Word / PDF)</button>' : ''}`,
+      after: () => { drawList(); $('iq').oninput = e => { st.q = e.target.value; drawList(); }; }
+    };
+  };
+  App.actions.invfilter = d => { st.f = d.f; App.refresh(); };
+  App.actions.newinv = d => App.invoiceStart(d.cid);
+  App.actions.newpro = d => App.invoiceStart(d.cid, true);
+
+  // ---------- New invoice: type then form ----------
+  const TYPE_INFO = [['materiel', '📦', 'Matériel uniquement', 'fournisseur, câble, routeur…'], ['abonnement', '📡', 'Abonnement uniquement', "Facture d'abonnement"], ['installation', '🔧', 'Installation uniquement', 'Main-d\'œuvre et configuration'], ['complete', '🧾', 'Facture complète', 'Kit + installation + abonnement + accessoires']];
+  App.invoiceStart = (cid, pf) => App.modal(pf ? 'Pro forma : choisissez le type' : 'Choisissez le type de facture', TYPE_INFO.map(([k, i, t, s]) => `<button class="opt" data-act="invtype" data-t="${k}" data-cid="${cid || ''}" data-pf="${pf ? 1 : ''}"><span class="ico">${i}</span><span><b>${t}</b><small>${s}</small></span></button>`).join(''));
+  App.actions.invtype = d => App.invoiceForm(d.t, { clientId: d.cid, pf: !!d.pf });
+
+  let draft = null;
+  const needsClient = t => t !== 'materiel';
+  App.invoiceForm = (type, pre = {}) => {
+    const db = App.db, S = db.settings;
+    draft = { type, lines: (pre.lines || []).map(l => ({ ...l })), paidTouched: false };
+    const total = () => draft.lines.reduce((a, l) => a + l.qty * l.price, 0);
+    const cur = () => App.v('f_cur') || 'USD';
+    const draw = () => {
+      const t = total();
+      $('cart').innerHTML = draft.lines.length ? `<div class="list">${draft.lines.map((l, k) => `<div class="item"><div class="grow"><b>${esc(l.desc)}</b><small>${l.qty} ${esc(l.unit || '')} × ${App.fmt(l.price, cur())}</small></div><b>${App.fmt(l.qty * l.price, cur())}</b><button type="button" class="btn sm del" data-act="rmline" data-i="${k}">✕</button></div>`).join('')}<div class="item"><div class="grow"><b>Total</b></div><b>${App.fmt(t, cur())}</b></div></div>` : '<div class="empty" style="padding:10px">Aucune ligne. Ajoutez un article ci-dessous.</div>';
+      if (!draft.paidTouched) $('f_paid').value = $('f_pend') && $('f_pend').checked ? '' : t ? round(App.conv(t, cur(), $('f_pcur').value, frate()), $('f_pcur').value) : '';
+      paySync();
+    };
+    const round = (n, c) => c === 'CDF' ? Math.round(n) : Math.round(n * 100) / 100;
+    const paySync = () => {
+      if (!$('p_sum')) return;
+      const c = cur(), pc = $('f_pcur').value, rate = frate(), tot = total(), given = App.n('f_paid'), gInv = App.conv(given, pc, c, rate);
+      $('p_total').textContent = App.fmt(tot, c) + (pc !== c ? ' ≈ ' + App.fmt(App.conv(tot, c, pc, rate), pc) : '');
+      const el = $('p_sum'); const canNeg = given > 0 && gInv < tot - 0.004; $('p_negw').style.display = canNeg ? '' : 'none'; if (!canNeg) $('f_neg').checked = false;
+      const pn = $('f_pend') && $('f_pend').checked;
+      if (pn) { $('p_negw').style.display = 'none'; $('f_neg').checked = false; el.className = given > 0 ? 'ok' : 'mut'; el.textContent = given > 0 ? `Acompte noté : ${App.fmt(Math.min(given, App.conv(tot, c, pc, rate)), pc)} (le solde sera à encaisser quand le client prendra le produit).` : 'Aucun acompte : laissez vide si le client n\'a rien donné.'; return; }
+      if (!(given > 0)) { el.className = 'warn'; el.textContent = tot ? `Aucun paiement enregistré : la facture restera impayée (reste ${App.fmt(tot, c)}).` : ''; }
+      else if (gInv >= tot - 0.004) { el.className = 'ok'; el.textContent = '✅ Payée en totalité' + (gInv - tot > 0.004 ? ` · À rendre au client : ${App.fmt(round(App.conv(gInv - tot, c, pc, rate), pc), pc)}` : ''); }
+      else { el.className = 'warn'; el.textContent = `Le client a donné ${App.fmt(given, pc)} · Reste à payer : ${App.fmt(tot - gInv, c)}` + ($('f_neg').checked ? ' → sera soldée au prix convenu' : ''); }
+    };
+    const clientSel = q => App.clientOpts(needsClient(type) ? '— Choisir un client —' : 'Client de passage', type === 'abonnement' ? ['gere'] : null, q);
+    const cl = clientSel();
+    const qcType = type === 'abonnement' ? 'gere' : type === 'installation' ? 'install' : type === 'materiel' ? 'mat' : 'gere';
+    const quick = `<div class="bar" style="margin-top:6px"><button type="button" class="btn sm sec" id="qc_open">＋ Nouveau client</button></div>
+       <div class="card" id="qc" hidden style="margin:8px 0">
+         <b>Nouveau client</b>
+         ${type === 'abonnement' ? '' : F.sel('qc_type', 'Type de client', [['gere', 'Géré par Gestio'], ['mat', 'Matériel uniquement'], ['install', 'Installation uniquement']], qcType)}
+         <div class="row">${F.text('qc_first', 'Prénom', '')}${F.text('qc_last', 'Nom', '')}</div>
+         ${F.text('qc_phone', 'Téléphone', '', 'type="tel" inputmode="tel"')}
+         <div id="qc_gere">${F.text('qc_acc', 'N° de compte / référence', '', 'autocapitalize="characters"')}<div class="row">${F.text('qc_plan', "Type d'abonnement", '', 'list="qc_pl"')}${F.num('qc_price', 'Prix ($)', '')}${F.date('qc_start', "Début", App.today())}</div>${F.list('qc_pl', App.PLANS)}</div>
+         <div class="bar" style="margin-top:12px"><button type="button" class="btn" id="qc_save">Enregistrer le client</button><button type="button" class="btn sec" id="qc_cancel">Annuler</button></div></div>`;
+    const renewBlock = ['abonnement', 'complete'].includes(type) ? `<label class="l" id="renwrap"><input type="checkbox" id="f_renew" checked style="width:auto"> Renouveler l'abonnement du client (nouvelle période) — décochez pour facturer la période en cours</label>` : '';
+    const instBlock = ['installation', 'complete'].includes(type) ? `<div class="row">${F.text('f_tech', 'Technicien', '', 'list="techlist" autocomplete="off"')}${F.list('techlist', App.techNames())}${F.text('f_obs', 'Observations', '')}</div>` : '';
+    App.modal('Nouvelle facture · ' + App.invTypes[type],
+      `${App.clientFinder('f_cl')}${F.sel('f_cl', 'Client', cl, pre.clientId || '')}${quick}
+       ${pre.pfId ? `<p class="mut" style="margin:8px 0 0">Facture établie à partir du pro forma, avec les mêmes lignes : vous pouvez encore les modifier.</p>` : `<label class="chk" style="display:block;margin-top:10px;padding:10px;border:2px dashed var(--acc);border-radius:10px"><input type="checkbox" id="f_pf"${pre.pf ? ' checked' : ''}> <b>📋 Pro forma</b> : le client veut un document avant la facture. Aucun paiement, aucune sortie de stock, aucun abonnement renouvelé ; il porte son propre numéro (PRO-…) et se transforme ensuite en facture.</label>`}
+       <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_cur', 'Devise', CUR, pre.cur || 'USD')}</div>
+       ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}<p class="mut" style="font-size:12px;margin:2px 0 0">Le taux est enregistré sur cette facture. Si vous le changez ici, il devient le taux du jour.</p>
+       <h2 class="sec">Lignes de la facture</h2><div id="cart"></div>
+       <div class="card" style="margin-top:10px">
+         ${F.sel('f_prod', 'Article du stock / catalogue', [['', '— Ligne libre —'], ...db.products.map(p => [p.id, p.name + (App.tracked(p) ? ` (${App.nf(p.qty, 2)}${p.unit === 'm' ? ' m' : ''})` : '')])], '')}
+         ${F.text('f_desc', 'Désignation', '')}
+         <div class="row">${F.num('f_qty', 'Quantité', 1, 'min="0"')}${F.num('f_price', 'Prix unitaire', '')}<div style="flex:none;min-width:auto;align-self:end"><button type="button" class="btn" id="f_add">Ajouter</button></div></div>
+         <div class="bar"><button type="button" class="btn sm sec" id="f_addsub">＋ Abonnement</button><button type="button" class="btn sm sec" id="f_addinst">＋ Installation</button></div></div>
+       ${renewBlock}${instBlock}
+       <label class="chk" style="display:block;margin-top:14px;padding:10px;border:2px dashed var(--acc);border-radius:10px"><input type="checkbox" id="f_pend"> <b>⏳ Facture en attente</b> : le client demande seulement la facture et n'a pas encore pris le produit. Rien n'est déduit du stock ni compté dans les ventes jusqu'à la validation.</label>
+       <div class="card" id="paycard" style="margin-top:14px;border:2px solid var(--acc)">
+         <h2 class="sec" style="margin:0 0 6px" id="p_title">💰 Paiement du client</h2>
+         <div class="spread"><span>Total à payer</span><b id="p_total" style="font-size:18px"></b></div>
+         <div class="row">${F.num('f_paid', 'Le client a donné', '')}${F.sel('f_pcur', 'En', CUR, pre.cur || 'USD')}</div>
+         <div class="bar"><button type="button" class="btn sm sec" id="p_all">Tout payé</button><button type="button" class="btn sm sec" id="p_half">La moitié</button><button type="button" class="btn sm sec" id="p_none">Rien pour l'instant</button></div>
+         <div class="row">${F.sel('f_pay', 'Mode de paiement', App.PAY_MODES, 'Cash')}${F.text('f_ref', 'Référence (n° transaction)', '')}</div>
+         <div id="p_sum" style="margin-top:8px;font-weight:700"></div>
+         <label id="p_negw" class="chk" style="display:none;margin-top:8px"><input type="checkbox" id="f_neg"> Le client a marchandé : ce qu'il a donné est le prix convenu (facture soldée, la facture imprimée reste au prix complet)</label>
+       </div>`,
+      () => {
+        const cid = App.v('f_cl'), c = App.client(cid);
+        if (needsClient(type) && !cid) { App.toast('Choisissez un client'); return false; }
+        if (!draft.lines.length) { App.toast('Ajoutez au moins une ligne'); return false; }
+        const date = App.v('f_date') || App.today(), curr = cur(), mode = App.v('f_pay');
+        let lines = draft.lines.map(l => { const { auto, ...r } = l; return r; });
+        let renewed = null;
+        if ($('f_renew') && $('f_renew').checked && c && c.type === 'gere') {
+          const s = App.sub(c), ns = s && s.status !== 'inactif' ? s.end : date, days = c.period || S.period, end = App.addDays(ns, days);
+          lines.forEach(l => { if (/^abonnement/i.test(l.desc) && !l.desc.includes('(')) l.desc += ` (${App.fdate(ns)} → ${App.fdate(end)})`; });
+          renewed = { ns, days, end };
+        } else if (c && c.type === 'gere' && App.sub(c)) {
+          const s = App.sub(c); // not renewing: the invoice covers the current period
+          lines.forEach(l => { if (/^abonnement/i.test(l.desc) && !l.desc.includes('(')) l.desc += ` (${App.fdate(s.start)} → ${App.fdate(s.end)})`; });
+        }
+        if ($('f_pf') && $('f_pf').checked) {
+          const pf = { id: App.uid(), number: proNo(date.slice(0, 4)), date, ts: Date.now(), type, clientId: cid, currency: curr, rate: frate(), lines, note: '', status: 'open', invoiceId: '' };
+          pfs().push(pf); App.log(cid, `Pro forma ${pf.number} : ${App.fmt(App.invTotal(pf), curr)}`); App.save(); App.toast('Pro forma ' + pf.number + ' créé');
+          st.f = 'pro'; App.go('invoices'); setTimeout(() => App.actions.pro_open({ id: pf.id }), 80); return;
+        }
+        const total = lines.reduce((a, l) => a + l.qty * l.price, 0);
+        const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
+        const pc = App.v('f_pcur') || curr, given = App.n('f_paid'), gInv = App.conv(given, pc, curr, rate), payAmount = given > 0 ? (gInv > total ? round(App.conv(total, curr, pc, rate), pc) : given) : 0;
+        const prevSub = c ? { start: c.start || '', period: c.period, price: c.price } : null;
+        const pend = !!($('f_pend') && $('f_pend').checked), inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate, pending: pend || undefined, payAmount, payCur: pc, payRef: App.v('f_ref') }, 0);
+        const fx = { renewed, prevSub };
+        if (['installation', 'complete'].includes(type) && cid) {
+          const fee = lines.filter(l => !l.pid && /install/i.test(l.desc)).reduce((a, l) => a + l.qty * l.price, 0);
+          const mats = lines.filter(l => l.pid && App.tracked(App.prod(l.pid))).map(l => ({ pid: l.pid, qty: l.qty }));
+          if (fee > 0 || type === 'installation') fx.inst = { fee, mats, tech: App.v('f_tech'), obs: App.v('f_obs') };
+        }
+        if (inv.pending) inv.fx = fx; else App.applyFx(inv, fx);
+        if (!pend && $('f_neg') && $('f_neg').checked && gInv > 0 && gInv < total - 0.004) { inv.agreed = Math.round(gInv * 100) / 100; App.log(cid, `Prix négocié sur ${inv.number} : ${App.fmt(inv.agreed, curr)} au lieu de ${App.fmt(total, curr)}`); }
+        if (pre.pfId) { const pf = pfs().find(x => x.id === pre.pfId); if (pf) { pf.status = 'converted'; pf.invoiceId = inv.id; } }
+        App.save(); App.toast('Facture ' + inv.number + (pend ? ' créée — en attente' : ' créée')); App.go('invoice', { id: inv.id });
+        const np = db.payments.find(x => x.invoiceId === inv.id);
+        if (np) queueMicrotask(() => App.receiptPrompt(np.id));
+        if (np && App.invDue(inv) <= 0.004 && !inv.pending) App.celebrate();
+      }, 'Créer la facture');
+    // renewal is on by default only when the client already had a subscription invoice
+    App.wireClientFinder('f_cl', clientSel);
+    const syncRenew = () => { const cb = $('f_renew'); if (cb) cb.checked = db.invoices.some(i => i.clientId === App.v('f_cl') && i.lines.some(l => /^abonnement/i.test(l.desc))); };
+    $('f_cl').addEventListener('change', syncRenew); syncRenew();
+    // quick client creation without leaving the invoice
+    const qcSync = () => { $('qc_gere').hidden = ($('qc_type') ? $('qc_type').value : 'gere') !== 'gere'; };
+    if ($('qc_type')) $('qc_type').onchange = qcSync; qcSync();
+    $('qc_open').onclick = () => { $('qc').hidden = false; $('qc_open').hidden = true; $('qc_first').focus(); };
+    const qcClose = () => { $('qc').hidden = true; $('qc_open').hidden = false; };
+    $('qc_cancel').onclick = qcClose;
+    $('qc').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.target.tagName !== 'BUTTON') $('qc_save').click(); } });
+    $('qc_save').onclick = () => {
+      const first = App.v('qc_first'), last = App.v('qc_last'); if (!first && !last) return App.toast('Saisissez au moins un nom');
+      const t = $('qc_type') ? $('qc_type').value : 'gere';
+      const c = { id: App.uid(), code: App.nextClientCode(), type: t, first, last, name: (first + ' ' + last).trim(), phone: App.v('qc_phone'), phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: 0, payMode: 'Cash', start: '', period: S.period, grace: S.grace, note: '', article: '', created: App.today(), subs: [] };
+      if (t === 'gere') Object.assign(c, { acc: App.v('qc_acc'), plan: App.v('qc_plan'), price: App.n('qc_price'), start: App.v('qc_start') || App.today() });
+      db.clients.push(c); App.log(c.id, 'Client créé (' + App.TYPES[t] + ')'); App.save();
+      if ($('f_cl_q')) $('f_cl_q').value = ''; $('f_cl').innerHTML = App.opts(clientSel()); $('f_cl').value = c.id; $('f_cl').dispatchEvent(new Event('change'));
+      ['qc_first', 'qc_last', 'qc_phone', 'qc_acc', 'qc_plan', 'qc_price'].forEach(i => { $(i).value = ''; }); qcClose(); App.toast('Client ajouté : ' + App.cname(c));
+    };
+    // behaviour
+    const frate = () => +$('f_rate').value > 0 ? +$('f_rate').value : App.rate();
+    $('f_rate').onchange = () => { autoSub(); draw(); };
+    $('f_date').onchange = () => { const r = App.rateOn($('f_date').value || App.today()); $('f_rate').value = r; autoSub(); draw(); };
+    $('f_prod').onchange = () => { const p = App.prod($('f_prod').value); if (p) { $('f_desc').value = p.name; $('f_price').value = App.conv(p.price, 'USD', cur(), frate()); } };
+    // subscription invoice: the line follows the chosen client's plan and price
+    const autoSub = () => {
+      if (type !== 'abonnement' || pre.lines) return;
+      draft.lines = draft.lines.filter(l => !l.auto); const c = App.client(App.v('f_cl'));
+      if (c && c.type === 'gere' && c.price > 0) draft.lines.unshift({ auto: true, pid: '', desc: 'Abonnement ' + (c.plan || 'fournisseur'), qty: 1, price: App.conv(c.price, 'USD', cur(), frate()), cost: 0, unit: '' });
+      else if (c) $('f_addsub').click();
+    };
+    $('f_cl').addEventListener('change', () => { autoSub(); draw(); });
+    $('f_cur').onchange = () => { $('f_pcur').value = cur(); draft.paidTouched = false; autoSub(); draw(); };
+    $('f_add').onclick = () => {
+      const p = App.prod($('f_prod').value), desc = App.v('f_desc') || (p && p.name), qty = App.n('f_qty');
+      if (!desc || qty <= 0) return App.toast('Désignation et quantité requises');
+      if (p && App.tracked(p)) { const inCart = draft.lines.filter(l => l.pid === p.id).reduce((a, l) => a + l.qty, 0); if (inCart + qty > p.qty && !App.confirm(`Stock insuffisant (${App.nf(p.qty, 2)}). Continuer quand même ?`)) return; }
+      draft.lines.push({ pid: p ? p.id : '', desc, qty, price: App.n('f_price'), cost: p ? App.conv(p.cost, 'USD', cur(), frate()) : 0, unit: p ? (p.unit === 'm' ? 'm' : '') : '' });
+      $('f_prod').value = ''; $('f_desc').value = ''; $('f_price').value = ''; $('f_qty').value = 1; draw();
+    };
+    $('f_addsub').onclick = () => { const c = App.client(App.v('f_cl')); $('f_prod').value = ''; $('f_desc').value = 'Abonnement ' + ((c && c.plan) || 'fournisseur'); $('f_qty').value = 1; $('f_price').value = c && c.price ? App.conv(c.price, 'USD', cur(), frate()) : ''; $('f_price').focus(); };
+    $('f_addinst').onclick = () => { $('f_prod').value = ''; $('f_desc').value = 'Installation'; $('f_qty').value = 1; $('f_price').value = ''; $('f_price').focus(); };
+    $('f_pend').onchange = () => { const pn = $('f_pend').checked; $('p_title').textContent = pn ? '💰 Acompte reçu du client (facultatif)' : '💰 Paiement du client'; $('p_all').style.display = pn ? 'none' : ''; draft.paidTouched = pn; if (pn) $('f_paid').value = ''; else { draft.paidTouched = false; draw(); } paySync(); }; $('f_neg').onchange = paySync; $('f_paid').oninput = () => { draft.paidTouched = true; paySync(); };
+    // pro forma: nothing to collect, nothing leaves the stock, no renewal
+    const pfSync = () => { const on = !!($('f_pf') && $('f_pf').checked); $('paycard').hidden = on; $('f_pend').closest('label').style.display = on ? 'none' : 'block'; if ($('renwrap')) $('renwrap').style.display = on ? 'none' : ''; $('dok').textContent = on ? 'Créer le pro forma' : 'Créer la facture'; };
+    if ($('f_pf')) { $('f_pf').onchange = pfSync; pfSync(); }
+    $('f_pcur').onchange = () => { draft.paidTouched = false; draw(); };
+    $('p_all').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total(), cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
+    $('p_half').onclick = () => { draft.paidTouched = true; $('f_paid').value = round(App.conv(total() / 2, cur(), $('f_pcur').value, frate()), $('f_pcur').value); paySync(); };
+    $('p_none').onclick = () => { draft.paidTouched = true; $('f_paid').value = 0; paySync(); };
+    if (type === 'abonnement' && !pre.lines) autoSub();
+    if (type === 'installation' && !pre.lines) $('f_addinst').click();
+    draw();
+  };
+  App.actions.rmline = d => { draft.lines.splice(+d.i, 1); const ev = new Event('change'); $('f_cur').dispatchEvent(ev); };
+
+  // ---------- Invoice document (screen, print, Word) ----------
+  // payments of an invoice in the order they were received, with the balance left after each one
+  App.invPayments = i => {
+    let left = App.invTotal(i);
+    return App.db.payments.map((p, k) => ({ p, k })).filter(x => x.p.invoiceId === i.id).sort((a, b) => a.p.date.localeCompare(b.p.date) || a.k - b.k).map(({ p }, n) => {
+      const inInv = App.conv(p.amount, p.currency, i.currency, App.rateOf(p)); left = Math.max(0, left - inInv);
+      return { p, n: n + 1, inInv, left, other: p.currency !== i.currency };
+    });
+  };
+  // receipt number: invoice number + order of the payment ("FAC-2026-0002-P2")
+  App.receiptNo = p => { const i = App.invoice(p.invoiceId); if (!i) return 'REC-' + (p.date || '').replace(/-/g, '') + '-' + String(p.id).slice(-4).toUpperCase(); const x = App.invPayments(i).find(y => y.p === p); return i.number + '-P' + (x ? x.n : 1); };
+
+  // Invoice / receipt look (modelled on the company's Word invoice): serif, navy #1A365D, orange note, round stamp. Table-based so Word keeps the layout.
+  const PAPER_CSS = `.paper{font:10.5pt/1.45 Cambria,'Times New Roman',Georgia,serif;color:#1a202c;background:#fff}.paper table{width:100%;border-collapse:collapse}.paper td,.paper th{vertical-align:top}.paper .r{text-align:right}.paper .hd td{vertical-align:middle;padding:0}.paper .hd img{height:2.3cm}.paper .nm{font-size:20pt;font-weight:bold;color:#1A365D;letter-spacing:.5px}.paper .sub{font-size:8pt;color:#4A5568;letter-spacing:.8px;margin-top:2px}.paper .legal{margin:10px 0 16px;border-bottom:1px solid #1a202c}.paper .legal td{padding:0 0 9px;font-size:9.5pt;line-height:1.6;width:50%}.paper .two{margin:0 0 18px;border-collapse:separate;border-spacing:0;table-layout:fixed}.paper .box{width:47.5%;border:1px solid #E2E8F0;background:#F7FAFC;padding:10px 12px;line-height:1.6}.paper .gap{width:5%}.paper .bh{font-size:11pt;font-weight:bold;color:#1A365D;margin-bottom:6px}.paper .items{margin:0 0 16px}.paper .items th{background:#1A365D;color:#fff;padding:8px 9px;text-align:left;font-weight:bold}.paper .items th.r{text-align:right}.paper .items td{padding:8px 9px;border-bottom:1px solid #E2E8F0}.paper .tots td{padding:6px 9px;width:50%;text-align:right}.paper .tots .net td{background:#1A365D;color:#fff;font-weight:bold}.paper .rate{font-size:8.5pt;color:#4A5568;text-align:right;margin-top:5px}.paper .wb{margin:16px 0 0;border-left:4px solid #DD6B20;background:#FFFAF0;padding:10px 14px;line-height:1.7}.paper .foot{margin-top:20px;page-break-inside:avoid}.paper .foot td{vertical-align:middle}.paper .foot td.thx{text-align:center;padding-top:6px}.paper .hd .nm,.paper .hd .sub{text-align:center}.paper .foot img{width:4.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)}.paper .foot img.qr{width:2.6cm;transform:none;filter:none}.paper .thx{font-weight:bold;color:#1A365D;letter-spacing:.6px;font-size:11pt}.paper .pay{margin-top:14px}.paper .pay h4{margin:0 0 4px;color:#1A365D}.paper .pay th{background:#1A365D;color:#fff;padding:6px;text-align:left}.paper .pay td{padding:6px;font-size:9.5pt;border-bottom:1px solid #E2E8F0}.paper .sold{display:inline-block;margin-top:10px;padding:3px 10px;border:2px solid #1d8a4f;color:#1d8a4f;font-weight:bold;transform:rotate(-3deg)}.paper .sig{display:flex;gap:30px;margin-top:34px}.paper .sg{margin-top:14px;table-layout:fixed;page-break-inside:avoid}.paper .sg td{padding:0}.paper .sg .ln{border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .sg .gp{width:30px}.paper .sg .s2{height:3.2cm;text-align:center;vertical-align:bottom}.paper .sg .s2 img{height:3cm;width:3cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)}.paper .sig div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center;font-size:9.5pt;color:#555}.paper .rc{border-left:4px solid #DD6B20;background:#FFFAF0;padding:14px 16px;margin:0 0 16px;font-size:12pt;line-height:1.8}.paper .rc b.big{font-size:15pt;color:#DD6B20}.paper table,.paper tr{page-break-inside:avoid}@media (max-width:640px){.paper .hd td:first-child{width:36%!important}.paper .hd img{height:auto;max-width:100%}.paper .nm{font-size:14pt}.paper .legal td{display:block;width:auto;text-align:left}}.paper .cttl{text-align:center;font-size:15pt;font-weight:bold;color:#1A365D;margin:6px 0 2px;letter-spacing:.4px}.paper .ctno{text-align:center;font-size:9.5pt;color:#4A5568}.paper .ctt{font-weight:bold;color:#1A365D;margin:11px 0 2px;page-break-after:avoid}.paper .ctp{margin:0 0 4px;text-align:justify;line-height:1.5}.paper .ctsg{margin-top:14px;page-break-inside:avoid}.paper .ctsg small{font-weight:normal;font-size:8pt}`;
+  const MADE_CSS = `.made{margin-top:12px;padding-top:3px;border-top:1px solid #E2E8F0;text-align:right;font:italic 7pt/1.3 Cambria,'Times New Roman',Georgia,serif;color:#A0AEC0}@media print{.made{position:fixed;left:0;right:0;bottom:0;margin:0}}`;
+  const DOC_CSS = `body{margin:0;background:#fff}@page{size:A4;margin:1.4cm 1.5cm 1.1cm}` + PAPER_CSS + MADE_CSS;
+  // line printed at the bottom of every document, whatever the company details: names the application that produced it
+  const made = () => `<div class="made">Document généré par l'application Gestio Manager</div>`;
+  { const st = document.createElement('style'); st.id = 'paperCss'; st.textContent = PAPER_CSS; document.head.appendChild(st); }
+  // shared pieces of the printed documents
+  const money = (n, cur) => cur === 'CDF' ? App.nf(n, 0) + ' CDF' : App.nf(n, 2) + ' $';
+  const lines = a => a.filter(Boolean).map(([k, v]) => `<div>${k ? `<b>${k} : </b>` : ''}${v}</div>`).join('');
+  const docName = co => (false) ? '' : String(co.name || '').toUpperCase();
+  const paperHead = (co, logo) => {
+    const legal = [co.rccm && ['RCCM', esc(co.rccm)], co.idnat && ['Id. Nat.', esc(co.idnat)], co.impot && ['N° Impôt', esc(co.impot)]];
+    return `<table class="hd"><tr><td style="width:6.2cm"><img src="${esc(logo || co.logo || 'logo.png')}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td><td style="width:6.2cm"></td></tr></table>
+      <table class="legal"><tr><td>${lines(legal)}</td><td class="r">${lines([['Siège Social', esc(co.address)], ['Contact', esc(co.email)], ['Téléphone', esc(co.phone)]])}</td></tr></table>`;
+  };
+  const twoBoxes = (t1, r1, t2, r2) => `<table class="two"><tr><td class="box"><div class="bh">${t1}</div>${lines(r1)}</td><td class="gap"></td>${t2 ? `<td class="box"><div class="bh">${t2}</div>${lines(r2)}</td>` : '<td class="box" style="border:0;background:none"></td>'}</tr></table>`;
+  // QR code: opens WhatsApp to the company with the invoice number already typed, so the client can send the payment proof
+  const qrCell = (i, cur, tot) => { try { const co = App.db.settings.company, u = co.phone && window.qrcode ? App.waUrl(co.phone, `Bonjour, je règle la facture ${i.number} (${money(tot, cur)}).`) : ''; if (!u) return '';
+    const q = window.qrcode(0, 'M'); q.addData(u); q.make(); return `<td style="width:3.4cm;text-align:center"><img class="qr" src="${q.createDataURL(4, 0)}" alt="QR" style="width:2.6cm;height:2.6cm"><div style="font-size:7pt;color:#4A5568;line-height:1.2">Scannez pour payer<br>ou envoyer la preuve</div></td>`; } catch (e) { return ''; } };
+  const paperFoot = (stamp, bare, qr = '') => `<table class="foot">${qr || !bare ? `<tr><td></td>${qr}${bare ? '' : `<td class="r" style="width:4.8cm"><img src="${esc(stamp || 'stamp.png')}" alt=""></td>`}</tr>` : ''}<tr><td class="thx" colspan="3">MERCI POUR VOTRE CONFIANCE</td></tr></table>`;
+  // reference printed for a line that has no product reference of its own: P0001, P0002… by line position
+  App.lineRef = n => 'P' + String(n + 1).padStart(4, '0');
+  App.invoiceDoc = (i, logo, stamp) => {
+    const co = App.db.settings.company, c = App.client(i.clientId), tot = App.invTotal(i), cur = i.currency === 'CDF' ? 'CDF' : 'USD', other = cur === 'USD' ? 'CDF' : 'USD', unit = cur === 'CDF' ? 'CDF' : 'USD';
+    const rows = i.lines.map((l, n) => { const pr = l.pid && App.prod(l.pid); return `<tr><td>${esc(l.ref || (pr && pr.ref) || App.lineRef(n))}</td><td>${esc(l.desc).replace(/ \(/, '<br>(')}</td><td class="r">${money(l.price, cur)}</td><td class="r">${App.nf(l.qty, 2)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${money(l.qty * l.price, cur)}</td></tr>`; }).join('');
+    return `<div class="paper">${paperHead(co, logo)}
+      ${twoBoxes(i.proforma ? 'FACTURE PRO FORMA' : 'FACTURE', [['Numéro', `<b>${esc(i.number)}</b>`], ['Date', App.fdate(i.date)], co.city && ['Lieu', esc(co.city)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], ['Adresse', esc(c ? (c.address || c.installAddr || '—') : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
+      <table class="items"><thead><tr><th style="width:13%">Référence</th><th>Description</th><th class="r" style="width:15%">P.U. (${unit})</th><th class="r" style="width:8%">Qté</th><th class="r" style="width:20%">Montant (${unit})</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="tots"><tr><td><b>Total TTC :</b></td><td>${money(tot, cur)}</td></tr><tr class="net"><td>${i.proforma ? 'TOTAL PRO FORMA :' : 'NET À PAYER :'}</td><td>${money(tot, cur)}</td></tr></table>
+      <div class="rate">Taux appliqué : 1 $ = ${App.nf(App.rateOf(i), 0)} CDF · équivalent ${money(App.conv(tot, cur, other, App.rateOf(i)), other)}</div>
+      <div class="wb"><b>Arrêtée la présente facture${i.proforma ? ' pro forma' : ''} à la somme de : ${esc(App.amountWords(tot, cur))}</b>.<br><b>Mode de règlement : </b>${esc(co.payTerms || '')}${i.proforma ? '<br><i>Document sans valeur de facture : il ne constitue ni une preuve de paiement ni une réservation du stock. La facture définitive sera établie après votre accord.</i>' : ''}</div>
+      ${paperFoot(stamp, false, i.proforma ? '' : qrCell(i, cur, tot))}</div>`;
+  };
+  // ---------- Payment receipt ----------
+  App.receiptDoc = (p, logo, stamp) => {
+    const co = App.db.settings.company, c = App.client(p.clientId), i = App.invoice(p.invoiceId);
+    let after = '';
+    if (i) { const x = App.invPayments(i).find(y => y.p === p), tot = App.invTotal(i), paid = App.invPaid(i), due = Math.max(0, tot - paid);
+      after = `${twoBoxes('FACTURE ' + esc(i.number), [['Date', App.fdate(i.date)], ['Total', money(tot, i.currency)], ['Déjà payé', money(paid, i.currency)], ['Reste', `<b>${money(due, i.currency)}</b>`]])}${x && x.left <= 0.004 ? '<div class="sold">FACTURE SOLDÉE</div>' : ''}`; }
+    return `<div class="paper">${paperHead(co, logo)}
+      ${twoBoxes('REÇU DE PAIEMENT', [['N°', `<b>${esc(App.receiptNo(p))}</b>`], ['Date', App.fdate(p.date)], ['Mode', esc(p.mode)], p.ref && ['Référence', esc(p.ref)]], 'CLIENT', [['Nom', `<b>${esc(App.cname(c))}</b>`], ['Code Client', esc(c ? c.code : '—')], c && c.phone && ['Téléphone', esc(c.phone)]])}
+      <div class="rc">Nous avons reçu de <b>${esc(App.cname(c))}</b> la somme de <b class="big">${App.fmt(p.amount, p.currency)}</b> <i>(${esc(App.amountWords(p.amount, p.currency))})</i>${i ? ` en paiement de la facture <b>${esc(i.number)}</b>` : ''}${p.comment ? ` — ${esc(p.comment)}` : ''}.</div>
+      ${after}<table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${esc(stamp || 'stamp.png')}" alt=""></td></tr><tr><td class="ln">Le client</td><td class="gp"></td><td class="ln">${esc(co.name)}</td></tr></table>${paperFoot(stamp, true)}</div>`;
+  };
+  // print only once the logo and the stamp are decoded (a phone prints a blank spot if it goes too early)
+  const readyThen = (f, go) => Promise.all([...f.contentDocument.images].map(im => im.decode ? im.decode().catch(() => {}) : 0)).then(() => setTimeout(go, 300), () => setTimeout(go, 700));
+  const printRaw = async (title, html) => {
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${DOC_CSS}</style>${html}${made()}`;
+    f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
+    document.body.appendChild(f);
+  };
+  App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) App.rcptSent(p.id); if (p) printRaw(App.recFileName(p), App.receiptDoc(p, await logoData(), await stampData())); };
+  App.actions.recword = async d => { const p = App.db.payments.find(x => x.id === d.id); if (!p) return; const no = App.receiptNo(p);
+    App.download(`${App.recFileName(p)}.doc`, `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.recFileName(p))}</title><style>${DOC_CSS}</style></head><body>${App.receiptDoc(p, await logoData(), await stampData())}${made()}</body></html>`, 'application/msword'); };
+
+  const stampData = async () => { const cs = App.db.settings.company.stamp; if ((cs || '').startsWith('data:')) return cs; try { const b = await (await fetch('stamp.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; } };
+  const logoData = async () => {
+    const co = App.db.settings.company; if ((co.logo || '').startsWith('data:')) return co.logo;
+    try { const b = await (await fetch('logo.png')).blob(); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { return ''; }
+  };
+  App.docKit = { DOC_CSS: () => PAPER_CSS + MADE_CSS, made, logoData, stampData, head: paperHead, boxes: twoBoxes, foot: paperFoot, money, print: printRaw };
+  // file name of an invoice: the client's name first, then the number (browsers use the page title when saving a print as PDF)
+  // file name of a document: "Client name - Reference" (the client name comes first so that the files sort by client)
+  App.docName = (who, ref) => { const n = String(who || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return n ? `${n} - ${ref}` : String(ref); };
+  App.invFileName = inv => App.docName(App.cname(App.client(inv.clientId)), inv.number);
+  App.recFileName = p => { const i = App.invoice(p.invoiceId), c = App.client(p.clientId) || (i && App.client(i.clientId)); return App.docName(c ? App.cname(c) : '', 'Recu ' + App.receiptNo(p)); };
+  const printDoc = async inv => {
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style>${App.invoiceDoc(inv, await logoData(), await stampData())}${made()}`;
+    f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
+    document.body.appendChild(f);
+  };
+  const wordDoc = async inv => {
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(App.invFileName(inv))}</title><style>${DOC_CSS}</style></head><body>${App.invoiceDoc(inv, await logoData(), await stampData())}${made()}</body></html>`;
+    App.download(`${App.invFileName(inv)}.doc`, html, 'application/msword');
+  };
+
+  // what this invoice is made of: installation (technicians), subscription (fournisseur) and Gestio's own revenue
+  const splitCardInv = i => { const s = App.invSplit(i); if (!(s.inst > 0 || s.sub > 0)) return ''; const F = x => App.fmt(x, i.currency);
+    return `<div class="card noprint" style="margin-bottom:10px"><b>🧮 Répartition de cette facture</b><div class="spread"><span>🔧 Installation (techniciens)</span><b>${F(s.inst)}</b></div><div class="spread"><span>📡 Abonnement (fournisseur)</span><b>${F(s.sub)}</b></div><div class="spread"><span>✅ Revenu Gestio (kits, matériel)</span><b class="ok">${F(s.own)}</b></div></div>`; };
+  App.views.invoice = p => {
+    const i = App.invoice(p.id); if (!i) return { title: 'Facture', back: 'invoices', html: '<div class="empty">Facture introuvable.</div>' };
+    const [t, k] = App.INV[App.invStatus(i)], due = App.invDue(i), pays = App.db.payments.filter(x => x.invoiceId === i.id);
+    return {
+      title: 'Facture', sub: i.number, back: 'invoices', nav: 'more',
+      html: `<section class="hero ihero"><div class="hero-top"><div><small>${App.invTypes[i.type]} · ${App.fdate(i.date)}</small><div class="hero-date" style="text-transform:none">${esc(i.number)}</div></div><span class="pill ${k}">${t}</span></div>
+          <div class="hero-num">${App.fmt(App.invTotal(i), i.currency)}</div>
+          ${i.pending ? '' : `<div class="pbar2 w"><i style="width:${Math.min(100, Math.round(App.invPaid(i) / Math.max(0.01, App.invAgreed(i)) * 100))}%"></i></div><div class="ifoot"><span>Reçu ${App.fmt(App.invPaid(i), i.currency)}</span><span>${due > 0.004 ? 'Reste ' + App.fmt(due, i.currency) : '✓ Soldée'}</span></div>`}
+          ${i.clientId && App.client(i.clientId) ? `<button class="chip" data-act="go" data-v="client" data-id="${i.clientId}">👤 ${esc(App.cname(App.client(i.clientId)))} ›</button>` : ''}</section>
+        <div class="card" style="margin-bottom:10px"><div class="spread"><span>Total de la facture imprimée</span><b>${App.fmt(App.invTotal(i), i.currency)}</b></div>${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<div class="spread"><span>Prix convenu (négocié)</span><b>${App.fmt(App.invAgreed(i), i.currency)}</b></div>` : ''}<div class="spread"><span>Reçu du client</span><b class="ok">${App.fmt(App.invPaid(i), i.currency)}</b></div><div class="spread"><span>Reste à payer</span><b class="${due > 0.004 ? 'bad' : 'ok'}">${App.fmt(due, i.currency)}</b></div></div>
+        ${splitCardInv(i)}
+        ${pays.some(x => x.rcpt === 'todo') ? `<div class="card noprint" style="margin-bottom:10px;border:3px solid var(--bad,#d93025)"><div style="font-size:18px;font-weight:800">🧾 Reçu à envoyer au client</div><p class="mut" style="margin:6px 0">${esc(App.cname(App.client(i.clientId)))} a payé : envoyez-lui le reçu pour qu'il ait la preuve de son paiement.</p><div class="bar"><button class="btn" data-act="recshare" data-id="${pays.find(x => x.rcpt === 'todo').id}">📤 Envoyer le reçu (PDF)</button><button class="btn sec" data-act="recwa" data-id="${pays.find(x => x.rcpt === 'todo').id}">💬 WhatsApp</button><button class="btn sm sec" data-act="recskip" data-id="${pays.find(x => x.rcpt === 'todo').id}">Pas de reçu</button></div></div>` : ''}
+        ${i.pending ? `<div class="card noprint" style="margin-bottom:10px;border:2px solid var(--warn,#e8a317)"><b>⏳ Facture en attente</b><p class="mut" style="margin:6px 0">Le client a la facture mais la vente n'est pas encore faite : le stock n'est pas déduit, rien n'est compté dans les ventes ni dans les impayés.</p><div class="bar"><button class="btn sec" data-act="newpay" data-iid="${i.id}">💰 Recevoir un acompte</button><button class="btn" data-act="invvalid" data-id="${i.id}">✅ Le client prend le produit</button><button class="btn del" data-act="invcancel" data-id="${i.id}">✖ Le client n'en veut plus</button></div></div>` : ''}
+        <div class="bar noprint"><button class="btn sec" data-act="dl_fromInv" data-id="${i.id}">🚚 Livraison</button>${due > 0.004 ? `<button class="btn" data-act="newpay" data-iid="${i.id}">💰 Encaisser (${App.fmt(due, i.currency)})</button>` : ''}${due > 0.004 && App.invPaid(i) > 0.004 ? `<button class="btn sec" data-act="invneg" data-id="${i.id}">🤝 Solder au prix négocié</button>` : ''}${App.invAgreed(i) < App.invTotal(i) - 0.004 ? `<button class="btn sec" data-act="invunneg" data-id="${i.id}">↩ Annuler le prix négocié</button>` : ''}<button class="btn sec" data-act="invpdf" data-id="${i.id}">📄 PDF</button><button class="btn sec" data-act="invprint" data-id="${i.id}">🖨️ Imprimer</button><button class="btn sec" data-act="invword" data-id="${i.id}">📝 Word</button><button class="btn sec" data-act="invshare" data-id="${i.id}">📤 Partager en PDF</button></div>
+        ${App.invoiceDoc(i)}
+        ${pays.length ? `<h2 class="sec noprint">Paiements reçus</h2><div class="list noprint">${App.invPayments(i).map(({ p: x, n, left }) => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${esc(App.receiptNo(x))}${x.ref ? ' · ' + esc(x.ref) : ''} · reste ${App.fmt(left, i.currency)}</small>${rcptPill(x)}</div><b class="ok">${App.fmt(x.amount, x.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${x.id}" title="Imprimer le reçu">🧾</button><button class="btn sm sec" data-act="recshare" data-id="${x.id}" title="Partager le reçu en PDF">📤</button></div>`).join('')}</div>` : ''}
+        <div class="bar" style="margin-top:14px">${i.clientId ? `<button class="btn sec" data-act="go" data-v="client" data-id="${i.clientId}">Voir le client</button>` : ''}<button class="btn del" data-act="delinv" data-id="${i.id}">Supprimer la facture</button></div>`
+    };
+  };
+  App.actions.invpdf = d => { App.toast('Choisissez « Enregistrer au format PDF »'); printDoc(App.invoice(d.id)); };
+  App.actions.invprint = d => printDoc(App.invoice(d.id));
+  App.actions.invword = d => wordDoc(App.invoice(d.id));
+
+  // pro forma: detail, print, PDF, WhatsApp, conversion
+  App.proDoc = (p, logo, stamp) => App.invoiceDoc({ ...p, proforma: true }, logo, stamp);
+  App.proFileName = p => App.docName(App.cname(App.client(p.clientId)), 'Pro forma ' + p.number);
+  App.actions.pro_open = d => {
+    const p = pfs().find(x => x.id === d.id); if (!p) return; const inv = p.invoiceId && App.invoice(p.invoiceId), open = p.status === 'open';
+    App.modal('Pro forma ' + p.number,
+      `<div class="card" style="margin:0 0 10px"><div class="spread"><b>${esc(App.cname(App.client(p.clientId)))}</b><span class="pill ${open ? 'warn' : 'ok'}">${open ? 'Pro forma' : 'Facturé'}</span></div><div class="mut">${App.invTypes[p.type]} · ${App.fdate(p.date)}</div>
+        <div class="list" style="margin-top:8px">${p.lines.map(l => `<div class="spread"><span>${esc(l.desc)} <small class="mut">× ${App.nf(l.qty, 2)}</small></span><b>${App.fmt(l.qty * l.price, p.currency)}</b></div>`).join('')}</div>
+        <div class="spread" style="margin-top:8px"><b>Total</b><b style="font-size:20px">${App.fmt(App.invTotal(p), p.currency)}</b></div></div>
+       <div class="bar"><button type="button" class="btn sec" data-act="pro_print" data-id="${p.id}">🖨️ Imprimer</button><button type="button" class="btn sec" data-act="pro_pdf" data-id="${p.id}">📤 PDF</button><button type="button" class="btn sec" data-act="pro_wa" data-id="${p.id}">💬 WhatsApp</button></div>
+       ${inv ? `<div class="bar"><button type="button" class="btn" data-act="go" data-v="invoice" data-id="${inv.id}">🧾 Voir la facture ${esc(inv.number)}</button></div>` : ''}
+       ${open ? `<div class="bar"><button type="button" class="btn" data-act="pro_convert" data-id="${p.id}">🧾 Transformer en facture</button></div>` : ''}
+       <div class="bar"><button type="button" class="btn sm del" data-act="pro_del" data-id="${p.id}">Supprimer</button></div>`);
+  };
+  App.actions.pro_print = async d => { const p = pfs().find(x => x.id === d.id); if (p) printRaw(App.proFileName(p), App.proDoc(p, await logoData(), await stampData())); };
+  App.actions.pro_pdf = async d => { const p = pfs().find(x => x.id === d.id); if (p) App.sharePdf(`${App.proFileName(p)}.pdf`, App.proDoc(p, await logoData(), await stampData())); };
+  App.actions.pro_wa = d => {
+    const p = pfs().find(x => x.id === d.id), c = p && p.clientId && App.client(p.clientId); if (!p) return; const co = App.db.settings.company;
+    const txt = `Bonjour ${(c && c.first) || App.cname(c)},\nVoici notre pro forma ${p.number} : ${p.lines.map(l => `${l.desc} × ${App.nf(l.qty, 2)}`).join(', ')}.\nTotal : ${App.fmt(App.invTotal(p), p.currency)}.\nDès votre accord, nous établissons la facture.\n${co.name}`;
+    window.open(c && c.phone ? App.waUrl(c.phone, txt) : 'https://wa.me/?text=' + encodeURIComponent(txt), '_blank', 'noopener');
+  };
+  App.actions.pro_convert = d => { const p = pfs().find(x => x.id === d.id); if (!p || p.status !== 'open') return; App.close(); setTimeout(() => App.invoiceForm(p.type, { clientId: p.clientId, lines: p.lines, cur: p.currency, pfId: p.id }), 40); };
+  App.actions.pro_del = d => { const p = pfs().find(x => x.id === d.id); if (!p || !App.confirm(`Supprimer le pro forma ${p.number} ?`)) return; App.db.proformas = pfs().filter(x => x !== p); App.save(); App.close(); App.refresh(); };
+  // Removes invoices (stock put back, linked payments / installations removed, a renewal undone) with a 12-second "Annuler" bar
+  App.removeInvoices = ids => {
+    const db = App.db, list = ids.map(App.invoice).filter(Boolean); if (!list.length) return;
+    const snap = JSON.parse(JSON.stringify({ invoices: db.invoices, payments: db.payments, installs: db.installs, products: db.products, moves: db.moves, clients: db.clients, deliveries: db.deliveries }));
+    const manual = [];
+    list.forEach(i => {
+      if (!i.pending) i.lines.forEach(l => { const p = l.pid && App.prod(l.pid); if (p && App.tracked(p)) App.move({ pid: p.id, qty: l.qty, invoiceId: '', clientId: i.clientId, note: 'Annulation ' + i.number }); }); // a pending invoice never took stock
+      const c = App.client(i.clientId), r = i.renew;
+      if (r && c && c.start === r.ns && r.prev) { // this invoice renewed the subscription: give the previous period back
+        c.start = r.prev.start; if (r.prev.period) c.period = r.prev.period; if (r.prev.price != null) c.price = r.prev.price;
+        const k = (c.subs || []).map(x => x.date + '|' + x.start).lastIndexOf(r.date + '|' + r.prev.start); if (k >= 0) c.subs.splice(k, 1);
+      } else if (!i.pending && (/abonnement/i.test(i.type) || i.type === 'complete')) manual.push(i.number);
+      db.payments = db.payments.filter(p => p.invoiceId !== i.id); db.installs = db.installs.filter(x => x.invoiceId !== i.id);
+      (db.deliveries || []).forEach(d => { if (d.invoiceId === i.id) { d.invoiceId = ''; d.collect = false; } });
+      db.invoices = db.invoices.filter(x => x !== i); App.log(i.clientId, `Facture ${i.number} supprimée`);
+    });
+    App.save();
+    const label = list.length === 1 ? 'Facture ' + list[0].number + ' supprimée' : list.length + ' factures supprimées';
+    App.undoBar(label + (manual.length ? ' · vérifiez la période d\'abonnement du client' : ''), () => { ['invoices', 'payments', 'installs', 'products', 'moves', 'clients', 'deliveries'].forEach(k => { db[k] = snap[k]; }); App.save(); App.toast('Suppression annulée'); App.refresh(); });
+  };
+  App.actions.delinv = d => {
+    const i = App.invoice(d.id); if (!i || !App.confirm(`Supprimer la facture ${i.number} ? Le stock sera remis et ses paiements supprimés.`)) return;
+    App.removeInvoices([i.id]); App.go('invoices', {}, true);
+  };
+  // multiple selection in the invoice list
+  App.actions.inv_sel = () => { st.sel = !st.sel; st.picked = new Set(); drawList(); };
+  App.actions.inv_pick = d => { st.picked.has(d.id) ? st.picked.delete(d.id) : st.picked.add(d.id); drawList(); };
+  App.actions.inv_all = () => { const all = visibleInvoices(); const full = all.every(i => st.picked.has(i.id)); all.forEach(i => full ? st.picked.delete(i.id) : st.picked.add(i.id)); drawList(); };
+  App.actions.delinvs = () => {
+    const ids = [...st.picked].filter(id => App.invoice(id)); if (!ids.length) return App.toast('Aucune facture sélectionnée');
+    if (!App.confirm(`Supprimer ${ids.length} facture(s) ? Le stock sera remis et leurs paiements supprimés.`)) return;
+    st.sel = false; st.picked = new Set(); App.removeInvoices(ids); drawList();
+  };
+
+  // ---------- Payments ----------
+  App.paymentForm = (pre = {}) => {
+    const db = App.db;
+    const bal = i => i.pending ? Math.max(0, App.invAgreed(i) - App.invPaid(i)) : App.invDue(i); // a pending invoice can already receive a deposit
+    const invOpts = cid => [['', '— Sans facture —'], ...db.invoices.filter(i => bal(i) > 0.004 && (!cid || i.clientId === cid)).map(i => [i.id, `${i.number} · ${App.cname(App.client(i.clientId))} · ${i.pending ? '⏳ en attente · ' : ''}reste ${App.fmt(bal(i), i.currency)}`])];
+    const inv0 = App.invoice(pre.invoiceId), cid0 = pre.clientId || (inv0 && inv0.clientId) || '';
+    App.modal('Nouveau paiement',
+      `${App.clientFinder('f_cl')}${F.sel('f_cl', 'Client', App.clientOpts('— Aucun —'), cid0)}${F.sel('f_inv', 'Facture', invOpts(cid0), pre.invoiceId || '')}
+       <div class="row">${F.num('f_amt', 'Montant', inv0 ? bal(inv0) : '')}${F.sel('f_cur', 'Devise', CUR, inv0 ? inv0.currency : 'USD')}</div>
+       <div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Mode de paiement', App.PAY_MODES, 'Cash')}</div>
+       ${F.num('f_rate', 'Taux du jour (1 $ = … CDF)', App.rate(), 'min="1" step="1"')}
+       ${F.text('f_ref', 'Référence (n° transaction)', '')}${F.text('f_com', 'Commentaire', '')}`,
+      () => {
+        let amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
+        const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
+        if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > bal(i) + 0.004 && bal(i) > 0.004) amt = Math.round(App.conv(bal(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
+        if (rate !== App.rate()) App.setRate(rate);
+        db.payments.push({ rcpt: 'todo', id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
+        App.log(cid, `Paiement ${App.fmt(amt, App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
+        if (i && $('f_neg').checked && !$('pp_negw').style.display) { i.agreed = Math.round(App.invPaid(i) * 100) / 100; App.log(cid, `Prix négocié sur ${i.number} : ${App.fmt(i.agreed, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); }
+        const np = db.payments[db.payments.length - 1]; App.save(); App.refresh();
+        queueMicrotask(() => App.receiptPrompt(np.id));
+        if (i && bal(i) <= 0.004) App.celebrate();
+      }, 'Enregistrer le paiement');
+    // live balance + quick buttons (works for old invoices too)
+    const box = document.createElement('div'); box.className = 'fld'; box.innerHTML = '<div class="bar"><button class="btn sec sm" type="button" id="pp_all">Tout le reste</button><button class="btn sec sm" type="button" id="pp_half">Moitié</button></div><div id="pp_msg" class="muted" style="margin-top:6px"></div><label id="pp_negw" class="chk" style="display:none;margin-top:6px"><input type="checkbox" id="f_neg"> Le client a marchandé : solder la facture avec ce paiement (prix convenu)</label>';
+    $('f_amt').closest('.row').before(box);
+    const ppSync = () => { const i = App.invoice($('f_inv').value), a = App.n('f_amt'); if (!i) { $('pp_msg').textContent = ''; $('pp_negw').style.display = 'none'; return; } const d = bal(i), g = App.conv(a, App.v('f_cur'), i.currency, App.rateOf(i)), left = d - g; $('pp_negw').style.display = left > 0.004 && !i.pending ? '' : 'none'; if (left <= 0.004 || i.pending) $('f_neg').checked = false; $('pp_msg').textContent = left > 0.004 ? `Reste après ce paiement : ${App.fmt(left, i.currency)}` : left < -0.004 ? `Trop perçu : ${App.fmt(-left, i.currency)} à rendre au client (le solde sera ramené à 0)` : '✅ La facture sera soldée'; };
+    const ppFill = k => { const i = App.invoice($('f_inv').value); if (!i) return App.toast('Choisissez d\'abord une facture'); $('f_cur').value = i.currency; $('f_amt').value = Math.round(bal(i) * k * 100) / 100; ppSync(); };
+    $('pp_all').onclick = () => ppFill(1); $('pp_half').onclick = () => ppFill(.5); $('f_amt').oninput = ppSync; $('f_cur').onchange = ppSync; ppSync();
+    $('f_cl').onchange = () => { $('f_inv').innerHTML = App.opts(invOpts($('f_cl').value)); };
+    App.wireClientFinder('f_cl', q => App.clientOpts('— Aucun —', null, q));
+    $('f_inv').onchange = () => { const i = App.invoice($('f_inv').value); if (i) { $('f_amt').value = bal(i); $('f_cur').value = i.currency; if (!$('f_cl').value) $('f_cl').value = i.clientId; } ppSync(); };
+  };
+  // negotiated price on an existing invoice: what was already received becomes the agreed price
+  App.actions.invneg = d => { const i = App.invoice(d.id); if (!i) return; const p = Math.round(App.invPaid(i) * 100) / 100;
+    if (!App.confirm(`Le client a marchandé ? Le prix convenu devient ${App.fmt(p, i.currency)} (déjà reçu) et la facture est soldée. La facture imprimée garde son prix complet de ${App.fmt(App.invTotal(i), i.currency)}.`)) return;
+    i.agreed = p; App.log(i.clientId, `Prix négocié sur ${i.number} : ${App.fmt(p, i.currency)} au lieu de ${App.fmt(App.invTotal(i), i.currency)}`); App.save(); App.refresh(); App.celebrate(); };
+  App.actions.invunneg = d => { const i = App.invoice(d.id); if (!i) return; delete i.agreed; App.save(); App.refresh(); App.toast('Prix négocié annulé'); };
+  App.actions.invvalid = d => { const i = App.invoice(d.id); if (!i) return; if (!App.confirm(`Valider la vente ${i.number} ? Le stock sera déduit et la facture comptera dans les ventes.`)) return; App.validateInvoice(i.id); App.refresh(); if (App.invDue(i) > 0.004) App.paymentForm({ invoiceId: i.id }); };
+  App.actions.invcancel = d => { const i = App.invoice(d.id); if (!i || !i.pending) return; const dep = App.invPaid(i); if (!App.confirm(`Annuler la facture ${i.number} ? Le client ne prend pas le produit : rien n'a été déduit du stock.${dep > 0.004 ? ` Le client avait donné ${App.fmt(dep, i.currency)} : rendez-lui cet argent (l'acompte sera retiré de la caisse).` : ''}`)) return; App.removeInvoices([i.id]); App.go('invoices'); };
+  App.actions.newpay = d => App.paymentForm({ clientId: d.cid, invoiceId: d.iid });
+
+  const pq = { mode: 'all' };
+  App.views.payments = () => {
+    const all = App.db.payments.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)), l = all.filter(p => pq.mode === 'all' || p.mode === pq.mode);
+    const by = {}; all.forEach(p => { by[p.mode] = (by[p.mode] || 0) + App.usd(p.amount, p.currency, p); });
+    return {
+      title: 'Paiements', sub: `${all.length} paiement(s)`, back: 'more', nav: 'more',
+      html: `<div class="bar"><button class="btn" data-act="newpay">+ Paiement</button></div>
+        <div class="chips"><button class="chip ${pq.mode === 'all' ? 'on' : ''}" data-act="paymode" data-m="all">Tous</button>${App.PAY_MODES.filter(m => by[m]).map(m => `<button class="chip ${pq.mode === m ? 'on' : ''}" data-act="paymode" data-m="${esc(m)}">${esc(m)} · ${App.fmt(by[m])}</button>`).join('')}</div>
+        ${l.length ? `<div class="list">${l.map(p => { const i = App.invoice(p.invoiceId); return `<div class="item"><div class="grow"><b>${esc(App.cname(App.client(p.clientId)))}</b><small>${App.fdate(p.date)} · ${esc(p.mode)}${i ? ' · ' + esc(i.number) : ''}${p.ref ? ' · ' + esc(p.ref) : ''}</small>${rcptPill(p)}</div><b class="ok">${App.fmt(p.amount, p.currency)}</b><button class="btn sm sec" data-act="recprint" data-id="${p.id}" title="Imprimer le reçu">🧾</button><button class="btn sm del" data-act="delpay" data-id="${p.id}">✕</button></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement.</div>'}`
+    };
+  };
+  App.actions.paymode = d => { pq.mode = d.m; App.refresh(); };
+  App.actions.delpay = d => { if (!App.confirm('Supprimer ce paiement ?')) return; App.db.payments = App.db.payments.filter(p => p.id !== d.id); App.save(); App.refresh(); };
+
+  // ---------- Expenses ----------
+  App.views.expenses = () => {
+    const l = App.db.expenses.slice().sort((a, b) => b.date.localeCompare(a.date)), m = App.today().slice(0, 7), mt = l.filter(e => e.date.startsWith(m)).reduce((a, e) => a + App.usd(e.amount, e.currency, e), 0);
+    return {
+      title: 'Dépenses', sub: `Ce mois : ${App.fmt(mt)}`, back: 'more', nav: 'more',
+      html: `<div class="bar"><button class="btn" data-act="newexp">+ Dépense</button><button class="btn sec" data-csv="depenses">CSV</button></div>` + (l.length ? `<div class="list">${l.map(e => `<div class="item"><div class="grow"><b>${esc(e.label)}</b><small>${App.fdate(e.date)} · ${esc(e.cat)}${e.mode ? ' · ' + esc(e.mode) : ''}</small></div><b>${App.fmt(e.amount, e.currency)}</b><button class="btn sm del" data-act="delexp" data-id="${e.id}">✕</button></div>`).join('')}</div>` : '<div class="empty">Aucune dépense.</div>')
+    };
+  };
+  App.actions.newexp = () => App.modal('Nouvelle dépense', `${F.text('f_label', 'Libellé', '')}${F.sel('f_cat', 'Catégorie', App.EXP_CATS)}<div class="row">${F.num('f_amt', 'Montant', '')}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div><div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Payé par', App.PAY_MODES, 'Cash')}</div>`, () => {
+    if (!App.v('f_label') || App.n('f_amt') <= 0) { App.toast('Libellé et montant requis'); return false; }
+    App.db.expenses.push({ id: App.uid(), label: App.v('f_label'), cat: App.v('f_cat'), amount: App.n('f_amt'), currency: App.v('f_cur'), mode: App.v('f_mode'), date: App.v('f_date') || App.today() }); App.save(); App.refresh();
+  });
+  App.actions.delexp = d => { if (!App.confirm('Supprimer cette dépense ?')) return; App.db.expenses = App.db.expenses.filter(e => e.id !== d.id); App.save(); App.refresh(); };
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-csv="depenses"]'); if (!b) return;
+    App.download(`gestio-depenses-${App.today()}.csv`, App.csv([['Date', 'Libellé', 'Catégorie', 'Montant', 'Devise'], ...App.db.expenses.map(x => [x.date, x.label, x.cat, x.amount, x.currency])]), 'text/csv');
+  });
+})();
