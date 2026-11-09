@@ -72,6 +72,7 @@
         '<section class="card"><h3>Modules</h3><p class="muted">Un module désactivé disparaît des menus, de l\'accueil et des rapports.</p>' + modulesHtml(s.modules) + '</section>' +
         '<section class="card"><h3>Vocabulaire</h3>' + vocabHtml(s.vocab) + '</section>' +
         '<section class="card"><h3>Champs personnalisés</h3><div id="cfs">' + customFields() + '</div></section>' +
+        '<section class="card"><h3>Paiements et messages</h3>' + ui.field('Modes de paiement (séparés par des virgules)', '<input id="modes" value="' + esc(s.modes.join(', ')) + '">') + ui.field('Message de relance', '<textarea data-msg="remind" rows="4">' + esc(s.msgs.remind) + '</textarea>', 'Variables : {nom} {numero} {montant} {reste} {jours} {entreprise}') + ui.field('Message après paiement', '<textarea data-msg="receipt" rows="3">' + esc(s.msgs.receipt) + '</textarea>', 'Variables : {nom} {montant} {facture} {date} {entreprise}') + '</section>' +
         '<section class="card"><h3>Apparence</h3><div class="seg" id="theme">' + [['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']].map(t => '<button data-t="' + t[0] + '" class="' + (s.theme === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') + '</div></section></div>';
       const redo = () => App.views.settings.render(el);
       el.querySelectorAll('[data-p]').forEach(i => i.onchange = () => {
@@ -85,6 +86,8 @@
       el.querySelector('#rate').onclick = () => { ui.rateSheet(); };
       el.querySelectorAll('[data-mod]').forEach(c => c.onchange = () => { s.modules[c.dataset.mod] = c.checked; App.save(); App.emit('settings'); });
       el.querySelectorAll('[data-vocab]').forEach(i => i.onchange = () => { s.vocab[i.dataset.vocab] = i.value.trim() || s.vocab[i.dataset.vocab]; App.save(); App.emit('settings'); });
+      el.querySelectorAll('[data-msg]').forEach(t => t.onchange = () => { s.msgs[t.dataset.msg] = t.value; App.save(); });
+      el.querySelector('#modes').onchange = e => { const m = e.target.value.split(',').map(x => x.trim()).filter(Boolean); if (m.length) { s.modes = m; App.save(); } };
       el.querySelectorAll('#theme button').forEach(b => b.onclick = () => { s.theme = b.dataset.t; App.save(); ui.applyTheme(); redo(); });
       el.querySelectorAll('[data-cfdel]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.cfdel.split('|'); s.fields[k] = s.fields[k].filter(f => f.id !== id); App.save(); redo(); });
       el.querySelectorAll('[data-cfadd]').forEach(b => b.onclick = () => {

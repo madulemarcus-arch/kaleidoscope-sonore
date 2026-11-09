@@ -1,13 +1,14 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { BUILD: 'business-v3', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v4', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
   App.$$ = (s, r) => [...(r || document).querySelectorAll(s)];
   App.esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   App.uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  App.diff = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
   App.today = () => App.isoDate(new Date());
   App.isoDate = d => { const z = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); };
   App.addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return App.isoDate(d); };
@@ -46,9 +47,11 @@
       modules: Object.fromEntries(App.MODULES.map(m => [m[0], App.PRESETS.general.modules.includes(m[0])])),
       vocab: { ...App.PRESETS.general.vocab },
       fields: { clients: [], products: [], invoices: [] }, // custom fields: {id,label,type,options}
-      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {} } // dial = country code for WhatsApp links
+      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {} },
+      modes: ['Espèces', 'Mobile money', 'Banque', 'Autre'],
+      msgs: { remind: 'Bonjour {nom},\nSauf erreur de notre part, la facture {numero} de {montant} (reste {reste}) est impayée depuis {jours} jour(s).\nMerci de régler dès que possible.\n{entreprise}', receipt: 'Bonjour {nom},\nNous avons bien reçu votre paiement de {montant}{facture} le {date}. Merci !\n{entreprise}' }, // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: []
   });
 
   // ---------- store ----------

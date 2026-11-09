@@ -44,7 +44,7 @@
   };
   const stub = id => ({ title: label(id), render(el) { el.innerHTML = '<div class="page"><div class="empty"><div class="big">' + SCREENS[id][1] + '</div><h2>' + esc(label(id)) + '</h2><p class="muted">Cet écran arrive à l\'étape ' + SCREENS[id][3] + ' du développement.</p></div></div>'; } });
 
-  document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) { e.preventDefault(); App.go(b.dataset.go); } });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) { e.preventDefault(); App.go(b.dataset.go, b.dataset.tab ? { tab: b.dataset.tab } : undefined); } });
   App.$('#fab').onclick = () => {
     const items = App.quick.filter(q => !q.mod || App.mod(q.mod));
     const sh = ui.sheet({ title: 'Ajouter', html: '<div class="quick">' + items.map((q, i) => '<button class="btn ghost big" data-q="' + i + '">' + esc(q.label()) + '</button>').join('') + '</div>', noFocus: true });
@@ -52,14 +52,15 @@
   };
 
   // ---------- home ----------
-  const monthSum = (offset) => { // invoices of the current/previous month, in main currency
+  const monthSum = offset => { // invoiced in the current / previous month, in the main currency
     const d = new Date(); d.setMonth(d.getMonth() - offset); const key = App.isoDate(d).slice(0, 7);
-    return App.db.invoices.filter(i => (i.date || '').startsWith(key)).reduce((a, i) => a + (+i.total || 0), 0);
+    return App.db.invoices.filter(i => !i.cancelled && (i.date || '').startsWith(key)).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : +i.total || 0), 0);
   };
   const todo = () => {
     const s = App.set(), t = [];
     if (!s.legal.some(l => l.v)) t.push(['Compléter les infos légales (RCCM, impôt…)', 'settings']);
     if (!s.logo) t.push(['Ajouter le logo de l\'entreprise', 'settings']);
+    if (App.mod('sales') && App.sales && App.sales.unpaidList().length) t.push([App.sales.unpaidList().length + ' facture(s) impayée(s) : ' + App.money.main(App.sales.unpaidTotal()), 'sales', { tab: 'unpaid' }]);
     if (!s.lastBackup) t.push(['Faire une première sauvegarde', 'settings']);
     return t;
   };
@@ -73,7 +74,7 @@
       el.innerHTML = '<div class="page home"><section class="hero"><small>Chiffre d\'affaires du mois</small><div class="amt">' + M.main(cm) + '</div><div class="sub">≈ ' + M.second(cm) + (diff == null ? '' : ' · <b class="' + (diff >= 0 ? 'up' : 'down') + '">' + (diff >= 0 ? '▲ +' : '▼ ') + diff + ' %</b> vs mois précédent') + '</div></section>' +
         '<section class="tiles">' + tiles + '</section>' +
         (done < start.length ? '<section class="card"><h3>Bien démarrer <small>' + done + '/' + start.length + '</small></h3><ul class="check">' + start.map(x => '<li class="' + (x[1] ? 'ok' : '') + '"><button data-go="' + x[2] + '">' + (x[1] ? '✔' : '○') + ' ' + esc(x[0]) + '</button></li>').join('') + '</ul></section>' : '') +
-        (td.length ? '<section class="card"><h3>À faire</h3><ul class="check">' + td.map(x => '<li><button data-go="' + x[1] + '">⚠ ' + esc(x[0]) + '</button></li>').join('') + '</ul></section>' : '') + '</div>';
+        (td.length ? '<section class="card"><h3>À faire</h3><ul class="check">' + td.map(x => '<li><button data-go="' + x[1] + '"' + (x[2] ? ' data-tab="' + x[2].tab + '"' : '') + '>⚠ ' + esc(x[0]) + '</button></li>').join('') + '</ul></section>' : '') + '</div>';
       const items = App.quick.filter(q => !q.mod || App.mod(q.mod));
       el.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { const q = items[+b.dataset.q]; q.run ? q.run() : App.go(q.to, { add: 1 }); });
     }
