@@ -46,7 +46,7 @@
     const sh = ui.sheet({ title: e ? 'Modifier la dépense' : 'Nouvelle dépense', wide: true,
       html: '<div class="row2">' + ui.field('Montant *', ui.input('amount', e ? e.amount : '', { num: 1 })) + ui.field('Devise', ui.select('currency', [s.currency, s.cur2], e ? e.currency : s.currency)) + '</div><div id="xr">' + ui.field('Taux (1 ' + s.currency + ' = ? ' + s.cur2 + ')', ui.input('rate', e ? e.rate : s.rate, { num: 1 })) + '</div>' +
         ui.field('Catégorie', '<input name="category" list="dl-xc" value="' + esc(e ? e.category : F.cats()[0]) + '"><datalist id="dl-xc">' + F.cats().map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>') + '<div class="row2">' + ui.field('Payé par', ui.select('mode', s.modes, e ? e.mode : s.modes[0])) + ui.field('Fournisseur', ui.select('supplierId', sup, e ? e.supplierId : '')) + '</div>' + ui.field('Date', ui.dateField('date', e && e.date)) + ui.field('Note', ui.input('note', e && e.note)),
-      actions: [...(e ? [{ label: 'Supprimer', cls: 'danger', fn: async s2 => { if (await ui.confirm('Supprimer cette dépense ?', 'Supprimer', true)) { db().expenses = db().expenses.filter(x => x.id !== id); App.log('expense.delete', e.category); App.save(); s2.close(); done ? done() : App.render(); } return false; } }] : []), { label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', cls: 'primary', fn: s2 => {
+      actions: [...(e && App.can('delete') ? [{ label: 'Supprimer', cls: 'danger', fn: async s2 => { if (await ui.confirm('Supprimer cette dépense ?', 'Supprimer', true)) { db().expenses = db().expenses.filter(x => x.id !== id); App.log('expense.delete', e.category); App.save(); s2.close(); done ? done() : App.render(); } return false; } }] : []), { label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', cls: 'primary', fn: s2 => {
         const f = ui.read(s2.body); if (!(f.amount > 0)) { App.toast('Montant invalide', 'err'); return false; } if (f.currency !== s.currency && !(f.rate > 0)) { App.toast('Taux invalide', 'err'); return false; }
         const cat = f.category || F.cats()[0]; if (!F.cats().includes(cat)) F.cats().push(cat);
         const rec = { amount: f.amount, currency: f.currency, rate: f.currency === s.currency ? s.rate : f.rate, category: cat, mode: f.mode, supplierId: f.supplierId, date: f.date, note: f.note };
@@ -78,7 +78,7 @@
     title: 'Argent',
     render(el, params) {
       if (params && params.tab) st.tab = params.tab;
-      const tabs = { journal: 'Journal', exp: 'Dépenses', ...Object.fromEntries(Object.entries(F.tabs).map(([k, v]) => [k, v.label])) };
+      const tabs = { journal: 'Journal', exp: 'Dépenses', ...Object.fromEntries(Object.entries(F.tabs).filter(([k, v]) => !v.perm || App.can(v.perm)).map(([k, v]) => [k, v.label])) }; if (!tabs[st.tab]) st.tab = 'journal';
       el.innerHTML = '<div class="page"><div class="seg" id="mtabs">' + Object.entries(tabs).map(([k, l]) => '<button data-t="' + k + '" class="' + (st.tab === k ? 'on' : '') + '">' + esc(l) + '</button>').join('') + '</div><div id="mt"></div></div>';
       el.querySelectorAll('#mtabs button').forEach(b => b.onclick = () => { st.tab = b.dataset.t; App.views.money.render(el); });
       const tab = el.querySelector('#mt'), draw = () => { (st.tab === 'journal' ? journal : st.tab === 'exp' ? expenses : F.tabs[st.tab].render)(tab, el); tab.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { st.r = b.dataset.r; draw(); }); }; draw();

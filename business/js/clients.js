@@ -4,7 +4,7 @@
   const C = App.clients = {}, db = () => App.db.clients, digits = s => String(s || '').replace(/\D/g, '');
   C.norm = norm; C.digits = digits;
   C.get = id => db().find(c => c.id === id);
-  C.nextCode = () => { const q = App.db.settings.seq; q.client = (q.client || 0) + 1; return 'CL-' + String(q.client).padStart(4, '0'); };
+  C.nextCode = () => { const q = App.db.settings.seq; let c; do { q.client = (q.client || 0) + 1; c = 'CL-' + String(q.client).padStart(4, '0'); } while (db().some(x => x.code === c)); return c; }; // never reuses a code, even after a sync merge
   C.initial = c => App.letterOf(c.name);
   // phone → international digits for wa.me (0xx… → country code + xx…)
   C.intl = p => { let d = digits(p); const dial = App.db.settings.dial || ''; if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0') && dial) d = dial + d.slice(1); return d; };
@@ -58,7 +58,7 @@
     const c = C.get(id); if (!c) return; const wa = C.intl(c.phone);
     const rows = [['Code', c.code], ['Type', c.type], ['Téléphone', c.phone], ['Courriel', c.email], ['Adresse', c.address], ['Depuis le', App.fmtDate(c.created)], ...App.cf.show('clients', c.fields), ['Note', c.note]].filter(r => r[1]);
     const sh = ui.sheet({ title: c.name, wide: true, html: '<div class="tools">' + (c.phone ? '<a class="btn ghost" href="tel:' + esc(digits(c.phone)) + '">📞 Appeler</a><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">💬 WhatsApp</a><button class="btn ghost" data-copy>📋 Copier</button>' : '') + '</div><dl class="kv">' + rows.map(r => '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>').join('') + '</dl>' + C.extras.map(fn => fn(c) || '').join(''),
-      actions: [{ label: 'Supprimer', cls: 'danger', fn: async s => { if (await ui.confirm('Supprimer ' + c.name + ' ?', 'Supprimer', true)) { s.close(); C.remove([c.id]); } return false; } }, { label: 'Modifier', cls: 'primary', fn: () => { setTimeout(() => C.form(c.id), 200); } }] });
+      actions: [...(App.can('delete') ? [{ label: 'Supprimer', cls: 'danger', fn: async s => { if (await ui.confirm('Supprimer ' + c.name + ' ?', 'Supprimer', true)) { s.close(); C.remove([c.id]); } return false; } }] : []), { label: 'Modifier', cls: 'primary', fn: () => { setTimeout(() => C.form(c.id), 200); } }] });
     const cp = sh.q('[data-copy]'); if (cp) cp.onclick = () => { (navigator.clipboard ? navigator.clipboard.writeText(c.name + ' ' + c.phone) : Promise.reject()).then(() => App.toast('Copié'), () => App.toast('Copie impossible', 'err')); };
   };
 

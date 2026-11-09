@@ -21,7 +21,7 @@
 
   // ---------- period report (tab « Rapports » of the Argent screen) ----------
   F.tabs.rep = {
-    label: 'Rapports',
+    label: 'Rapports', perm: 'reports',
     render(tab, el) {
       const r = F.range(F.state.r), c = R.compute(r), p = R.compute(F.prevRange(r)), gp = F.state.r === 'month' ? R.goalPct(c.revenue) : null;
       const daily = F.perDay(r, days => c.inv.forEach(i => { const d = days.find(x => x.d === i.date); if (d) d.v += A.main(i, i.total); }));

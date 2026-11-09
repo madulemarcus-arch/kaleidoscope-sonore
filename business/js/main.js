@@ -6,18 +6,18 @@
     home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases'], 3], money: ['Argent', '💰', null, 5],
     services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7],
     interventions: ['Interventions', '🧰', 'interventions', 7], contracts: ['Contrats', '📄', 'contracts', 7], purchases: ['Achats', '🛒', 'purchases', 7],
-    cash: ['Caisse', '🏧', 'cash', 5], team: ['Équipe', '🧑‍💼', 'team', 6], settings: ['Réglages', '⚙️', null, 1]
+    cash: ['Caisse', '🏧', 'cash', 5], team: ['Équipe', '🧑‍💼', 'team', 6], data: ['Données et sécurité', '💾', null, 6], settings: ['Réglages', '⚙️', null, 1]
   };
   App.screens = SCREENS;
   const label = id => id === 'clients' ? App.cap(App.vocab('client', true)) : id === 'subs' ? App.cap(App.vocab('sub', true)) : SCREENS[id][0];
-  const enabled = id => !SCREENS[id][2] || [].concat(SCREENS[id][2]).some(App.mod);
+  const enabled = id => (!SCREENS[id][2] || [].concat(SCREENS[id][2]).some(App.mod)) && (!App.canView || App.canView(id));
   App.quick = [ // quick-create entries (+ button); other modules push theirs
     { label: () => 'Nouveau ' + App.vocab('client'), mod: null, to: 'clients' }, { label: () => 'Nouvelle facture', mod: 'sales', to: 'sales' },
     { label: () => 'Nouveau ' + App.vocab('product'), mod: 'stock', to: 'stock' }, { label: () => 'Nouvelle dépense', mod: null, to: 'money' }
   ];
 
   // ---------- routing ----------
-  let cur = 'home';
+  let cur = 'home'; App.current = () => cur;
   App.go = (id, params) => { if (id !== 'more' && (!SCREENS[id] || !enabled(id))) id = 'home'; const h = '#/' + id; if (location.hash === h) { cur = id; App.render(params); } else { App.params = params; location.hash = h; } };
   const fromHash = () => { const m = location.hash.match(/^#\/(\w+)/); return m ? m[1] : 'home'; };
   window.addEventListener('hashchange', () => { cur = fromHash(); App.render(App.params); App.params = null; });
@@ -29,12 +29,14 @@
     App.$('#tabs').innerHTML = t.map(id => navBtn(id, id === cur || (id === 'more' && (cur === 'more' || moreOn)))).join('');
     App.$('#side').innerHTML = '<div class="brand">' + (App.set().logo ? '<img alt="" src="' + App.set().logo + '">' : '<b>CB</b>') + '<span>' + esc(App.set().name || 'CISPOLstore Business') + '</span></div>' + Object.keys(SCREENS).filter(enabled).filter(id => id !== 'settings').map(id => navBtn(id, id === cur)).join('') + '<div class="grow"></div>' + navBtn('settings', cur === 'settings');
     const r = App.set().rate;
-    App.$('#top').innerHTML = '<h1 id="ttl"></h1><button class="chip" id="ratechip" aria-label="Modifier le taux de change">1 ' + esc(App.set().currency) + ' = ' + esc(String(r).replace(/\B(?=(\d{3})+$)/g, ' ')) + ' ' + esc(App.set().cur2) + '</button><button class="icon" data-go="settings" aria-label="Réglages">⚙️</button>';
+    App.$('#top').innerHTML = '<h1 id="ttl"></h1><button class="chip" id="ratechip" aria-label="Modifier le taux de change">1 ' + esc(App.set().currency) + ' = ' + esc(String(r).replace(/\B(?=(\d{3})+$)/g, ' ')) + ' ' + esc(App.set().cur2) + '</button>' + (App.syncConfigured && App.syncConfigured() ? '<button class="icon" id="syncbtn" aria-label="Synchroniser">' + App.sync.icon() + '</button>' : '') + (App.db.users.length ? '<button class="icon" id="lockbtn" aria-label="Verrouiller">🔒</button>' : '') + (App.canView('settings') ? '<button class="icon" data-go="settings" aria-label="Réglages">⚙️</button>' : '');
+    const sb = App.$('#syncbtn'); if (sb) sb.onclick = async () => { App.toast('Synchronisation…'); App.toast(await App.sync.now()); }; const lb = App.$('#lockbtn'); if (lb) lb.onclick = () => App.roles.lock();
     App.$('#ratechip').onclick = ui.rateSheet;
   };
 
   App.render = params => {
     if (!App.set().setup) { if (!App.$('.wizard')) App.wizard(); }
+    if (App.roles && App.roles.isLocked()) { App.$('#view').innerHTML = ''; return; } // nothing visible behind the lock screen
     drawNav();
     const id = cur === 'more' ? 'more' : (enabled(cur) ? cur : 'home'), v = App.views[id] || stub(id), el = App.$('#view');
     App.$('#ttl').textContent = id === 'more' ? 'Plus' : id === 'home' ? (App.set().name || 'Accueil') : (v.title || label(id));
@@ -61,7 +63,8 @@
     if (!s.legal.some(l => l.v)) t.push(['Compléter les infos légales (RCCM, impôt…)', 'settings']);
     if (!s.logo) t.push(['Ajouter le logo de l\'entreprise', 'settings']);
     if (App.mod('sales') && App.sales && App.sales.unpaidList().length) t.push([App.sales.unpaidList().length + ' facture(s) impayée(s) : ' + App.money.main(App.sales.unpaidTotal()), 'sales', { tab: 'unpaid' }]);
-    if (!s.lastBackup) t.push(['Faire une première sauvegarde', 'settings']);
+    if (!s.lastBackup || Date.now() - s.lastBackup > 7 * 864e5) t.push([s.lastBackup ? 'Sauvegarde ancienne (plus de 7 jours)' : 'Faire une première sauvegarde', 'data']);
+    if (!App.db.users.length && App.can('settings')) t.push(['Protéger l\'application avec un PIN', 'data']);
     return t;
   };
   App.views.home = {

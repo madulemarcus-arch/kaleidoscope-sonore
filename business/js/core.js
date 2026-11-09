@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v5', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v6', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -52,7 +52,7 @@
       modes: ['Espèces', 'Mobile money', 'Banque', 'Autre'],
       msgs: { remind: 'Bonjour {nom},\nSauf erreur de notre part, la facture {numero} de {montant} (reste {reste}) est impayée depuis {jours} jour(s).\nMerci de régler dès que possible.\n{entreprise}', receipt: 'Bonjour {nom},\nNous avons bien reçu votre paiement de {montant}{facture} le {date}. Merci !\n{entreprise}' }, // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: []
   });
 
   // ---------- store ----------
@@ -100,7 +100,10 @@
   App.mod = id => !!App.db.settings.modules[id];
   App.vocab = (k, plural) => { const w = (App.db.settings.vocab[k] || k); return plural ? (/[sx]$/.test(w) ? w : w + 's') : w; };
   App.cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-  App.log = (action, detail) => { const l = App.db.log; l.push({ t: Date.now(), a: action, d: detail || '' }); if (l.length > 500) l.splice(0, l.length - 500); };
+  App.log = (action, detail) => { const l = App.db.log; l.push({ t: Date.now(), a: action, d: detail || '', u: App.user ? App.user.name : '' }); if (l.length > 500) l.splice(0, l.length - 500); };
 
-  App.ready = App.load();
+  // permissions: no profile created yet = single owner = everything allowed (roles.js narrows this once users exist)
+  App.can = () => true; App.canView = () => true;
+  // ready = data loaded AND every script parsed (modules register views/hooks while loading)
+  App.ready = Promise.all([App.load(), new Promise(r => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', r) : r())]);
 })();

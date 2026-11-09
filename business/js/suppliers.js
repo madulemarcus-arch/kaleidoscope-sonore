@@ -3,13 +3,13 @@
   const App = window.App, ui = App.ui, esc = App.esc, M = App.money, S = App.stock, C = App.clients, norm = C.norm, db = () => App.db;
   const P = App.suppliers = {};
   P.get = id => db().suppliers.find(s => s.id === id);
-  P.nextCode = () => { const q = App.db.settings.seq; q.supplier = (q.supplier || 0) + 1; return 'FO-' + String(q.supplier).padStart(4, '0'); };
+  P.nextCode = () => { const q = App.db.settings.seq; let c; do { q.supplier = (q.supplier || 0) + 1; c = 'FO-' + String(q.supplier).padStart(4, '0'); } while (db().suppliers.some(x => x.code === c)); return c; };
   P.extras = []; // other modules add (supplier) => html
   P.form = (id, done) => {
     const s = id ? P.get(id) : null;
     ui.sheet({ title: s ? 'Modifier — ' + s.name : 'Nouveau fournisseur', wide: true,
       html: ui.field('Nom *', ui.input('name', s && s.name)) + '<div class="row2">' + ui.field('Contact', ui.input('contact', s && s.contact)) + ui.field('Téléphone', ui.input('phone', s && s.phone, { tel: 1 })) + '</div><div class="row2">' + ui.field('Courriel', ui.input('email', s && s.email, { type: 'email' })) + ui.field('Adresse', ui.input('address', s && s.address)) + '</div>' + ui.field('Note', '<textarea name="note" rows="2">' + esc(s ? s.note : '') + '</textarea>'),
-      actions: [...(s ? [{ label: 'Supprimer', cls: 'danger', fn: async sh => { const used = db().products.some(p => p.supplierId === s.id) || db().movements.some(m => m.supplierId === s.id) || db().orders.some(o => o.supplierId === s.id); if (used) { App.toast('Ce fournisseur a un historique : suppression impossible', 'err'); return false; } if (await ui.confirm('Supprimer ' + s.name + ' ?', 'Supprimer', true)) { db().suppliers = db().suppliers.filter(x => x.id !== s.id); App.save(); sh.close(); done ? done() : App.render(); } return false; } }] : []),
+      actions: [...(s && App.can('delete') ? [{ label: 'Supprimer', cls: 'danger', fn: async sh => { const used = db().products.some(p => p.supplierId === s.id) || db().movements.some(m => m.supplierId === s.id) || db().orders.some(o => o.supplierId === s.id); if (used) { App.toast('Ce fournisseur a un historique : suppression impossible', 'err'); return false; } if (await ui.confirm('Supprimer ' + s.name + ' ?', 'Supprimer', true)) { db().suppliers = db().suppliers.filter(x => x.id !== s.id); App.save(); sh.close(); done ? done() : App.render(); } return false; } }] : []),
         { label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', cls: 'primary', fn: sh => {
           const f = ui.read(sh.body); if (!f.name) { App.toast('Le nom est obligatoire', 'err'); return false; }
           if (s) Object.assign(s, f); else db().suppliers.push({ id: App.uid(), code: P.nextCode(), created: App.today(), ...f });
