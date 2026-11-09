@@ -78,6 +78,8 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px s
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; } .stats b { display: block; font-size: 1.15rem; } .stats small { color: var(--mut); } .stats .bad b { color: var(--bad); }
 .warnbox { background: color-mix(in srgb, #e9a400 16%, var(--card)); border-radius: 12px; padding: 10px 12px; font-size: .9rem; }
 .item .end { text-align: right; display: grid; gap: 2px; justify-items: end; }
+.rbar { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 4px 0; font-size: .85rem; } .rbar i { grid-column: 1 / -1; grid-row: 2; height: 6px; border-radius: 3px; background: var(--pri); } .rbar b { grid-column: 2; grid-row: 1; }
+.goalbar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.25); overflow: hidden; margin-top: 6px; } .goalbar i { display: block; height: 100%; background: #9be7b3; }
 /* lists: swipe actions, A–Z index, selection */
 .list { display: grid; gap: 0; background: var(--card); border-radius: 14px; box-shadow: var(--sh); overflow: hidden; }
 .swr { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); } .swr:last-child { border-bottom: 0; }

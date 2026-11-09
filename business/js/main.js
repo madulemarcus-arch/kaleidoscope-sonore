@@ -13,7 +13,7 @@
   const enabled = id => !SCREENS[id][2] || [].concat(SCREENS[id][2]).some(App.mod);
   App.quick = [ // quick-create entries (+ button); other modules push theirs
     { label: () => 'Nouveau ' + App.vocab('client'), mod: null, to: 'clients' }, { label: () => 'Nouvelle facture', mod: 'sales', to: 'sales' },
-    { label: () => 'Nouveau ' + App.vocab('product'), mod: 'stock', to: 'stock' }, { label: () => 'Nouvelle dépense', mod: 'cash', to: 'money' }
+    { label: () => 'Nouveau ' + App.vocab('product'), mod: 'stock', to: 'stock' }, { label: () => 'Nouvelle dépense', mod: null, to: 'money' }
   ];
 
   // ---------- routing ----------
@@ -71,7 +71,7 @@
       const start = [[App.cap(App.vocab('client')) + ' ajouté', App.db.clients.length > 0, 'clients'], ['Logo importé', !!s.logo, 'settings'], ['Infos légales remplies', s.legal.some(l => l.v), 'settings']];
       if (App.mod('stock')) start.push([App.cap(App.vocab('product')) + ' ajouté', App.db.products.length > 0, 'stock']);
       const done = start.filter(x => x[1]).length, td = todo();
-      el.innerHTML = '<div class="page home"><section class="hero"><small>Chiffre d\'affaires du mois</small><div class="amt">' + M.main(cm) + '</div><div class="sub">≈ ' + M.second(cm) + (diff == null ? '' : ' · <b class="' + (diff >= 0 ? 'up' : 'down') + '">' + (diff >= 0 ? '▲ +' : '▼ ') + diff + ' %</b> vs mois précédent') + '</div></section>' +
+      el.innerHTML = '<div class="page home"><section class="hero"><small>Chiffre d\'affaires du mois</small><div class="amt">' + M.main(cm) + '</div><div class="sub">≈ ' + M.second(cm) + (diff == null ? '' : ' · <b class="' + (diff >= 0 ? 'up' : 'down') + '">' + (diff >= 0 ? '▲ +' : '▼ ') + diff + ' %</b> vs mois précédent') + '</div>' + (s.goal > 0 ? '<div class="goalbar"><i style="width:' + Math.min(100, Math.round(cm / s.goal * 100)) + '%"></i></div><div class="sub">Objectif ' + M.main(s.goal) + ' · ' + Math.round(cm / s.goal * 100) + ' %</div>' : '') + '</section>' +
         '<section class="tiles">' + tiles + '</section>' +
         (done < start.length ? '<section class="card"><h3>Bien démarrer <small>' + done + '/' + start.length + '</small></h3><ul class="check">' + start.map(x => '<li class="' + (x[1] ? 'ok' : '') + '"><button data-go="' + x[2] + '">' + (x[1] ? '✔' : '○') + ' ' + esc(x[0]) + '</button></li>').join('') + '</ul></section>' : '') +
         (td.length ? '<section class="card"><h3>À faire</h3><ul class="check">' + td.map(x => '<li><button data-go="' + x[1] + '"' + (x[2] ? ' data-tab="' + x[2].tab + '"' : '') + '>⚠ ' + esc(x[0]) + '</button></li>').join('') + '</ul></section>' : '') + '</div>';

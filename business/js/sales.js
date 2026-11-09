@@ -62,7 +62,7 @@
       const { f, lines, calc } = vals(), ok = lines.filter(l => l.qty > 0 && (l.desc || l.pid)); if (!ok.length) { App.toast('Ajoutez au moins une ligne', 'err'); return false; }
       if (!(f.rate > 0)) { App.toast('Taux invalide', 'err'); return false; }
       if (!old && !sh._ok) { const short = ok.filter(l => { const p = l.pid && S.get(l.pid); return p && S.tracked(p) && p.qty < l.qty; }); if (short.length) { App.toast('Stock insuffisant : ' + short.map(l => l.desc).join(', ') + '. Appuyez encore pour continuer.', 'err'); sh._ok = true; return false; } }
-      const rec = { clientId: f.clientId, clientName: f.clientId ? '' : 'Client de passage', date: f.date, currency: f.currency, rate: f.rate, lines: ok, disc: { type: f.dtype, value: f.dval || 0 }, sub: calc.sub, discAmt: calc.disc, total: calc.total, note: f.note, fields: App.cf.read('invoices', box) };
+      const rec = { clientId: f.clientId, clientName: f.clientId ? '' : 'Client de passage', date: f.date, currency: f.currency, rate: f.rate, lines: ok.map(l => { const pr = l.pid && S.get(l.pid); return { ...l, cost: pr ? +pr.cost || 0 : +l.cost || 0 }; }), disc: { type: f.dtype, value: f.dval || 0 }, sub: calc.sub, discAmt: calc.disc, total: calc.total, note: f.note, fields: App.cf.read('invoices', box) };
       let inv;
       if (old) { undoStock(old, 'Modification'); Object.assign(old, rec); inv = old; applyStock(inv); App.log('invoice.edit', inv.number); }
       else { inv = { id: App.uid(), number: A.nextNo('FAC', 'invoice', () => db().invoices), kind: 'sale', ...rec }; db().invoices.push(inv); applyStock(inv); if (o.fromQuote) { o.fromQuote.status = 'invoiced'; o.fromQuote.invoiceId = inv.id; }
@@ -75,7 +75,7 @@
 
   // ---------- payments ----------
   A.addPayment = (inv, p, quiet) => {
-    const rec = { id: App.uid(), invoiceId: inv.id, clientId: inv.clientId, date: p.date || App.today(), amount: p.amount, currency: p.currency || inv.currency, rate: p.rate || (p.currency && p.currency !== inv.currency ? db().settings.rate : inv.rate), mode: p.mode || db().settings.modes[0], note: p.note || '', no: A.nextNo('REC', 'receipt', () => db().payments.map(x => ({ number: x.no }))) };
+    const rec = { id: App.uid(), invoiceId: inv.id, clientId: inv.clientId, date: p.date || App.today(), amount: p.amount, currency: p.currency || inv.currency, rate: p.rate || (p.currency && p.currency !== inv.currency ? db().settings.rate : inv.rate), mode: p.mode || db().settings.modes[0], at: Date.now(), note: p.note || '', no: A.nextNo('REC', 'receipt', () => db().payments.map(x => ({ number: x.no }))) };
     db().payments.push(rec); App.log('payment.add', inv.number + ' ' + rec.amount + ' ' + rec.currency); if (!quiet) App.save(); return rec;
   };
   A.payForm = (id) => {
