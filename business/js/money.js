@@ -33,11 +33,12 @@
 
   // ----- French number to words -----
   const U = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
-  const T = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante'];
+  const T = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'septante', 'quatre-vingt', 'nonante'];
+  // Belgian / Congolese forms by default (septante 70, nonante 90, quatre-vingts 80); settings.words = 'fr' gives soixante-dix / quatre-vingt-dix
   const below100 = (n, final) => {
     if (n < 20) return U[n];
-    const t = Math.floor(n / 10), u = n % 10;
-    if (t === 7 || t === 9) { const b = t === 7 ? 'soixante' : 'quatre-vingt', r = 10 + u; return b + (t === 7 && r === 11 ? ' et ' : '-') + U[r]; }
+    const t = Math.floor(n / 10), u = n % 10, fr = App.db.settings.words === 'fr';
+    if (fr && (t === 7 || t === 9)) { const b = t === 7 ? 'soixante' : 'quatre-vingt', r = 10 + u; return b + (t === 7 && r === 11 ? ' et ' : '-') + U[r]; }
     if (t === 8) return u ? 'quatre-vingt-' + U[u] : 'quatre-vingt' + (final ? 's' : '');
     return T[t] + (u === 1 ? ' et un' : u ? '-' + U[u] : '');
   };

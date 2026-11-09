@@ -46,7 +46,7 @@
       modules: Object.fromEntries(App.MODULES.map(m => [m[0], App.PRESETS.general.modules.includes(m[0])])),
       vocab: { ...App.PRESETS.general.vocab },
       fields: { clients: [], products: [], invoices: [] }, // custom fields: {id,label,type,options}
-      theme: 'auto', dial: '243', clientTypes: ['Particulier', 'Entreprise'], seq: { client: 0, product: 0, supplier: 0 } // dial = country code for WhatsApp links
+      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], seq: { client: 0, product: 0, supplier: 0 } // dial = country code for WhatsApp links
     },
     clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null
   });

@@ -2,8 +2,9 @@ const { check, launch, setup } = require('./helper');
 (async () => {
   const t = await launch(), p = t.page; await setup(p);
   const w = await p.evaluate(() => [0, 1, 21, 71, 80, 81, 91, 100, 200, 1000, 1001, 2000, 80000, 1e6, 2e6, 1234567].map(n => App.money.words(n)));
-  const exp = ['zéro', 'un', 'vingt et un', 'soixante et onze', 'quatre-vingts', 'quatre-vingt-un', 'quatre-vingt-onze', 'cent', 'deux cents', 'mille', 'mille un', 'deux mille', 'quatre-vingt mille', 'un million', 'deux millions', 'un million deux cent trente-quatre mille cinq cent soixante-sept'];
+  const exp = ['zéro', 'un', 'vingt et un', 'septante et un', 'quatre-vingts', 'quatre-vingt-un', 'nonante et un', 'cent', 'deux cents', 'mille', 'mille un', 'deux mille', 'quatre-vingt mille', 'un million', 'deux millions', 'un million deux cent trente-quatre mille cinq cent soixante-sept'];
   exp.forEach((e, i) => check('en lettres : ' + e, w[i] === e, w[i]));
+  check('formes françaises en option', await p.evaluate(() => { App.db.settings.words = 'fr'; const r = App.money.words(71) === 'soixante et onze' && App.money.words(90) === 'quatre-vingt-dix'; App.db.settings.words = 'be'; return r; }));
   const iw = await p.evaluate(() => [App.money.inWords(120.5, 'USD'), App.money.inWords(1, 'USD'), App.money.inWords(2800, 'CDF'), App.money.inWords(1e6, 'CDF')]);
   check('montant en lettres USD', iw[0] === 'Cent vingt dollars américains et cinquante cents', iw[0]); check('un dollar', iw[1] === 'Un dollar américain', iw[1]);
   check('montant en lettres CDF', iw[2] === 'Deux mille huit cents francs congolais', iw[2]); check('million de', iw[3] === 'Un million de francs congolais', iw[3]);
