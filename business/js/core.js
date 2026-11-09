@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { BUILD: 'business-v1', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { BUILD: 'business-v2', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -46,9 +46,9 @@
       modules: Object.fromEntries(App.MODULES.map(m => [m[0], App.PRESETS.general.modules.includes(m[0])])),
       vocab: { ...App.PRESETS.general.vocab },
       fields: { clients: [], products: [], invoices: [] }, // custom fields: {id,label,type,options}
-      theme: 'auto'
+      theme: 'auto', dial: '243', clientTypes: ['Particulier', 'Entreprise'], seq: { client: 0, product: 0, supplier: 0 } // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null
   });
 
   // ---------- store ----------
