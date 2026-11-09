@@ -3,14 +3,14 @@
   const App = window.App, ui = App.ui, esc = App.esc, M = App.money;
   // id → [label, icon, module needed (null = always), step of the roadmap that delivers the screen]
   const SCREENS = {
-    home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], money: ['Argent', '💰', null, 5],
+    home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases'], 3], money: ['Argent', '💰', null, 5],
     services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7],
     interventions: ['Interventions', '🧰', 'interventions', 7], contracts: ['Contrats', '📄', 'contracts', 7], purchases: ['Achats', '🛒', 'purchases', 7],
     cash: ['Caisse', '🏧', 'cash', 5], team: ['Équipe', '🧑‍💼', 'team', 6], settings: ['Réglages', '⚙️', null, 1]
   };
   App.screens = SCREENS;
   const label = id => id === 'clients' ? App.cap(App.vocab('client', true)) : id === 'subs' ? App.cap(App.vocab('sub', true)) : SCREENS[id][0];
-  const enabled = id => !SCREENS[id][2] || App.mod(SCREENS[id][2]);
+  const enabled = id => !SCREENS[id][2] || [].concat(SCREENS[id][2]).some(App.mod);
   App.quick = [ // quick-create entries (+ button); other modules push theirs
     { label: () => 'Nouveau ' + App.vocab('client'), mod: null, to: 'clients' }, { label: () => 'Nouvelle facture', mod: 'sales', to: 'sales' },
     { label: () => 'Nouveau ' + App.vocab('product'), mod: 'stock', to: 'stock' }, { label: () => 'Nouvelle dépense', mod: 'cash', to: 'money' }

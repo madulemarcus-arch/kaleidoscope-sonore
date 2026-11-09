@@ -74,6 +74,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px s
   .page { padding: 24px; } .sheet-wrap { align-items: center; } .sheet { border-radius: 18px; } #toasts { bottom: 20px; }
   .tiles { grid-template-columns: repeat(4, 1fr); } .grid { grid-template-columns: repeat(4, 1fr); }
 }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: .8rem; font-weight: 600; background: var(--line); } .pill.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); } .pill.warn { background: color-mix(in srgb, #e9a400 22%, transparent); color: #a86f00; } .pill.bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; } .stats b { display: block; font-size: 1.15rem; } .stats small { color: var(--mut); } .stats .bad b { color: var(--bad); }
+.warnbox { background: color-mix(in srgb, #e9a400 16%, var(--card)); border-radius: 12px; padding: 10px 12px; font-size: .9rem; }
+.item .end { text-align: right; display: grid; gap: 2px; justify-items: end; }
 /* lists: swipe actions, A–Z index, selection */
 .list { display: grid; gap: 0; background: var(--card); border-radius: 14px; box-shadow: var(--sh); overflow: hidden; }
 .swr { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); } .swr:last-child { border-bottom: 0; }

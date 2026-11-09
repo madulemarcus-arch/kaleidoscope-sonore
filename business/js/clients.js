@@ -24,7 +24,7 @@
     const n = norm(q), d = digits(q), has = (...xs) => xs.some(x => norm(x).includes(n)), r = { clients: [], products: [], suppliers: [], invoices: [] };
     if (!n) return r;
     r.clients = db().filter(c => has(c.name, c.code, c.email, c.address, c.note, ...Object.values(c.fields || {})) || (/^[\d\s+().-]+$/.test(q) && d.length > 2 && digits(c.phone).includes(d)));
-    r.products = App.db.products.filter(p => has(p.name, p.code, p.sku, p.category));
+    r.products = App.db.products.filter(p => has(p.name, p.code, p.ref, p.cat));
     r.suppliers = App.db.suppliers.filter(s => has(s.name, s.phone, s.contact));
     r.invoices = App.db.invoices.filter(i => has(i.number, i.clientName, i.ref));
     return r;
