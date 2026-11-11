@@ -27,7 +27,7 @@
     return { el, az, dir: [Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)] }; };
 
   A.buildMesh = doc => {
-    const base = [], solid = [], glass = [], st = { boxes: 0, panes: 0, walls: 0, furn: 0, roof: 'none' };
+    const base = [], solid = [], glass = [], st = { boxes: 0, panes: 0, walls: 0, furn: 0, cols: 0, beams: 0, roof: 'none' };
     const tri = (out, p, n, c) => p.forEach(q => out.push(q[0], q[1], q[2], n[0], n[1], n[2], c[0], c[1], c[2], c[3]));
     const quad = (out, p, n, c) => tri(out, [p[0], p[1], p[2], p[0], p[2], p[3]], n, c);
     // Polygon with a computed normal: pointing up (slopes) or away from `away` (gables).
@@ -48,6 +48,9 @@
         panes.forEach(p => { st.panes++; const P = (s, y) => [w.a[0] + g.u[0] * (p.s0 + s * (p.s1 - p.s0)), y, -(w.a[1] + g.u[1] * (p.s0 + s * (p.s1 - p.s0)))]; quad(glass, [P(0, p.y0), P(1, p.y0), P(1, p.y1), P(0, p.y1)], [g.n[0], 0, -g.n[1]], GLASS); }); });
       doc.items.filter(i => i.t === 'furn' && A.shown(i)).forEach(f => { st.furn++; const a = (f.rot || 0) * Math.PI / 180, u = [Math.cos(a), Math.sin(a)], k = A.FURN[f.kind] || A.FURN.table;
         box(solid, f.p, u, [-u[1], u[0]], -f.w / 2, f.w / 2, -f.d / 2, f.d / 2, 0, f.h, rgba(k[4])); });
+      if (r.structure) { const Hs = walls.length ? Math.max(...walls.map(w => w.h)) : doc.defaults.h, sz = A.struct.sizes(), concrete = [0.62, 0.62, 0.64, 1];
+        A.struct.columns().forEach(c => { const a = sz.col[c.id] || c.a; st.cols++; box(solid, c.p, [1, 0], [0, 1], -a / 2 - 0.004, a / 2 + 0.004, -a / 2 - 0.004, a / 2 + 0.004, 0, Hs + 0.006, concrete); });
+        A.struct.beams().forEach(b => { const s = sz.beam[b.k] || { b: 0.2, h: 0.3 }, u = A.unit(b.ca.p, b.cb.p); st.beams++; box(solid, b.ca.p, u, A.normal(u), 0, b.L, -s.b / 2 - 0.004, s.b / 2 + 0.004, Hs - s.h, Hs + 0.003, concrete); }); }
       if (wb) { const H = Math.max(...walls.map(w => w.h)), o = r.over, tn = Math.tan(r.slope * Math.PI / 180), fl = rgba((A.FLOORS[r.floorMat] || A.FLOORS.carrelage)[1]), rc = rgba((A.ROOFMATS[r.roofMat] || A.ROOFMATS.tuile)[1]), wc = rgba(wallMat[1]);
         box(base, [wb.x0, wb.y0], [1, 0], [0, 1], 0, wb.x1 - wb.x0, 0, wb.y1 - wb.y0, -0.1, 0, fl);
         box(base, [wb.x0 - 12, wb.y0 - 12], [1, 0], [0, 1], 0, wb.x1 - wb.x0 + 24, 0, wb.y1 - wb.y0 + 24, -0.6, -0.01, rgba(GRASS));

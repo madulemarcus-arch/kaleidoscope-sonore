@@ -1,7 +1,7 @@
 // Core: document model, geometry helpers, hit testing, undo/redo, autosave.
 // All coordinates are in metres, x to the right, y UP (screen conversion happens in draw.js).
 (function () {
-  const A = window.App = { BUILD: 'archi-v3', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
+  const A = window.App = { BUILD: 'archi-v4', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
   const L = (id, name, color) => ({ id, name, color, on: true, lock: false });
   A.uid = () => Math.random().toString(36).slice(2, 9);
   A.newDoc = () => A.ensureDoc({ v: 1, name: 'Sans titre', active: 'mur', defaults: { th: 0.2, h: 2.8 },
@@ -10,10 +10,14 @@
   A.FURN = { lit: ['Lit', 1.6, 2.0, 0.5, [0.55, 0.65, 0.85]], table: ['Table', 1.4, 0.8, 0.75, [0.62, 0.45, 0.28]], chaise: ['Chaise', 0.45, 0.45, 0.9, [0.62, 0.45, 0.28]], canape: ['Canapé', 2.0, 0.9, 0.85, [0.45, 0.50, 0.58]],
     armoire: ['Armoire', 1.2, 0.6, 2.0, [0.55, 0.40, 0.25]], bureau: ['Bureau', 1.4, 0.7, 0.75, [0.70, 0.58, 0.40]], cuisine: ['Plan de cuisine', 2.4, 0.6, 0.9, [0.85, 0.85, 0.82]], lavabo: ['Lavabo', 0.6, 0.5, 0.85, [0.95, 0.95, 0.95]],
     wc: ['WC', 0.4, 0.7, 0.4, [0.95, 0.95, 0.95]], douche: ['Douche', 0.9, 0.9, 0.1, [0.80, 0.90, 0.95]], baignoire: ['Baignoire', 1.7, 0.75, 0.55, [0.95, 0.95, 0.95]] };
+  // BAEL 91 (rev. 99) pre-sizing parameters. Stresses in MPa, loads in kN/m2 (kN/m for walls per m2 of wall).
+  A.STRUCT_DEFAULTS = { fc28: 25, fe: 500, sigSol: 0.2, nlev: 1, top: 'dalle', G2: 2.0, Q: 1.5, G2top: 1.5, Qtop: 1.0, Groof: 1.0, Qroof: 0.5, wallLoad: 2.8, maxSpan: 4.5 };
   // Fills in everything a document needs (older plans lack the rendering settings and the furniture layer).
   A.ensureDoc = d => { d.defaults = d.defaults || { th: 0.2, h: 2.8 };
     d.render = Object.assign({ wallMat: 'crepi', floorMat: 'carrelage', roof: 'none', slope: 25, over: 0.4, roofMat: 'tuile', hour: 14, shadows: true }, d.render || {});
     if (!d.layers.some(l => l.id === 'meu')) d.layers.push({ id: 'meu', name: 'Mobilier', color: '#c9a26b', on: true, lock: false });
+    if (!d.layers.some(l => l.id === 'str')) d.layers.push({ id: 'str', name: 'Structure', color: '#ff9f6b', on: true, lock: false });
+    d.struct = d.struct || {}; d.struct.p = Object.assign({}, A.STRUCT_DEFAULTS, d.struct.p || {}); d.render.structure = d.render.structure !== false;
     if (!d.layers.some(l => l.id === d.active)) d.active = d.layers[0].id; return d; };
   let hist = [], fut = [];
   A.on = f => A.listeners.push(f);
@@ -44,7 +48,7 @@
     const u = A.unit(a, b), t = Math.max(0, Math.min(l, (p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]));
     return { d: A.dist(p, [a[0] + u[0] * t, a[1] + u[1] * t]), t };
   };
-  A.endpoints = it => it.t === 'wall' || it.t === 'line' || it.t === 'dim' ? [it.a, it.b] : it.t === 'text' ? [it.p] : [];
+  A.endpoints = it => it.t === 'wall' || it.t === 'line' || it.t === 'dim' || it.t === 'beam' ? [it.a, it.b] : it.t === 'text' || it.t === 'col' ? [it.p] : [];
   // A wall end that touches another wall's end is extended by half a thickness so corners close cleanly.
   A.wallGeom = w => {
     const u = A.unit(w.a, w.b), n = A.normal(u), h = w.th / 2;
@@ -68,6 +72,7 @@
   // Four world corners of a furniture piece (centre p, size w x d, rotation in degrees).
   A.furnPoly = f => { const r = (f.rot || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r), hw = f.w / 2, hd = f.d / 2;
     return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([x, y]) => [f.p[0] + x * c - y * s, f.p[1] + x * s + y * c]); };
+  A.colPoly = c => { const h = c.a / 2; return [[c.p[0] - h, c.p[1] - h], [c.p[0] + h, c.p[1] - h], [c.p[0] + h, c.p[1] + h], [c.p[0] - h, c.p[1] + h]]; };
   A.textBox = t => [t.p[0], t.p[1], t.p[0] + t.s.length * t.size * 0.6, t.p[1] + t.size];
 
   // Topmost item under world point p (openings win over their wall); tol in metres.
@@ -78,7 +83,8 @@
       if (Math.abs(x.t - r.c) <= o.w / 2 + tol * 0.3 && x.d <= r.g.h + tol) return o.id; }
     for (let i = its.length - 1; i >= 0; i--) { const o = its[i];
       if (o.t === 'wall' && A.segDist(p, o.a, o.b).d <= o.th / 2 + tol) return o.id;
-      if (o.t === 'line' && A.segDist(p, o.a, o.b).d <= tol) return o.id;
+      if ((o.t === 'line' || o.t === 'beam') && A.segDist(p, o.a, o.b).d <= tol) return o.id;
+      if (o.t === 'col' && Math.abs(p[0] - o.p[0]) <= o.a / 2 + tol && Math.abs(p[1] - o.p[1]) <= o.a / 2 + tol) return o.id;
       if (o.t === 'dim') { const g = A.dimGeom(o); if (A.segDist(p, g.a2, g.b2).d <= tol) return o.id; }
       if (o.t === 'furn') { const r = -(o.rot || 0) * Math.PI / 180, dx = p[0] - o.p[0], dy = p[1] - o.p[1], lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
         if (Math.abs(lx) <= o.w / 2 + tol && Math.abs(ly) <= o.d / 2 + tol) return o.id; }
@@ -87,7 +93,7 @@
   };
   A.bounds = () => {
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; const add = p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); };
-    A.doc.items.filter(A.shown).forEach(it => { if (it.t === 'wall') A.wallGeom(it).poly.forEach(add); else if (it.t === 'text') { const b = A.textBox(it); add([b[0], b[1]]); add([b[2], b[3]]); } else if (it.t === 'furn') A.furnPoly(it).forEach(add);
+    A.doc.items.filter(A.shown).forEach(it => { if (it.t === 'wall') A.wallGeom(it).poly.forEach(add); else if (it.t === 'text') { const b = A.textBox(it); add([b[0], b[1]]); add([b[2], b[3]]); } else if (it.t === 'furn') A.furnPoly(it).forEach(add); else if (it.t === 'col') A.colPoly(it).forEach(add);
       else if (it.t === 'dim') { const g = A.dimGeom(it); [it.a, it.b, g.a2, g.b2].forEach(add); } else A.endpoints(it).forEach(add); });
     return x1 < x0 ? null : { x0, y0, x1, y1 };
   };

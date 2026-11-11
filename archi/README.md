@@ -1,6 +1,6 @@
 # Archi 2D
 
-Logiciel de dessin de plans d'architecture, web installable (PWA), hors connexion, sans dépendance ni build. Projet en étapes : plan 2D (fait) → vue 3D automatique (fait) → rendu : matériaux, toiture, mobilier, soleil (fait) → dimensionnement (BAEL).
+Logiciel de dessin de plans d'architecture, web installable (PWA), hors connexion, sans dépendance ni build. Projet en étapes : plan 2D (fait) → vue 3D automatique (fait) → rendu : matériaux, toiture, mobilier, soleil (fait) → dimensionnement BAEL (fait).
 
 ## Lancer
 
@@ -17,6 +17,7 @@ Ouvrir `archi/index.html` dans un navigateur récent, ou `python3 -m http.server
 | D / F | Porte / Fenêtre (X : inverser le côté) |
 | C | Cote (3 clics : deux points, puis la ligne de cote) |
 | U | Meuble (choisir le type en haut, cliquer pour poser, X : tourner de 90°) |
+| P / B | Poteau / Poutre dessinée à la main (les poutres sous les murs se déduisent des poteaux) |
 | T | Texte |
 | O / G / S | Orthogonal / Grille / Accrochage aux points (Maj : orthogonal temporaire) |
 | H | Tout voir (en 3D : vue isométrique) |
@@ -43,6 +44,20 @@ Le bouton « 3D » (ou la touche 3) construit le bâtiment à partir du plan : c
 
 Les réglages de rendu sont enregistrés avec le plan (`doc.render`). Les murs d'un plan ancien reçoivent des valeurs par défaut à l'ouverture.
 
+## Dimensionnement BAEL (pré-dimensionnement)
+
+Pour une structure poteaux-poutres-dalles en béton armé avec remplissage en maçonnerie. Le panneau « Structure (BAEL) » (à droite, en 2D) regroupe les données et les boutons.
+
+1. **Poteaux** : « Placer les poteaux automatiquement » les pose aux coins et extrémités des murs et le long des murs longs (portée maximale réglable, 4,5 m par défaut), ou outil Poteau (P).
+2. **Poutres** : déduites des poteaux alignés sur un mur ; poutres supplémentaires avec l'outil Poutre (B) entre deux poteaux.
+3. **Dalles** : chaque rectangle fermé par des poutres est un panneau (les côtés peuvent comporter plusieurs poutres).
+4. **Données** : béton fc28, acier FeE400/500, contrainte admissible du sol, nombre de niveaux, plancher haut (dalle terrasse ou charpente légère), usage (Q), revêtements (G). Maçonnerie : 2,8 kN/m² de mur, réduite des ouvertures.
+5. **Calculer** : le plan se couvre des sections (poteaux, poutres), de l'épaisseur des dalles et des semelles (pointillés). « Appliquer les sections aux poteaux » les reporte dans le modèle et la 3D. « Note de calcul » produit un fichier HTML imprimable (hypothèses, tableaux, remarques).
+
+**Ce que le calcul fait (BAEL 91 révisé 99, ELU et ELS)** : combinaisons 1,35 G + 1,5 Q et G + Q. Dalles : épaisseur minimale (lx/40 ou lx/30, au moins 12 cm) puis vérification en flexion et à l'effort tranchant, moments par l'annexe E3 (ν = 0), armatures de travée et de chapeaux. Poutres : charges équivalentes des dalles (triangle, trapèze), poids propre et maçonnerie, section la plus petite qui passe en flexion simple sans armatures comprimées et au cisaillement, cadres HA6. Poteaux : méthode forfaitaire B.8.4 (élancement, flambement, armatures minimale et maximale), charge majorée de 10 % pour un poteau continu. Semelles isolées carrées : surface selon le sol, hauteur et aciers par la méthode des bielles (maximum ELU et ELS fissuration préjudiciable).
+
+**Limites** : pré-dimensionnement seulement, à vérifier et valider par un ingénieur structure avant toute exécution. Non traités : séisme, vent, poinçonnement, flèche des poutres, poutres continues détaillées (moment de travée forfaitaire 0,85 M0), dégression des charges d'exploitation, semelles filantes et radiers (les chevauchements sont signalés), charpente, escaliers, balcons, sol multicouche. Cadre rectangulaire seulement pour les dalles.
+
 ## Étapes suivantes
 
-1. Pré-dimensionnement BAEL (descente de charges, poutres, poteaux, dalles, fondations), à valider par un ingénieur.
+1. Poutres continues et semelles filantes, descente de charges par niveau détaillée, plans de ferraillage.

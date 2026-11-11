@@ -6,7 +6,7 @@
   // ---------- canvas ----------
   const resize = () => { const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2); const nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
     if (W) { A.view.ox += (nw - W) / 2; A.view.oy += (nh - H) / 2; } W = nw; H = nh; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); A.redraw(); };
-  const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true }); };
+  const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true, struct: A.doc.struct.show !== false }); };
   A.redraw = () => { if (!raf) raf = requestAnimationFrame(paint); };
   A.fitView = () => { A.fit(W, H); A.redraw(); };
   new ResizeObserver(() => { if (A.mode === '3d') A.v3.resize(); else resize(); }).observe($('stage'));
@@ -52,7 +52,8 @@
       <label class="row"><span>Pente (°)</span><input type="number" data-k="slope" min="5" max="60" step="1" value="${r.slope}"></label>
       <label class="row"><span>Débord (m)</span><input type="number" data-k="over" min="0" max="2" step="0.1" value="${r.over}"></label></section>
       <section><h2>Soleil</h2><label class="row"><span>Heure</span><b id="hourTxt">${hh} h ${String(mm).padStart(2, '0')}</b></label><input type="range" data-k="hour" min="6" max="18" step="0.25" value="${r.hour}" aria-label="Heure du soleil">
-      <label class="chk"><input type="checkbox" data-k="shadows"${r.shadows ? ' checked' : ''}> Ombres portées</label></section>`;
+      <label class="chk"><input type="checkbox" data-k="shadows"${r.shadows ? ' checked' : ''}> Ombres portées</label></section>
+      <section><h2>Structure</h2><label class="chk"><input type="checkbox" data-k="structure"${r.structure ? ' checked' : ''}> Poteaux et poutres</label></section>`;
   }
   p3.onchange = e => { const k = e.target.dataset.k; if (!k) return; let v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' || e.target.type === 'range' ? parseFloat(e.target.value) : e.target.value;
     if (typeof v === 'number' && !isFinite(v)) return; if (k === 'slope') v = Math.max(5, Math.min(60, v)); if (k === 'over') v = Math.max(0, Math.min(2, v)); A.edit(d => { d.render[k] = v; }); };
@@ -82,6 +83,32 @@
   }
   $('addLayer').onclick = () => { const n = prompt('Nom du calque :'); if (n && n.trim()) A.edit(d => { const id = 'c' + A.uid(); d.layers.push({ id, name: n.trim(), color: '#9be29b', on: true, lock: false }); d.active = id; }); };
 
+  // ---------- structure panel (BAEL pre-sizing) ----------
+  const sb = $('structBox'), USAGES = { 'Logement': 1.5, 'Bureaux, école, hôpital': 2.5, 'Commerce': 5.0 };
+  function drawStruct() {
+    const p = A.doc.struct.p, r = A.doc.struct.result, o = (list, cur) => list.map(v => `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${v}</option>`).join(''), num = (k, label, step, min, max) => `<label class="row"><span>${label}</span><input type="number" data-s="${k}" step="${step}" min="${min}" max="${max}" value="${p[k]}"></label>`;
+    const usage = Object.keys(USAGES).find(k => USAGES[k] === p.Q);
+    let h = `<label class="row"><span>Béton fc28 (MPa)</span><select data-s="fc28">${o([20, 25, 30, 35], p.fc28)}</select></label><label class="row"><span>Acier HA FeE</span><select data-s="fe">${o([400, 500], p.fe)}</select></label>` +
+      num('sigSol', 'Sol admissible (MPa)', 0.05, 0.05, 1) + num('nlev', 'Niveaux (planchers)', 1, 1, 8) +
+      `<label class="row"><span>Plancher haut</span><select data-s="top"><option value="dalle"${p.top === 'dalle' ? ' selected' : ''}>Dalle terrasse</option><option value="charpente"${p.top === 'charpente' ? ' selected' : ''}>Charpente légère</option></select></label>` +
+      `<label class="row"><span>Usage</span><select data-u="1">${Object.keys(USAGES).map(k => `<option${k === usage ? ' selected' : ''}>${k}</option>`).join('')}${usage ? '' : '<option selected>Personnalisé</option>'}</select></label>` +
+      num('Q', 'Q planchers (kN/m²)', 0.5, 0.5, 10) + num('G2', 'G revêtements (kN/m²)', 0.5, 0, 10) + num('maxSpan', 'Portée max. auto (m)', 0.5, 2, 8) +
+      `<label class="chk"><input type="checkbox" data-s="show"${A.doc.struct.show !== false ? ' checked' : ''}> Afficher les résultats sur le plan</label>` +
+      `<button class="wide" data-act="autocol">Placer les poteaux automatiquement</button><button class="wide" data-act="calc">Calculer</button>`;
+    if (r) { if (r.errors.length) h += `<p class="muted">${esc(r.errors.join(' '))}</p>`; else { const stale = A.struct.stale();
+      h += `<p class="muted">${stale ? '<b>Résultats périmés : le plan a changé, relancez le calcul.</b><br>' : ''}${r.columns.length} poteaux, ${r.beams.length} poutres${r.slab ? ', dalle de ' + Math.round(r.slab.h * 100) + ' cm' : ''}. Charge totale : ${A.fmt(r.totals.Nu, 0)} kN (ELU).</p>` + r.warnings.map(w => `<p class="muted">⚠ ${esc(w)}</p>`).join('') +
+        `<button class="wide" data-act="apply">Appliquer les sections aux poteaux</button><button class="wide" data-act="report">Note de calcul (fichier HTML)</button>`; } }
+    else h += '<p class="muted">Posez des poteaux (touche P) sur les coins et le long des murs, puis lancez le calcul. Pré-dimensionnement BAEL à valider par un ingénieur.</p>';
+    sb.innerHTML = h + '<p class="muted">Pré-dimensionnement automatique (BAEL 91 rév. 99) : à vérifier et valider par un ingénieur structure avant toute exécution.</p>';
+  }
+  sb.onchange = e => { const t = e.target; if (t.dataset.u) { const q = USAGES[t.value]; if (q) A.edit(d => { d.struct.p.Q = q; }); return; } const k = t.dataset.s; if (!k) return;
+    if (k === 'show') { A.edit(d => { d.struct.show = t.checked; }); return; } const v = parseFloat(t.value); if (!isFinite(v)) { A.emit(); return; } A.edit(d => { d.struct.p[k] = k === 'nlev' ? Math.max(1, Math.min(8, Math.round(v))) : v; }); };
+  sb.onclick = e => { const act = e.target.dataset && e.target.dataset.act; if (!act) return;
+    if (act === 'autocol') { const n = A.struct.autoColumns(); if (!n) alert('Aucun nouveau poteau à placer (dessinez d\'abord des murs).'); }
+    else if (act === 'calc') A.struct.run();
+    else if (act === 'apply') { const r = A.doc.struct.result; if (r) A.edit(d => r.columns.forEach(c => { const it = d.items.find(i => i.id === c.id); if (it) it.a = c.a; })); }
+    else if (act === 'report') { const html = A.struct.report(A.doc); if (html) A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-note-de-calcul.html', new Blob([html], { type: 'text/html' })); } };
+
   // ---------- properties panel ----------
   function field(label, value, step, set, min) { const r = document.createElement('label'); r.className = 'row'; r.innerHTML = `<span>${label}</span>`; const i = document.createElement('input'); i.type = 'number'; i.step = step; i.min = min == null ? 0.01 : min; i.value = Math.round(value * 1000) / 1000;
     i.onchange = () => { const v = parseFloat(i.value); if (isFinite(v) && v >= i.min) A.edit(set.bind(null, v)); else A.emit(); }; r.appendChild(i); return r; }
@@ -89,7 +116,7 @@
     const box = $('props'); box.innerHTML = ''; const sel = A.sel.map(A.item).filter(Boolean);
     if (!sel.length) { $('propsTitle').textContent = 'Réglages des murs'; box.appendChild(field('Épaisseur (m)', A.doc.defaults.th, 0.01, (v, d) => { d.defaults.th = v; }));
       box.appendChild(field('Hauteur (m)', A.doc.defaults.h, 0.05, (v, d) => { d.defaults.h = v; })); const m = document.createElement('p'); m.className = 'muted'; m.textContent = 'Valables pour les prochains murs. Sélectionnez un élément pour modifier ses propriétés.'; box.appendChild(m); return; }
-    const names = { wall: 'Mur', line: 'Ligne', door: 'Porte', window: 'Fenêtre', dim: 'Cote', text: 'Texte', furn: 'Meuble' };
+    const names = { wall: 'Mur', line: 'Ligne', door: 'Porte', window: 'Fenêtre', dim: 'Cote', text: 'Texte', furn: 'Meuble', col: 'Poteau', beam: 'Poutre' };
     $('propsTitle').textContent = sel.length > 1 ? sel.length + ' éléments' : names[sel[0].t];
     const each = (fn) => d => sel.forEach(s => fn(d.items.find(i => i.id === s.id)));
     if (sel.length === 1) { const it = sel[0];
@@ -101,7 +128,8 @@
         ks.onchange = () => A.edit(d => { d.items.find(i => i.id === it.id).kind = ks.value; }); r.appendChild(ks); box.appendChild(r);
         [['Largeur (m)', 'w', 0.05, 0.05], ['Profondeur (m)', 'd', 0.05, 0.05], ['Hauteur (m)', 'h', 0.05, 0.02]].forEach(([l, k, st, mn]) => box.appendChild(field(l, it[k], st, (v, d) => { d.items.find(i => i.id === it.id)[k] = v; }, mn)));
         box.appendChild(field('Rotation (°)', it.rot || 0, 5, (v, d) => { d.items.find(i => i.id === it.id).rot = v % 360; }, 0)); }
-      if (it.t === 'line' || it.t === 'dim') { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Longueur : ' + A.fmt(A.dist(it.a, it.b)) + ' m'; box.appendChild(p); }
+      if (it.t === 'col') box.appendChild(field('Section (m)', it.a, 0.05, (v, d) => { d.items.find(i => i.id === it.id).a = v; }));
+      if (it.t === 'line' || it.t === 'dim' || it.t === 'beam') { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Longueur : ' + A.fmt(A.dist(it.a, it.b)) + ' m'; box.appendChild(p); }
       if (A.isOpening(it)) { box.appendChild(field('Largeur (m)', it.w, 0.05, (v, d) => { d.items.find(i => i.id === it.id).w = v; })); box.appendChild(field('Hauteur (m)', it.h, 0.05, (v, d) => { d.items.find(i => i.id === it.id).h = v; }));
         box.appendChild(field('Allège (m)', it.sill, 0.05, (v, d) => { d.items.find(i => i.id === it.id).sill = v; }, 0));
         const r = document.createElement('div'); r.className = 'row btns'; [['flip', 'Inverser le côté'], ['mirror', it.t === 'door' ? 'Charnière' : null]].forEach(([k, t]) => { if (!t) return; const b = document.createElement('button'); b.textContent = t; b.onclick = () => A.edit(d => { const x = d.items.find(i => i.id === it.id); x[k] = !x[k]; }); r.appendChild(b); }); box.appendChild(r); }
@@ -124,7 +152,7 @@
     if (document.activeElement !== $('docName')) $('docName').value = A.doc.name;
     if (!A.doc.layers.some(l => l.id === A.doc.active)) A.doc.active = A.doc.layers[0].id;
     $('furnSel').hidden = A.tool !== 'furn'; if (document.activeElement !== fs) fs.value = A.furnKind;
-    drawLayers(); drawProps(); drawRender(); A.status(); A.redraw();
+    drawLayers(); drawProps(); drawStruct(); drawRender(); A.status(); A.redraw();
   });
 
   // ---------- start ----------
