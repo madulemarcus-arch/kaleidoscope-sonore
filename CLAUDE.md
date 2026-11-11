@@ -48,3 +48,11 @@ Rules:
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 - A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
+
+## CISPOLstore Business (`business/`) : application générale
+
+- Application de gestion générale (tous secteurs), même esprit que `cispolstore/` mais sans rien de Starlink. Tests : `cd tests && node business/run.js` (voir `tests/business/README.md`), workflow `.github/workflows/tests-business.yml`.
+- Mêmes règles : `CACHE` dans `business/sw.js` = `App.BUILD` dans `business/js/core.js` ; tout nouveau fichier `js/` va dans `index.html` ET dans `FILES` de `sw.js` ; ne jamais changer `id` ni `start_url` du manifeste.
+- Étapes : 1 socle (fait) · 2 clients (fait) · 3 stock/fournisseurs (fait) · 4 factures/paiements/impression (fait) · 5 finance/caisse/rapports (fait) · 6 profils/sauvegarde/synchro (fait ; Google Drive optionnel reporté) · 7 modules optionnels (fait).
+- Règle de reprise : on reprend de CISPOLstore Manager les principes utiles à tous les secteurs (abonnements libres, coût reversé à un fournisseur, relances, impayés, clôture, rôles…) ; on laisse seulement ce qui est propre à Starlink (ACC, pénalités, kits, lecteur de courriels, décor).
+- Design (identité reprise de CISPOLstore Manager) : palette marine `#12365d` / orange `#d5522f` / jaune `#e5b044`, police Inter (`business/fonts/`), en-tête en dégradé, menu du bas aux icônes bicolores animées (`js/icons.js`), héros « verre » avec ciel animé, anneau d'objectif et confettis (`js/fx.js`), clavier PIN rond. Les variables de couleur sont dans `:root` de `css/app.css` ; la marque est `icons/logo.svg` (les PNG de l'application en sont générés).

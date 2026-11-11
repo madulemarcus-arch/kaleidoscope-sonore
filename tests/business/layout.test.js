@@ -1,0 +1,20 @@
+const { check, launch, setup } = require('./helper');
+(async () => {
+  const t = await launch(), p = t.page; await setup(p);
+  check('téléphone : menu du bas visible, latéral caché', await p.isVisible('#tabs') && !(await p.isVisible('#side')));
+  check('téléphone : bouton + visible', await p.isVisible('#fab'));
+  await p.click('#fab'); check('feuille « Ajouter » ouverte', await p.isVisible('.sheet') && (await p.textContent('.sheet')).includes('Nouveau client'));
+  await p.keyboard.press('Escape'); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
+  await p.setViewportSize({ width: 1280, height: 800 });
+  check('ordinateur : menu latéral visible, menu du bas caché', await p.isVisible('#side') && !(await p.isVisible('#tabs')));
+  check('ordinateur : pas de défilement horizontal', await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await p.setViewportSize({ width: 360, height: 640 });
+  check('petit téléphone : pas de défilement horizontal', await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await p.goto(process.env.BASE_URL + '/index.html?go=settings'); await p.waitForSelector('html[data-ready="1"]');
+  check('raccourci ?go=settings', (await p.textContent('#ttl')) === 'Réglages');
+  await p.evaluate(() => { const s = App.ui.sheet({ title: 'T', html: App.ui.stepper('q', 1, 0) + App.ui.dateField('d', '2026-01-10') }); });
+  await p.click('.stepper [data-d="1"]'); await p.click('.stepper [data-d="1"]'); await p.click('.stepper [data-d="-1"]');
+  check('boutons − / + des quantités', (await p.inputValue('.stepper input')) === '2');
+  await p.click('[data-dd="-1"]'); check('date rapide « Hier »', (await p.inputValue('.datef input')) === await p.evaluate(() => App.addDays(App.today(), -1)));
+  check('aucune erreur JS', t.errors.length === 0, t.errors.join(' | ')); await t.browser.close();
+})().catch(e => { console.log('FAIL exception → ' + e.message); process.exit(1); });
