@@ -110,6 +110,8 @@
       `<label class="row"><span>Usage</span><select data-u="1">${Object.keys(USAGES).map(k => `<option${k === usage ? ' selected' : ''}>${k}</option>`).join('')}${usage ? '' : '<option selected>Personnalisé</option>'}</select></label>` +
       num('Q', 'Q planchers (kN/m²)', 0.5, 0.5, 10) + num('G2', 'G revêtements (kN/m²)', 0.5, 0, 10) + num('maxSpan', 'Portée max. auto (m)', 0.5, 2, 8) +
       `<label class="chk"><input type="checkbox" data-s="degr"${p.degr !== false ? ' checked' : ''}> Dégression des charges d'exploitation (5 planchers et plus)</label>` +
+      `<label class="chk"><input type="checkbox" data-s="frame"${p.frame !== false ? ' checked' : ''}> Moments des poteaux par analyse de portique</label>` +
+      `<label class="row"><span>Pied de poteau</span><select data-s="base"><option value="pin"${p.base !== 'fix' ? ' selected' : ''}>Articulé (semelle isolée)</option><option value="fix"${p.base === 'fix' ? ' selected' : ''}>Encastré (radier, semelle filante)</option></select></label>` +
       `<label class="chk"><input type="checkbox" data-s="show"${A.doc.struct.show !== false ? ' checked' : ''}> Afficher les résultats sur le plan</label>` +
       `<button class="wide" data-act="autocol">Placer les poteaux automatiquement</button><button class="wide" data-act="calc">Calculer</button>`;
     if (r) { if (r.errors.length) h += `<p class="muted">${esc(r.errors.join(' '))}</p>`; else { const stale = A.struct.stale();
@@ -119,7 +121,7 @@
     sb.innerHTML = h + '<p class="muted">Pré-dimensionnement automatique (BAEL 91 rév. 99) : à vérifier et valider par un ingénieur structure avant toute exécution.</p>';
   }
   sb.onchange = e => { const t = e.target; if (t.dataset.u) { const q = USAGES[t.value]; if (q) A.edit(d => { d.struct.p.Q = q; }); return; } const k = t.dataset.s; if (!k) return;
-    if (k === 'show') { A.edit(d => { d.struct.show = t.checked; }); return; } if (k === 'degr') { A.edit(d => { d.struct.p.degr = t.checked; }); return; } if (k === 'found') { A.edit(d => { d.struct.p.found = t.value; }); return; } const v = parseFloat(t.value); if (!isFinite(v)) { A.emit(); return; } A.edit(d => { d.struct.p[k] = k === 'nlev' ? Math.max(1, Math.min(8, Math.round(v))) : v; }); };
+    if (k === 'show') { A.edit(d => { d.struct.show = t.checked; }); return; } if (k === 'degr') { A.edit(d => { d.struct.p.degr = t.checked; }); return; } if (k === 'frame') { A.edit(d => { d.struct.p.frame = t.checked; }); return; } if (k === 'base') { A.edit(d => { d.struct.p.base = t.value; }); return; } if (k === 'found') { A.edit(d => { d.struct.p.found = t.value; }); return; } const v = parseFloat(t.value); if (!isFinite(v)) { A.emit(); return; } A.edit(d => { d.struct.p[k] = k === 'nlev' ? Math.max(1, Math.min(8, Math.round(v))) : v; }); };
   sb.onclick = e => { const act = e.target.dataset && e.target.dataset.act; if (!act) return;
     if (act === 'autocol') { const n = A.struct.autoColumns(); if (!n) alert('Aucun nouveau poteau à placer (dessinez d\'abord des murs).'); }
     else if (act === 'calc') A.struct.run();

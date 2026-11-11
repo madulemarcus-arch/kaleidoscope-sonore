@@ -19,7 +19,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // ---- in a plan: room 6 x 4 m, P2 (and P5) are inner columns on the 6 m walls
   await key('r'); await click(-3, -2); await click(3, 2); await key('d'); await click(0, -2); await key('f'); await click(3, 0); await key('v');
   await page.evaluate(() => { App.struct.autoColumns(); });
-  const run = mod => page.evaluate(m => { App.edit(d => { Object.assign(d.struct.p, { nlev: 1, Q: 1.5, G2: 2, degr: true, found: 'isolees', sigSol: 0.2 }, m); }); return JSON.parse(JSON.stringify(App.struct.run())); }, mod);
+  const run = mod => page.evaluate(m => { App.edit(d => { Object.assign(d.struct.p, { nlev: 1, Q: 1.5, G2: 2, degr: true, found: 'isolees', sigSol: 0.2, frame: false }, m); }); return JSON.parse(JSON.stringify(App.struct.run())); }, mod);
   const expected = (r, c, key, kA, kB) => { const byId = Object.fromEntries(r.beams.map(b => [b.id, b])), [pa, pb] = c.node.pairs[0].beams.map(id => byId[id]), e = b => ({ Gm: b.slabG + b.self + b.wall, Qm: b.slabQ, L: b.L, Ib: b.b * Math.pow(b.h, 3) / 12 });
     const A = e(pa), B = e(pb), fl = x => (1.35 * x.Gm + 1.5 * x.Qm) * x.L * x.L / 12, fu = x => 1.35 * x.Gm * x.L * x.L / 12, dM = Math.max(Math.abs(fl(A) - fu(B)), Math.abs(fu(A) - fl(B))), sk = A.Ib / A.L + B.Ib / B.L + kA + kB; return { dM, above: dM * kA / sk, below: dM * kB / sk }; };
   const r1 = await run({}), H = r1.H, kcOf = a => Math.pow(a, 4) / 12 / H, p2 = r1.columns.find(c => c.label === 'P2');

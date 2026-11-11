@@ -18,7 +18,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // ---- room 6 x 4 m with 20 cm columns
   await key('r'); await click(-3, -2); await click(3, 2); await key('d'); await click(0, -2); await key('f'); await click(3, 0); await key('v');
   await page.evaluate(() => { App.struct.autoColumns(); });
-  const run = mod => page.evaluate(m => { App.edit(d => { Object.assign(d.struct.p, { nlev: 1, Q: 1.5, found: 'isolees', sigSol: 0.2, degr: true }, m); }); return JSON.parse(JSON.stringify(App.struct.run())); }, mod);
+  const run = mod => page.evaluate(m => { App.edit(d => { Object.assign(d.struct.p, { nlev: 1, Q: 1.5, found: 'isolees', sigSol: 0.2, degr: true, frame: false }, m); }); return JSON.parse(JSON.stringify(App.struct.run())); }, mod);
   const r = await run({}), corners = r.columns.filter(c => c.node.rive.length), inner = r.columns.filter(c => !c.node.rive.length);
   check('4 poteaux d\'angle reçoivent le moment de leurs poutres de rive, les 2 poteaux de milieu (poutres alignées) n\'en reçoivent pas', corners.length === 4 && inner.length === 2 && corners.every(c => c.node.rive.length === 2));
   check('poteaux de milieu : pas de moment de rive, mais le déséquilibre sous chargement alterné (sens des poutres), pas dans l\'autre sens', inner.every(c => c.levels[0].Mx > 0 && c.levels[0].My === 0 && c.node.pairs.length === 1 && c.node.pairs[0].axis === 'x'));
