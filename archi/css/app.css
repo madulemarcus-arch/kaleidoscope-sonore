@@ -27,10 +27,14 @@ main { flex: 1; display: flex; min-height: 0; }
 #bar3 { position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 #bar3 button { background: rgba(22,30,46,.88); }
 #msg3 { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 10px 16px; background: rgba(22,30,46,.9); border: 1px solid var(--line); border-radius: 10px; color: var(--mute); text-align: center; max-width: 80%; }
+#panel3 { display: none; }
 [data-mode="3d"] #tools, [data-mode="3d"] #panel, [data-mode="3d"] #tools2d { display: none; }
-#panel { width: 250px; padding: 10px; background: var(--panel); border-left: 1px solid var(--line); overflow: auto; }
-#panel h2 { margin: 6px 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
-#panel section { margin-bottom: 14px; }
+[data-mode="3d"] #panel3 { display: block; }
+input[type=range] { width: 100%; padding: 0; min-height: 28px; }
+.chk { display: flex; align-items: center; gap: 8px; margin: 8px 0; } .chk input { min-height: 0; width: 18px; height: 18px; }
+#panel, #panel3 { width: 250px; padding: 10px; background: var(--panel); border-left: 1px solid var(--line); overflow: auto; }
+#panel h2, #panel3 h2 { margin: 6px 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+#panel section, #panel3 section { margin-bottom: 14px; }
 .wide { width: 100%; margin-top: 6px; }
 .layer { display: flex; align-items: center; gap: 4px; padding: 3px 0; }
 .layer button { min-height: 30px; padding: 3px 7px; } .layer .nm { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -46,8 +50,9 @@ main { flex: 1; display: flex; min-height: 0; }
   #tools { flex-direction: row; border-right: 0; border-top: 1px solid var(--line); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   #tools button { width: auto; flex: 0 0 auto; } #tools button small { display: none; }
   .only-small { display: inline-block; }
-  #panel { display: none; position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; max-width: 86vw; box-shadow: -10px 0 30px #0008; }
-  #panel.open { display: block; }
+  #panel, #panel3 { display: none; position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; max-width: 86vw; box-shadow: -10px 0 30px #0008; }
+  #panel.open, [data-mode="3d"] #panel3.open { display: block; }
+  [data-mode="3d"] #panel3 { display: none; }
   main { position: relative; }
   .brand input { width: 110px; }
 }

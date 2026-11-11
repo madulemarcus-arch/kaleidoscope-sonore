@@ -21,6 +21,7 @@
     <button id="tSnap" class="tog" aria-pressed="true" title="Accrochage aux points (S)">Points</button>
     <button id="tOrtho" class="tog" aria-pressed="false" title="Orthogonal (O, ou maintenir Maj)">Ortho</button>
     <button id="fit" title="Tout voir (H)">Tout voir</button>
+    <select id="furnSel" hidden aria-label="Type de meuble" title="Type de meuble"></select>
     <button id="lenBtn" hidden title="Saisir une longueur ou 4x3">Longueur…</button>
     <button id="panelBtn" class="only-small" aria-pressed="false">Calques</button>
   </div>
@@ -37,12 +38,13 @@
 <main>
   <nav id="tools" aria-label="Outils"></nav>
   <div id="stage"><canvas id="cv" aria-label="Zone de dessin"></canvas><canvas id="cv3" aria-label="Vue 3D" hidden></canvas>
-    <div id="bar3" hidden><button data-v="iso">Isométrique</button><button data-v="top">Dessus</button><button data-v="front">Face</button><button data-v="png">Image PNG</button></div>
+    <div id="bar3" hidden><button data-v="iso">Isométrique</button><button data-v="top">Dessus</button><button data-v="front">Face</button><button data-v="png">Image HD</button><button data-v="panel" class="only-small">Rendu</button></div>
     <p id="msg3" hidden></p></div>
   <aside id="panel">
     <section><h2>Calques</h2><div id="layers"></div><button id="addLayer" class="wide">+ Nouveau calque</button></section>
     <section><h2 id="propsTitle">Propriétés</h2><div id="props"></div></section>
   </aside>
+  <aside id="panel3" aria-label="Réglages du rendu"></aside>
 </main>
 <footer id="status"><span id="hint"></span><span id="coords"></span></footer>
 <script src="js/core.js"></script>

@@ -59,6 +59,6 @@ Rules:
 
 ## Archi 2D (`archi/`) : plans d'architecture
 
-- Logiciel de dessin 2D (murs, portes, fenêtres, cotes, calques, export DXF/PNG/JSON), PWA sans dépendance. Étapes prévues : 1 dessin 2D (fait) · 2 vue 3D automatique (fait : `js/mesh.js` + `js/view3d.js`, WebGL sans bibliothèque) · 3 rendu · 4 dimensionnement BAEL. Tests : `cd tests && node archi/run.js`, workflow `.github/workflows/tests-archi.yml`.
+- Logiciel de dessin 2D (murs, portes, fenêtres, cotes, calques, export DXF/PNG/JSON), PWA sans dépendance. Étapes prévues : 1 dessin 2D (fait) · 2 vue 3D automatique (fait : `js/mesh.js` + `js/view3d.js`, WebGL sans bibliothèque) · 3 rendu (fait : matériaux, toiture, mobilier, soleil et ombres portées par projection au sol avec pochoir ; réglages dans `doc.render`, complétés par `A.ensureDoc`) · 4 dimensionnement BAEL. Tests : `cd tests && node archi/run.js`, workflow `.github/workflows/tests-archi.yml`.
 - Mêmes règles que les autres applications : `CACHE` dans `archi/sw.js` = `App.BUILD` dans `archi/js/core.js` ; tout nouveau fichier `js/` va dans `index.html` ET dans `FILES` de `sw.js` ; ne jamais changer `id` ni `start_url` du manifeste.
-- Unités : mètres, y vers le haut ; l'export DXF est en millimètres. Les raccourcis (V, M, L, R, D, F, C, T, O, G, S, H, et 2/3 pour changer de mode) sont décrits dans `tools.js` (`A.TOOLS` et le gestionnaire `keydown`), `archi/README.md` et les `title` des boutons.
+- Unités : mètres, y vers le haut ; l'export DXF est en millimètres. Les raccourcis (V, M, L, R, D, F, C, U, T, O, G, S, H, et 2/3 pour changer de mode) sont décrits dans `tools.js` (`A.TOOLS` et le gestionnaire `keydown`), `archi/README.md` et les `title` des boutons.

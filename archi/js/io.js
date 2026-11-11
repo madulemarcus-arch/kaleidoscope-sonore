@@ -5,7 +5,7 @@
   A.download = download;
   const base = () => (A.doc.name || 'plan').replace(/[^\w\-À-ÿ ]+/g, '').trim().replace(/\s+/g, '-') || 'plan';
   A.exportJSON = () => download(base() + '.archi.json', new Blob([JSON.stringify(A.doc, null, 1)], { type: 'application/json' }));
-  A.importJSON = text => { const d = JSON.parse(text); if (!A.valid(d)) throw new Error('Fichier non reconnu'); if (!d.layers.some(l => l.id === d.active)) d.active = d.layers[0].id; d.defaults = d.defaults || { th: 0.2, h: 2.8 }; A.setDoc(d); };
+  A.importJSON = text => { const d = JSON.parse(text); if (!A.valid(d)) throw new Error('Fichier non reconnu'); A.setDoc(A.ensureDoc(d)); };
 
   // ---------- DXF (R12 ASCII, 1 unit = 1 mm) ----------
   const ascii = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '?');
@@ -27,6 +27,7 @@
         if (s1 > cur) faces(cur, s1); if (!w.ea) line(at(s0, w.h), at(s0, -w.h), ly); if (!w.eb) line(at(s1, w.h), at(s1, -w.h), ly); }
       else if (it.t === 'dim') { const d = A.dimGeom(it); line(it.a, d.a2, ly); line(it.b, d.b2, ly); line(d.a2, d.b2, ly);
         let ang = Math.atan2(d.u[1], d.u[0]) * 180 / Math.PI; text(A.fmt(d.len) + ' m', [(d.a2[0] + d.b2[0]) / 2 + d.n[0] * 0.05, (d.a2[1] + d.b2[1]) / 2 + d.n[1] * 0.05], 0.15, ly, ang); }
+      else if (it.t === 'furn') { const P = A.furnPoly(it); P.forEach((p, i) => line(p, P[(i + 1) % 4], ly)); text((A.FURN[it.kind] || [it.kind])[0], it.p, 0.15, ly); }
       else if (it.t === 'text') text(it.s, it.p, it.size, ly);
     });
     g(0, 'ENDSEC'); g(0, 'EOF'); return out.join('\n') + '\n';

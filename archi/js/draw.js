@@ -52,12 +52,15 @@
       seg(ctx, d.a, g.a2, v); seg(ctx, d.b, g.b2, v); seg(ctx, g.a2, g.b2, v);
       [g.a2, g.b2].forEach(p => { const k = 0.08; seg(ctx, [p[0] - (g.u[0] - g.n[0]) * k, p[1] - (g.u[1] - g.n[1]) * k], [p[0] + (g.u[0] - g.n[0]) * k, p[1] + (g.u[1] - g.n[1]) * k], v); });
       label(ctx, A.fmt(g.len) + ' m', [(g.a2[0] + g.b2[0]) / 2, (g.a2[1] + g.b2[1]) / 2], Math.atan2(g.u[1], g.u[0]), v, c, Math.max(10, Math.min(16, 0.2 * v.s))); });
+    items.filter(i => i.t === 'furn').forEach(f => { const c = col(f), P = A.furnPoly(f), q = A.toScreen(f.p, v); ctx.fillStyle = c; ctx.strokeStyle = c; ctx.globalAlpha = 0.14; poly(ctx, P, v); ctx.fill(); ctx.globalAlpha = 1; ctx.lineWidth = 1.2; poly(ctx, P, v); ctx.stroke();
+      const px = Math.min(13, Math.min(f.w, f.d) * v.s * 0.4); if (px >= 7) { ctx.font = `${px}px Inter, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText((A.FURN[f.kind] || [f.kind])[0], q[0], q[1]); } });
     items.filter(i => i.t === 'text').forEach(t => { const q = A.toScreen(t.p, v); ctx.fillStyle = th.ink || col(t); ctx.font = `${Math.max(6, t.size * v.s)}px Inter, system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillText(t.s, q[0], q[1]); });
 
     // selection
     ctx.lineWidth = 2; ctx.strokeStyle = th.sel; ctx.fillStyle = th.sel;
     (opts.sel || []).map(A.item).filter(Boolean).forEach(it => {
       if (it.t === 'wall') poly(ctx, A.wallGeom(it).poly, v); else if (A.isOpening(it)) { const r = A.openRect(it); if (!r) return; poly(ctx, r.pts, v); }
+      else if (it.t === 'furn') poly(ctx, A.furnPoly(it), v);
       else if (it.t === 'text') { const b = A.textBox(it); poly(ctx, [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]], v); }
       else if (it.t === 'dim') { const g = A.dimGeom(it); seg(ctx, g.a2, g.b2, v); return; } else { seg(ctx, it.a, it.b, v); return; }
       ctx.stroke(); });

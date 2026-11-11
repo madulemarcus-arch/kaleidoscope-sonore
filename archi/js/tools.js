@@ -2,8 +2,8 @@
 (function () {
   const A = window.App, V = A.view;
   A.opts = { grid: true, ortho: false, snap: true };
-  A.tool = 'select'; A.pts = []; A.typed = ''; A.cur = null; A.raw = [0, 0]; A.pv = null; A.snapInfo = null; A.flip = false;
-  A.TOOLS = [['select', 'Sélection', 'V'], ['wall', 'Mur', 'M'], ['line', 'Ligne', 'L'], ['rect', 'Pièce', 'R'], ['door', 'Porte', 'D'], ['window', 'Fenêtre', 'F'], ['dim', 'Cote', 'C'], ['text', 'Texte', 'T']];
+  A.tool = 'select'; A.pts = []; A.typed = ''; A.cur = null; A.raw = [0, 0]; A.pv = null; A.snapInfo = null; A.flip = false; A.furnKind = 'lit'; A.furnRot = 0;
+  A.TOOLS = [['select', 'Sélection', 'V'], ['wall', 'Mur', 'M'], ['line', 'Ligne', 'L'], ['rect', 'Pièce', 'R'], ['door', 'Porte', 'D'], ['window', 'Fenêtre', 'F'], ['dim', 'Cote', 'C'], ['furn', 'Meuble', 'U'], ['text', 'Texte', 'T']];
   const OPEN = { door: { w: 0.9, h: 2.1, sill: 0 }, window: { w: 1.2, h: 1.2, sill: 0.9 } };
   let shiftKey = false, spaceKey = false;
   const num = s => parseFloat(String(s).replace(',', '.'));
@@ -53,6 +53,7 @@
       const ang = (Math.atan2(c[1] - from[1], c[0] - from[0]) * 180 / Math.PI + 360) % 360; pv.label = { p: c, text: A.typed ? A.typed + ' m' : `${A.fmt(l)} m · ${A.fmt(ang, 0)}°` }; }
     else if (A.tool === 'rect' && from) { pv.rect = rectPts(from, c); const w = Math.abs(c[0] - from[0]), h = Math.abs(c[1] - from[1]); pv.label = { p: c, text: A.typed || `${A.fmt(w)} × ${A.fmt(h)} m · ${A.fmt(w * h)} m²` }; }
     else if (A.tool === 'door' || A.tool === 'window') { const o = A.openingAt(A.raw, A.tool); if (o) { pv.open = A.openRect({ wall: o.wall.id, pos: o.pos, w: OPEN[A.tool].w }).pts; A.pvOpen = o; } else A.pvOpen = null; }
+    else if (A.tool === 'furn') { const k = A.FURN[A.furnKind]; pv.rect = A.furnPoly({ p: c, w: k[1], d: k[2], rot: A.furnRot }); pv.label = { p: c, text: k[0] }; }
     else if (A.tool === 'dim' && from) { const off = A.pts[1] ? dimOff(from, A.pts[1], c) : 0, b = A.pts[1] || c; pv.lines.push([from, b]);
       if (A.pts[1]) { const g = A.dimGeom({ a: from, b, off }); pv.lines.push([g.a2, g.b2]); } pv.label = { p: c, text: `${A.fmt(A.dist(from, b))} m` }; }
   };
@@ -62,6 +63,7 @@
     if (chain()) return n ? 'Cliquez le point suivant · tapez une longueur puis Entrée · clic droit / Échap pour finir' : 'Cliquez le point de départ';
     if (t === 'rect') return n ? 'Cliquez le coin opposé · ou tapez 4x3 puis Entrée' : 'Cliquez un coin de la pièce';
     if (t === 'door' || t === 'window') return 'Cliquez sur un mur pour poser · X : inverser le côté';
+    if (t === 'furn') return 'Choisissez le meuble en haut · cliquez pour le poser · X : tourner de 90°';
     if (t === 'dim') return n === 0 ? 'Cliquez le premier point' : n === 1 ? 'Cliquez le second point' : 'Cliquez pour placer la ligne de cote';
     return 'Cliquez pour placer le texte';
   };
@@ -73,6 +75,7 @@
     else if (t === 'rect') { if (!A.pts.length) A.pts = [p]; else if (addRect(A.pts[0], p)) A.pts = []; }
     else if (t === 'door' || t === 'window') { const o = A.openingAt(A.raw, t); if (o) A.edit(d => mk(d, Object.assign({ t, wall: o.wall.id, pos: o.pos, flip: A.flip, mirror: false, layer: o.wall.layer }, OPEN[t]))); }
     else if (t === 'dim') { if (A.pts.length < 2) { if (!A.pts.length || !A.same(A.pts[0], p)) A.pts.push(p); } else { const off = dimOff(A.pts[0], A.pts[1], p) || 0.5, [a, b] = A.pts; A.edit(d => mk(d, { t: 'dim', a, b, off })); A.pts = []; } }
+    else if (t === 'furn') { const k = A.FURN[A.furnKind]; A.edit(d => mk(d, { t: 'furn', kind: A.furnKind, p, w: k[1], d: k[2], h: k[3], rot: A.furnRot, layer: A.layer('meu') ? 'meu' : layerId() })); }
     else if (t === 'text') { const s = prompt('Texte :'); if (s && s.trim()) A.edit(d => mk(d, { t: 'text', p, s: s.trim(), size: 0.25 })); }
     A.typed = ''; A.updatePreview(); A.redraw(); A.emit();
   }
@@ -115,7 +118,7 @@
     const ids = Object.keys(drag.orig), moving = ids.filter(id => { const o = drag.orig[id]; return !(A.isOpening(o) && ids.includes(o.wall)); });
     moving.forEach(id => { const it = A.item(id), o = drag.orig[id];
       if (A.isOpening(it)) { const w = A.item(it.wall); if (!w) return; const u = A.unit(w.a, w.b); it.pos = Math.max(it.w / 2, Math.min(A.dist(w.a, w.b) - it.w / 2, o.pos + d[0] * u[0] + d[1] * u[1])); }
-      else if (it.t === 'text') it.p = [o.p[0] + d[0], o.p[1] + d[1]];
+      else if (it.t === 'text' || it.t === 'furn') it.p = [o.p[0] + d[0], o.p[1] + d[1]];
       else { it.a = [o.a[0] + d[0], o.a[1] + d[1]]; it.b = [o.b[0] + d[0], o.b[1] + d[1]]; } });
     drag.stretch.forEach(l => { const it = A.item(Object.keys(drag.orig)[0]); l.o[l.k] = it[l.key].slice(); });
     A.redraw();
@@ -184,9 +187,10 @@
     if (e.key === '3') { A.setMode('3d'); return; }
     if (e.key === 'Escape') { if (A.typed) { A.typed = ''; A.updatePreview(); A.redraw(); A.status && A.status(); } else if (A.pts.length) A.finishChain(); else if (A.sel.length) { A.sel = []; A.emit(); } else A.setTool('select'); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (A.sel.length) { A.edit(d => A.removeIds(A.sel)); A.sel = []; A.emit(); } return; }
-    const tool = { v: 'select', m: 'wall', l: 'line', r: 'rect', d: 'door', f: 'window', c: 'dim', t: 'text' }[k];
+    const tool = { v: 'select', m: 'wall', l: 'line', r: 'rect', d: 'door', f: 'window', c: 'dim', u: 'furn', t: 'text' }[k];
     if (tool) { A.setTool(tool); return; }
     if (k === 'x' && (A.tool === 'door' || A.tool === 'window')) { A.flip = !A.flip; A.emit(); }
+    else if (k === 'x' && A.tool === 'furn') { A.furnRot = (A.furnRot + 90) % 360; A.updatePreview(); A.redraw(); }
     else if (k === 'o') { A.opts.ortho = !A.opts.ortho; A.emit(); } else if (k === 'g') { A.opts.grid = !A.opts.grid; A.emit(); } else if (k === 's') { A.opts.snap = !A.opts.snap; A.emit(); }
     else if (k === 'h' && A.fitView) A.fitView();
   });

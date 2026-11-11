@@ -31,10 +31,32 @@
     $('mode2').setAttribute('aria-pressed', String(!d3)); $('mode3').setAttribute('aria-pressed', String(d3));
     if (d3) { A.v3.rebuild(); A.v3.resize(); A.v3.preset('iso'); const none = !A.v3.mesh.stats.walls; $('msg3').hidden = !none; $('msg3').textContent = 'Aucun mur à afficher : dessinez d\'abord en 2D.'; }
     else { $('msg3').hidden = true; resize(); }
-    A.emit();
+    A.emit(); drawRender();
   };
   $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
-  $('bar3').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; if (v === 'png') { A.v3.render(); cv3.toBlob(b => A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-3d.png', b), 'image/png'); } else A.v3.preset(v); };
+  $('bar3').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; if (v === 'png') A.v3.snapshot(2, b => A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-3d.png', b)); else if (v === 'panel') $('panel3').classList.toggle('open'); else A.v3.preset(v); };
+
+  // ---------- furniture picker (header, visible with the Meuble tool) ----------
+  const fs = $('furnSel'); Object.keys(A.FURN).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = A.FURN[k][0]; fs.appendChild(o); });
+  fs.onchange = () => { A.furnKind = fs.value; A.updatePreview(); A.redraw(); }; fs.value = A.furnKind;
+
+  // ---------- 3D rendering panel (materials, roof, sun) ----------
+  const p3 = $('panel3');
+  const opts = (table, cur) => Object.keys(table).map(k => `<option value="${k}"${k === cur ? ' selected' : ''}>${esc(Array.isArray(table[k]) ? table[k][0] : table[k])}</option>`).join('');
+  function drawRender() {
+    if (A.mode !== '3d') return; const a = document.activeElement; if (p3.contains(a) && a.type === 'range') return; const r = A.doc.render, hh = Math.floor(r.hour), mm = Math.round((r.hour - hh) * 60);
+    p3.innerHTML = `<section><h2>Matériaux</h2><label class="row"><span>Murs</span><select data-k="wallMat">${opts(A.MATS, r.wallMat)}</select></label><label class="row"><span>Sol</span><select data-k="floorMat">${opts(A.FLOORS, r.floorMat)}</select></label>
+      <p class="muted">Un mur précis peut avoir son propre matériau : sélectionnez-le en 2D.</p></section>
+      <section><h2>Toiture</h2><label class="row"><span>Type</span><select data-k="roof">${opts(A.ROOFS, r.roof)}</select></label>
+      <label class="row"><span>Matériau</span><select data-k="roofMat">${opts(A.ROOFMATS, r.roofMat)}</select></label>
+      <label class="row"><span>Pente (°)</span><input type="number" data-k="slope" min="5" max="60" step="1" value="${r.slope}"></label>
+      <label class="row"><span>Débord (m)</span><input type="number" data-k="over" min="0" max="2" step="0.1" value="${r.over}"></label></section>
+      <section><h2>Soleil</h2><label class="row"><span>Heure</span><b id="hourTxt">${hh} h ${String(mm).padStart(2, '0')}</b></label><input type="range" data-k="hour" min="6" max="18" step="0.25" value="${r.hour}" aria-label="Heure du soleil">
+      <label class="chk"><input type="checkbox" data-k="shadows"${r.shadows ? ' checked' : ''}> Ombres portées</label></section>`;
+  }
+  p3.onchange = e => { const k = e.target.dataset.k; if (!k) return; let v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' || e.target.type === 'range' ? parseFloat(e.target.value) : e.target.value;
+    if (typeof v === 'number' && !isFinite(v)) return; if (k === 'slope') v = Math.max(5, Math.min(60, v)); if (k === 'over') v = Math.max(0, Math.min(2, v)); A.edit(d => { d.render[k] = v; }); };
+  p3.oninput = e => { if (e.target.dataset.k !== 'hour') return; const v = parseFloat(e.target.value); A.doc.render.hour = v; const hh = Math.floor(v); $('hourTxt').textContent = `${hh} h ${String(Math.round((v - hh) * 60)).padStart(2, '0')}`; A.v3.draw(); };
 
   // ---------- file menu ----------
   const menu = $('menu'), closeMenu = () => { menu.hidden = true; $('menuBtn').setAttribute('aria-expanded', 'false'); };
@@ -67,12 +89,18 @@
     const box = $('props'); box.innerHTML = ''; const sel = A.sel.map(A.item).filter(Boolean);
     if (!sel.length) { $('propsTitle').textContent = 'Réglages des murs'; box.appendChild(field('Épaisseur (m)', A.doc.defaults.th, 0.01, (v, d) => { d.defaults.th = v; }));
       box.appendChild(field('Hauteur (m)', A.doc.defaults.h, 0.05, (v, d) => { d.defaults.h = v; })); const m = document.createElement('p'); m.className = 'muted'; m.textContent = 'Valables pour les prochains murs. Sélectionnez un élément pour modifier ses propriétés.'; box.appendChild(m); return; }
-    const names = { wall: 'Mur', line: 'Ligne', door: 'Porte', window: 'Fenêtre', dim: 'Cote', text: 'Texte' };
+    const names = { wall: 'Mur', line: 'Ligne', door: 'Porte', window: 'Fenêtre', dim: 'Cote', text: 'Texte', furn: 'Meuble' };
     $('propsTitle').textContent = sel.length > 1 ? sel.length + ' éléments' : names[sel[0].t];
     const each = (fn) => d => sel.forEach(s => fn(d.items.find(i => i.id === s.id)));
     if (sel.length === 1) { const it = sel[0];
       if (it.t === 'wall') { box.appendChild(field('Épaisseur (m)', it.th, 0.01, (v, d) => { d.items.find(i => i.id === it.id).th = v; })); box.appendChild(field('Hauteur (m)', it.h, 0.05, (v, d) => { d.items.find(i => i.id === it.id).h = v; }));
+        const r = document.createElement('label'); r.className = 'row'; r.innerHTML = '<span>Matériau</span>'; const ms = document.createElement('select'); ms.innerHTML = '<option value="">Par défaut</option>' + Object.keys(A.MATS).map(k => `<option value="${k}"${it.mat === k ? ' selected' : ''}>${esc(A.MATS[k][0])}</option>`).join('');
+        ms.onchange = () => A.edit(d => { const x = d.items.find(i => i.id === it.id); if (ms.value) x.mat = ms.value; else delete x.mat; }); r.appendChild(ms); box.appendChild(r);
         const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Longueur : ' + A.fmt(A.dist(it.a, it.b)) + ' m'; box.appendChild(p); }
+      if (it.t === 'furn') { const r = document.createElement('label'); r.className = 'row'; r.innerHTML = '<span>Type</span>'; const ks = document.createElement('select'); ks.innerHTML = Object.keys(A.FURN).map(k => `<option value="${k}"${it.kind === k ? ' selected' : ''}>${esc(A.FURN[k][0])}</option>`).join('');
+        ks.onchange = () => A.edit(d => { d.items.find(i => i.id === it.id).kind = ks.value; }); r.appendChild(ks); box.appendChild(r);
+        [['Largeur (m)', 'w', 0.05, 0.05], ['Profondeur (m)', 'd', 0.05, 0.05], ['Hauteur (m)', 'h', 0.05, 0.02]].forEach(([l, k, st, mn]) => box.appendChild(field(l, it[k], st, (v, d) => { d.items.find(i => i.id === it.id)[k] = v; }, mn)));
+        box.appendChild(field('Rotation (°)', it.rot || 0, 5, (v, d) => { d.items.find(i => i.id === it.id).rot = v % 360; }, 0)); }
       if (it.t === 'line' || it.t === 'dim') { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Longueur : ' + A.fmt(A.dist(it.a, it.b)) + ' m'; box.appendChild(p); }
       if (A.isOpening(it)) { box.appendChild(field('Largeur (m)', it.w, 0.05, (v, d) => { d.items.find(i => i.id === it.id).w = v; })); box.appendChild(field('Hauteur (m)', it.h, 0.05, (v, d) => { d.items.find(i => i.id === it.id).h = v; }));
         box.appendChild(field('Allège (m)', it.sill, 0.05, (v, d) => { d.items.find(i => i.id === it.id).sill = v; }, 0));
@@ -95,7 +123,8 @@
     $('undo').disabled = !A.canUndo(); $('redo').disabled = !A.canRedo(); $('lenBtn').hidden = !(A.pts.length && (A.tool === 'wall' || A.tool === 'line' || A.tool === 'rect'));
     if (document.activeElement !== $('docName')) $('docName').value = A.doc.name;
     if (!A.doc.layers.some(l => l.id === A.doc.active)) A.doc.active = A.doc.layers[0].id;
-    drawLayers(); drawProps(); A.status(); A.redraw();
+    $('furnSel').hidden = A.tool !== 'furn'; if (document.activeElement !== fs) fs.value = A.furnKind;
+    drawLayers(); drawProps(); drawRender(); A.status(); A.redraw();
   });
 
   // ---------- start ----------
