@@ -15,9 +15,10 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // model against hand calculations (fc28 25, FeE500, cover 3 cm)
   const mdl = await page.evaluate(() => { const m = App.rebar.model(App.doc); return { po: m.beams.find(b => Math.abs(b.L - 3) < 1e-6), p1: m.cols[0], s1: m.foots[0], d1: m.slabs[0], tot: m.totals, ls12: m.ls(12) }; });
   const b0 = mdl.po, last = b0.bars[b0.bars.length - 1];
-  check('poutre : barres inférieures 4HA10, longueur 3,14 + 2 crochets de 20 Ø = 3,54 m', b0.bars[0].n === 4 && b0.bars[0].d === 10 && near(b0.bars[0].len, 3.54, 1e-6), JSON.stringify(b0.bars[0]));
-  check('poutre : poids = n·L·0,00617·Ø²', near(b0.bars[0].kg, 4 * 3.54 * 0.00617 * 100, 1e-6));
-  check('poutre : cadres HA6 e=15, 18 cadres de 0,78 m', last.n === 18 && near(last.len, 0.78, 1e-6) && b0.st === 15, JSON.stringify(last));
+  const b1 = b0.bars[0], hk = 20 * b1.d / 1000;
+  check('poutre : barres inférieures, longueur 3,14 m + 2 crochets de 20 Ø', b1.n >= 2 && near(b1.len, 3.14 + 2 * hk, 1e-6), JSON.stringify(b1));
+  check('poutre : poids = n·L·0,00617·Ø²', near(b1.kg, b1.n * b1.len * 0.00617 * b1.d * b1.d, 1e-9));
+  check('poutre : cadres HA6, nombre = ⌊portée libre / espacement⌋, 0,78 m chacun', last.n === Math.floor(2.8 / (b0.st / 100)) && near(last.len, 0.78, 1e-6) && last.d === 6, JSON.stringify(last));
   check('poutre : 2HA10 de montage', b0.bars[1].n === 2 && b0.bars[1].d === 10 && near(b0.bars[1].len, 3.54, 1e-6));
   const p1 = mdl.p1;
   check('poteau : barres de 3,11 m (hauteur − enrobage + semelle − 5 cm + équerre 12 Ø)', near(p1.bars[0].len, 2.8 - 0.03 + (0.25 - 0.05) + 0.144, 1e-6) && p1.bars[0].n === 4 && p1.bars[0].d === 12, JSON.stringify(p1.bars[0]));

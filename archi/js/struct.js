@@ -24,6 +24,33 @@
   S.footing = (Nu, Ns, a, sigSol, m) => { const A0 = Math.sqrt(1.1 * Ns / (sigSol * 1000)), side = Math.max(ceilTo(A0, 0.05), a + 0.3), d = Math.max(ceilTo((side - a) / 4, 0.05), 0.2), h = d + 0.05;
     const Asu = cm2(Nu / 1000 * (side - a) / (8 * d * m.ss)), Ass = cm2(Ns / 1000 * (side - a) / (8 * d * m.ssSer)); return { side, d, h, Asu, Ass, As: Math.max(Asu, Ass), sigma: 1.1 * Ns / (side * side) / 1000 }; };
 
+  // ---------- continuous beams (BAEL B.6.2,21 forfaitaire, B.6.2,22 Caquot) ----------
+  // spans: [{ L, Gm, Qm, Gv, Qv }] in m and kN/m (m = loads used for moments, v = loads used for shear). Returns moments (kN.m, magnitudes) and shears (kN) per span.
+  S.continuous = spans => { const n = spans.length, pu = s => 1.35 * s.Gm + 1.5 * s.Qm, puv = s => 1.35 * s.Gv + 1.5 * s.Qv, psv = s => s.Gv + s.Qv;
+    const M0 = spans.map(s => pu(s) * s.L * s.L / 8), al = spans.map(s => s.Gm + s.Qm > 0 ? s.Qm / (s.Gm + s.Qm) : 0), why = [];
+    spans.forEach((s, i) => { if (s.Qm > 2 * s.Gm + 1e-9) why.push('Q > 2G dans la travée ' + (i + 1)); });
+    for (let i = 0; i + 1 < n; i++) { const r = spans[i].L / spans[i + 1].L; if (r < 0.8 - 1e-9 || r > 1.25 + 1e-9) why.push('portées voisines dans un rapport de ' + A.fmt(r) + ' (hors de 0,8 à 1,25)'); }
+    const method = why.length ? 'caquot' : 'forfaitaire', Ms = new Array(n + 1).fill(0), Mt = [], Vl = [], Vr = [];
+    Ms[0] = 0.15 * M0[0]; Ms[n] = 0.15 * M0[n - 1];
+    if (method === 'forfaitaire') {
+      for (let k = 1; k < n; k++) Ms[k] = (n === 2 ? 0.6 : (k === 1 || k === n - 1) ? 0.5 : 0.4) * Math.max(M0[k - 1], M0[k]);
+      spans.forEach((s, i) => { const a = al[i], end = i === 0 || i === n - 1; Mt[i] = Math.max(Math.max(1.05, 1 + 0.3 * a) * M0[i] - (Ms[i] + Ms[i + 1]) / 2, (end ? 1.2 + 0.3 * a : 1 + 0.3 * a) / 2 * M0[i]); });
+      const f = k => k <= 0 || k >= n ? 1 : n === 2 ? 1.10 : (k === 1 || k === n - 1) ? 1.15 : 1.0;
+      spans.forEach((s, i) => { const v = puv(s) * s.L / 2; Vl[i] = v * f(i); Vr[i] = v * f(i + 1); });
+    } else {
+      const lp = spans.map((s, i) => n === 1 || i === 0 || i === n - 1 ? s.L : 0.8 * s.L), pmax = spans.map(pu), pmin = spans.map(s => 1.35 * s.Gm), sup = (k, pw, pe) => (pw * Math.pow(lp[k - 1], 3) + pe * Math.pow(lp[k], 3)) / (8.5 * (lp[k - 1] + lp[k]));
+      for (let k = 1; k < n; k++) Ms[k] = sup(k, pmax[k - 1], pmax[k]);
+      spans.forEach((s, i) => { const Mw = i === 0 ? 0.15 * M0[i] : sup(i, pmin[i - 1], pmax[i]), Me = i === n - 1 ? 0.15 * M0[i] : sup(i + 1, pmax[i], pmin[i + 1]), p = pmax[i], x = Math.max(0, Math.min(s.L, s.L / 2 + (Mw - Me) / (p * s.L)));
+        Mt[i] = Math.max(0, p * x * (s.L - x) / 2 - Mw * (1 - x / s.L) - Me * x / s.L); Vl[i] = puv(s) * s.L / 2 + (Ms[i] - Ms[i + 1]) / s.L; Vr[i] = puv(s) * s.L / 2 + (Ms[i + 1] - Ms[i]) / s.L; });
+    }
+    return { method, reasons: why, spans: spans.map((s, i) => ({ L: s.L, p: pu(s), M0: M0[i], alpha: al[i], Mw: Ms[i], Me: Ms[i + 1], Mt: Mt[i], Vl: Vl[i], Vr: Vr[i], Vls: Vl[i] * psv(s) / puv(s), Vrs: Vr[i] * psv(s) / puv(s), endW: i === 0 ? 'rive' : 'appui', endE: i === n - 1 ? 'rive' : 'appui' })) }; };
+  // Groups beams into continuous chains (collinear beams meeting at a column), ordered along the chain. Each item: { b, flip } with flip = the beam's ca is its east end.
+  S.chains = beams => { const par = beams.map((_, i) => i), find = i => par[i] === i ? i : (par[i] = find(par[i])), byCol = new Map(), dir = (b, c) => A.unit(c.p, (b.ca === c ? b.cb : b.ca).p);
+    beams.forEach((b, i) => [b.ca, b.cb].forEach(c => { if (!byCol.has(c.id)) byCol.set(c.id, []); byCol.get(c.id).push({ i, c }); }));
+    byCol.forEach(l => { for (let x = 0; x < l.length; x++) for (let y = x + 1; y < l.length; y++) { const u = dir(beams[l[x].i], l[x].c), v = dir(beams[l[y].i], l[y].c); if (u[0] * v[0] + u[1] * v[1] < -0.95) par[find(l[x].i)] = find(l[y].i); } });
+    const groups = new Map(); beams.forEach((b, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(b); });
+    return [...groups.values()].map(g => { const u = A.unit(g[0].ca.p, g[0].cb.p), pr = p => p[0] * u[0] + p[1] * u[1]; return g.map(b => ({ b, flip: pr(b.ca.p) > pr(b.cb.p), s: pr(b.ca.p) + pr(b.cb.p) })).sort((p, q) => p.s - q.s); }); };
+
   // ---------- reinforcement choices ----------
   const area = d => Math.PI * Math.pow(d / 10, 2) / 4;            // cm2 for a diameter in mm
   S.beamBars = (As, b) => { for (const d of [10, 12, 14, 16, 20, 25]) { const n = Math.max(2, Math.ceil(As / area(d) - 1e-9)), maxN = Math.max(2, Math.floor((b * 1000 - 60 + 25) / (d + 25))); if (n <= maxN) return { n, d, text: n + 'HA' + d, As: n * area(d) }; } const d = 25, n = Math.ceil(As / area(d)); return { n, d, text: n + 'HA25', As: n * area(d) }; };
@@ -86,34 +113,44 @@
       else if (hs > 0.25) warn.push('Dalle épaisse (' + Math.round(hs * 100) + ' cm) : envisagez des poutres intermédiaires ou un plancher à corps creux.');
     } else if (needSlab) warn.push('Aucune dalle rectangulaire fermée par quatre poutres : épaisseur de dalle non calculée (15 cm par défaut).');
     if (needSlab && !hs) hs = 0.15;
-    const Lf = nInter >= 1 ? setF(hs) : null, Lt = setT(hs), puF = Lf ? 1.35 * Lf.g + 1.5 * Lf.q : 0, psF = Lf ? Lf.g + Lf.q : 0, puT = 1.35 * Lt.g + 1.5 * Lt.q, psT = Lt.g + Lt.q;
+    const Lf = nInter >= 1 ? setF(hs) : null, Lt = setT(hs);
     res.slab = needSlab ? { h: hs, panels: panelsOut.map((o, i) => { const c = o.c, mo = o.mo, bar = (r, mn, main) => S.slabBars(Math.max(r.As, mn), hs, main), ymin = 6 * hs, xmin = ymin * (3 - Math.max(mo.alpha, 0.4)) / 2;
       return { id: 'D' + (i + 1), lx: c.lx, ly: c.ly, alpha: mo.alpha, oneWay: mo.oneWay, mux: mo.mux, muy: mo.muy, M0x: mo.M0x, M0y: mo.M0y, pu: o.pu, tau: o.tau, tauLim: o.tauLim,
         Atx: Math.max(o.tx.As, xmin), Aty: Math.max(o.ty.As, ymin), Aax: Math.max(o.ax.As, xmin * 0.5), Aay: Math.max(o.ay.As, ymin * 0.5), barTx: bar(o.tx, xmin, true), barTy: bar(o.ty, ymin, false), barAx: bar(o.ax, xmin * 0.5, true), barAy: bar(o.ay, ymin * 0.5, false), x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1 }; }) } : null;
     panelsOut = null;
-    // --- load a set (ELU pu / ELS ps) puts on every beam, summed over adjacent panels
-    const slabOn = (pu, ps) => { const o = new Map(beams.map(b => [b.k, { um: 0, uv: 0, sm: 0, sv: 0 }])); cells.forEach(c => c.edges.forEach(e => { const edge = e.len <= c.lx + 0.01 ? 'short' : 'long', U = S.panelLoad(pu, c.lx, c.ly, edge), Sv = S.panelLoad(ps, c.lx, c.ly, edge); e.bs.forEach(b => { const t = o.get(b.k); t.um += U.m; t.uv += U.v; t.sm += Sv.m; t.sv += Sv.v; }); })); return o; };
-    const govLoad = nInter >= 1 ? slabOn(puF, psF) : slabOn(puT, psT), floorLoad = Lf ? slabOn(puF, psF) : null, topLoad = slabOn(puT, psT);
-    // --- beams: smallest section passing bending (no compression steel) and shear
-    const bm = new Map();
-    beams.forEach(bw => { const sl = govLoad.get(bw.k); let b = 0.20, h = Math.max(0.25, ceilTo(bw.L / 12, 0.05)), out = null;
-      for (let n = 0; n < 60; n++) { const self = GC * b * h, wall = S.wallLoad(bw, p, h), pm = sl.um + 1.35 * (self + wall), pv = sl.uv + 1.35 * (self + wall), M0 = pm * bw.L * bw.L / 8, Vu = pv * bw.L / 2, d = h - 0.04;
-        const f = S.flex(0.85 * M0 / 1000, b, d, m), fa = S.flex(0.5 * M0 / 1000, b, d, m), tau = Vu / 1000 / (b * d);
-        if (f.ok && fa.ok && tau <= m.tauLim) { const Amin = cm2(0.23 * b * d * m.ft28 / m.fe), Ast = Math.max(f.As, Amin), Aa = Math.max(fa.As, Amin), k = Math.max(0, tau - 0.3 * m.ft28), At = 2 * area(6) * 1e-4;
-          let stM = Math.min(0.40, 0.9 * d, At * m.fe / (0.4 * b)); if (k > 0) stM = Math.min(stM, At / (b * k / (0.9 * m.ss))); const st = Math.max(5, Math.floor(stM * 100 / 5) * 5);
-          out = { b, h, d, M0, Mt: 0.85 * M0, Ma: 0.5 * M0, Vu, tau, Ast, Aa, barT: S.beamBars(Ast, b), barA: S.beamBars(Aa, b), st, self, wall, pu: pm }; break; }
-        if (h < 0.70 - 1e-9) h = Math.round((h + 0.05) * 100) / 100; else { b = Math.round((b + 0.05) * 100) / 100; h = Math.max(0.25, ceilTo(bw.L / 12, 0.05)); } }
-      if (!out) { warn.push('Poutre ' + bw.id + ' : section non trouvée (portée trop grande), ajoutez un poteau.'); out = { b: 0.3, h: 0.7, d: 0.66, M0: 0, Mt: 0, Ma: 0, Vu: 0, tau: 0, Ast: 0, Aa: 0, barT: { text: '—' }, barA: { text: '—' }, st: 15, self: 0, wall: 0, pu: 0, failed: true }; }
-      bm.set(bw.k, out); });
-    // --- reactions at the beam ends, per level set
-    const react = (bw, ld, ult) => { const s = ld.get(bw.k), o = bm.get(bw.k), wall = 0, line = (ult ? s.uv + 1.35 * (o.self + o.wall) : s.sv + o.self + o.wall); return line * bw.L / 2; };
-    res.beams = beams.map(bw => { const o = bm.get(bw.k), sl = govLoad.get(bw.k); return { id: bw.id, k: bw.k, ca: bw.ca.id, cb: bw.cb.id, from: lab[bw.ca.id], to: lab[bw.cb.id], p1: bw.ca.p, p2: bw.cb.p, L: bw.L, manual: bw.manual, ...o, slabPm: sl.um, slabPv: sl.uv }; });
+    // --- loads a set puts on every beam, split into dead (g) and live (q) parts, for moments (m) and shear (v)
+    const slabOn = (g, q) => { const o = new Map(beams.map(b => [b.k, { gm: 0, gv: 0, qm: 0, qv: 0 }])); cells.forEach(c => c.edges.forEach(e => { const edge = e.len <= c.lx + 0.01 ? 'short' : 'long', G = S.panelLoad(g, c.lx, c.ly, edge), Q = S.panelLoad(q, c.lx, c.ly, edge); e.bs.forEach(bb => { const t = o.get(bb.k); t.gm += G.m; t.gv += G.v; t.qm += Q.m; t.qv += Q.v; }); })); return o; };
+    const govSet = nInter >= 1 ? slabOn(Lf.g, Lf.q) : slabOn(Lt.g, Lt.q), floorSet = Lf ? slabOn(Lf.g, Lf.q) : null, topSet = slabOn(Lt.g, Lt.q);
+    const spanLoads = (chain, set, sec) => chain.map(it => { const sl = set.get(it.b.k), self = GC * sec.b * sec.h, wall = S.wallLoad(it.b, p, sec.h); return { L: it.b.L, Gm: sl.gm + self + wall, Qm: sl.qm, Gv: sl.gv + self + wall, Qv: sl.qv, self, wall }; });
+    // --- beams, chain by chain: smallest common section passing bending at mid-span and supports (no compression steel) and shear
+    const bm = new Map(), chains = S.chains(beams), chainInfo = [];
+    chains.forEach((chain, ci) => { const Lmax = Math.max(...chain.map(it => it.b.L)); let b = 0.20, h = Math.max(0.25, ceilTo(Lmax / 12, 0.05)), found = null, an = null, loads = null;
+      for (let n = 0; n < 80 && !found; n++) { loads = spanLoads(chain, govSet, { b, h }); an = S.continuous(loads); const d = h - 0.04;
+        const ok = an.spans.every((s, i) => S.flex(s.Mt / 1000, b, d, m).ok && S.flex(s.Mw / 1000, b, d, m).ok && S.flex(s.Me / 1000, b, d, m).ok && Math.max(s.Vl, s.Vr) / 1000 / (b * d) <= m.tauLim);
+        if (ok) found = { b, h }; else if (h < 0.70 - 1e-9) h = Math.round((h + 0.05) * 100) / 100; else { b = Math.round((b + 0.05) * 100) / 100; h = Math.max(0.25, ceilTo(Lmax / 12, 0.05)); } }
+      if (!found) { warn.push('Poutre continue ' + chain.map(it => it.b.id).join('–') + ' : section non trouvée (portées trop grandes), ajoutez un poteau.'); found = { b, h }; }
+      const sec = found, d = sec.h - 0.04, Amin = cm2(0.23 * sec.b * d * m.ft28 / m.fe), n = chain.length;
+      if (an.method === 'caquot') warn.push('Poutres ' + chain.map(it => it.b.id).join('–') + ' : méthode forfaitaire non applicable (' + an.reasons.join(' ; ') + '), calcul par la méthode de Caquot.');
+      chainInfo.push({ beams: chain.map(it => it.b.id), method: an.method, reasons: an.reasons });
+      chain.forEach((it, i) => { const s = an.spans[i], ld = loads[i], V = Math.max(s.Vl, s.Vr), tau = V / 1000 / (sec.b * d), ft = (M, dd) => S.flex(M / 1000, sec.b, dd, m);
+        const Ast = Math.max(ft(s.Mt, d).As || 0, Amin), AaW = Math.max(ft(s.Mw, d).As || 0, Amin), AaE = Math.max(ft(s.Me, d).As || 0, Amin), k = Math.max(0, tau - 0.3 * m.ft28), At = 2 * area(6) * 1e-4;
+        let stM = Math.min(0.40, 0.9 * d, At * m.fe / (0.4 * sec.b)); if (k > 0) stM = Math.min(stM, At / (sec.b * k / (0.9 * m.ss))); const st = Math.max(5, Math.floor(stM * 100 / 5) * 5);
+        const Lw = i === 0 ? it.b.L : Math.max(chain[i - 1].b.L, it.b.L), Le = i === n - 1 ? it.b.L : Math.max(chain[i + 1].b.L, it.b.L), M0w = i === 0 ? s.M0 : Math.max(an.spans[i - 1].M0, s.M0), M0e = i === n - 1 ? s.M0 : Math.max(an.spans[i + 1].M0, s.M0);
+        const capW = (i === 0 ? 0.2 : s.Mw >= 0.4 * M0w - 1e-9 ? 0.25 : 0.2) * Lw, capE = (i === n - 1 ? 0.2 : s.Me >= 0.4 * M0e - 1e-9 ? 0.25 : 0.2) * Le, Aa = Math.max(AaW, AaE);
+        bm.set(it.b.k, { b: sec.b, h: sec.h, d, M0: s.M0, Mt: s.Mt, Mw: s.Mw, Me: s.Me, Ma: Math.max(s.Mw, s.Me), Vu: V, tau, Ast, AaW, AaE, Aa, barT: S.beamBars(Ast, sec.b), barA: S.beamBars(Aa, sec.b), barW: S.beamBars(AaW, sec.b), barE: S.beamBars(AaE, sec.b), st, self: ld.self, wall: ld.wall, pu: s.p,
+          capW, capE, endW: s.endW, endE: s.endE, flip: it.flip, ...(it.flip ? { MA: s.Me, MB: s.Mw, AaA: AaE, AaB: AaW, capA: capE, capB: capW, endA: s.endE, endB: s.endW } : { MA: s.Mw, MB: s.Me, AaA: AaW, AaB: AaE, capA: capW, capB: capE, endA: s.endW, endB: s.endE }), method: an.method, chain: ci + 1, pos: i + 1, nSpans: n, alpha: s.alpha, ok: !!found.b }); }); });
+    // shear at both ends of every span, per level set (these are the beam reactions on the columns, with the continuity effect included)
+    const ends = new Map(); beams.forEach(bw => ends.set(bw.k, {}));
+    chains.forEach(chain => { const sec = bm.get(chain[0].b.k), res2 = {}; [['F', floorSet], ['T', topSet]].forEach(([key, set]) => { if (!set) return; const an = S.continuous(spanLoads(chain, set, sec));
+      chain.forEach((it, i) => { const s = an.spans[i], west = it.flip ? it.b.cb : it.b.ca, east = it.flip ? it.b.ca : it.b.cb, e = ends.get(it.b.k); (e[west.id] = e[west.id] || {})[key] = { u: s.Vl, s: s.Vls }; (e[east.id] = e[east.id] || {})[key] = { u: s.Vr, s: s.Vrs }; }); }); });
+    const react = (bw, colId, ult) => { const e = ends.get(bw.k)[colId], g = x => x ? (ult ? x.u : x.s) : 0; return nInter * g(e.F) + g(e.T); };
+    res.chains = chainInfo;
+    res.beams = beams.map(bw => { const o = bm.get(bw.k), sl = govSet.get(bw.k); return { id: bw.id, k: bw.k, ca: bw.ca.id, cb: bw.cb.id, from: lab[bw.ca.id], to: lab[bw.cb.id], p1: bw.ca.p, p2: bw.cb.p, L: bw.L, manual: bw.manual, ...o, slabG: sl.gm, slabQ: sl.qm }; });
     // --- columns
     const hbMax = id => Math.max(0.25, ...beams.filter(b => b.ca.id === id || b.cb.id === id).map(b => bm.get(b.k).h));
     cols.forEach(c => { const mine = beams.filter(b => b.ca.id === c.id || b.cb.id === c.id), l0 = Math.max(1.5, H - hbMax(c.id));
-      let Ru = 0, Rs = 0; const dirs = []; mine.forEach(b => { const other = b.ca.id === c.id ? b.cb : b.ca, u = A.unit(c.p, other.p); dirs.push(u);
-        const ru = (nInter ? nInter * react(b, floorLoad, true) : 0) + react(b, topLoad, true), rs = (nInter ? nInter * react(b, floorLoad, false) : 0) + react(b, topLoad, false); Ru += ru; Rs += rs; });
-      const cont = dirs.some((u, i) => dirs.some((v, j) => j > i && u[0] * v[0] + u[1] * v[1] < -0.95)), cf = cont ? 1.10 : 1.0; Ru *= cf; Rs *= cf;
+      let Ru = 0, Rs = 0; const dirs = []; mine.forEach(b => { const other = b.ca.id === c.id ? b.cb : b.ca; dirs.push(A.unit(c.p, other.p)); Ru += react(b, c.id, true); Rs += react(b, c.id, false); });
+      const cont = dirs.some((u, i) => dirs.some((v, j) => j > i && u[0] * v[0] + u[1] * v[1] < -0.95));
       const amin = Math.max(0.20, ceilTo(Math.max(0, ...walls.filter(w => A.segDist(c.p, w.a, w.b).d <= TOL).map(w => w.th)), 0.05)), levels = Math.max(1, Math.round(p.nlev)); let a = amin, out = null;
       for (; a <= 0.60 + 1e-9; a = Math.round((a + 0.05) * 100) / 100) { const Nu = Ru + 1.35 * GC * a * a * H * levels, r = S.column(Nu / 1000, a, l0, m); if (r.Areq <= 0.02 * a * a * 1e4 && r.lam <= 70) { out = { a, Nu, Ns: Rs + GC * a * a * H * levels, r }; break; } }
       let failed = false; if (!out) { a = 0.60; const Nu = Ru + 1.35 * GC * a * a * H * levels; out = { a, Nu, Ns: Rs + GC * a * a * H * levels, r: S.column(Nu / 1000, a, l0, m) }; failed = true; warn.push('Poteau ' + lab[c.id] + ' : 60 × 60 cm insuffisant, réduisez la charge (ajoutez des poteaux) ou étudiez-le avec un ingénieur.'); }
@@ -155,8 +192,9 @@
     if (r.warnings.length) h += '<div class="w"><b>Points d\'attention</b><br>' + r.warnings.map(esc).join('<br>') + '</div>';
     if (r.slab) { h += `<h2>2. Dalle (épaisseur ${Math.round(r.slab.h * 100)} cm)</h2><table>${head(['Panneau', 'lx × ly (m)', 'α', 'pu (kN/m²)', 'M0x / M0y (kN.m/m)', 'Chapeaux / travée sens x', 'sens y', 'τu / limite (MPa)'])}`;
       r.slab.panels.forEach(d => { h += row([d.id, f(d.lx) + ' × ' + f(d.ly), f(d.alpha) + (d.oneWay ? ' (portée unique)' : ''), f(d.pu), f(d.M0x) + ' / ' + f(d.M0y), 'travée ' + d.barTx.text + ' ; chapeaux ' + d.barAx.text, 'travée ' + d.barTy.text + ' ; chapeaux ' + d.barAy.text, f(d.tau) + ' / ' + f(d.tauLim)]); }); h += '</table><p class="note">Moments : coefficients de l\'annexe E3 (ν = 0) ; moments en travée 0,85 M0, sur appuis 0,5 M0. Pas d\'armatures d\'effort tranchant (τu ≤ 0,07 fc28/γb).</p>'; }
-    h += `<h2>3. Poutres</h2><table>${head(['Poutre', 'Entre', 'Portée (m)', 'Section b × h (cm)', 'pu (kN/m)', 'M0 (kN.m)', 'Travée', 'Appui', 'Vu (kN)', 'τu (MPa)', 'Cadres HA6'])}`;
-    r.beams.forEach(b => { h += row([b.id + (b.manual ? ' (dessinée)' : ''), b.from + '–' + b.to, f(b.L), Math.round(b.b * 100) + ' × ' + Math.round(b.h * 100), f(b.pu), f(b.M0), b.barT.text, b.barA.text, f(b.Vu, 1), f(b.tau), 'e=' + b.st + ' cm']); }); h += '</table><p class="note">Charges sur les poutres : charges équivalentes des dalles (triangle ou trapèze), poids propre et maçonnerie. Moment en travée 0,85 M0, sur appui 0,5 M0. Armatures longitudinales de montage non détaillées.</p>';
+    h += `<h2>3. Poutres</h2><table>${head(['Poutre', 'Entre', 'Portée (m)', 'Section b × h (cm)', 'Continuité', 'pu (kN/m)', 'M0 (kN.m)', 'M appui gauche / travée / appui droit (kN.m)', 'Armatures de travée', 'Chapeaux (appui g. / appui d.)', 'Vu (kN)', 'τu (MPa)', 'Cadres HA6'])}`;
+    r.beams.forEach(b => { h += row([b.id + (b.manual ? ' (dessinée)' : ''), b.from + '–' + b.to, f(b.L), Math.round(b.b * 100) + ' × ' + Math.round(b.h * 100), b.nSpans > 1 ? 'travée ' + b.pos + '/' + b.nSpans + ' (' + (b.method === 'caquot' ? 'Caquot' : 'forfaitaire') + ')' : 'travée isolée', f(b.pu), f(b.M0), f(b.MA, 1) + ' / ' + f(b.Mt, 1) + ' / ' + f(b.MB, 1), b.barT.text, (b.AaA > 0 ? S.beamBars(b.AaA, b.b).text : '—') + ' / ' + (b.AaB > 0 ? S.beamBars(b.AaB, b.b).text : '—'), f(b.Vu, 1), f(b.tau), 'e=' + b.st + ' cm']); });
+    h += '</table><p class="note">Poutres alignées reliées par un poteau : poutre continue, calculée par la méthode forfaitaire (BAEL B.6.2,21) quand Q ≤ 2G et que les portées voisines sont dans un rapport de 0,8 à 1,25, sinon par la méthode de Caquot (B.6.2,22). Moments aux appuis de rive : 0,15 M0 (encastrement partiel). Section commune à toute la file. Efforts tranchants majorés de 10 % (2 travées) ou 15 % (3 travées et plus) sur le premier appui intermédiaire. Charges sur les poutres : charges équivalentes des dalles (triangle, trapèze), poids propre et maçonnerie. Armatures de montage non détaillées.</p>';
     h += `<h2>4. Poteaux et semelles isolées</h2><table>${head(['Poteau', 'Section (cm)', 'Nu (kN)', 'Ns (kN)', 'λ', 'Armatures', 'Cadres', 'Semelle A × A (m)', 'Hauteur (m)', 'Aciers de semelle', 'σ sol (MPa)'])}`;
     r.columns.forEach(c => { h += row([c.label, Math.round(c.a * 100) + ' × ' + Math.round(c.a * 100), f(c.Nu, 0), f(c.Ns, 0), f(c.lam, 1), c.bars.text + ' (A = ' + f(c.Areq) + ' cm² requis, mini ' + f(c.Amin) + ')', c.tie, f(c.footing.side) + ' × ' + f(c.footing.side), f(c.footing.h), c.footing.bars.text, f(c.footing.sigma)]); });
     h += `</table><p class="note">Poteaux : méthode forfaitaire BAEL B.8.4 (élancement, flambement), longueur de flambement 0,7 l0, majoration de 10 % des charges pour un poteau continu. Semelles : méthode des bielles, aciers = max(ELU, ELS fissuration préjudiciable). Charges totales : Nu = ${f(r.totals.Nu, 0)} kN, Ns = ${f(r.totals.Ns, 0)} kN.</p></body></html>`; return h; };

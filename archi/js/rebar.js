@@ -13,12 +13,16 @@
     const r = doc.struct.result; if (!r || r.errors.length) return null; const m = r.mat, p = r.params, colBy = {}; r.columns.forEach(c => { colBy[c.id] = c; });
     const out = { beams: [], cols: [], foots: [], slabs: [], mat: m, H: r.H, hs: r.hs, ls: d => R.ls(d, m) };
     r.beams.forEach(b => { const A_ = colBy[b.ca], B_ = colBy[b.cb], aA = A_.a, aB = B_.a, Ln = b.L - (aA + aB) / 2, bars = [], d = b.barT.d, n = b.barT.n;
-      const straight = b.L + (aA + aB) / 2 - 2 * C, mont = { n: 2, d: MONT }, need = Math.max(0, b.Aa - 2 * area(MONT)), chap = need > 0.3 ? A.struct.beamBars(need, b.b) : null, nCad = Math.max(1, Math.floor(Ln / (b.st / 100) + 1e-9)), cadLen = 2 * (b.b - 2 * C) + 2 * (b.h - 2 * C) + 2 * 10 * ST / 1000;
+      const straight = b.L + (aA + aB) / 2 - 2 * C, mont = { n: 2, d: MONT }, cad = ST, nCad = Math.max(1, Math.floor(Ln / (b.st / 100) + 1e-9)), cadLen = 2 * (b.b - 2 * C) + 2 * (b.h - 2 * C) + 2 * 10 * ST / 1000;
+      const capBars = Aa => { const need = Math.max(0, Aa - 2 * area(MONT)); return need > 0.3 ? A.struct.beamBars(need, b.b) : null; }, chapA = capBars(b.AaA), chapB = capBars(b.AaB);
+      // a hogging bar over an inner support runs on into the neighbouring span (only this span's share is listed); at an end support it is anchored by a hook
+      const capLen = (ch, cap, end, a) => cap + a / 2 + (end === 'rive' ? -C + hook180(ch.d) : 0), mk = { };
       bars.push(bar('1', 'Armatures inférieures de travée', n, d, straight + 2 * hook180(d), 'straight-hooks'));
       bars.push(bar('2', 'Armatures supérieures de montage', mont.n, mont.d, straight + 2 * hook180(mont.d), 'straight-hooks'));
-      if (chap) bars.push(bar('3', 'Chapeaux sur appuis (de chaque côté)', 2 * chap.n, chap.d, 0.25 * b.L + aA / 2 - C + hook180(chap.d), 'chapeau'));
-      bars.push(bar(chap ? '4' : '3', 'Cadres HA' + ST + ' e=' + b.st + ' cm', nCad, ST, cadLen, 'stirrup'));
-      out.beams.push({ id: b.id, from: b.from, to: b.to, L: b.L, Ln, b: b.b, h: b.h, aA, aB, bot: { n, d }, mont, chap, st: b.st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: b.b * b.h * Ln }); });
+      let k = 3; if (chapA) { mk.A = String(k); bars.push(bar(String(k++), 'Chapeaux sur l\'appui ' + b.from + (b.endA === 'rive' ? ' (ancrés par crochet)' : ' (se poursuivent dans la travée voisine)'), chapA.n, chapA.d, capLen(chapA, b.capA, b.endA, aA), 'chapeau')); }
+      if (chapB) { mk.B = String(k); bars.push(bar(String(k++), 'Chapeaux sur l\'appui ' + b.to + (b.endB === 'rive' ? ' (ancrés par crochet)' : ' (se poursuivent dans la travée voisine)'), chapB.n, chapB.d, capLen(chapB, b.capB, b.endB, aB), 'chapeau')); }
+      mk.cad = String(k); bars.push(bar(String(k), 'Cadres HA' + cad + ' e=' + b.st + ' cm', nCad, cad, cadLen, 'stirrup'));
+      out.beams.push({ id: b.id, from: b.from, to: b.to, L: b.L, Ln, b: b.b, h: b.h, aA, aB, bot: { n, d }, mont, chapA, chapB, capA: b.capA, capB: b.capB, endA: b.endA, endB: b.endB, MA: b.MA, MB: b.MB, Mt: b.Mt, M0: b.M0, method: b.method, chain: b.chain, pos: b.pos, nSpans: b.nSpans, mk, st: b.st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: b.b * b.h * Ln }); });
     r.columns.forEach(c => { const d = c.bars.d, n = c.bars.n, st = Math.max(5, Math.floor(Math.min(15 * d / 10, 40, c.a * 100 + 10) / 5) * 5), nCad = Math.floor(r.H / (st / 100)) + 2, ft = c.footing, ls = p.nlev > 1 ? R.ls(d, m) : 0;
       const L1 = r.H - C + (ft.h - CF) + hook90(d) + ls, cadLen = 4 * (c.a - 2 * C) + 2 * 10 * ST / 1000, bars = [bar('1', 'Armatures longitudinales' + (ls ? ' (attentes de ' + A.fmt(ls) + ' m au niveau supérieur)' : ''), n, d, L1, 'column'), bar('2', 'Cadres HA' + ST + ' e=' + st + ' cm', nCad, ST, cadLen, 'stirrup')];
       out.cols.push({ id: c.id, label: c.label, a: c.a, H: r.H, n, d, st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: c.a * c.a * r.H, lap: ls });
@@ -57,7 +61,7 @@
   const table = e =>`<table class="bars"><tr><th>Rep.</th><th>Désignation</th><th>Ø</th><th>Nb</th><th>Long. unit. (m)</th><th>Long. totale (m)</th><th>Poids (kg)</th></tr>${e.bars.map(b => `<tr><td>${b.mark}</td><td>${esc(b.desc)}</td><td>HA${b.d}</td><td>${b.n}</td><td>${f1(b.len)}</td><td>${f1(b.n * b.len)}</td><td>${f1(b.kg)}</td></tr>`).join('')}<tr class="tot"><td colspan="6">Total</td><td>${f1(e.kg)}</td></tr></table>`;
 
   // ---------- beam: longitudinal section + two cross sections ----------
-  R.beamSVG = (e) => { const W = 940, s = (W - 140) / (e.L + 0.8), ox = 70, X = x => ox + (x + 0.4) * s, yT = 60, hh = e.h * s, colH = 0.6 * s, H = yT + hh + colH + 40, c = C * s, out = [];
+  R.beamSVG = (e) => { const W = 940, s = (W - 140) / (e.L + 0.8), ox = 70, X = x => ox + (x + 0.4) * s, yT = 80, hh = e.h * s, colH = 0.6 * s, H = yT + hh + colH + 40, c = C * s, out = [];
     [[0, e.aA], [e.L, e.aB]].forEach(([x, a]) => { out.push(Rc(X(x - a / 2), yT, a * s, hh + colH, GREY)); });
     out.push(Rc(X(-e.aA / 2), yT, (e.L + (e.aA + e.aB) / 2) * s, hh, '#fff'));
     const x0 = X(-e.aA / 2 + C), x1 = X(e.L + e.aB / 2 - C), leg = Math.min(0.2 * s, hh * 0.35), yB = yT + hh - c - e.bot.d / 2000 * s, yTop = yT + c + MONT / 2000 * s;
@@ -65,13 +69,16 @@
     const face = e.aA / 2; for (let i = 0; i < e.nCad; i++) { const x = X(face + (e.st / 2 + i * e.st) / 100); out.push(L(x, yT + c, x, yT + hh - c, BLUE, 1)); }
     out.push(Pth([[x0, yB - leg], [x0, yB], [x1, yB], [x1, yB - leg]], RED, Math.max(2, e.bot.d / 1000 * s)));
     out.push(Pth([[x0, yTop + leg], [x0, yTop], [x1, yTop], [x1, yTop + leg]], RED, Math.max(1.6, MONT / 1000 * s)));
-    if (e.chap) { const yC = yTop + 0.03 * s + e.chap.d / 1000 * s, lc = 0.25 * e.L * s, w = Math.max(1.8, e.chap.d / 1000 * s); out.push(Pth([[x0, yC + leg * 0.8], [x0, yC], [X(0.25 * e.L), yC]], '#8e44ad', w)); out.push(Pth([[x1, yC + leg * 0.8], [x1, yC], [X(e.L - 0.25 * e.L), yC]], '#8e44ad', w)); }
+    const yC = yTop + 0.03 * s + MONT / 1000 * s, capW = d => Math.max(1.8, d / 1000 * s);
+    if (e.chapA) out.push(Pth([[x0, yC + leg * 0.8], [x0, yC], [X(e.capA), yC]], '#8e44ad', capW(e.chapA.d)));
+    if (e.chapB) out.push(Pth([[x1, yC + leg * 0.8], [x1, yC], [X(e.L - e.capB), yC]], '#8e44ad', capW(e.chapB.d)));
     const yBot = yT + hh + 18, yUp = yT - 8, lead = (x, y1, y2) => L(x, y1, x, y2, MUTE, 0.7, 'stroke-dasharray="2 2"');
     out.push(lead(X(e.L / 2), yBot - 8, yB), mark(X(e.L / 2), yBot, '1'), lead(X(e.L / 2), yUp + 8, yTop), mark(X(e.L / 2), yUp, '2'));
-    if (e.chap) out.push(lead(X(0.12 * e.L), yUp + 8, yTop + 0.03 * s + e.chap.d / 1000 * s), mark(X(0.12 * e.L), yUp, '3'));
-    const xc = X(face + (e.st / 2 + 3 * e.st) / 100); out.push(lead(xc, yBot - 8, yT + hh - c), mark(xc, yBot, e.chap ? '4' : '3'));
+    if (e.chapA) out.push(lead(X(0.12 * e.L), yUp + 8, yC), mark(X(0.12 * e.L), yUp, e.mk.A));
+    if (e.chapB) out.push(lead(X(0.88 * e.L), yUp + 8, yC), mark(X(0.88 * e.L), yUp, e.mk.B));
+    const xc = X(face + (e.st / 2 + 3 * e.st) / 100); out.push(lead(xc, yBot - 8, yT + hh - c), mark(xc, yBot, e.mk.cad));
     out.push(dimH(X(0), X(e.L), yT - 22, 'L = ' + f1(e.L) + ' m entre axes'), dimV(X(-e.aA / 2) - 12, yT, yT + hh, Math.round(e.h * 100) + ' cm'));
-    out.push(T(ox, 22, `${e.id} — ${e.from} à ${e.to} — section ${Math.round(e.b * 100)} × ${Math.round(e.h * 100)} cm`, 'start', INK, 14, 'font-weight="700"'));
+    out.push(T(ox, 22, `${e.id} — ${e.from} à ${e.to} — section ${Math.round(e.b * 100)} × ${Math.round(e.h * 100)} cm`, 'start', INK, 14, 'font-weight="700"'), T(ox, 38, (e.nSpans > 1 ? `Poutre continue de ${e.nSpans} travées (travée ${e.pos}), méthode ${e.method === 'caquot' ? 'de Caquot' : 'forfaitaire'} — ` : 'Travée isolée — ') + `M appui ${e.from} = ${f1(e.MA)}, M travée = ${f1(e.Mt)}, M appui ${e.to} = ${f1(e.MB)} kN.m`, 'start', MUTE, 11));
     out.push(T(ox, H - 10, 'Coupe longitudinale (échelle indicative) — poteaux en gris, cadres en bleu, chapeaux en violet', 'start', MUTE, 10));
     return svg(W, H, out.join('')); };
   R.beamSectionSVG = (e) => { const s = 300 / Math.max(e.b, e.h) * 0.8, W = 640, H = e.h * s + 90, c = C * s, bw = e.b * s, bh = e.h * s, d = e.bot.d / 1000 * s, dc = ST / 1000 * s, out = [];
@@ -79,7 +86,7 @@
       out.push(T(ox + bw / 2, 22, title, 'middle', INK, 12, 'font-weight="700"'), Rc(ox, oy, bw, bh, '#fff'), Rc(ox + c, oy + c, bw - 2 * c, bh - 2 * c, 'none', BLUE, Math.max(1.2, dc)));
       const lo = ox + c + dc + d / 2, hi = ox + bw - c - dc - d / 2; spread(e.bot.n, lo, hi).forEach(x => out.push(Ci(x, oy + bh - c - dc - d / 2, d / 2)));
       const md = MONT / 1000 * s, top = [lo + (md - d) / 2, hi - (md - d) / 2]; top.forEach(x => out.push(Ci(x, oy + c + dc + md / 2, md / 2)));
-      if (support && e.chap) { const cd = e.chap.d / 1000 * s, ys = oy + c + dc + md + cd * 0.9; spread(e.chap.n, lo + 4, hi - 4).forEach(x => out.push(Ci(x, ys, cd / 2, '#8e44ad'))); }
+      const ch = e.chapA && e.chapB ? (e.chapA.n * e.chapA.d * e.chapA.d >= e.chapB.n * e.chapB.d * e.chapB.d ? e.chapA : e.chapB) : e.chapA || e.chapB; if (support && ch) { const cd = ch.d / 1000 * s, ys = oy + c + dc + md + cd * 0.9; spread(ch.n, lo + 4, hi - 4).forEach(x => out.push(Ci(x, ys, cd / 2, '#8e44ad'))); }
       out.push(dimH(ox, ox + bw, oy + bh + 22, Math.round(e.b * 100) + ' cm'), dimV(ox - 10, oy, oy + bh, Math.round(e.h * 100))); });
     return svg(W, H, out.join('')); };
 

@@ -49,21 +49,21 @@ Les réglages de rendu sont enregistrés avec le plan (`doc.render`). Les murs d
 Pour une structure poteaux-poutres-dalles en béton armé avec remplissage en maçonnerie. Le panneau « Structure (BAEL) » (à droite, en 2D) regroupe les données et les boutons.
 
 1. **Poteaux** : « Placer les poteaux automatiquement » les pose aux coins et extrémités des murs et le long des murs longs (portée maximale réglable, 4,5 m par défaut), ou outil Poteau (P).
-2. **Poutres** : déduites des poteaux alignés sur un mur ; poutres supplémentaires avec l'outil Poutre (B) entre deux poteaux.
+2. **Poutres** : déduites des poteaux alignés sur un mur ; poutres supplémentaires avec l'outil Poutre (B) entre deux poteaux. Des poutres alignées qui se rejoignent sur un poteau forment une **poutre continue** (une seule section pour toute la file).
 3. **Dalles** : chaque rectangle fermé par des poutres est un panneau (les côtés peuvent comporter plusieurs poutres).
 4. **Données** : béton fc28, acier FeE400/500, contrainte admissible du sol, nombre de niveaux, plancher haut (dalle terrasse ou charpente légère), usage (Q), revêtements (G). Maçonnerie : 2,8 kN/m² de mur, réduite des ouvertures.
 5. **Calculer** : le plan se couvre des sections (poteaux, poutres), de l'épaisseur des dalles et des semelles (pointillés). « Appliquer les sections aux poteaux » les reporte dans le modèle et la 3D. « Note de calcul » produit un fichier HTML imprimable (hypothèses, tableaux, remarques).
 
-**Ce que le calcul fait (BAEL 91 révisé 99, ELU et ELS)** : combinaisons 1,35 G + 1,5 Q et G + Q. Dalles : épaisseur minimale (lx/40 ou lx/30, au moins 12 cm) puis vérification en flexion et à l'effort tranchant, moments par l'annexe E3 (ν = 0), armatures de travée et de chapeaux. Poutres : charges équivalentes des dalles (triangle, trapèze), poids propre et maçonnerie, section la plus petite qui passe en flexion simple sans armatures comprimées et au cisaillement, cadres HA6. Poteaux : méthode forfaitaire B.8.4 (élancement, flambement, armatures minimale et maximale), charge majorée de 10 % pour un poteau continu. Semelles isolées carrées : surface selon le sol, hauteur et aciers par la méthode des bielles (maximum ELU et ELS fissuration préjudiciable).
+**Ce que le calcul fait (BAEL 91 révisé 99, ELU et ELS)** : combinaisons 1,35 G + 1,5 Q et G + Q. Dalles : épaisseur minimale (lx/40 ou lx/30, au moins 12 cm) puis vérification en flexion et à l'effort tranchant, moments par l'annexe E3 (ν = 0), armatures de travée et de chapeaux. Poutres : charges équivalentes des dalles (triangle, trapèze), poids propre et maçonnerie ; poutres continues par la **méthode forfaitaire** (BAEL B.6.2,21 : appuis de rive 0,15 M0, appui central 0,6 M0 pour 2 travées, 0,5 puis 0,4 M0 au-delà, moments de travée par Mt + (Mw + Me)/2 ≥ max(1,05 ; 1 + 0,3α) M0, tranchant majoré de 10 ou 15 % sur le premier appui intermédiaire) quand Q ≤ 2G et que les portées voisines sont dans un rapport de 0,8 à 1,25, sinon par la **méthode de Caquot** (B.6.2,22 : portées fictives l' = L ou 0,8 L, travée chargée et voisines à 1,35 G) ; section la plus petite qui passe en flexion simple (travée et appuis) sans armatures comprimées et au cisaillement, cadres HA6. Les réactions aux poteaux viennent de cette analyse (continuité comprise). Poteaux : méthode forfaitaire B.8.4 (élancement, flambement, armatures minimale et maximale), charge majorée de 10 % pour un poteau continu. Semelles isolées carrées : surface selon le sol, hauteur et aciers par la méthode des bielles (maximum ELU et ELS fissuration préjudiciable).
 
-**Limites** : pré-dimensionnement seulement, à vérifier et valider par un ingénieur structure avant toute exécution. Non traités : séisme, vent, poinçonnement, flèche des poutres, poutres continues détaillées (moment de travée forfaitaire 0,85 M0), dégression des charges d'exploitation, semelles filantes et radiers (les chevauchements sont signalés), charpente, escaliers, balcons, sol multicouche. Cadre rectangulaire seulement pour les dalles.
+**Limites** : pré-dimensionnement seulement, à vérifier et valider par un ingénieur structure avant toute exécution. Non traités : séisme, vent, poinçonnement, flèche des poutres, charges concentrées sur les poutres, nœuds poutre-poteau (moments transmis aux poteaux), dégression des charges d'exploitation, semelles filantes et radiers (les chevauchements sont signalés), charpente, escaliers, balcons, sol multicouche. Cadre rectangulaire seulement pour les dalles.
 
 ## Plans de ferraillage
 
 Après le calcul, le bouton « Ferraillage » (ou la touche 4) affiche, pour chaque élément, le plan d'armatures et son tableau de nomenclature :
 
 - **Plan de repérage** : poteaux, poutres, semelles et dalles avec leurs repères et leurs sections.
-- **Poutres** : coupe longitudinale (barres inférieures, montage, chapeaux, cadres) et coupes en travée et sur appui.
+- **Poutres** : coupe longitudinale (barres inférieures, montage, chapeaux sur chaque appui, cadres, moments d'appui et de travée, rappel de la continuité) et coupes en travée et sur appui. Un chapeau sur un appui intermédiaire se poursuit dans la travée voisine (seule sa part est comptée), un chapeau de rive est ancré par un crochet.
 - **Poteaux** : élévation avec la semelle (barres, équerre de pied, cadres) et coupe transversale (barres réparties dans le carré).
 - **Semelles** : vue en plan du quadrillage et coupe.
 - **Dalles** : vue en plan des lits inférieurs dans les deux sens et des chapeaux sur appuis.
@@ -75,4 +75,4 @@ Conventions : enrobage 3 cm (5 cm pour les semelles, sur béton de propreté de 
 
 ## Étapes suivantes
 
-1. Poutres continues et semelles filantes, descente de charges par niveau détaillée, détail des nœuds.
+1. Semelles filantes, descente de charges par niveau détaillée, détail des nœuds, flèche des poutres.
