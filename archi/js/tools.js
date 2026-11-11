@@ -171,6 +171,7 @@
   window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftKey = false; if (e.key === ' ') spaceKey = false; });
   window.addEventListener('keydown', e => {
     if (/^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName)) return;
+    if (A.mode === '3d') { const k3 = e.key.toLowerCase(); if (e.key === '2' || e.key === 'Escape') A.setMode('2d'); else if (k3 === 'h') A.v3.preset('iso'); else if (k3 === 't') A.v3.preset('top'); return; }
     if (e.key === 'Shift') shiftKey = true; if (e.key === ' ') { spaceKey = true; e.preventDefault(); return; }
     const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
     if (mod) { if (k === 'z') { e.preventDefault(); e.shiftKey ? A.redo() : A.undo(); } else if (k === 'y') { e.preventDefault(); A.redo(); }
@@ -180,6 +181,7 @@
       if (e.key === 'Backspace' && A.typed) { A.typed = A.typed.slice(0, -1); A.updatePreview(); A.redraw(); A.status && A.status(); e.preventDefault(); return; }
       if (e.key === 'Enter') { if (A.typed) A.commitTyped(); else A.finishChain(); e.preventDefault(); return; }
     }
+    if (e.key === '3') { A.setMode('3d'); return; }
     if (e.key === 'Escape') { if (A.typed) { A.typed = ''; A.updatePreview(); A.redraw(); A.status && A.status(); } else if (A.pts.length) A.finishChain(); else if (A.sel.length) { A.sel = []; A.emit(); } else A.setTool('select'); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (A.sel.length) { A.edit(d => A.removeIds(A.sel)); A.sel = []; A.emit(); } return; }
     const tool = { v: 'select', m: 'wall', l: 'line', r: 'rect', d: 'door', f: 'window', c: 'dim', t: 'text' }[k];

@@ -13,7 +13,8 @@
 <body>
 <header id="top">
   <div class="brand"><img src="icons/logo.svg" alt="" width="26" height="26"><b>Archi 2D</b><input id="docName" aria-label="Nom du plan" value="Sans titre"></div>
-  <div class="grp">
+  <div class="grp" id="modes" role="group" aria-label="Mode"><button id="mode2" aria-pressed="true" title="Dessin 2D (2)">2D</button><button id="mode3" aria-pressed="false" title="Vue 3D (3)">3D</button></div>
+  <div class="grp" id="tools2d">
     <button id="undo" title="Annuler (Ctrl+Z)" aria-label="Annuler">↶</button>
     <button id="redo" title="Rétablir (Ctrl+Y)" aria-label="Rétablir">↷</button>
     <button id="tGrid" class="tog" aria-pressed="true" title="Grille magnétique (G)">Grille</button>
@@ -21,21 +22,23 @@
     <button id="tOrtho" class="tog" aria-pressed="false" title="Orthogonal (O, ou maintenir Maj)">Ortho</button>
     <button id="fit" title="Tout voir (H)">Tout voir</button>
     <button id="lenBtn" hidden title="Saisir une longueur ou 4x3">Longueur…</button>
-    <button id="menuBtn" aria-haspopup="true" aria-expanded="false">Fichier ▾</button>
     <button id="panelBtn" class="only-small" aria-pressed="false">Calques</button>
   </div>
+  <div class="grp"><button id="menuBtn" aria-haspopup="true" aria-expanded="false">Fichier ▾</button></div>
   <div id="menu" hidden>
     <button data-act="new">Nouveau plan</button>
     <button data-act="open">Ouvrir un plan (.json)…</button>
     <button data-act="save">Enregistrer (.json)</button>
     <button data-act="dxf">Exporter en DXF (AutoCAD, mm)</button>
-    <button data-act="png">Exporter en image PNG</button>
+    <button data-act="png">Exporter en image PNG (plan)</button>
   </div>
   <input id="file" type="file" accept=".json,application/json" hidden>
 </header>
 <main>
   <nav id="tools" aria-label="Outils"></nav>
-  <div id="stage"><canvas id="cv" aria-label="Zone de dessin"></canvas></div>
+  <div id="stage"><canvas id="cv" aria-label="Zone de dessin"></canvas><canvas id="cv3" aria-label="Vue 3D" hidden></canvas>
+    <div id="bar3" hidden><button data-v="iso">Isométrique</button><button data-v="top">Dessus</button><button data-v="front">Face</button><button data-v="png">Image PNG</button></div>
+    <p id="msg3" hidden></p></div>
   <aside id="panel">
     <section><h2>Calques</h2><div id="layers"></div><button id="addLayer" class="wide">+ Nouveau calque</button></section>
     <section><h2 id="propsTitle">Propriétés</h2><div id="props"></div></section>
@@ -45,6 +48,8 @@
 <script src="js/core.js"></script>
 <script src="js/draw.js"></script>
 <script src="js/tools.js"></script>
+<script src="js/mesh.js"></script>
+<script src="js/view3d.js"></script>
 <script src="js/io.js"></script>
 <script src="js/main.js"></script>
 </body>

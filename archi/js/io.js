@@ -2,6 +2,7 @@
 (function () {
   const A = window.App;
   const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  A.download = download;
   const base = () => (A.doc.name || 'plan').replace(/[^\w\-À-ÿ ]+/g, '').trim().replace(/\s+/g, '-') || 'plan';
   A.exportJSON = () => download(base() + '.archi.json', new Blob([JSON.stringify(A.doc, null, 1)], { type: 'application/json' }));
   A.importJSON = text => { const d = JSON.parse(text); if (!A.valid(d)) throw new Error('Fichier non reconnu'); if (!d.layers.some(l => l.id === d.active)) d.active = d.layers[0].id; d.defaults = d.defaults || { th: 0.2, h: 2.8 }; A.setDoc(d); };

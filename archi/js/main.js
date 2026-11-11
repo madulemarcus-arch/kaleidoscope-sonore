@@ -9,7 +9,7 @@
   const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true }); };
   A.redraw = () => { if (!raf) raf = requestAnimationFrame(paint); };
   A.fitView = () => { A.fit(W, H); A.redraw(); };
-  new ResizeObserver(resize).observe($('stage'));
+  new ResizeObserver(() => { if (A.mode === '3d') A.v3.resize(); else resize(); }).observe($('stage'));
 
   // ---------- toolbar + toggles ----------
   const tools = $('tools');
@@ -19,6 +19,22 @@
   $('panelBtn').onclick = () => { const o = $('panel').classList.toggle('open'); $('panelBtn').setAttribute('aria-pressed', o); };
   $('lenBtn').onclick = () => { const s = prompt(A.tool === 'rect' ? 'Dimensions en mètres (ex. 4x3) :' : 'Longueur en mètres :'); if (s) A.commitTyped(s); };
   $('docName').onchange = e => A.edit(d => { d.name = e.target.value.trim() || 'Sans titre'; });
+
+  // ---------- 2D / 3D mode ----------
+  const cv3 = $('cv3'); let first3 = true;
+  A.mode = '2d';
+  A.setMode = m => {
+    if (m === A.mode) return;
+    if (m === '3d') { A.cancel(); if (!A.v3.init(cv3)) { alert('La vue 3D demande WebGL, absent de ce navigateur.'); return; } A.mode = '3d'; if (first3) { A.v3.initInput(cv3); first3 = false; } }
+    else A.mode = '2d';
+    const d3 = A.mode === '3d'; document.body.dataset.mode = A.mode; cv.hidden = d3; cv3.hidden = !d3; $('bar3').hidden = !d3;
+    $('mode2').setAttribute('aria-pressed', String(!d3)); $('mode3').setAttribute('aria-pressed', String(d3));
+    if (d3) { A.v3.rebuild(); A.v3.resize(); A.v3.preset('iso'); const none = !A.v3.mesh.stats.walls; $('msg3').hidden = !none; $('msg3').textContent = 'Aucun mur à afficher : dessinez d\'abord en 2D.'; }
+    else { $('msg3').hidden = true; resize(); }
+    A.emit();
+  };
+  $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
+  $('bar3').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; if (v === 'png') { A.v3.render(); cv3.toBlob(b => A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-3d.png', b), 'image/png'); } else A.v3.preset(v); };
 
   // ---------- file menu ----------
   const menu = $('menu'), closeMenu = () => { menu.hidden = true; $('menuBtn').setAttribute('aria-expanded', 'false'); };
@@ -71,7 +87,7 @@
   }
 
   // ---------- status + global refresh ----------
-  A.status = () => { const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m · ${A.fmt(A.view.s, 0)} px/m`;
+  A.status = () => { if (A.mode === '3d') { $('coords').textContent = ''; $('hint').textContent = 'Glissez pour tourner · Maj ou clic droit + glisser : déplacer · molette ou deux doigts : zoom'; return; } const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m · ${A.fmt(A.view.s, 0)} px/m`;
     $('hint').textContent = A.typed ? `Saisie : ${A.typed} (Entrée pour valider)` : A.hint(); };
   A.on(() => {
     tools.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === A.tool)));
