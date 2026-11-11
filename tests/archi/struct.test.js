@@ -26,6 +26,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const r0 = await page.evaluate(() => { const r = App.struct.compute(App.doc); return r.errors; }); check('sans poteau : message d\'aide', r0.length === 1 && /poteau/i.test(r0[0]), r0.join());
   const n = await page.evaluate(() => App.struct.autoColumns()); check('poteaux automatiques : 4 coins + 2 milieux de grands côtés', n === 6, String(n));
   check('pas de doublon au second passage', (await page.evaluate(() => App.struct.autoColumns())) === 0);
+  await page.evaluate(() => App.edit(d => { d.struct.p.crack = false; }));   // gross sections here: the cracked stiffness has its own test file
   const r = await page.evaluate(() => JSON.parse(JSON.stringify(App.struct.run())));
   check('calcul sans erreur', r.errors.length === 0 && r.columns.length === 6 && r.beams.length === 6, JSON.stringify(r.errors));
   check('une dalle de 4 × 6 m, épaisseur 12 cm', !!r.slab && r.slab.panels.length === 1 && near(r.slab.panels[0].lx, 4, 1e-9) && near(r.slab.panels[0].ly, 6, 1e-9) && near(r.slab.h, 0.12, 1e-9), JSON.stringify(r.slab && r.slab.h));

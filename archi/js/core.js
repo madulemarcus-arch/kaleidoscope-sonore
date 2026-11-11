@@ -1,7 +1,7 @@
 // Core: document model, geometry helpers, hit testing, undo/redo, autosave.
 // All coordinates are in metres, x to the right, y UP (screen conversion happens in draw.js).
 (function () {
-  const A = window.App = { BUILD: 'archi-v12', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
+  const A = window.App = { BUILD: 'archi-v13', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
   const L = (id, name, color) => ({ id, name, color, on: true, lock: false });
   A.uid = () => Math.random().toString(36).slice(2, 9);
   A.newDoc = () => A.ensureDoc({ v: 1, name: 'Sans titre', active: 'mur', defaults: { th: 0.2, h: 2.8 },
@@ -11,7 +11,7 @@
     armoire: ['Armoire', 1.2, 0.6, 2.0, [0.55, 0.40, 0.25]], bureau: ['Bureau', 1.4, 0.7, 0.75, [0.70, 0.58, 0.40]], cuisine: ['Plan de cuisine', 2.4, 0.6, 0.9, [0.85, 0.85, 0.82]], lavabo: ['Lavabo', 0.6, 0.5, 0.85, [0.95, 0.95, 0.95]],
     wc: ['WC', 0.4, 0.7, 0.4, [0.95, 0.95, 0.95]], douche: ['Douche', 0.9, 0.9, 0.1, [0.80, 0.90, 0.95]], baignoire: ['Baignoire', 1.7, 0.75, 0.55, [0.95, 0.95, 0.95]] };
   // BAEL 91 (rev. 99) pre-sizing parameters. Stresses in MPa, loads in kN/m2 (kN/m for walls per m2 of wall).
-  A.STRUCT_DEFAULTS = { fc28: 25, fe: 500, sigSol: 0.2, nlev: 1, top: 'dalle', G2: 2.0, Q: 1.5, G2top: 1.5, Qtop: 1.0, Groof: 1.0, Qroof: 0.5, wallLoad: 2.8, maxSpan: 4.5, found: 'auto', degr: true, frame: true, base: 'pin' };
+  A.STRUCT_DEFAULTS = { fc28: 25, fe: 500, sigSol: 0.2, nlev: 1, top: 'dalle', G2: 2.0, Q: 1.5, G2top: 1.5, Qtop: 1.0, Groof: 1.0, Qroof: 0.5, wallLoad: 2.8, maxSpan: 4.5, found: 'auto', degr: true, frame: true, base: 'pin', crack: true, crackB: 0.35, crackC: 0.7, vent: 0 };
   // Fills in everything a document needs (older plans lack the rendering settings and the furniture layer).
   A.ensureDoc = d => { d.defaults = d.defaults || { th: 0.2, h: 2.8 };
     d.render = Object.assign({ wallMat: 'crepi', floorMat: 'carrelage', roof: 'none', slope: 25, over: 0.4, roofMat: 'tuile', hour: 14, shadows: true }, d.render || {});

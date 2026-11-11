@@ -8,7 +8,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   check('sans calcul : message et bouton Calculer', /Aucun calcul/.test(await page.textContent('#ferMain')) && await page.locator('#ferCalc').isVisible());
   check('outils 2D masqués', !(await page.locator('#tools').isVisible())); await key('2');
   await key('r'); await click(-3, -2); await click(3, 2); await key('d'); await click(0, -2); await key('f'); await click(3, 0); await key('v');
-  await page.evaluate(() => { App.struct.autoColumns(); App.struct.run(); });
+  await page.evaluate(() => { App.struct.autoColumns(); App.edit(d => { d.struct.p.crack = false; }); App.struct.run(); });
   await page.click('#mode4'); check('bouton Ferraillage', await page.locator('#fer').isVisible() && !(await page.locator('#cv').isVisible()));
   const ids = await page.$$eval('#ferList button', b => b.map(x => x.dataset.v));
   check('28 vues : repérage, descente de charges, 6 poutres, 6 poteaux, 6 nœuds, 6 semelles, 1 dalle, métré', ids.length === 28 && ids[0] === 'plan' && ids[1] === 'dc' && ids.filter(i => /^ND-/.test(i)).length === 6 && ids[ids.length - 1] === 'qty', ids.join(','));
