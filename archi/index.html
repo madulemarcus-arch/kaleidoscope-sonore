@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12365d">
+<title>Archi 2D — plans d'architecture</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><img src="icons/logo.svg" alt="" width="26" height="26"><b>Archi 2D</b><input id="docName" aria-label="Nom du plan" value="Sans titre"></div>
+  <div class="grp">
+    <button id="undo" title="Annuler (Ctrl+Z)" aria-label="Annuler">↶</button>
+    <button id="redo" title="Rétablir (Ctrl+Y)" aria-label="Rétablir">↷</button>
+    <button id="tGrid" class="tog" aria-pressed="true" title="Grille magnétique (G)">Grille</button>
+    <button id="tSnap" class="tog" aria-pressed="true" title="Accrochage aux points (S)">Points</button>
+    <button id="tOrtho" class="tog" aria-pressed="false" title="Orthogonal (O, ou maintenir Maj)">Ortho</button>
+    <button id="fit" title="Tout voir (H)">Tout voir</button>
+    <button id="lenBtn" hidden title="Saisir une longueur ou 4x3">Longueur…</button>
+    <button id="menuBtn" aria-haspopup="true" aria-expanded="false">Fichier ▾</button>
+    <button id="panelBtn" class="only-small" aria-pressed="false">Calques</button>
+  </div>
+  <div id="menu" hidden>
+    <button data-act="new">Nouveau plan</button>
+    <button data-act="open">Ouvrir un plan (.json)…</button>
+    <button data-act="save">Enregistrer (.json)</button>
+    <button data-act="dxf">Exporter en DXF (AutoCAD, mm)</button>
+    <button data-act="png">Exporter en image PNG</button>
+  </div>
+  <input id="file" type="file" accept=".json,application/json" hidden>
+</header>
+<main>
+  <nav id="tools" aria-label="Outils"></nav>
+  <div id="stage"><canvas id="cv" aria-label="Zone de dessin"></canvas></div>
+  <aside id="panel">
+    <section><h2>Calques</h2><div id="layers"></div><button id="addLayer" class="wide">+ Nouveau calque</button></section>
+    <section><h2 id="propsTitle">Propriétés</h2><div id="props"></div></section>
+  </aside>
+</main>
+<footer id="status"><span id="hint"></span><span id="coords"></span></footer>
+<script src="js/core.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/io.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

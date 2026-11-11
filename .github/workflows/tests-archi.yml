@@ -1,0 +1,33 @@
+# Lance les tests automatiques d'Archi 2D (contrôles statiques + parcours dans Chromium).
+name: Tests Archi 2D
+on:
+  push:
+    branches: [main]
+    paths: ['archi/**', 'tests/archi/**', '.github/workflows/tests-archi.yml']
+  pull_request:
+    paths: ['archi/**', 'tests/archi/**', '.github/workflows/tests-archi.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tests-archi-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - name: Installer Playwright et Chromium
+        working-directory: tests
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Lancer les tests
+        working-directory: tests
+        run: node archi/run.js

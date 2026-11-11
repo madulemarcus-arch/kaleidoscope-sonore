@@ -56,3 +56,9 @@ Rules:
 - Étapes : 1 socle (fait) · 2 clients (fait) · 3 stock/fournisseurs (fait) · 4 factures/paiements/impression (fait) · 5 finance/caisse/rapports (fait) · 6 profils/sauvegarde/synchro (fait ; Google Drive optionnel reporté) · 7 modules optionnels (fait).
 - Règle de reprise : on reprend de CISPOLstore Manager les principes utiles à tous les secteurs (abonnements libres, coût reversé à un fournisseur, relances, impayés, clôture, rôles…) ; on laisse seulement ce qui est propre à Starlink (ACC, pénalités, kits, lecteur de courriels, décor).
 - Design (identité reprise de CISPOLstore Manager) : palette marine `#12365d` / orange `#d5522f` / jaune `#e5b044`, police Inter (`business/fonts/`), en-tête en dégradé, menu du bas aux icônes bicolores animées (`js/icons.js`), héros « verre » avec ciel animé, anneau d'objectif et confettis (`js/fx.js`), clavier PIN rond. Les variables de couleur sont dans `:root` de `css/app.css` ; la marque est `icons/logo.svg` (les PNG de l'application en sont générés).
+
+## Archi 2D (`archi/`) : plans d'architecture
+
+- Logiciel de dessin 2D (murs, portes, fenêtres, cotes, calques, export DXF/PNG/JSON), PWA sans dépendance. Étapes prévues : 1 dessin 2D (fait) · 2 vue 3D automatique · 3 rendu · 4 dimensionnement BAEL. Tests : `cd tests && node archi/run.js`, workflow `.github/workflows/tests-archi.yml`.
+- Mêmes règles que les autres applications : `CACHE` dans `archi/sw.js` = `App.BUILD` dans `archi/js/core.js` ; tout nouveau fichier `js/` va dans `index.html` ET dans `FILES` de `sw.js` ; ne jamais changer `id` ni `start_url` du manifeste.
+- Unités : mètres, y vers le haut ; l'export DXF est en millimètres. Les raccourcis (V, M, L, R, D, F, C, T, O, G, S, H) sont décrits dans `tools.js` (`A.TOOLS` et le gestionnaire `keydown`), `archi/README.md` et les `title` des boutons.
