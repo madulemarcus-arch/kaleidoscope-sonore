@@ -11,7 +11,7 @@
   // ---------- model: every bar of every element, with lengths and weights ----------
   R.model = doc => {
     const r = doc.struct.result; if (!r || r.errors.length) return null; const m = r.mat, p = r.params, colBy = {}; r.columns.forEach(c => { colBy[c.id] = c; });
-    const out = { beams: [], cols: [], foots: [], slabs: [], mat: m, H: r.H, hs: r.hs, ls: d => R.ls(d, m) };
+    const out = { beams: [], cols: [], foots: [], strips: [], slabs: [], mat: m, H: r.H, hs: r.hs, ls: d => R.ls(d, m) };
     r.beams.forEach(b => { const A_ = colBy[b.ca], B_ = colBy[b.cb], aA = A_.a, aB = B_.a, Ln = b.L - (aA + aB) / 2, bars = [], d = b.barT.d, n = b.barT.n;
       const straight = b.L + (aA + aB) / 2 - 2 * C, mont = { n: 2, d: MONT }, cad = ST, nCad = Math.max(1, Math.floor(Ln / (b.st / 100) + 1e-9)), cadLen = 2 * (b.b - 2 * C) + 2 * (b.h - 2 * C) + 2 * 10 * ST / 1000;
       const capBars = Aa => { const need = Math.max(0, Aa - 2 * area(MONT)); return need > 0.3 ? A.struct.beamBars(need, b.b) : null; }, chapA = capBars(b.AaA), chapB = capBars(b.AaB);
@@ -24,10 +24,14 @@
       mk.cad = String(k); bars.push(bar(String(k), 'Cadres HA' + cad + ' e=' + b.st + ' cm', nCad, cad, cadLen, 'stirrup'));
       out.beams.push({ id: b.id, from: b.from, to: b.to, L: b.L, Ln, b: b.b, h: b.h, aA, aB, bot: { n, d }, mont, chapA, chapB, capA: b.capA, capB: b.capB, endA: b.endA, endB: b.endB, MA: b.MA, MB: b.MB, Mt: b.Mt, M0: b.M0, method: b.method, chain: b.chain, pos: b.pos, nSpans: b.nSpans, mk, st: b.st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: b.b * b.h * Ln }); });
     r.columns.forEach(c => { const d = c.bars.d, n = c.bars.n, st = Math.max(5, Math.floor(Math.min(15 * d / 10, 40, c.a * 100 + 10) / 5) * 5), nCad = Math.floor(r.H / (st / 100)) + 2, ft = c.footing, ls = p.nlev > 1 ? R.ls(d, m) : 0;
-      const L1 = r.H - C + (ft.h - CF) + hook90(d) + ls, cadLen = 4 * (c.a - 2 * C) + 2 * 10 * ST / 1000, bars = [bar('1', 'Armatures longitudinales' + (ls ? ' (attentes de ' + A.fmt(ls) + ' m au niveau supérieur)' : ''), n, d, L1, 'column'), bar('2', 'Cadres HA' + ST + ' e=' + st + ' cm', nCad, ST, cadLen, 'stirrup')];
-      out.cols.push({ id: c.id, label: c.label, a: c.a, H: r.H, n, d, st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: c.a * c.a * r.H, lap: ls });
+      const fh = c.strips ? c.fh : ft.h, L1 = r.H - C + (fh - CF) + hook90(d) + ls, cadLen = 4 * (c.a - 2 * C) + 2 * 10 * ST / 1000, bars = [bar('1', 'Armatures longitudinales' + (ls ? ' (attentes de ' + A.fmt(ls) + ' m au niveau supérieur)' : ''), n, d, L1, 'column'), bar('2', 'Cadres HA' + ST + ' e=' + st + ' cm', nCad, ST, cadLen, 'stirrup')];
+      out.cols.push({ id: c.id, label: c.label, a: c.a, H: r.H, n, d, st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: c.a * c.a * r.H, lap: ls, strips: c.strips || null, fh: c.fh, fw: c.fw });
+      if (c.strips) return;
       const fb = ft.bars, fbar = bar('1', 'Aciers de semelle, sens x et sens y (' + fb.n + ' HA' + fb.d + ' par sens)', 2 * fb.n, fb.d, ft.side - 2 * CF + 2 * hook90(fb.d), 'footing');
       out.foots.push({ id: c.id, label: c.label.replace('P', 'S'), col: c.label, side: ft.side, h: ft.h, a: c.a, n: fb.n, d: fb.d, bars: [fbar], kg: fbar.kg, conc: ft.side * ft.side * ft.h, sigma: ft.sigma, Nu: c.Nu }); });
+    (r.strips || []).forEach(st => { const tr = st.barTr, bb = st.barBot, tb = st.barTop, nTr = Math.floor((st.L - 0.10) / (tr.e / 100) + 1e-9) + 1,
+        bars = [bar('1', 'Armatures transversales inférieures HA' + tr.d + ' e=' + tr.e + ' cm', nTr, tr.d, st.B - 2 * CF + 2 * hook90(tr.d), 'strip-tr'), bar('2', 'Armatures longitudinales inférieures (sous les poteaux), ' + bb.text, bb.n, bb.d, st.L - 2 * CF + 2 * hook90(bb.d), 'strip-long'), bar('3', 'Armatures longitudinales supérieures (entre les poteaux), ' + tb.text, tb.n, tb.d, st.L - 2 * CF + 2 * hook90(tb.d), 'strip-long')];
+      out.strips.push({ id: st.id, cols: st.cols.map(c => ({ label: c.label, x: c.x, a: c.a })), B: st.B, L: st.L, h: st.h, d: st.d, x0: st.x0, x1: st.x1, barTr: tr, barBot: bb, barTop: tb, sigma: st.sigma, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: st.B * st.L * st.h }); });
     if (r.slab) r.slab.panels.forEach(s => { const w = s.x1 - s.x0, h = s.y1 - s.y0, shortX = w <= h, spanX = shortX ? s.lx : s.ly, spanY = shortX ? s.ly : s.lx, cnt = (perp, e) => Math.floor(perp * 100 / e + 1e-9) + 1, bars = [];
       const tx = s.barTx, ty = s.barTy, ax = s.barAx, ay = s.barAy;   // x = direction of the short span lx
       const dirs = [['x', tx, ax, s.lx, s.ly], ['y', ty, ay, s.ly, s.lx]];
@@ -35,10 +39,10 @@
         bars.push(bar(String(2 * i + 2), 'Chapeaux sur appuis, sens ' + (k === 'x' ? 'lx' : 'ly') + ' : HA' + a.d + ' e=' + a.e, 2 * cnt(perp, a.e), a.d, 0.2 * span + 0.15, 'slab-top')); });
       out.slabs.push({ id: s.id, w, h, shortX, lx: s.lx, ly: s.ly, thick: r.slab.h, x0: s.x0, y0: s.y0, x1: s.x1, y1: s.y1, bars, kg: bars.reduce((q, x) => q + x.kg, 0), conc: w * h * r.slab.h, tx, ty, ax, ay }); });
     const sum = k => (arr) => arr.reduce((q, x) => q + x[k], 0);
-    out.totals = { beams: { kg: sum('kg')(out.beams), conc: sum('conc')(out.beams) }, cols: { kg: sum('kg')(out.cols), conc: sum('conc')(out.cols) }, foots: { kg: sum('kg')(out.foots), conc: sum('conc')(out.foots) }, slabs: { kg: sum('kg')(out.slabs), conc: sum('conc')(out.slabs) } };
+    out.totals = { beams: { kg: sum('kg')(out.beams), conc: sum('conc')(out.beams) }, cols: { kg: sum('kg')(out.cols), conc: sum('conc')(out.cols) }, foots: { kg: sum('kg')(out.foots), conc: sum('conc')(out.foots) }, strips: { kg: sum('kg')(out.strips), conc: sum('conc')(out.strips) }, slabs: { kg: sum('kg')(out.slabs), conc: sum('conc')(out.slabs) } };
     out.totals.all = { kg: Object.values(out.totals).reduce((q, x) => q + x.kg, 0), conc: Object.values(out.totals).reduce((q, x) => q + x.conc, 0) };
     // per-diameter steel summary
-    const byD = {}; [...out.beams, ...out.cols, ...out.foots, ...out.slabs].forEach(e => e.bars.forEach(b => { byD[b.d] = (byD[b.d] || 0) + b.n * b.len; })); out.byDiameter = Object.keys(byD).map(Number).sort((x, y) => x - y).map(d => ({ d, len: byD[d], kg: byD[d] * kgm(d) }));
+    const byD = {}; [...out.beams, ...out.cols, ...out.foots, ...out.strips, ...out.slabs].forEach(e => e.bars.forEach(b => { byD[b.d] = (byD[b.d] || 0) + b.n * b.len; })); out.byDiameter = Object.keys(byD).map(Number).sort((x, y) => x - y).map(d => ({ d, len: byD[d], kg: byD[d] * kgm(d) }));
     return out; };
 
   // ---------- drawing helpers ----------
@@ -120,6 +124,26 @@
     out.push(dimV(sx - 12, top + colH, top + colH + hS, Math.round(f.h * 100) + ' cm'), T(sx + wS / 2, top + colH + hS + 0.05 * ss + 18, 'béton de propreté 5 cm', 'middle', MUTE, 10));
     return svg(W, Math.max(oy + f.side * s + 60, 330), out.join('')); };
 
+  // ---------- strip footing: plan, longitudinal section, cross section ----------
+  R.stripSVG = e => { const W = 940, s = (W - 140) / e.L, sy = Math.max(s, 48 / e.B), sv = Math.max(s, 90 / e.h), ox = 70, X = x => ox + (x - e.x0) * s, out = [];
+    const oy = 70, hp = e.B * sy, c = CF * sy; out.push(T(ox, 22, `${e.id} — sous ${e.cols.map(q => q.label).join(', ')} — ${f1(e.B)} × ${f1(e.L)} m, h = ${Math.round(e.h * 100)} cm`, 'start', INK, 14, 'font-weight="700"'), T(ox, 40, 'Plan (échelle transversale exagérée si besoin)', 'start', MUTE, 10));
+    out.push(Rc(X(e.x0), oy, e.L * s, hp, '#fff', INK, 2));
+    const tr = e.barTr, nT = Math.floor((e.L - 0.10) / (tr.e / 100) + 1e-9) + 1, stp = Math.max(1, Math.ceil(nT / 70)); for (let j = 0; j < nT; j += stp) { const x = X(e.x0 + CF + j * tr.e / 100); out.push(L(x, oy + c, x, oy + hp - c, '#e67e22', 0.8)); }
+    spread(e.barBot.n, oy + c + 3, oy + hp - c - 3).forEach(y => out.push(L(X(e.x0 + CF), y, X(e.x1 - CF), y, RED, 1.4)));
+    e.cols.forEach(q => out.push(Rc(X(q.x) - q.a * s / 2, oy + hp / 2 - q.a * sy / 2, q.a * s, q.a * sy, 'rgba(0,0,0,.18)', INK, 1), T(X(q.x), oy - 8, q.label, 'middle', INK, 11, 'font-weight="700"')));
+    out.push(dimH(X(e.x0), X(e.x1), oy + hp + 22, f1(e.L) + ' m'), dimV(ox - 10, oy, oy + hp, f1(e.B) + ' m'));
+    // longitudinal section
+    const hh = e.h * sv, stub = Math.min(0.5 * sv, 70), ly = oy + hp + 62 + stub, leg = Math.min(0.2 * sv, hh * 0.35); out.push(T(ox, ly - stub - 14, 'Coupe longitudinale (échelle verticale exagérée si besoin) — aciers inférieurs en rouge, supérieurs en violet', 'start', MUTE, 10), Rc(X(e.x0), ly, e.L * s, hh, '#e9e9e9'), Rc(X(e.x0), ly + hh, e.L * s, 0.05 * sv, '#f6f6f6', INK, 1, 'stroke-dasharray="3 2"'));
+    e.cols.forEach(q => { out.push(Rc(X(q.x) - q.a * s / 2, ly - stub, q.a * s, stub, '#fff'), L(X(q.x) - q.a * s / 2 + 3, ly - stub + 4, X(q.x) - q.a * s / 2 + 3, ly + hh - CF * sv, RED, 1), L(X(q.x) + q.a * s / 2 - 3, ly - stub + 4, X(q.x) + q.a * s / 2 - 3, ly + hh - CF * sv, RED, 1)); });
+    const yb = ly + hh - CF * sv - e.barBot.d / 2000 * sv, yt = ly + CF * sv + e.barTop.d / 2000 * sv; out.push(Pth([[X(e.x0 + CF), yb - leg], [X(e.x0 + CF), yb], [X(e.x1 - CF), yb], [X(e.x1 - CF), yb - leg]], RED, Math.max(2, e.barBot.d / 1000 * sv)), Pth([[X(e.x0 + CF), yt + leg], [X(e.x0 + CF), yt], [X(e.x1 - CF), yt], [X(e.x1 - CF), yt + leg]], '#8e44ad', Math.max(2, e.barTop.d / 1000 * sv)));
+    out.push(mark(X(e.x0 + e.L * 0.25), yb + 20, '2'), mark(X(e.x0 + e.L * 0.25), yt - 12, '3'), dimV(ox - 10, ly, ly + hh, Math.round(e.h * 100) + ' cm'));
+    // cross section
+    const cy = ly + hh + 70, sc = Math.min(260 / e.B, 200 / e.h), bw = e.B * sc, bh = e.h * sc, cx = ox + 120, cs = CF * sc; out.push(T(cx + bw / 2, cy - 16, 'Coupe transversale', 'middle', INK, 12, 'font-weight="700"'), Rc(cx, cy + 0.5 * sc, bw, bh, '#e9e9e9'), Rc(cx + bw / 2 - 0.125 * sc, cy, 0.25 * sc, 0.5 * sc, '#fff'));
+    const dTr = e.barTr.d / 1000 * sc, dB = e.barBot.d / 1000 * sc, dT = e.barTop.d / 1000 * sc, yTr = cy + 0.5 * sc + bh - cs - dTr / 2; out.push(L(cx + cs, yTr, cx + bw - cs, yTr, '#e67e22', Math.max(2, dTr)));
+    spread(e.barBot.n, cx + cs + dB / 2 + 2, cx + bw - cs - dB / 2 - 2).forEach(x => out.push(Ci(x, yTr - dTr / 2 - dB / 2, dB / 2))); spread(e.barTop.n, cx + cs + dT / 2 + 2, cx + bw - cs - dT / 2 - 2).forEach(x => out.push(Ci(x, cy + 0.5 * sc + cs + dT / 2, dT / 2, '#8e44ad')));
+    out.push(mark(cx + bw + 22, yTr, '1'), dimH(cx, cx + bw, cy + 0.5 * sc + bh + 26, f1(e.B) + ' m'), dimV(cx - 10, cy + 0.5 * sc, cy + 0.5 * sc + bh, Math.round(e.h * 100) + ' cm'), T(cx + bw + 50, cy + 0.5 * sc + bh / 2, 'béton de propreté 5 cm', 'start', MUTE, 10));
+    return svg(W, cy + 0.5 * sc + bh + 50, out.join('')); };
+
   // ---------- slab panel ----------
   R.slabSVG = (e) => { const W = 640, s = Math.min(420 / e.w, 300 / e.h), ox = 60, oy = 50, w = e.w * s, h = e.h * s, out = [], maxLines = 40;
     out.push(T(ox, 24, `${e.id} — ${f1(e.lx)} × ${f1(e.ly)} m, épaisseur ${Math.round(e.thick * 100)} cm`, 'start', INK, 14, 'font-weight="700"'), Rc(ox, oy, w, h, '#fff', INK, 2.5));
@@ -144,16 +168,17 @@
 
   // ---------- bill of quantities ----------
   R.summaryHTML = mdl => { const t = mdl.totals, row = (n, o, kgp) => `<tr><td>${n}</td><td>${f1(o.conc)}</td><td>${f1(o.kg)}</td><td>${o.conc > 0 ? f1(o.kg / o.conc, 0) : '—'}</td></tr>`;
-    return `<table class="bars"><tr><th>Ouvrage</th><th>Béton (m³)</th><th>Acier (kg)</th><th>Ratio (kg/m³)</th></tr>${row('Semelles', t.foots)}${row('Poteaux', t.cols)}${row('Poutres', t.beams)}${row('Dalles', t.slabs)}<tr class="tot"><td>Total</td><td>${f1(t.all.conc)}</td><td>${f1(t.all.kg)}</td><td>${t.all.conc > 0 ? f1(t.all.kg / t.all.conc, 0) : '—'}</td></tr></table>` +
+    return `<table class="bars"><tr><th>Ouvrage</th><th>Béton (m³)</th><th>Acier (kg)</th><th>Ratio (kg/m³)</th></tr>${row('Semelles isolées', t.foots)}${t.strips.conc > 0 ? row('Semelles filantes', t.strips) : ''}${row('Poteaux', t.cols)}${row('Poutres', t.beams)}${row('Dalles', t.slabs)}<tr class="tot"><td>Total</td><td>${f1(t.all.conc)}</td><td>${f1(t.all.kg)}</td><td>${t.all.conc > 0 ? f1(t.all.kg / t.all.conc, 0) : '—'}</td></tr></table>` +
       `<table class="bars"><tr><th>Diamètre</th><th>Longueur (m)</th><th>Poids (kg)</th></tr>${mdl.byDiameter.map(x => `<tr><td>HA${x.d}</td><td>${f1(x.len)}</td><td>${f1(x.kg)}</td></tr>`).join('')}</table>`; };
-  R.notesHTML = mdl => `<ul class="notes"><li>Enrobage 3 cm (5 cm pour les semelles, sur béton de propreté de 5 cm). Béton fc28 = ${mdl.mat.fc} MPa, acier HA FeE${mdl.mat.fe}.</li><li>Longueurs développées : crochet à 180° = 20 Ø, équerre = 12 Ø, crochets de cadres = 10 Ø.</li><li>Longueur de scellement droit ls = Ø·fe / (4 τs) avec τs = 0,6 ψs² ft28 : HA12 ≈ ${f1(R.ls(12, mdl.mat))} m, HA16 ≈ ${f1(R.ls(16, mdl.mat))} m ; recouvrements ≥ ls.</li><li>Chapeaux : 0,25 L de chaque côté des appuis ; dalle : chapeaux sur 0,2 de la portée.</li><li>Quantités indicatives (pertes et façonnage non comptés). Plans de principe issus du pré-dimensionnement : à vérifier et valider par un ingénieur structure avant exécution.</li></ul>`;
+  R.notesHTML = mdl => `<ul class="notes"><li>Enrobage 3 cm (5 cm pour les semelles, sur béton de propreté de 5 cm). Béton fc28 = ${mdl.mat.fc} MPa, acier HA FeE${mdl.mat.fe}.</li><li>Longueurs développées : crochet à 180° = 20 Ø, équerre = 12 Ø, crochets de cadres = 10 Ø.</li><li>Longueur de scellement droit ls = Ø·fe / (4 τs) avec τs = 0,6 ψs² ft28 : HA12 ≈ ${f1(R.ls(12, mdl.mat))} m, HA16 ≈ ${f1(R.ls(16, mdl.mat))} m ; recouvrements ≥ ls.</li><li>Semelles filantes : aciers transversaux en lit inférieur, aciers longitudinaux inférieurs sous les poteaux et supérieurs entre les poteaux, équerres de 12 Ø aux extrémités.</li><li>Chapeaux : 0,25 L de chaque côté des appuis ; dalle : chapeaux sur 0,2 de la portée.</li><li>Quantités indicatives (pertes et façonnage non comptés). Plans de principe issus du pré-dimensionnement : à vérifier et valider par un ingénieur structure avant exécution.</li></ul>`;
 
   // ---------- list of views and full printable document ----------
-  R.views = mdl => [{ id: 'plan', title: 'Plan de repérage' }, ...mdl.beams.map(b => ({ id: b.id, title: `Poutre ${b.id}` })), ...mdl.cols.map(c => ({ id: c.label, title: `Poteau ${c.label}` })), ...mdl.foots.map(f => ({ id: f.label, title: `Semelle ${f.label}` })), ...mdl.slabs.map(s => ({ id: s.id, title: `Dalle ${s.id}` })), { id: 'qty', title: 'Nomenclature et métré' }];
+  R.views = mdl => [{ id: 'plan', title: 'Plan de repérage' }, ...mdl.beams.map(b => ({ id: b.id, title: `Poutre ${b.id}` })), ...mdl.cols.map(c => ({ id: c.label, title: `Poteau ${c.label}` })), ...mdl.foots.map(f => ({ id: f.label, title: `Semelle ${f.label}` })), ...mdl.strips.map(f => ({ id: f.id, title: `Semelle filante ${f.id}` })), ...mdl.slabs.map(s => ({ id: s.id, title: `Dalle ${s.id}` })), { id: 'qty', title: 'Nomenclature et métré' }];
   R.viewHTML = (doc, mdl, id) => { if (id === 'plan') return R.planSVG(doc, mdl);
     if (id === 'qty') return '<h3>Métré</h3>' + R.summaryHTML(mdl) + R.notesHTML(mdl); let e;
     if ((e = mdl.beams.find(x => x.id === id))) return R.beamSVG(e) + R.beamSectionSVG(e) + table(e);
-    if ((e = mdl.cols.find(x => x.label === id))) return R.colSVG(e, mdl.foots.find(f => f.id === e.id)) + table(e);
+    if ((e = mdl.cols.find(x => x.label === id))) return R.colSVG(e, mdl.foots.find(f => f.id === e.id) || { side: e.fw, h: e.fh, label: e.strips.join('+') }) + table(e);
+    if ((e = mdl.strips.find(x => x.id === id))) return R.stripSVG(e) + table(e);
     if ((e = mdl.foots.find(x => x.label === id))) return R.footSVG(e) + table(e);
     if ((e = mdl.slabs.find(x => x.id === id))) return R.slabSVG(e) + table(e); return ''; };
   R.document = doc => { const mdl = R.model(doc); if (!mdl) return ''; const css = 'body{font:13px/1.4 system-ui,Segoe UI,sans-serif;margin:0;color:#111}section{page-break-after:always;padding:16px 20px;max-width:1000px;margin:auto}h1{font-size:20px;color:#12365d}h2{font-size:16px;border-bottom:2px solid #12365d;color:#12365d}table.bars{border-collapse:collapse;width:100%;margin:8px 0}table.bars td,table.bars th{border:1px solid #bbb;padding:3px 6px;text-align:left}table.bars th{background:#eef2f7}tr.tot td{font-weight:700;background:#f6f6f6}.notes{color:#444}svg{display:block;margin:6px 0}@page{size:A4 landscape;margin:10mm}';

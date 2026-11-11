@@ -104,7 +104,8 @@
     const p = A.doc.struct.p, r = A.doc.struct.result, o = (list, cur) => list.map(v => `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${v}</option>`).join(''), num = (k, label, step, min, max) => `<label class="row"><span>${label}</span><input type="number" data-s="${k}" step="${step}" min="${min}" max="${max}" value="${p[k]}"></label>`;
     const usage = Object.keys(USAGES).find(k => USAGES[k] === p.Q);
     let h = `<label class="row"><span>Béton fc28 (MPa)</span><select data-s="fc28">${o([20, 25, 30, 35], p.fc28)}</select></label><label class="row"><span>Acier HA FeE</span><select data-s="fe">${o([400, 500], p.fe)}</select></label>` +
-      num('sigSol', 'Sol admissible (MPa)', 0.05, 0.05, 1) + num('nlev', 'Niveaux (planchers)', 1, 1, 8) +
+      num('sigSol', 'Sol admissible (MPa)', 0.05, 0.05, 1) +
+      `<label class="row"><span>Fondations</span><select data-s="found"><option value="auto"${p.found === 'auto' ? ' selected' : ''}>Automatique</option><option value="isolees"${p.found === 'isolees' ? ' selected' : ''}>Semelles isolées</option><option value="filantes"${p.found === 'filantes' ? ' selected' : ''}>Semelles filantes</option></select></label>` + num('nlev', 'Niveaux (planchers)', 1, 1, 8) +
       `<label class="row"><span>Plancher haut</span><select data-s="top"><option value="dalle"${p.top === 'dalle' ? ' selected' : ''}>Dalle terrasse</option><option value="charpente"${p.top === 'charpente' ? ' selected' : ''}>Charpente légère</option></select></label>` +
       `<label class="row"><span>Usage</span><select data-u="1">${Object.keys(USAGES).map(k => `<option${k === usage ? ' selected' : ''}>${k}</option>`).join('')}${usage ? '' : '<option selected>Personnalisé</option>'}</select></label>` +
       num('Q', 'Q planchers (kN/m²)', 0.5, 0.5, 10) + num('G2', 'G revêtements (kN/m²)', 0.5, 0, 10) + num('maxSpan', 'Portée max. auto (m)', 0.5, 2, 8) +
@@ -117,7 +118,7 @@
     sb.innerHTML = h + '<p class="muted">Pré-dimensionnement automatique (BAEL 91 rév. 99) : à vérifier et valider par un ingénieur structure avant toute exécution.</p>';
   }
   sb.onchange = e => { const t = e.target; if (t.dataset.u) { const q = USAGES[t.value]; if (q) A.edit(d => { d.struct.p.Q = q; }); return; } const k = t.dataset.s; if (!k) return;
-    if (k === 'show') { A.edit(d => { d.struct.show = t.checked; }); return; } const v = parseFloat(t.value); if (!isFinite(v)) { A.emit(); return; } A.edit(d => { d.struct.p[k] = k === 'nlev' ? Math.max(1, Math.min(8, Math.round(v))) : v; }); };
+    if (k === 'show') { A.edit(d => { d.struct.show = t.checked; }); return; } if (k === 'found') { A.edit(d => { d.struct.p.found = t.value; }); return; } const v = parseFloat(t.value); if (!isFinite(v)) { A.emit(); return; } A.edit(d => { d.struct.p[k] = k === 'nlev' ? Math.max(1, Math.min(8, Math.round(v))) : v; }); };
   sb.onclick = e => { const act = e.target.dataset && e.target.dataset.act; if (!act) return;
     if (act === 'autocol') { const n = A.struct.autoColumns(); if (!n) alert('Aucun nouveau poteau à placer (dessinez d\'abord des murs).'); }
     else if (act === 'calc') A.struct.run();

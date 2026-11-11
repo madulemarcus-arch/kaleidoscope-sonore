@@ -59,6 +59,23 @@
   S.colBars = As => { for (const d of [12, 14, 16, 20, 25]) { let n = Math.max(4, Math.ceil(As / area(d) - 1e-9)); if (n % 2) n++; if (n <= 12) return { n, d, text: n + 'HA' + d, As: n * area(d) }; } const d = 25, n = Math.ceil(As / area(d)); return { n, d, text: n + 'HA25', As: n * area(d) }; };
   S.footBars = (As, side) => { for (const d of [10, 12, 14, 16]) { const n = Math.max(4, Math.ceil(As / area(d) - 1e-9)), e = (side - 0.1) / (n - 1); if (e >= 0.10) return { n, d, e: Math.floor(e * 100), text: n + 'HA' + d + ' par sens', As: n * area(d) }; } const d = 20, n = Math.ceil(As / area(d)); return { n, d, e: 10, text: n + 'HA20 par sens', As: n * area(d) }; };
 
+  // ---------- strip footing under a row of columns ----------
+  S.stripBars = (As, B) => { const nmin = Math.ceil((B - 0.10) / 0.25 - 1e-9) + 1; for (const d of [12, 14, 16, 20, 25]) { const n = Math.max(nmin, Math.ceil(As / area(d) - 1e-9)), e = (B - 0.10) / (n - 1); if (e >= 0.075 || d === 25) return { n, d, e: Math.floor(e * 100), text: n + 'HA' + d, As: n * area(d) }; } };
+  // cols: [{ x (m along the row), Nu, Ns (kN), a (m) }] sorted by x. The strip is centred on the resultant of the service loads, so the soil pressure is uniform.
+  // Longitudinally it works like an upside-down continuous beam (tension at the bottom under the columns, at the top between them), transversally like two cantilevers.
+  S.strip = (cols, p, m) => { const n = cols.length, sNu = cols.reduce((s, c) => s + c.Nu, 0), sNs = cols.reduce((s, c) => s + c.Ns, 0), xs = cols.map(c => c.x), aMax = Math.max(...cols.map(c => c.a));
+    const xR = cols.reduce((s, c) => s + c.Ns * c.x, 0) / sNs, half = Math.max(xR - xs[0], xs[n - 1] - xR) + 0.25, x0 = xR - half, x1 = xR + half, L = 2 * half;
+    const B = Math.max(ceilTo(1.1 * sNs / (p.sigSol * 1000 * L), 0.05), ceilTo(aMax + 0.3, 0.05), 0.5), wu = sNu / L, qu = sNu / (B * L), sigma = 1.1 * sNs / (B * L) / 1000, ratio = sNs / sNu;
+    const an = S.continuous(xs.slice(1).map((x, i) => ({ L: x - xs[i], Gm: wu / 1.35, Qm: 0, Gv: wu / 1.35, Qv: 0 }))), cl = xs[0] - x0, cr = x1 - xs[n - 1];
+    const Msup = xs.map((_, i) => i === 0 ? Math.max(an.spans[0].Mw, wu * cl * cl / 2) : i === n - 1 ? Math.max(an.spans[n - 2].Me, wu * cr * cr / 2) : an.spans[i - 1].Me);
+    const Mbot = Math.max(...Msup), Mtop = Math.max(...an.spans.map(s => s.Mt)), V = Math.max(...an.spans.map(s => Math.max(s.Vl, s.Vr)), wu * cl, wu * cr), b0 = 0.25, c = (B - b0) / 2, Mtr = qu * c * c / 2;
+    let h = Math.max(0.30, ceilTo((B - b0) / 4 + 0.05, 0.05)), ok = false, fb, ft, ftr, d, tau; const tauLim = 0.07 * m.fc / GB;
+    for (; h <= 1.2 + 1e-9; h = Math.round((h + 0.05) * 100) / 100) { d = h - 0.07; fb = S.flex(Mbot / 1000, B, d, m); ft = S.flex(Mtop / 1000, B, d, m); ftr = S.flex(Mtr / 1000, 1, d, m); tau = V / 1000 / (B * d); if (fb.ok && ft.ok && ftr.ok && tau <= tauLim) { ok = true; break; } }
+    if (!ok) { h = 1.2; d = h - 0.07; fb = S.flex(Mbot / 1000, B, d, m); ft = S.flex(Mtop / 1000, B, d, m); ftr = S.flex(Mtr / 1000, 1, d, m); tau = V / 1000 / (B * d); }
+    const ser = M => cm2(M * ratio / 1000 / (0.9 * d * m.ssSer)), Amin = cm2(0.23 * B * d * m.ft28 / m.fe), Amin1 = cm2(0.23 * d * m.ft28 / m.fe);
+    const Ab = Math.max(fb.As || 0, ser(Mbot), Amin), At = Math.max(ft.As || 0, ser(Mtop), Amin), Atr = Math.max(ftr.As || 0, ser(Mtr), Amin1);
+    return { n, L, B, h, d, x0, x1, xR, overL: cl, overR: cr, wu, qu, sigma, sNu, sNs, Mbot, Mtop, Mtr, V, tau, tauLim, Msup, an, failed: !ok, Ab, At, Atr, barBot: S.stripBars(Ab, B), barTop: S.stripBars(At, B), barTr: S.slabBars(Atr, h, true) }; };
+
   // ---------- geometry: columns, beams, panels ----------
   S.columns = () => A.doc.items.filter(i => i.t === 'col' && A.shown(i));
   S.labels = () => { const cols = S.columns().slice().sort((p, q) => (Math.round(q.p[1] * 10) - Math.round(p.p[1] * 10)) || (p.p[0] - q.p[0])), m = {}; cols.forEach((c, i) => { m[c.id] = 'P' + (i + 1); }); return m; };
@@ -158,9 +175,24 @@
       const bars = S.colBars(out.r.As), ft = S.footing(out.Nu, out.Ns, out.a, p.sigSol, m);
       res.columns.push({ id: c.id, label: lab[c.id], p: c.p, a: out.a, l0, Nu: out.Nu, Ns: out.Ns, lam: out.r.lam, alpha: out.r.alpha, Areq: out.r.Areq, Amin: out.r.Amin, Amax: out.r.Amax, bars, tie: out.a >= 0.2 ? 'cadres HA6 e=' + Math.floor(Math.min(15 * bars.d / 10, 40, out.a * 100 + 10) / 5) * 5 + ' cm' : '', failed, continuous: cont, beams: mine.map(b => b.id), footing: { ...ft, bars: S.footBars(ft.As, ft.side) } }); });
     res.columns.sort((q, r) => parseInt(q.label.slice(1)) - parseInt(r.label.slice(1)));
-    // footings that touch each other
-    for (let i = 0; i < res.columns.length; i++) for (let j = i + 1; j < res.columns.length; j++) { const u = res.columns[i], v = res.columns[j], f1 = u.footing.side / 2, f2 = v.footing.side / 2; if (Math.abs(u.p[0] - v.p[0]) < f1 + f2 - 0.001 && Math.abs(u.p[1] - v.p[1]) < f1 + f2 - 0.001) warn.push('Semelles de ' + u.label + ' et ' + v.label + ' qui se chevauchent : prévoyez une semelle filante ou un radier.'); }
-    res.H = H; res.hs = hs; res.sigSol = p.sigSol; res.totals = { Nu: res.columns.reduce((s, c) => s + c.Nu, 0), Ns: res.columns.reduce((s, c) => s + c.Ns, 0) };
+    // --- strip footings: under a row of columns when the isolated footings (nearly) touch, or always when asked for
+    const mode = p.found || 'auto', colRes = Object.fromEntries(res.columns.map(c => [c.id, c])), cand = []; res.strips = [];
+    chains.forEach(chain => { const cs = [chain[0].flip ? chain[0].b.cb : chain[0].b.ca]; chain.forEach(it => cs.push(it.flip ? it.b.ca : it.b.cb)); if (cs.length < 2) return;
+      const close = cs.some((c, i) => i > 0 && colRes[c.id].footing.side / 2 + colRes[cs[i - 1].id].footing.side / 2 + 0.25 > A.dist(c.p, cs[i - 1].p)); if (mode === 'filantes' || (mode === 'auto' && close)) cand.push({ cs, chain }); });
+    const parts = {}; cand.forEach((cd, k) => cd.cs.forEach(c => { const R = cd.chain.filter(it => it.b.ca.id === c.id || it.b.cb.id === c.id).reduce((s, it) => s + react(it.b, c.id, true), 0); (parts[c.id] = parts[c.id] || []).push({ k, R }); }));
+    cand.forEach((cd, k) => { const u = A.unit(cd.cs[0].p, cd.cs[cd.cs.length - 1].p), cols = cd.cs.map(c => { const list = parts[c.id], tot = list.reduce((s, x) => s + x.R, 0), mine = list.find(x => x.k === k), fr = tot > 0 ? mine.R / tot : 1 / list.length, cr = colRes[c.id];
+        return { id: c.id, label: cr.label, x: (c.p[0] - cd.cs[0].p[0]) * u[0] + (c.p[1] - cd.cs[0].p[1]) * u[1], Nu: cr.Nu * fr, Ns: cr.Ns * fr, a: cr.a }; });
+      const st = S.strip(cols, p, m), n = [-u[1], u[0]], O = cd.cs[0].p, P = (x, y) => [O[0] + u[0] * x + n[0] * y, O[1] + u[1] * x + n[1] * y];
+      Object.assign(st, { id: 'SF' + (k + 1), u, origin: O, cols, corners: [P(st.x0, -st.B / 2), P(st.x1, -st.B / 2), P(st.x1, st.B / 2), P(st.x0, st.B / 2)], centre: P((st.x0 + st.x1) / 2, 0) });
+      if (st.failed) warn.push('Semelle filante ' + st.id + ' : hauteur de 1,20 m insuffisante, étudiez un radier.');
+      st.cols.forEach(c => { const cr = colRes[c.id]; (cr.strips = cr.strips || []).push(st.id); cr.fh = Math.max(cr.fh || 0, st.h); cr.fw = Math.max(cr.fw || 0, st.B); });
+      res.strips.push(st); });
+    // overlaps: isolated footings between themselves, and parallel strips
+    const iso = res.columns.filter(c => !c.strips);
+    for (let i = 0; i < iso.length; i++) for (let j = i + 1; j < iso.length; j++) { const u = iso[i], v = iso[j], f1 = u.footing.side / 2, f2 = v.footing.side / 2; if (Math.abs(u.p[0] - v.p[0]) < f1 + f2 - 0.001 && Math.abs(u.p[1] - v.p[1]) < f1 + f2 - 0.001) warn.push('Semelles de ' + u.label + ' et ' + v.label + ' qui se chevauchent : prévoyez une semelle filante ou un radier.'); }
+    for (let i = 0; i < res.strips.length; i++) for (let j = i + 1; j < res.strips.length; j++) { const u = res.strips[i], v = res.strips[j]; if (Math.abs(u.u[0] * v.u[0] + u.u[1] * v.u[1]) > 0.95 && Math.abs((v.centre[0] - u.centre[0]) * -u.u[1] + (v.centre[1] - u.centre[1]) * u.u[0]) < (u.B + v.B) / 2 - 0.001) { const su = (v.centre[0] - u.centre[0]) * u.u[0] + (v.centre[1] - u.centre[1]) * u.u[1]; if (Math.abs(su) < (u.L + v.L) / 2) warn.push('Semelles filantes ' + u.id + ' et ' + v.id + ' parallèles qui se recoupent : prévoyez un radier.'); } }
+    if (res.columns.some(c => c.strips && c.strips.length > 1)) warn.push('Semelles filantes : les croisements de deux semelles ne sont pas détaillés (nœud d\'angle à étudier).');
+    res.H = H; res.hs = hs; res.sigSol = p.sigSol; res.found = mode; res.totals = { Nu: res.columns.reduce((s, c) => s + c.Nu, 0), Ns: res.columns.reduce((s, c) => s + c.Ns, 0) };
     if (p.sigSol < 0.1) warn.push('Contrainte admissible du sol très faible (' + p.sigSol + ' MPa) : étude de sol indispensable.');
     return res;
   }
@@ -173,13 +205,15 @@
   // ---------- drawing on the 2D plan ----------
   S.overlay = (ctx, v, th, sel) => { const r = A.doc.struct.result; if (!r || r.errors.length) return; const T = p => A.toScreen(p, v), stale = r.sig !== S.sig(A.doc); ctx.save(); ctx.globalAlpha = stale ? 0.45 : 1; ctx.lineJoin = 'round';
     ctx.setLineDash([6, 4]); ctx.strokeStyle = '#ffb27a'; ctx.lineWidth = 1;
-    r.columns.forEach(c => { const f = c.footing.side, q = [T([c.p[0] - f / 2, c.p[1] + f / 2]), T([c.p[0] + f / 2, c.p[1] - f / 2])]; ctx.strokeRect(q[0][0], q[0][1], q[1][0] - q[0][0], q[1][1] - q[0][1]); });
+    r.columns.forEach(c => { if (c.strips) return; const f = c.footing.side, q = [T([c.p[0] - f / 2, c.p[1] + f / 2]), T([c.p[0] + f / 2, c.p[1] - f / 2])]; ctx.strokeRect(q[0][0], q[0][1], q[1][0] - q[0][0], q[1][1] - q[0][1]); });
+    (r.strips || []).forEach(st => { ctx.beginPath(); st.corners.forEach((p, i) => { const q = T(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath(); ctx.stroke(); });
     ctx.setLineDash([]); ctx.lineWidth = Math.max(2, 0.2 * v.s * 0.5); ctx.strokeStyle = 'rgba(255,159,107,.55)';
     r.beams.forEach(b => { const p = T(b.p1), q = T(b.p2); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); });
     const px = Math.max(9, Math.min(13, 0.22 * v.s)); ctx.font = `${px}px Inter, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = th.text || '#ffd27a';
     r.beams.forEach(b => { const mx = (b.p1[0] + b.p2[0]) / 2, my = (b.p1[1] + b.p2[1]) / 2, q = T([mx, my]); ctx.save(); ctx.translate(q[0], q[1]); let ang = -Math.atan2(b.p2[1] - b.p1[1], b.p2[0] - b.p1[0]); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI; ctx.rotate(ang); ctx.fillText(`${b.id} ${Math.round(b.b * 100)}×${Math.round(b.h * 100)}`, 0, -4); ctx.restore(); });
-    r.columns.forEach(c => { const f = c.footing.side / 2, top = T([c.p[0], c.p[1] + f]), bot = T([c.p[0], c.p[1] - f]); ctx.fillStyle = th.text || '#ffd27a'; ctx.textBaseline = 'bottom'; ctx.fillText(`${c.label} ${Math.round(c.a * 100)}×${Math.round(c.a * 100)}`, top[0], top[1] - 2);
-      ctx.fillStyle = '#ffb27a'; ctx.textBaseline = 'top'; ctx.fillText(`S ${A.fmt(c.footing.side)}`, bot[0], bot[1] + 2); });
+    r.columns.forEach(c => { const f = c.strips ? c.a / 2 + 0.05 : c.footing.side / 2, top = T([c.p[0], c.p[1] + f]), bot = T([c.p[0], c.p[1] - f]); ctx.fillStyle = th.text || '#ffd27a'; ctx.textBaseline = 'bottom'; ctx.fillText(`${c.label} ${Math.round(c.a * 100)}×${Math.round(c.a * 100)}`, top[0], top[1] - 2);
+      if (c.strips) return; ctx.fillStyle = '#ffb27a'; ctx.textBaseline = 'top'; ctx.fillText(`S ${A.fmt(c.footing.side)}`, bot[0], bot[1] + 2); });
+    (r.strips || []).forEach(st => { const q = T(st.centre); ctx.fillStyle = '#ffb27a'; ctx.textBaseline = 'middle'; ctx.fillText(`${st.id} ${A.fmt(st.B)}×${A.fmt(st.L)} h=${Math.round(st.h * 100)}`, q[0], q[1] + Math.max(14, st.B * v.s / 2 + 10)); });
     if (r.slab) { ctx.textBaseline = 'middle'; ctx.fillStyle = '#9be29b'; r.slab.panels.forEach(d => { const q = T([(d.x0 + d.x1) / 2, (d.y0 + d.y1) / 2]); ctx.fillText(`${d.id} e=${Math.round(r.slab.h * 100)} cm`, q[0], q[1]); }); }
     ctx.restore(); };
 
@@ -195,7 +229,11 @@
     h += `<h2>3. Poutres</h2><table>${head(['Poutre', 'Entre', 'Portée (m)', 'Section b × h (cm)', 'Continuité', 'pu (kN/m)', 'M0 (kN.m)', 'M appui gauche / travée / appui droit (kN.m)', 'Armatures de travée', 'Chapeaux (appui g. / appui d.)', 'Vu (kN)', 'τu (MPa)', 'Cadres HA6'])}`;
     r.beams.forEach(b => { h += row([b.id + (b.manual ? ' (dessinée)' : ''), b.from + '–' + b.to, f(b.L), Math.round(b.b * 100) + ' × ' + Math.round(b.h * 100), b.nSpans > 1 ? 'travée ' + b.pos + '/' + b.nSpans + ' (' + (b.method === 'caquot' ? 'Caquot' : 'forfaitaire') + ')' : 'travée isolée', f(b.pu), f(b.M0), f(b.MA, 1) + ' / ' + f(b.Mt, 1) + ' / ' + f(b.MB, 1), b.barT.text, (b.AaA > 0 ? S.beamBars(b.AaA, b.b).text : '—') + ' / ' + (b.AaB > 0 ? S.beamBars(b.AaB, b.b).text : '—'), f(b.Vu, 1), f(b.tau), 'e=' + b.st + ' cm']); });
     h += '</table><p class="note">Poutres alignées reliées par un poteau : poutre continue, calculée par la méthode forfaitaire (BAEL B.6.2,21) quand Q ≤ 2G et que les portées voisines sont dans un rapport de 0,8 à 1,25, sinon par la méthode de Caquot (B.6.2,22). Moments aux appuis de rive : 0,15 M0 (encastrement partiel). Section commune à toute la file. Efforts tranchants majorés de 10 % (2 travées) ou 15 % (3 travées et plus) sur le premier appui intermédiaire. Charges sur les poutres : charges équivalentes des dalles (triangle, trapèze), poids propre et maçonnerie. Armatures de montage non détaillées.</p>';
-    h += `<h2>4. Poteaux et semelles isolées</h2><table>${head(['Poteau', 'Section (cm)', 'Nu (kN)', 'Ns (kN)', 'λ', 'Armatures', 'Cadres', 'Semelle A × A (m)', 'Hauteur (m)', 'Aciers de semelle', 'σ sol (MPa)'])}`;
-    r.columns.forEach(c => { h += row([c.label, Math.round(c.a * 100) + ' × ' + Math.round(c.a * 100), f(c.Nu, 0), f(c.Ns, 0), f(c.lam, 1), c.bars.text + ' (A = ' + f(c.Areq) + ' cm² requis, mini ' + f(c.Amin) + ')', c.tie, f(c.footing.side) + ' × ' + f(c.footing.side), f(c.footing.h), c.footing.bars.text, f(c.footing.sigma)]); });
-    h += `</table><p class="note">Poteaux : méthode forfaitaire BAEL B.8.4 (élancement, flambement), longueur de flambement 0,7 l0, majoration de 10 % des charges pour un poteau continu. Semelles : méthode des bielles, aciers = max(ELU, ELS fissuration préjudiciable). Charges totales : Nu = ${f(r.totals.Nu, 0)} kN, Ns = ${f(r.totals.Ns, 0)} kN.</p></body></html>`; return h; };
+    h += `<h2>4. Poteaux et semelles</h2><table>${head(['Poteau', 'Section (cm)', 'Nu (kN)', 'Ns (kN)', 'λ', 'Armatures', 'Cadres', 'Semelle A × A (m)', 'Hauteur (m)', 'Aciers de semelle', 'σ sol (MPa)'])}`;
+    r.columns.forEach(c => { h += row([c.label, Math.round(c.a * 100) + ' × ' + Math.round(c.a * 100), f(c.Nu, 0), f(c.Ns, 0), f(c.lam, 1), c.bars.text + ' (A = ' + f(c.Areq) + ' cm² requis, mini ' + f(c.Amin) + ')', c.tie, c.strips ? 'sous ' + c.strips.join(' + ') : f(c.footing.side) + ' × ' + f(c.footing.side), c.strips ? f(c.fh) : f(c.footing.h), c.strips ? '—' : c.footing.bars.text, c.strips ? '—' : f(c.footing.sigma)]); });
+    h += `</table><p class="note">Poteaux : méthode forfaitaire BAEL B.8.4 (élancement, flambement), longueur de flambement 0,7 l0, charges issues de l\'analyse des poutres continues (effet de continuité compris). Semelles isolées : méthode des bielles, aciers = max(ELU, ELS fissuration préjudiciable). Charges totales : Nu = ${f(r.totals.Nu, 0)} kN, Ns = ${f(r.totals.Ns, 0)} kN.</p>`;
+    if (r.strips && r.strips.length) { h += `<h2>5. Semelles filantes</h2><table>${head(['Semelle', 'Poteaux', 'B × L × h (m)', 'σ sol (MPa)', 'wu (kN/m)', 'M appui / M travée (kN.m)', 'Vu (kN)', 'τu / limite (MPa)', 'Aciers inférieurs (sous les poteaux)', 'Aciers supérieurs (entre poteaux)', 'Aciers transversaux'])}`;
+      r.strips.forEach(st => { h += row([st.id, st.cols.map(c => c.label).join(', '), f(st.B) + ' × ' + f(st.L) + ' × ' + f(st.h), f(st.sigma), f(st.wu, 1), f(st.Mbot, 1) + ' / ' + f(st.Mtop, 1), f(st.V, 1), f(st.tau) + ' / ' + f(st.tauLim), st.barBot.text, st.barTop.text, st.barTr.text]); });
+      h += '</table><p class="note">Semelle centrée sur la résultante des charges de service (pression uniforme du sol), calculée dans le sens longitudinal comme une poutre continue renversée (méthode forfaitaire ou Caquot, débords en console), dans le sens transversal comme deux consoles de largeur (B − 25 cm)/2. Section rectangulaire sans armatures d\'effort tranchant : τu ≤ 0,07 fc28/γb. Aciers = max(ELU, ELS fissuration préjudiciable, section minimale). Charge d\'un poteau commun à deux semelles répartie au prorata des réactions des poutres.</p>'; }
+    h += '</body></html>'; return h; };
 })();
