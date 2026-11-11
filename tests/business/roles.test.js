@@ -12,14 +12,14 @@ const { check, launch, setup } = require('./helper');
   // restart: the lock screen must come first
   await t.reload(); check('verrouillé au démarrage', await p.isVisible('#lock') && (await p.textContent('#view')) === '');
   check('liste des profils', (await p.locator('#lock [data-u]').count()) === 4);
-  await p.click('#lock [data-u]:has-text("Marie")'); await p.fill('#lpin', '0000'); await p.click('#lgo'); check('PIN incorrect refusé', (await p.textContent('#lmsg')).includes('incorrect') && await p.isVisible('#lock'));
-  await p.fill('#lpin', '4321'); await p.keyboard.press('Enter'); await p.waitForSelector('#lock', { state: 'hidden' });
+  await p.click('#lock [data-u]:has-text("Marie")'); await p.fill('#lpin', '0000'); await p.waitForTimeout(150); check('PIN incorrect refusé', (await p.textContent('#lmsg')).includes('incorrect') && await p.isVisible('#lock'));
+  await p.fill('#lpin', '4321'); await p.waitForSelector('#lock', { state: 'hidden' });
   check('PIN correct : application déverrouillée', (await p.textContent('#ttl')) === 'Ets Test' && await p.evaluate(() => App.user.name === 'Marie Admin'));
   check('administrateur : tout autorisé', await p.evaluate(() => App.can('delete') && App.can('team') && App.canView('settings') && App.canView('money')));
   // limit of the last admin
   check('le dernier administrateur ne peut pas être supprimé', await p.evaluate(() => App.roles.removeUser(App.db.users[0].id) === false));
   // seller
-  await p.click('#lockbtn'); await p.click('#lock [data-u]:has-text("Paul")'); await p.fill('#lpin', '1111'); await p.click('#lgo'); await p.waitForSelector('#lock', { state: 'hidden' });
+  await p.click('#lockbtn'); await p.click('#lock [data-u]:has-text("Paul")'); await p.fill('#lpin', '1111'); await p.waitForSelector('#lock', { state: 'hidden' }); // the PIN length is known: the keypad validates by itself
   check('vendeur : pas de Réglages ni d\'Argent', await p.evaluate(() => !App.canView('settings') && !App.canView('money') && !App.canView('cash') && App.canView('sales')));
   check('vendeur : pas de bouton Réglages', (await p.locator('#top [data-go=settings]').count()) === 0);
   check('vendeur : peut vendre et encaisser mais pas supprimer ni voir les coûts', await p.evaluate(() => App.can('sell') && App.can('pay') && !App.can('delete') && !App.can('costs') && !App.can('expense') && !App.can('export')));

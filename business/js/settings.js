@@ -40,7 +40,7 @@
       if (step === 2) { b.querySelectorAll('[data-mod]').forEach(c => d.modules[c.dataset.mod] = c.checked); b.querySelectorAll('[data-vocab]').forEach(i => d.vocab[i.dataset.vocab] = i.value.trim() || d.vocab[i.dataset.vocab]); }
     };
     const draw = () => {
-      el.innerHTML = '<div class="wbox"><div class="dots">' + steps.map((s, i) => '<i class="' + (i <= step ? 'on' : '') + '"></i>').join('') + '</div><h1>' + (step === 0 ? 'Bienvenue dans CISPOLstore Business' : esc(steps[step])) + '</h1><p class="muted">Étape ' + (step + 1) + ' sur 3 — ' + steps[step] + '</p><div class="body">' + body() + '</div><div class="wfoot">' + (step ? '<button class="btn ghost" data-back>Retour</button>' : '<span></span>') + '<button class="btn primary" data-next>' + (step === 2 ? 'Terminer' : 'Suivant') + '</button></div></div>';
+      el.innerHTML = '<div class="wbox"><div class="whead"><img class="logo" alt="" src="' + esc(d.logo || 'icons/logo.svg') + '"><h1>' + (step === 0 ? 'Bienvenue dans CISPOLstore Business' : esc(steps[step])) + '</h1><p>Étape ' + (step + 1) + ' sur 3 — ' + steps[step] + '</p></div><div class="wb"><div class="dots">' + steps.map((s, i) => '<i class="' + (i <= step ? 'on' : '') + '"></i>').join('') + '</div><div class="body">' + body() + '</div><div class="wfoot">' + (step ? '<button class="btn ghost" data-back>Retour</button>' : '<span></span>') + '<button class="btn primary" data-next>' + (step === 2 ? 'Terminer' : 'Suivant') + '</button></div></div></div>';
       bindImgs(el, d);
       el.querySelector('[data-back]') && (el.querySelector('[data-back]').onclick = () => { read(); step--; draw(); });
       el.querySelector('[data-next]').onclick = () => {

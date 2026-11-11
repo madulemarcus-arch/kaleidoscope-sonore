@@ -6,7 +6,7 @@
   ui.applyTheme = () => {
     const t = App.db.settings.theme, dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = dark ? '#0b1620' : '#0f3d5e';
+    const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = dark ? '#0a1a2c' : '#12365d';
   };
   matchMedia('(prefers-color-scheme: dark)').addEventListener && matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => ui.applyTheme());
 

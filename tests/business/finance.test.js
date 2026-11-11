@@ -30,7 +30,7 @@ const { check, launch, setup } = require('./helper');
   check('rapport affiché', (await p.textContent('#mt')).includes('Meilleures ventes') && (await p.textContent('#mt')).includes('Comptabilité simple'));
   await p.fill('#mt [name=goal]', '400'); await p.click('#sg'); check('objectif enregistré', await p.evaluate(() => App.db.settings.goal === 400));
   await p.click('#mtabs [data-t=rep]'); check('progression vers l\'objectif : 25 %', (await p.textContent('#mt .hero')).includes('25 %'));
-  await p.evaluate(() => App.go('home')); await p.waitForSelector('.hero'); check('objectif sur l\'accueil', (await p.textContent('.hero')).includes('Objectif') && await p.isVisible('.goalbar'));
+  await p.evaluate(() => App.go('home')); await p.waitForSelector('.hero'); check('objectif sur l\'accueil : anneau de progression à 25 %', await p.isVisible('.hero .ring svg') && (await p.textContent('.hero .ring')).includes('25'));
   // previous period comparison
   await p.evaluate(() => { const d = App.fin.prevRange(App.fin.range('month')); App.db.invoices.push({ id: 'i0', number: 'FAC-0', clientId: 'c1', date: d.to, currency: 'USD', rate: 2800, lines: [{ desc: 'x', qty: 1, price: 50, cost: 0 }], sub: 50, total: 50, disc: {}, fields: {} }); App.save(); const r = App.reports.compute(d); window.__p = r.revenue; });
   check('période précédente calculée (même durée, juste avant)', await p.evaluate(() => window.__p === 50));

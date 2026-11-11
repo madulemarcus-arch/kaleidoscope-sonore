@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="CISPOLstore Business">
+<defs>
+<linearGradient id="o" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#c8431f"/><stop offset="1" stop-color="#f07a4a"/></linearGradient>
+<linearGradient id="y" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#d99a2b"/><stop offset="1" stop-color="#f4cf6a"/></linearGradient>
+<linearGradient id="n" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12365d"/><stop offset="1" stop-color="#2a6aa8"/></linearGradient>
+</defs>
+<path d="M76 22A40 40 0 1 0 100 80" fill="none" stroke="url(#n)" stroke-width="14" stroke-linecap="round"/>
+<path d="M46 66C50 38 68 18 102 10C86 24 76 40 72 66Z" fill="url(#y)"/>
+<path d="M58 70C66 46 84 30 110 28C95 40 86 54 82 74Z" fill="url(#o)"/>
+<polygon points="80,56 99,67 99,89 80,100 61,89 61,67" fill="url(#o)"/>
+<polygon points="80,56 99,67 80,78 61,67" fill="#f6a06f" opacity=".85"/>
+<polygon points="80,78 99,67 99,89 80,100" fill="#a83316" opacity=".55"/>
+</svg>

@@ -9,7 +9,7 @@ const { check, launch, setup } = require('./helper');
   await p.click('#top [data-go=settings]'); await p.uncheck('[data-mod=sales]');
   check('onglets du bas : 5 places', (await p.locator('#tabs button').count()) === 5);
   check('Ventes retirées du menu du bas', !(await p.textContent('#tabs')).includes('Ventes'));
-  await p.click('#tabs [data-go=home]'); await p.waitForSelector('#view .hero'); check('tuile facture masquée sans Ventes', !(await p.textContent('.tiles')).includes('facture'));
+  await p.click('#tabs [data-go=home]'); await p.waitForSelector('#view .hero'); check('tuile facture masquée sans Ventes', !(await p.textContent('.qa')).includes('facture'));
   await p.evaluate(() => App.go('sales')); await p.waitForSelector('#view .hero'); check('écran désactivé redirige vers accueil', await p.isVisible('.hero'));
   check('aucune erreur JS', t.errors.length === 0, t.errors.join(' | ')); await t.browser.close();
 })().catch(e => { console.log('FAIL exception → ' + e.message); process.exit(1); });

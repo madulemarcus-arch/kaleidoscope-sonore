@@ -33,11 +33,11 @@
   R.addUser = async (name, role, pin) => {
     if (!name || !R.ROLES[role] || !R.validPin(pin)) throw new Error('Nom, profil et PIN (4 à 8 chiffres) requis');
     const first = !db().users.length; if (first && role !== 'admin') throw new Error('Le premier profil doit être administrateur');
-    const salt = R.salt(), u = { id: App.uid(), name, role, salt, hash: await R.hash(salt, pin) }; db().users.push(u);
+    const salt = R.salt(), u = { id: App.uid(), name, role, salt, len: pin.length, hash: await R.hash(salt, pin) }; db().users.push(u);
     let code = null; if (first) { code = R.makeCode(); const rs = R.salt(); db().settings.recovery = { salt: rs, hash: await R.hash(rs, code.replace(/-/g, '')) }; App.user = u; }
     App.log('user.add', name + ' (' + role + ')'); App.save(); return { user: u, code };
   };
-  R.setPin = async (id, pin) => { const u = db().users.find(x => x.id === id); if (!u || !R.validPin(pin)) throw new Error('PIN de 4 à 8 chiffres requis'); u.salt = R.salt(); u.hash = await R.hash(u.salt, pin); App.log('user.pin', u.name); App.save(); };
+  R.setPin = async (id, pin) => { const u = db().users.find(x => x.id === id); if (!u || !R.validPin(pin)) throw new Error('PIN de 4 à 8 chiffres requis'); u.salt = R.salt(); u.hash = await R.hash(u.salt, pin); u.len = pin.length; App.log('user.pin', u.name); App.save(); };
   R.removeUser = id => { const u = db().users.find(x => x.id === id); if (!u) return false; if (u.role === 'admin' && db().users.filter(x => x.role === 'admin').length < 2) return false; db().users = db().users.filter(x => x.id !== id); App.log('user.delete', u.name); if (!db().users.length) { db().settings.recovery = null; App.user = null; } App.save(); return true; };
   R.newRecovery = async () => { const code = R.makeCode(), rs = R.salt(); db().settings.recovery = { salt: rs, hash: await R.hash(rs, code.replace(/-/g, '')) }; App.log('security.recovery', ''); App.save(); return code; };
 
@@ -54,24 +54,30 @@
     if (!db().users.length) return; state.locked = true; if (App.user) App.log('logout', ''); App.user = null; App.$$('.sheet-wrap').forEach(e => e.remove());
     let el = App.$('#lock'); if (!el) { el = document.createElement('div'); el.id = 'lock'; el.className = 'lockscr'; document.body.appendChild(el); } el.hidden = false; pick(el); App.render && App.render();
   };
+  const logo = () => '<img class="logo" alt="" src="' + esc(db().settings.logo || 'icons/logo.svg') + '">';
   const pick = el => {
-    el.innerHTML = '<div class="lbox"><div class="logo">' + (db().settings.logo ? '<img alt="" src="' + db().settings.logo + '">' : '<b>CB</b>') + '</div><h1>' + esc(db().settings.name || App.NAME) + '</h1><p class="muted">Qui êtes-vous ?</p><div class="ulist">' + db().users.map(u => '<button class="btn ghost" data-u="' + u.id + '"><span class="av">' + esc(App.letterOf(u.name)) + '</span><span><b>' + esc(u.name) + '</b><br><small>' + esc(R.ROLES[u.role]) + '</small></span></button>').join('') + '</div></div>';
+    el.innerHTML = '<div class="lbox">' + logo() + '<h1>' + esc(db().settings.name || App.NAME) + '</h1><p class="muted">Qui êtes-vous ?</p><div class="ulist">' + db().users.map(u => '<button class="btn ghost" data-u="' + u.id + '"><span class="av">' + esc(App.letterOf(u.name)) + '</span><span><b>' + esc(u.name) + '</b><br><small>' + esc(R.ROLES[u.role]) + '</small></span></button>').join('') + '</div></div>';
     el.querySelectorAll('[data-u]').forEach(b => b.onclick = () => pin(el, db().users.find(u => u.id === b.dataset.u)));
   };
+  // PIN keypad: round keys, dots that fill, shake on error; a hidden input keeps keyboards and tests working
   const pin = (el, u) => {
-    el.innerHTML = '<div class="lbox"><h1>' + esc(u.name) + '</h1><p class="muted">Entrez votre PIN</p><input id="lpin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" autofocus><p id="lmsg" class="muted" style="color:var(--bad)"></p><div class="tools"><button class="btn ghost" id="lback">Retour</button><button class="btn primary" id="lgo">Entrer</button></div><button class="btn ghost sm" id="lforgot">PIN oublié ?</button></div>';
+    const len = u.len || 4;
+    el.innerHTML = '<div class="lbox">' + logo() + '<h1>' + esc(u.name) + '</h1><p class="muted">Entrez votre PIN</p><div class="pdots" id="pd">' + Array.from({ length: len }, () => '<i></i>').join('') + '</div><input id="lpin" class="ptxt" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN"><p id="lmsg" style="color:#ffb4b4;min-height:1.2em"></p>' +
+      '<div class="keypad">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => '<button type="button" data-k="' + n + '">' + n + '</button>').join('') + '<button type="button" class="go" id="lgo" aria-label="Entrer">✔</button><button type="button" data-k="0">0</button><button type="button" data-k="x" aria-label="Effacer">⌫</button></div><div class="tools"><button class="btn ghost sm" id="lback" style="color:#fff">Retour</button><button class="btn ghost sm" id="lforgot" style="color:#fff">PIN oublié ?</button></div></div>';
+    const inp = el.querySelector('#lpin'), dots = el.querySelector('#pd'), paint = () => { const n = inp.value.length, tot = Math.max(len, n); dots.innerHTML = Array.from({ length: tot }, (_, k) => '<i class="' + (k < n ? 'f' : '') + '"></i>').join(''); };
     const go = async () => {
       const msg = el.querySelector('#lmsg'); if (Date.now() < until) { msg.textContent = 'Trop d\'essais : patientez ' + Math.ceil((until - Date.now()) / 1000) + ' s'; return; }
-      const v = el.querySelector('#lpin').value; if (!v) return;
-      if (await R.hash(u.salt, v) === u.hash) { fails = 0; state.locked = false; App.user = u; last = Date.now(); App.log('login', ''); App.save(); el.hidden = true; if (!App.canView(App.current && App.current())) App.go('home'); App.render(); }
-      else { fails++; el.querySelector('#lpin').value = ''; if (fails >= 5) { until = Date.now() + 30000; fails = 0; msg.textContent = 'Trop d\'essais : patientez 30 s'; } else msg.textContent = 'PIN incorrect'; App.log('login.fail', u.name); }
+      const v = inp.value; if (!v) return;
+      if (await R.hash(u.salt, v) === u.hash) { fails = 0; state.locked = false; App.user = u; last = Date.now(); if (!u.len) { u.len = v.length; } App.log('login', ''); App.save(); el.hidden = true; if (!App.canView(App.current && App.current())) App.go('home'); App.render(); }
+      else { fails++; inp.value = ''; paint(); dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake'); try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } if (fails >= 5) { until = Date.now() + 30000; fails = 0; msg.textContent = 'Trop d\'essais : patientez 30 s'; } else msg.textContent = 'PIN incorrect'; App.log('login.fail', u.name); }
     };
-    el.querySelector('#lgo').onclick = go; el.querySelector('#lpin').onkeydown = e => { if (e.key === 'Enter') go(); }; el.querySelector('#lback').onclick = () => pick(el); setTimeout(() => { const i = el.querySelector('#lpin'); i && i.focus(); }, 50);
-    el.querySelector('#lforgot').onclick = () => recover(el);
+    inp.oninput = () => { paint(); if (u.len && inp.value.length === u.len) go(); };
+    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { const k = b.dataset.k; if (k === 'x') inp.value = inp.value.slice(0, -1); else if (inp.value.length < 8) inp.value += k; el.querySelector('#lmsg').textContent = ''; inp.oninput(); });
+    el.querySelector('#lgo').onclick = go; inp.onkeydown = e => { if (e.key === 'Enter') go(); }; el.querySelector('#lback').onclick = () => pick(el);
+    el.querySelector('#lforgot').onclick = () => recover(el); document.onkeydown = ev => { if (el.hidden || !el.querySelector('#lpin') || !/^\d$/.test(ev.key) || document.activeElement === inp || document.activeElement.tagName === 'INPUT') return; inp.value += ev.key; inp.oninput(); };
   };
   const recover = el => {
-    const admins = db().users.filter(u => u.role === 'admin');
-    el.innerHTML = '<div class="lbox"><h1>PIN oublié</h1><p class="muted">Saisissez le code de récupération noté à la création du premier profil.</p><input id="lcode" autocomplete="off" placeholder="XXXX-XXXX-XXXX" aria-label="Code de récupération"><label class="fld"><span>Profil à réinitialiser</span><select id="lwho">' + db().users.map(u => '<option value="' + u.id + '">' + esc(u.name) + '</option>').join('') + '</select></label><label class="fld"><span>Nouveau PIN</span><input id="lnew" type="password" inputmode="numeric" maxlength="8"></label><p id="lmsg" style="color:var(--bad)"></p><div class="tools"><button class="btn ghost" id="lback">Retour</button><button class="btn primary" id="lok">Réinitialiser</button></div></div>';
+    el.innerHTML = '<div class="lbox">' + logo() + '<h1>PIN oublié</h1><p class="muted">Saisissez le code de récupération noté à la création du premier profil.</p><input id="lcode" autocomplete="off" placeholder="XXXX-XXXX-XXXX" aria-label="Code de récupération"><label class="fld" style="width:100%"><span style="color:rgba(255,255,255,.8)">Profil à réinitialiser</span><select id="lwho">' + db().users.map(u => '<option value="' + u.id + '">' + esc(u.name) + '</option>').join('') + '</select></label><label class="fld" style="width:100%"><span style="color:rgba(255,255,255,.8)">Nouveau PIN</span><input id="lnew" type="password" inputmode="numeric" maxlength="8"></label><p id="lmsg" style="color:#ffb4b4"></p><div class="tools"><button class="btn ghost" id="lback" style="color:#fff">Retour</button><button class="btn primary" id="lok">Réinitialiser</button></div></div>';
     el.querySelector('#lback').onclick = () => pick(el);
     el.querySelector('#lok').onclick = async () => {
       const msg = el.querySelector('#lmsg'), rec = db().settings.recovery, code = el.querySelector('#lcode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''), np = el.querySelector('#lnew').value;
