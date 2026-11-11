@@ -75,7 +75,7 @@
     tab.querySelector('#nx').onclick = () => F.expenseForm(); tab.querySelector('#xc').onchange = e => { st.cat = e.target.value; expenses(tab, el); }; tab.querySelectorAll('[data-x]').forEach(i => i.onclick = () => F.expenseForm(i.dataset.x));
   };
   App.views.money = {
-    title: 'Argent',
+    title: 'Finances',
     render(el, params) {
       if (params && params.tab) st.tab = params.tab;
       const tabs = { journal: 'Journal', exp: 'Dépenses', ...Object.fromEntries(Object.entries(F.tabs).filter(([k, v]) => !v.perm || App.can(v.perm)).map(([k, v]) => [k, v.label])) }; if (!tabs[st.tab]) st.tab = 'journal';

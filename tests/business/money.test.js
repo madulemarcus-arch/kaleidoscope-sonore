@@ -12,7 +12,7 @@ const { check, launch, setup } = require('./helper');
   check('format USD', f[0].replace(/\s/g, ' ') === '1 234,50 $', f[0]); check('format CDF sans décimales', f[1].replace(/\s/g, ' ') === '2 800 000 FC', f[1]);
   check('conversion USD→CDF au taux 2800', f[2] === 28000); check('conversion CDF→USD', f[3] === 2);
   await p.click('#ratechip'); await p.fill('.sheet input[name=rate]', '3000'); await p.click('.sheet footer .primary');
-  check('taux modifié en un geste', (await p.textContent('#ratechip')).replace(/\s/g, ' ').includes('3 000 CDF'));
+  check('taux modifié en un geste', (await p.textContent('#ratechip')).replace(/\s/g, ' ').includes('3 000 FC'));
   await p.waitForSelector('.sheet-wrap', { state: 'detached' }); await p.click('#ratechip'); await p.fill('.sheet input[name=rate]', '0'); await p.click('.sheet footer .primary'); check('taux 0 refusé', await p.isVisible('.sheet') && await p.isVisible('.toast.err'));
   check('aucune erreur JS', t.errors.length === 0, t.errors.join(' | ')); await t.browser.close();
 })().catch(e => { console.log('FAIL exception → ' + e.message); process.exit(1); });

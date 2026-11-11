@@ -3,7 +3,7 @@
   const App = window.App, ui = App.ui, esc = App.esc, M = App.money;
   // id → [label, emoji, module needed (null = always), step of the roadmap that delivers the screen]; the navigation icon has the same name as the id
   const SCREENS = {
-    home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases'], 3], money: ['Argent', '💰', null, 5],
+    home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases'], 3], money: ['Finances', '💰', null, 5],
     services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7],
     interventions: ['Interventions', '🧰', 'interventions', 7], contracts: ['Contrats', '📄', 'contracts', 7], purchases: ['Achats', '🛒', 'purchases', 7],
     cash: ['Caisse', '🏧', 'cash', 5], team: ['Équipe', '🧑‍💼', 'team', 6], data: ['Données et sécurité', '💾', null, 6], settings: ['Réglages', '⚙️', null, 1]
@@ -33,7 +33,7 @@
   const tabsFor = () => { const mid = ['sales', 'stock', 'money'].filter(enabled).slice(0, 2); return ['home', 'clients', ...mid, 'more']; };
   const navBtn = (id, on) => '<button data-go="' + id + '" class="' + (on ? 'on' : '') + '"' + (on ? ' aria-current="page"' : '') + '><i aria-hidden="true">' + App.icon(id) + '</i><span>' + esc(id === 'more' ? 'Plus' : label(id)) + '</span></button>';
   const logoSrc = () => App.set().logo || 'icons/logo.svg';
-  const rateChip = cls => '<button class="' + cls + '" id="ratechip" aria-label="Modifier le taux de change">1 ' + esc(M.info(App.set().currency)[0]) + ' = ' + esc(String(App.set().rate).replace(/\B(?=(\d{3})+$)/g, ' ')) + ' ' + esc(App.set().cur2) + '</button>';
+  const rateChip = cls => '<button class="' + cls + '" id="ratechip" aria-label="Modifier le taux de change">1 ' + esc(M.info(App.set().currency)[0]) + ' = ' + esc(String(App.set().rate).replace(/\B(?=(\d{3})+$)/g, ' ')) + ' ' + esc(M.info(App.set().cur2)[0]) + '</button>';
   const drawNav = id => {
     const t = tabsFor(), moreOn = !t.includes(cur) && cur !== 'more';
     App.$('#tabs').innerHTML = t.map(x => navBtn(x, x === cur || (x === 'more' && (cur === 'more' || moreOn)))).join('');
@@ -127,8 +127,14 @@
   };
   App.views.more = {
     render(el) {
-      const ids = Object.keys(SCREENS).filter(enabled).filter(id => id !== 'home');
-      el.innerHTML = '<div class="page"><div class="grid">' + ids.map(id => '<button class="tile big" data-go="' + id + '"><i>' + App.icon(id) + '</i><span>' + esc(label(id)) + '</span></button>').join('') + '</div><p class="muted center">' + esc(App.NAME) + ' · ' + esc(App.BUILD) + '</p></div>';
+      // Screens already in the bottom bar are not repeated; the rest is grouped by what the user is doing.
+      const inBar = tabsFor(), ids = Object.keys(SCREENS).filter(enabled).filter(id => id !== 'home' && !inBar.includes(id));
+      const GROUPS = [['Vendre', ['sales', 'services', 'interventions', 'subs', 'rental', 'delivery', 'contracts']], ['Gérer', ['stock', 'suppliers', 'purchases', 'money', 'cash', 'team']], ['Réglages', ['data', 'settings']]];
+      const HINT = { services: 'Prestations', interventions: 'Visites', money: 'Dépenses, rapports', cash: 'Comptage du jour', data: 'Sauvegarde, PIN' };
+      const tile = id => '<button class="tile big" data-go="' + id + '"><i>' + App.icon(id) + '</i><span>' + esc(label(id)) + '</span>' + (HINT[id] ? '<small class="muted">' + esc(HINT[id]) + '</small>' : '') + '</button>';
+      const used = new Set(), html = GROUPS.map(([t, list]) => { const l = list.filter(id => ids.includes(id)); l.forEach(id => used.add(id)); return l.length ? '<h3 class="grp">' + t + '</h3><div class="grid">' + l.map(tile).join('') + '</div>' : ''; }).join('');
+      const rest = ids.filter(id => !used.has(id)); // any screen added later still shows up
+      el.innerHTML = '<div class="page">' + html + (rest.length ? '<h3 class="grp">Autres</h3><div class="grid">' + rest.map(tile).join('') + '</div>' : '') + '<p class="muted center">' + esc(App.NAME) + ' · ' + esc(App.BUILD) + '</p></div>';
     }
   };
 

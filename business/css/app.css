@@ -183,3 +183,5 @@ input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--pri)
 /* tab containers and small details */
 #mt, #bt, #tab { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .stats small b { display: inline; font-size: .78rem; font-weight: 800; } .card .up, .stats .up { color: var(--ok); } .card .down, .stats .down { color: var(--bad); }
+
+.grp { margin: 16px 4px 8px; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); } .grp:first-child { margin-top: 4px; } .tile.big small { font-size: .7rem; font-weight: 500; line-height: 1.2; }

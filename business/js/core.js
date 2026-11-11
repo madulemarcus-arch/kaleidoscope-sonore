@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v8', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v9', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
