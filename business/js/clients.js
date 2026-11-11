@@ -8,6 +8,7 @@
   C.initial = c => App.letterOf(c.name);
   // phone → international digits for wa.me (0xx… → country code + xx…)
   C.intl = p => { let d = digits(p); const dial = App.db.settings.dial || ''; if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0') && dial) d = dial + d.slice(1); return d; };
+  C.options = blank => [['', blank || '— Client de passage —'], ...db().slice().sort((a, b) => norm(a.name).localeCompare(norm(b.name), 'fr')).map(c => [c.id, c.name + (c.phone ? ' · ' + c.phone : '')])];
   C.extras = []; // other modules push (client) => html shown on the profile (invoices, balance…)
 
   // ---------- custom fields (clients / products / invoices) ----------

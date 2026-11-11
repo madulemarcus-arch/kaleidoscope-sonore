@@ -34,7 +34,7 @@ const { check, launch, setup } = require('./helper');
   await p.evaluate(() => { App.user = App.db.users.find(u => u.role === 'seller'); });
   await p.evaluate(() => { window.location.hash = '#/money'; }); await p.waitForTimeout(200); check('écran Argent inaccessible par l\'adresse', (await p.textContent('#ttl')) !== 'Argent');
   // driver and accountant
-  check('profils : livreur et comptable', await p.evaluate(async () => { const R = App.roles; const k = r => { App.user = App.db.users.find(u => u.role === r); return [App.can('pay'), App.can('costs'), App.can('reports'), App.canView('delivery'), App.canView('money')]; }; const d = k('driver'), a = k('accountant'); return JSON.stringify(d) === '[true,false,false,true,false]' && JSON.stringify(a) === '[true,true,true,false,true]'; }));
+  check('profils : livreur et comptable', await p.evaluate(async () => { const R = App.roles; const k = r => { App.user = App.db.users.find(u => u.role === r); return [App.can('pay'), App.can('costs'), App.can('reports'), App.canView('delivery'), App.canView('money')]; }; const d = k('driver'), a = k('accountant'); return JSON.stringify(d) === '[true,false,false,true,false]' && JSON.stringify(a) === '[true,true,true,true,true]'; }));
   // audit journal records who did what
   await p.evaluate(() => { App.user = App.db.users.find(u => u.role === 'admin'); }); check('journal : connexions et auteur enregistrés', await p.evaluate(() => App.db.log.some(l => l.a === 'login' && l.u === 'Marie Admin') && App.db.log.some(l => l.a === 'login.fail')));
   // lockout after 5 failures

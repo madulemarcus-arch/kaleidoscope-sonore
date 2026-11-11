@@ -73,6 +73,13 @@
     draw();
   };
 
+  // Programmatic invoice used by the other modules (subscriptions, interventions, rentals): same numbering, stock and payment rules as the form.
+  A.createInvoice = o => {
+    const s = db().settings, cur = o.currency || s.currency, rate = o.rate || s.rate, lines = o.lines.map(l => ({ pid: l.pid || '', desc: l.desc, qty: l.qty == null ? 1 : l.qty, price: l.price, cost: l.cost || 0 })), calc = A.calc(lines, o.disc, cur);
+    const inv = { id: App.uid(), number: A.nextNo('FAC', 'invoice', () => db().invoices), kind: 'sale', clientId: o.clientId || '', clientName: o.clientId ? '' : 'Client de passage', date: o.date || App.today(), currency: cur, rate, lines, disc: o.disc || { type: 'pct', value: 0 }, sub: calc.sub, discAmt: calc.disc, total: calc.total, note: o.note || '', fields: {}, source: o.source || '' };
+    db().invoices.push(inv); applyStock(inv); if (o.paid > 0) A.addPayment(inv, { amount: Math.min(o.paid, inv.total), currency: cur, mode: o.mode, date: inv.date }, true);
+    App.log('invoice.add', inv.number + (o.source ? ' (' + o.source + ')' : '')); return inv;
+  };
   // ---------- payments ----------
   A.addPayment = (inv, p, quiet) => {
     const rec = { id: App.uid(), invoiceId: inv.id, clientId: inv.clientId, date: p.date || App.today(), amount: p.amount, currency: p.currency || inv.currency, rate: p.rate || (p.currency && p.currency !== inv.currency ? db().settings.rate : inv.rate), mode: p.mode || db().settings.modes[0], at: Date.now(), note: p.note || '', no: A.nextNo('REC', 'receipt', () => db().payments.map(x => ({ number: x.no }))) };

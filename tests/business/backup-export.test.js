@@ -25,7 +25,7 @@ const fs = require('fs'), { check, launch, setup } = require('./helper'), fx = r
   const [dx] = await Promise.all([p.waitForEvent('download'), p.click('#dxl')]); const buf = fs.readFileSync(await dx.path());
   check('export .xlsx : nom de fichier', /^export-ets-test-.*\.xlsx$/.test(dx.suggestedFilename()));
   const sheets = await p.evaluate(async b => { const r = await App.sheetio.readXlsx(new Uint8Array(b).buffer); return r.map(s => ({ n: s.name, rows: s.rows })); }, [...buf]);
-  check('Excel : 8 feuilles', sheets.length === 8 && sheets.map(s => s.n).includes('Factures') && sheets.map(s => s.n).includes('Mouvements de stock'));
+  check('Excel : 12 feuilles', sheets.length === 12 && sheets.map(s => s.n).includes('Factures') && sheets.map(s => s.n).includes('Mouvements de stock'));
   const cl = sheets.find(s => s.n === 'Clients'); check('Excel : clients (en-tête + 5 lignes)', cl.rows.length === 6 && cl.rows[0][1] === 'Nom' && String(cl.rows[1][1]).includes('Test001'));
   const fa = sheets.find(s => s.n === 'Factures'); check('Excel : facture avec payé / reste / statut', fa.rows[1][0] === 'FAC-2026-0001' && fa.rows[1][8] === 4 && fa.rows[1][9] === 2 && fa.rows[1][10] === 'Partielle', JSON.stringify(fa.rows[1]));
   const pr = sheets.find(s => s.n === 'Produits'); check('Excel : nombres restent des nombres', typeof pr.rows[1][6] === 'number' && pr.rows[1][6] === 10);
