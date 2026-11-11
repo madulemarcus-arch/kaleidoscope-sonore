@@ -11,8 +11,8 @@ const { check, launch, setup } = require('./helper'), fx = require('./fixtures')
   await p.fill('#cq', 'cl-0007'); check('recherche par code', (await p.locator('.item[data-id]').count()) === 1);
   await p.fill('#cq', 'zzzz'); check('aucun résultat', (await p.locator('.item[data-id]').count()) === 0); await p.fill('#cq', '');
   // add via form, duplicate phone warning
-  await p.evaluate(() => App.clients.form()); await p.fill('.sheet input[name=name]', 'Nouveau Client'); await p.fill('.sheet input[name=phone]', people[0].phone); await p.click('.sheet footer .primary');
-  check('doublon de téléphone signalé', await p.isVisible('.toast.err') && (await p.evaluate(() => App.db.clients.length)) === 30);
+  await p.evaluate(() => App.clients.form()); await p.waitForSelector('.sheet-wrap.on'); await p.waitForTimeout(200); await p.fill('.sheet input[name=name]', 'Nouveau Client'); await p.fill('.sheet input[name=phone]', people[0].phone); await p.click('.sheet footer .primary');
+  check('doublon de téléphone signalé', await p.waitForSelector('.toast.err', { timeout: 5000 }).then(() => true, () => false) && (await p.evaluate(() => App.db.clients.length)) === 30);
   await p.fill('.sheet input[name=phone]', '0899999999'); await p.click('.sheet footer .primary'); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
   check('client ajouté avec code', await p.evaluate(() => App.db.clients.length === 31 && /^CL-\d{4}$/.test(App.db.clients[30].code)));
   // profile and intl link
