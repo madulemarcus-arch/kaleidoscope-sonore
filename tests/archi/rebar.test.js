@@ -11,7 +11,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   await page.evaluate(() => { App.struct.autoColumns(); App.struct.run(); });
   await page.click('#mode4'); check('bouton Ferraillage', await page.locator('#fer').isVisible() && !(await page.locator('#cv').isVisible()));
   const ids = await page.$$eval('#ferList button', b => b.map(x => x.dataset.v));
-  check('26 vues : repérage, descente de charges, 6 poutres, 6 poteaux, 4 nœuds de rive, 6 semelles, 1 dalle, métré', ids.length === 26 && ids[0] === 'plan' && ids[1] === 'dc' && ids.filter(i => /^ND-/.test(i)).length === 4 && ids[ids.length - 1] === 'qty', ids.join(','));
+  check('28 vues : repérage, descente de charges, 6 poutres, 6 poteaux, 6 nœuds, 6 semelles, 1 dalle, métré', ids.length === 28 && ids[0] === 'plan' && ids[1] === 'dc' && ids.filter(i => /^ND-/.test(i)).length === 6 && ids[ids.length - 1] === 'qty', ids.join(','));
   // model against hand calculations (fc28 25, FeE500, cover 3 cm)
   const mdl = await page.evaluate(() => { const m = App.rebar.model(App.doc); return { po: m.beams.find(b => Math.abs(b.L - 3) < 1e-6), p1: m.cols[0], s1: m.foots[0], d1: m.slabs[0], tot: m.totals, ls12: m.ls(12) }; });
   const b0 = mdl.po, last = b0.bars[b0.bars.length - 1];
@@ -40,7 +40,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     App.rebar.views(m).forEach(v => { const h = App.rebar.viewHTML(App.doc, m, v.id), tmp = document.createElement('div'); tmp.innerHTML = h;
       tmp.querySelectorAll('svg').forEach(s => { const x = new DOMParser().parseFromString(s.outerHTML, 'image/svg+xml'); if (x.querySelector('parsererror') || !s.querySelectorAll('line,path,rect,circle').length) out.push(v.id); });
       if (!tmp.querySelector('svg') && v.id !== 'qty' && v.id !== 'dc') out.push(v.id + ' (sans dessin)'); }); return out; });
-  check('26 vues : SVG bien formés et non vides', bad.length === 0, bad.join(','));
+  check('28 vues : SVG bien formés et non vides', bad.length === 0, bad.join(','));
   await page.click('#ferList [data-v=PO1]'); check('vue poutre : coupes et tableau', (await page.$$('#ferMain svg')).length === 2 && /Armatures inférieures/.test(await page.textContent('#ferMain')));
   await page.click('#ferList [data-v=P1]'); check('vue poteau', /Armatures longitudinales/.test(await page.textContent('#ferMain')));
   await page.click('#ferList [data-v=S1]'); check('vue semelle', /Aciers de semelle/.test(await page.textContent('#ferMain')));
@@ -49,7 +49,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // export
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#ferExport')]); check('export HTML de tous les plans', dl.suggestedFilename().endsWith('plans-de-ferraillage.html'));
   const doc = await page.evaluate(() => App.rebar.document(App.doc));
-  check('document : 27 sections (garde + 26 vues), avertissement ingénieur', (doc.match(/<section>/g) || []).length === 27 && /valider par un ingénieur/.test(doc) && (doc.match(/<svg/g) || []).length >= 25);
+  check('document : 29 sections (garde + 28 vues), avertissement ingénieur', (doc.match(/<section>/g) || []).length === 29 && /valider par un ingénieur/.test(doc) && (doc.match(/<svg/g) || []).length >= 25);
   // stale results
   await page.evaluate(() => App.edit(d => { d.items.find(i => i.t === 'col').p = [-3.4, -2]; }));
   check('plan modifié : bandeau « périmés » et bouton Recalculer', /périmés/.test(await page.textContent('#ferMain')) && await page.locator('#ferCalc').isVisible());
