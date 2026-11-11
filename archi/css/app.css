@@ -27,6 +27,15 @@ main { flex: 1; display: flex; min-height: 0; }
 #bar3 { position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 #bar3 button { background: rgba(22,30,46,.88); }
 #msg3 { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 10px 16px; background: rgba(22,30,46,.9); border: 1px solid var(--line); border-radius: 10px; color: var(--mute); text-align: center; max-width: 80%; }
+#fer { position: absolute; inset: 0; display: flex; background: var(--bg); } #fer[hidden] { display: none; }
+#ferList { width: 190px; padding: 8px; display: flex; flex-direction: column; gap: 5px; overflow: auto; background: var(--panel); border-right: 1px solid var(--line); }
+#ferList button { text-align: left; } #ferList button.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+#ferMain { flex: 1; min-width: 0; overflow: auto; background: #fff; color: #111; padding: 14px 18px; }
+#ferMain h2 { margin: 4px 0 8px; font-size: 18px; color: #12365d; } #ferMain h3 { color: #12365d; }
+#ferMain .bars { border-collapse: collapse; width: 100%; margin: 8px 0; } #ferMain .bars td, #ferMain .bars th { border: 1px solid #bbb; padding: 3px 6px; text-align: left; font-size: 13px; } #ferMain .bars th { background: #eef2f7; } #ferMain tr.tot td { font-weight: 700; background: #f6f6f6; }
+#ferMain button { background: #12365d; color: #fff; border-color: #12365d; } #ferMain .notes { color: #444; font-size: 13px; }
+#ferMain .warn { background: #fff4e5; border: 1px solid #e5b044; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; }
+[data-mode="fer"] #tools, [data-mode="fer"] #panel, [data-mode="fer"] #tools2d, [data-mode="fer"] #panel3 { display: none; }
 #panel3 { display: none; }
 [data-mode="3d"] #tools, [data-mode="3d"] #panel, [data-mode="3d"] #tools2d { display: none; }
 [data-mode="3d"] #panel3 { display: block; }
@@ -52,6 +61,7 @@ input[type=range] { width: 100%; padding: 0; min-height: 28px; }
   .only-small { display: inline-block; }
   #panel, #panel3 { display: none; position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; max-width: 86vw; box-shadow: -10px 0 30px #0008; }
   #panel.open, [data-mode="3d"] #panel3.open { display: block; }
+  #fer { flex-direction: column; } #ferList { width: auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); flex: 0 0 auto; } #ferList button { flex: 0 0 auto; }
   [data-mode="3d"] #panel3 { display: none; }
   main { position: relative; }
   .brand input { width: 110px; }

@@ -1,7 +1,7 @@
 // Core: document model, geometry helpers, hit testing, undo/redo, autosave.
 // All coordinates are in metres, x to the right, y UP (screen conversion happens in draw.js).
 (function () {
-  const A = window.App = { BUILD: 'archi-v4', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
+  const A = window.App = { BUILD: 'archi-v5', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
   const L = (id, name, color) => ({ id, name, color, on: true, lock: false });
   A.uid = () => Math.random().toString(36).slice(2, 9);
   A.newDoc = () => A.ensureDoc({ v: 1, name: 'Sans titre', active: 'mur', defaults: { th: 0.2, h: 2.8 },

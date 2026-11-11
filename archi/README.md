@@ -1,6 +1,6 @@
 # Archi 2D
 
-Logiciel de dessin de plans d'architecture, web installable (PWA), hors connexion, sans dépendance ni build. Projet en étapes : plan 2D (fait) → vue 3D automatique (fait) → rendu : matériaux, toiture, mobilier, soleil (fait) → dimensionnement BAEL (fait).
+Logiciel de dessin de plans d'architecture, web installable (PWA), hors connexion, sans dépendance ni build. Projet en étapes : plan 2D (fait) → vue 3D automatique (fait) → rendu : matériaux, toiture, mobilier, soleil (fait) → dimensionnement BAEL (fait) → plans de ferraillage (fait).
 
 ## Lancer
 
@@ -21,7 +21,7 @@ Ouvrir `archi/index.html` dans un navigateur récent, ou `python3 -m http.server
 | T | Texte |
 | O / G / S | Orthogonal / Grille / Accrochage aux points (Maj : orthogonal temporaire) |
 | H | Tout voir (en 3D : vue isométrique) |
-| 2 / 3 | Passer en dessin 2D / en vue 3D (en 3D : T = vue de dessus, Échap = retour au 2D) |
+| 2 / 3 / 4 | Passer en dessin 2D / vue 3D / plans de ferraillage (en 3D : H = isométrique, T = dessus ; Échap = retour au 2D) |
 | Suppr, Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+S | Supprimer, annuler, rétablir, tout sélectionner, enregistrer |
 
 Molette = zoom ; clic droit, clic milieu ou Espace + glisser = déplacer la vue ; deux doigts = zoom et déplacement sur tablette.
@@ -58,6 +58,21 @@ Pour une structure poteaux-poutres-dalles en béton armé avec remplissage en ma
 
 **Limites** : pré-dimensionnement seulement, à vérifier et valider par un ingénieur structure avant toute exécution. Non traités : séisme, vent, poinçonnement, flèche des poutres, poutres continues détaillées (moment de travée forfaitaire 0,85 M0), dégression des charges d'exploitation, semelles filantes et radiers (les chevauchements sont signalés), charpente, escaliers, balcons, sol multicouche. Cadre rectangulaire seulement pour les dalles.
 
+## Plans de ferraillage
+
+Après le calcul, le bouton « Ferraillage » (ou la touche 4) affiche, pour chaque élément, le plan d'armatures et son tableau de nomenclature :
+
+- **Plan de repérage** : poteaux, poutres, semelles et dalles avec leurs repères et leurs sections.
+- **Poutres** : coupe longitudinale (barres inférieures, montage, chapeaux, cadres) et coupes en travée et sur appui.
+- **Poteaux** : élévation avec la semelle (barres, équerre de pied, cadres) et coupe transversale (barres réparties dans le carré).
+- **Semelles** : vue en plan du quadrillage et coupe.
+- **Dalles** : vue en plan des lits inférieurs dans les deux sens et des chapeaux sur appuis.
+- **Nomenclature et métré** : béton (m³), acier (kg) et ratio kg/m³ par ouvrage, longueurs et poids par diamètre.
+
+« Exporter tous les plans » produit un fichier HTML (une page par élément, format A4 paysage) à ouvrir et imprimer en PDF depuis le navigateur. Les plans sont périmés (bandeau d'alerte) dès que le plan 2D change : un bouton relance le calcul.
+
+Conventions : enrobage 3 cm (5 cm pour les semelles, sur béton de propreté de 5 cm) ; crochet à 180° développé 20 Ø, équerre 12 Ø, crochets de cadres 10 Ø ; scellement droit ls = Ø fe / (4 τs), τs = 0,6 ψs² ft28 ; chapeaux de poutre sur 0,25 L, de dalle sur 0,2 de la portée ; poids 0,00617 Ø² kg/m. Les plans sont des plans de principe tirés du pré-dimensionnement : ni détail des nœuds, ni arrêts de barres, ni pertes de façonnage ; à vérifier et valider par un ingénieur structure.
+
 ## Étapes suivantes
 
-1. Poutres continues et semelles filantes, descente de charges par niveau détaillée, plans de ferraillage.
+1. Poutres continues et semelles filantes, descente de charges par niveau détaillée, détail des nœuds.

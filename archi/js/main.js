@@ -25,14 +25,29 @@
   A.mode = '2d';
   A.setMode = m => {
     if (m === A.mode) return;
-    if (m === '3d') { A.cancel(); if (!A.v3.init(cv3)) { alert('La vue 3D demande WebGL, absent de ce navigateur.'); return; } A.mode = '3d'; if (first3) { A.v3.initInput(cv3); first3 = false; } }
-    else A.mode = '2d';
-    const d3 = A.mode === '3d'; document.body.dataset.mode = A.mode; cv.hidden = d3; cv3.hidden = !d3; $('bar3').hidden = !d3;
-    $('mode2').setAttribute('aria-pressed', String(!d3)); $('mode3').setAttribute('aria-pressed', String(d3));
+    if (m === '3d') { A.cancel(); if (!A.v3.init(cv3)) { alert('La vue 3D demande WebGL, absent de ce navigateur.'); return; } if (first3) { A.v3.initInput(cv3); first3 = false; } }
+    if (m === 'fer') A.cancel();
+    A.mode = m; const d3 = m === '3d';
+    document.body.dataset.mode = m; cv.hidden = m !== '2d'; cv3.hidden = !d3; $('bar3').hidden = !d3; $('fer').hidden = m !== 'fer';
+    [['mode2', '2d'], ['mode3', '3d'], ['mode4', 'fer']].forEach(([id, k]) => $(id).setAttribute('aria-pressed', String(m === k)));
     if (d3) { A.v3.rebuild(); A.v3.resize(); A.v3.preset('iso'); const none = !A.v3.mesh.stats.walls; $('msg3').hidden = !none; $('msg3').textContent = 'Aucun mur à afficher : dessinez d\'abord en 2D.'; }
-    else { $('msg3').hidden = true; resize(); }
+    else $('msg3').hidden = true;
+    if (m === '2d') resize();
     A.emit(); drawRender();
   };
+  // ---------- reinforcement drawings (Ferraillage mode) ----------
+  A.ferView = 'plan';
+  function drawFer() {
+    if (A.mode !== 'fer') return; const r = A.doc.struct.result, box = $('ferMain'), list = $('ferList');
+    if (!r || r.errors.length) { list.innerHTML = ''; box.innerHTML = `<div class="warn">${r && r.errors.length ? esc(r.errors.join(' ')) : 'Aucun calcul de structure pour ce plan.'} Posez les poteaux en 2D (panneau « Structure »), puis lancez le calcul.</div><button id="ferCalc">Calculer maintenant</button>`; return; }
+    const mdl = A.rebar.model(A.doc), views = A.rebar.views(mdl); if (!views.some(v => v.id === A.ferView)) A.ferView = 'plan';
+    list.innerHTML = views.map(v => `<button data-v="${esc(v.id)}"${v.id === A.ferView ? ' class="on"' : ''}>${esc(v.title)}</button>`).join('');
+    const stale = A.struct.stale(), title = views.find(v => v.id === A.ferView).title;
+    box.innerHTML = (stale ? '<div class="warn">Le plan a changé depuis le dernier calcul : ces plans sont périmés. <button id="ferCalc">Recalculer</button></div>' : '') + `<h2>${esc(title)}</h2>` + A.rebar.viewHTML(A.doc, mdl, A.ferView) + '<p><button id="ferExport">Exporter tous les plans (HTML imprimable)</button></p>';
+  }
+  $('ferList').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; A.ferView = v; drawFer(); $('ferMain').scrollTop = 0; };
+  $('ferMain').onclick = e => { if (e.target.id === 'ferCalc') A.struct.run(); else if (e.target.id === 'ferExport') { const html = A.rebar.document(A.doc); if (html) A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-plans-de-ferraillage.html', new Blob([html], { type: 'text/html' })); } };
+  $('mode4').onclick = () => A.setMode('fer');
   $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
   $('bar3').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; if (v === 'png') A.v3.snapshot(2, b => A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-3d.png', b)); else if (v === 'panel') $('panel3').classList.toggle('open'); else A.v3.preset(v); };
 
@@ -152,7 +167,7 @@
     if (document.activeElement !== $('docName')) $('docName').value = A.doc.name;
     if (!A.doc.layers.some(l => l.id === A.doc.active)) A.doc.active = A.doc.layers[0].id;
     $('furnSel').hidden = A.tool !== 'furn'; if (document.activeElement !== fs) fs.value = A.furnKind;
-    drawLayers(); drawProps(); drawStruct(); drawRender(); A.status(); A.redraw();
+    drawLayers(); drawProps(); drawStruct(); drawRender(); drawFer(); A.status(); A.redraw();
   });
 
   // ---------- start ----------
