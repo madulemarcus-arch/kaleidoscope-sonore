@@ -297,7 +297,7 @@
   // QR code: opens WhatsApp to the company with the invoice number already typed, so the client can send the payment proof
   const qrCell = (i, cur, tot) => { try { const co = App.db.settings.company, u = co.phone && window.qrcode ? App.waUrl(co.phone, `Bonjour, je règle la facture ${i.number} (${money(tot, cur)}).`) : ''; if (!u) return '';
     const q = window.qrcode(0, 'M'); q.addData(u); q.make(); return `<td style="width:3.4cm;text-align:center"><img class="qr" src="${q.createDataURL(4, 0)}" alt="QR" style="width:2.6cm;height:2.6cm"><div style="font-size:7pt;color:#4A5568;line-height:1.2">Scannez pour payer<br>ou envoyer la preuve</div></td>`; } catch (e) { return ''; } };
-  const paperFoot = (stamp, bare, qr = '') => `<table class="foot">${qr || !bare ? `<tr><td></td>${qr}${bare ? '' : `<td class="r" style="width:4.8cm"><img src="${esc(stamp || 'stamp.png')}" alt=""></td>`}</tr>` : ''}<tr><td class="thx" colspan="3">MERCI POUR VOTRE CONFIANCE</td></tr></table>`;
+  const paperFoot = (stamp, bare, qr = '') => `<table class="foot">${qr || !bare ? `<tr><td></td>${qr}${bare ? '' : `<td class="r" style="width:4.8cm"><img src="${esc(stamp || App.db.settings.company.stamp || 'stamp.png')}" alt=""></td>`}</tr>` : ''}<tr><td class="thx" colspan="3">MERCI POUR VOTRE CONFIANCE</td></tr></table>`;
   // reference printed for a line that has no product reference of its own: P0001, P0002… by line position
   App.lineRef = n => 'P' + String(n + 1).padStart(4, '0');
   App.invoiceDoc = (i, logo, stamp) => {
