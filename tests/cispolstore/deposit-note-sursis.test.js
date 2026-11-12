@@ -8,7 +8,7 @@ const D=await p.evaluate(()=>{const t=App.today(),a=n=>App.addDays(t,n);App.db.c
  {id:'c2',code:'CL-2',type:'gere',first:'Bob',last:'Actif',name:'Bob Actif',phone:'0992',subs:[],created:t,start:a(-10),period:30,grace:7},     // active, ends +20, grace until +27
  {id:'c3',code:'CL-3',type:'gere',first:'Cléo',last:'Inactive',name:'Cléo Inactive',phone:'0993',subs:[],created:t,start:a(-90),period:30,grace:5},// long over
  {id:'c4',code:'CL-4',type:'gere',first:'Dan',last:'Sansabo',name:'Dan Sansabo',phone:'0994',subs:[],created:t});App.save();
- return {g1:App.fdate(App.sub(App.client('c1')).gEnd),g2:App.fdate(App.sub(App.client('c2')).gEnd)}});
+ return {g1:App.fdate(App.sub(App.client('c1')).gEnd),g2:App.fdate(App.sub(App.client('c2')).gEnd),g3:App.fdate(App.sub(App.client('c3')).gEnd)}});
 await p.evaluate(()=>App.go('deposits'));await p.waitForTimeout(500);
 await p.click('[data-act=dep_new]');await p.waitForTimeout(400);
 const note=()=>p.inputValue('#f_dn');
@@ -18,7 +18,7 @@ ok('client in grace period: « À payer avant le » + end of the grace period ('
 await p.selectOption('#f_dc','c2');await p.waitForTimeout(150);
 ok('another client: the note follows (end of grace '+D.g2+')',await note()==='À payer avant le '+D.g2,await note());
 await p.selectOption('#f_dc','c3');await p.waitForTimeout(150);
-ok('client already inactive (grace over): no date offered, the note is cleared',await note()==='',await note());
+ok('client already inactive (grace over): the end of the grace period ('+D.g3+') is offered too',await note()==='À payer avant le '+D.g3,await note());
 await p.selectOption('#f_dc','c4');await p.waitForTimeout(150);
 ok('client without subscription: note stays empty',await note()==='');
 await p.selectOption('#f_dc','c1');await p.waitForTimeout(150);await p.fill('#f_dn','à payer à Starlink le 15');await p.selectOption('#f_dc','c2');await p.waitForTimeout(150);
@@ -40,7 +40,7 @@ const rowTxt=id=>p.$eval('[data-act=dep_open][data-id='+id+']',e=>e.innerText);
 ok('existing deposit without note, client active: « À payer avant le '+D.g2+' » appears at once',(await rowTxt('d1')).includes('À payer avant le '+D.g2),await rowTxt('d1'));
 ok('existing deposit with its own note: the note is kept, no automatic date',(await rowTxt('d2')).includes('note de la main')&&!(await rowTxt('d2')).includes('À payer avant'));
 ok('deposit already fully paid: no deadline',!(await rowTxt('d3')).includes('À payer avant'));
-ok('client already inactive: no deadline',!(await rowTxt('d4')).includes('À payer avant'));
+ok('client already inactive: the deadline shows too ('+D.g3+')',(await rowTxt('d4')).includes('À payer avant le '+D.g3),await rowTxt('d4'));
 ok('nothing was written into the stored deposits',await p.evaluate(()=>App.db.deposits.every(d=>d.id==='d2'?d.note==='note de la main':!d.note)));
 await p.click('[data-act=dep_open][data-id=d1]');await p.waitForTimeout(300);
 ok('the deposit window shows the deadline too',(await p.innerText('dialog')).includes('À payer avant le '+D.g2));

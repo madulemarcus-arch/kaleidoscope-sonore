@@ -8,8 +8,8 @@
   const st = { f: 'wait' };
   const list = () => (App.db.deposits = App.db.deposits || []);
   const out = d => (d.uses || []).reduce((a, u) => a + (+u.amount || 0), 0);
-  // « À payer avant le … » = end of the client's grace period (nothing for a client without subscription or already inactive)
-  const payBefore = c => { const s = c && App.sub(c); return s && s.gEnd >= App.today() ? 'À payer avant le ' + App.fdate(s.gEnd) : ''; };
+  // « À payer avant le … » = end of the client's grace period, also for a client already inactive (nothing only for a client without subscription)
+  const payBefore = c => { const s = c && App.sub(c); return s ? 'À payer avant le ' + App.fdate(s.gEnd) : ''; };
   // the line shown for a deposit: its own note, or, for a deposit still waiting to be paid and written without a note, the live deadline of the client
   const noteOf = d => d.note || (App.depBalance(d) > 0.004 ? payBefore(App.client(d.clientId)) : '');
   App.depBalance = d => Math.max(0, Math.round(((+d.amount || 0) - out(d)) * 100) / 100);
