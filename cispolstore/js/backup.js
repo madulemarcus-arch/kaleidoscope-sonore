@@ -41,7 +41,7 @@
   App.actions.bk_test = () => {
     if (!App.guard('restore')) return App.toast("Action réservée à l'administrateur");
     const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
-    i.onchange = () => { const f = i.files[0]; if (!f) return; f.text().then(t => { const a = App.analyzeBackup(t); pending = t; show(a, f.name); }).catch(() => App.toast('Impossible de lire ce fichier')); };
+    i.onchange = () => { const f = i.files[0]; if (!f) return; f.text().then(async t => { if (App.bkOpen) { t = await App.bkOpen(t); if (t === null) return; } const a = App.analyzeBackup(t); pending = t; show(a, f.name); }).catch(() => App.toast('Impossible de lire ce fichier')); };
     i.click();
   };
   const show = (a, name) => {
@@ -60,7 +60,7 @@
 
   // ---------- settings rows ----------
   App.backupRows = () => { const row = (t, s, b) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${b || ''}</div>`;
-    return row('Tester une sauvegarde', 'Choisissez un fichier .json : l\'application le lit et le compare à vos données, sans rien remplacer.', '<button class="btn sm sec" data-act="bk_test">Tester…</button>')
+    return (App.bkEncRow ? App.bkEncRow() : '') + row('Tester une sauvegarde', 'Choisissez un fichier .json : l\'application le lit et le compare à vos données, sans rien remplacer.', '<button class="btn sm sec" data-act="bk_test">Tester…</button>')
       + row('Rappel de sauvegarde', 'Un bandeau vous le rappelle sur les écrans principaux.', `<select id="s_bkdays" style="width:auto">${App.opts(DAYS, thr())}</select>`); };
   document.addEventListener('change', e => { if (e.target.id !== 's_bkdays') return; App.db.settings.backupDays = +e.target.value; delete App.db.settings.bkSnooze; App.save(); App.toast(+e.target.value ? 'Rappel : ' + DAYS.find(x => x[0] === +e.target.value)[1].toLowerCase() : 'Rappel désactivé'); });
 })();
