@@ -1,0 +1,17 @@
+{
+  "name": "Archi 2D — plans d'architecture",
+  "short_name": "Archi 2D",
+  "description": "Dessin de plans d'architecture 2D hors connexion : murs, portes, fenêtres, cotes, export DXF",
+  "lang": "fr",
+  "id": "archi-2d",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1420",
+  "theme_color": "#12365d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
