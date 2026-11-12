@@ -1,9 +1,10 @@
-// Starlink e-mails: reads the Starlink notices in the user's Gmail (read-only) and updates the status of the matching client, found by its ACC number.
+// Starlink e-mails: reads the Starlink notices in the user's Gmail (read-only by default) and updates the status of the matching client, found by its ACC number.
+// Optional « tidy » setting: once a notice has been understood, the e-mail is marked as read and archived (never deleted). It needs the gmail.modify scope, requested only when the setting is on.
 // Same Google sign-in as the Drive backup (Google Identity Services, token flow): nothing is stored on a server, tokens live in memory for one hour.
 (() => {
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc, F = App.f;
-  const KEY = 'cispolstore-gmail', DRIVE_KEY = 'cispolstore-drive', SCOPE = 'https://www.googleapis.com/auth/gmail.readonly', API = 'https://gmail.googleapis.com/gmail/v1/users/me';
+  const KEY = 'cispolstore-gmail', DRIVE_KEY = 'cispolstore-drive', SCOPE = 'https://www.googleapis.com/auth/gmail.readonly', SCOPE_MOD = 'https://www.googleapis.com/auth/gmail.modify', API = 'https://gmail.googleapis.com/gmail/v1/users/me';
   const FIRST_DAYS = 30, MAX_MSG = 300, MAX_LOG = 600, DUP_MS = 2 * 3600e3;
 
   let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
@@ -11,14 +12,15 @@
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   // The list of mailboxes, the Google client ID and the reading frequency follow the data (synced settings), so the phone shows the same mailboxes as the computer.
   // Tokens never leave the device: each device signs in to Google itself. Last change wins (cfg.gt = time of the version this device holds).
-  const shareCfg = () => { if (!App.db || !App.db.settings) return; const t = Date.now(); cfg.gt = t; saveCfg(); App.db.settings.gmail = { t, clientId: clientId(), every: cfg.every, accounts: cfg.accounts.map(a => a.email) }; App.save(); };
+  const shareCfg = () => { if (!App.db || !App.db.settings) return; const t = Date.now(); cfg.gt = t; saveCfg(); App.db.settings.gmail = { t, clientId: clientId(), every: cfg.every, tidy: !!cfg.tidy, accounts: cfg.accounts.map(a => a.email) }; App.save(); };
   const adopt = () => {
     const g = App.db && App.db.settings && App.db.settings.gmail;
     if (!g) { if (App.db && App.db.settings && (cfg.accounts.length || cfg.clientId)) shareCfg(); return false; } // first time on this device: publish what it already has
     if (!(g.t > (cfg.gt || 0))) return false;
     cfg.accounts = (g.accounts || []).map(e => cfg.accounts.find(a => a.email.toLowerCase() === String(e).toLowerCase()) || { email: e });
-    if (g.clientId) cfg.clientId = g.clientId; if (g.every !== undefined) cfg.every = g.every; cfg.gt = g.t; saveCfg(); return true;
+    if (g.clientId) cfg.clientId = g.clientId; if (g.every !== undefined) cfg.every = g.every; if (g.tidy !== undefined) cfg.tidy = !!g.tidy; cfg.gt = g.t; saveCfg(); return true;
   };
+  const TIDY = [[0, 'Ne rien changer dans Gmail (lecture seule)'], [1, 'Marquer comme lu et archiver']];
   const EVERY = [[24, '1 fois par jour'], [12, '2 fois par jour'], [0, 'Seulement avec « Vérifier maintenant »']];
   const everyH = () => cfg.every === undefined || cfg.every === null ? 12 : +cfg.every;
   const driveId = () => { try { return (JSON.parse(localStorage.getItem(DRIVE_KEY)) || {}).clientId || ''; } catch (e) { return ''; } };
@@ -115,8 +117,8 @@
     document.head.appendChild(s);
   });
   const toks = {};
-  const gf = async (url, tok) => {
-    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
+  const gf = async (url, tok, body) => {
+    const r = await fetch(url, body ? { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { headers: { Authorization: 'Bearer ' + tok } });
     if (r.status === 401) throw Object.assign(new Error('Reconnexion à Google nécessaire'), { code: 'auth' });
     if (!r.ok) {
       let m = '', why = ''; try { const j = (await r.json()).error; m = j.message; why = ((j.errors || [])[0] || {}).reason || ''; } catch (e) {}
@@ -129,7 +131,7 @@
   L.pace = 150; // ms between two messages read
   L.delay = ms => new Promise(ok => setTimeout(ok, ms));
   // same request, retried a few times with a growing pause when Gmail asks to slow down
-  const gq = async (url, tok) => { for (let i = 0; ; i++) { try { return await gf(url, tok); } catch (e) { if (e.code !== 'quota' || i >= 3) throw e; await L.delay((e.retry || 10 * 2 ** i) * 1000); } } };
+  const gq = async (url, tok, body) => { for (let i = 0; ; i++) { try { return await gf(url, tok, body); } catch (e) { if (e.code !== 'quota' || i >= 3) throw e; await L.delay((e.retry || 10 * 2 ** i) * 1000); } } };
   // email '' = pick any Google account (adding a mailbox); interactive false = reuse the existing Google session silently
   const getToken = async (email, interactive) => {
     const t0 = email && toks[email.toLowerCase()]; if (t0 && Date.now() < t0.exp) return t0.tok;
@@ -137,7 +139,7 @@
     await loadGis();
     const t = await new Promise((ok, ko) => {
       const tc = google.accounts.oauth2.initTokenClient({
-        client_id: clientId(), scope: SCOPE, login_hint: email || undefined,
+        client_id: clientId(), scope: cfg.tidy ? SCOPE_MOD : SCOPE, login_hint: email || undefined,
         callback: r => r.error ? ko(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : ok({ tok: r.access_token, exp: Date.now() + ((+r.expires_in || 3600) - 60) * 1000 }),
         error_callback: e => ko(Object.assign(new Error(e && e.type === 'popup_closed' ? 'Fenêtre Google fermée avant la fin (si Google affichait « The OAuth client was not found », l\'ID client est faux : vérifiez-le dans « Identifiant Google »)' : e && e.type === 'popup_failed_to_open' ? 'Le navigateur a bloqué la fenêtre Google : autorisez les fenêtres surgissantes pour ce site (icône dans la barre d\'adresse) ou ouvrez l\'application dans Chrome, puis réessayez.' : 'Connexion Google impossible (' + ((e && e.type) || 'erreur') + ')'), { code: (e && e.type) || 'popup' }))
       });
@@ -153,33 +155,37 @@
     return plain || (html ? (new DOMParser().parseFromString(html, 'text/html').body.textContent || '') : '');
   };
   const header = (msg, name) => ((((msg.payload || {}).headers) || []).find(h => String(h.name).toLowerCase() === name) || {}).value || '';
+  let tidied = 0;
   const syncAccount = async (a, interactive) => {
     const tok = await getToken(a.email, interactive), since = a.last ? Math.floor((a.last - 2 * 864e5) / 1000) : Math.floor((Date.now() - FIRST_DAYS * 864e5) / 1000);
     const q = encodeURIComponent(`from:starlink.com after:${since}`), have = new Set(log().map(e => e.id)), seen = new Set(a.seen || []);
     let ids = [], page = ''; do { const r = await gq(`${API}/messages?q=${q}&maxResults=100${page ? '&pageToken=' + page : ''}`, tok); ids = ids.concat((r.messages || []).map(x => x.id)); page = r.nextPageToken || ''; } while (page && ids.length < MAX_MSG);
-    let added = 0;
+    let added = 0, denied = false, stop = false;
+    // marked as read and archived (never deleted): only e-mails whose notice was understood; a refusal (scope not granted yet) never stops the reading
+    const tidy = async id => { if (!cfg.tidy || stop) return; try { await gq(`${API}/messages/${id}/modify`, tok, { removeLabelIds: ['UNREAD', 'INBOX'] }); tidied++; } catch (e) { stop = true; if (e.status === 403) denied = true; } };
     // newest first: if Gmail stops us half way, the most recent notices are already read and the next reading resumes where this one stopped
     try {
       for (const id of ids.slice(0, MAX_MSG)) {
         if (have.has(a.email + ':' + id) || seen.has(id)) continue;
         const m = await gq(`${API}/messages/${id}?format=full`, tok), from = header(m, 'from');
         if (!/starlink\.com/i.test(from)) seen.add(id);
-        else { const e = L.ingest({ id, rid: header(m, 'message-id'), subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) added++; else seen.add(id); }
+        else { const e = L.ingest({ id, rid: header(m, 'message-id'), subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) { added++; await tidy(id); } else seen.add(id); }
         if (L.pace) await L.delay(L.pace);
       }
     } finally { a.seen = [...seen].slice(-500); }
+    if (denied) a.tidyErr = "Google n'a pas autorisé la modification : ajoutez la portée gmail.modify dans la console Google (« E-mails Starlink : Google »), puis touchez « Reconnecter »"; else delete a.tidyErr;
     a.last = Date.now(); delete a.err; return added;
   };
   const NEED_LOGIN = ['interaction_required', 'access_denied', 'auth', 'popup_closed', 'popup_failed_to_open', 'immediate_failed', 'user_logged_out', 'consent_required', 'login_required', 'popup', 'unknown'];
   L.check = async (interactive, only) => {
     adopt(); if (busy || !cfg.accounts.length) return 0; busy = true; L.status = 'busy'; redraw();
-    let added = 0; const errs = [];
+    let added = 0; const errs = []; tidied = 0;
     for (const a of (only ? [only] : cfg.accounts.filter(x => !x.skip))) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
     let auto = 0; try { auto = await L.autoLink(interactive); } catch (e) {}
     const re = rematch();
     cfg.lastCheck = Date.now(); saveCfg(); App.save();
     L.status = errs.length ? 'error' : 'idle'; L.error = errs.join(' · '); busy = false;
-    if (interactive) App.toast(errs.length ? errs[0] : added || auto ? `${added} e-mail(s) Starlink lu(s)` + (re ? `, ${re} rapproché(s)` : '') + (auto ? ` · ${auto} ACC lié(s) automatiquement` : '') : 'Aucun nouvel e-mail Starlink');
+    if (interactive) App.toast(errs.length ? errs[0] : added || auto ? `${added} e-mail(s) Starlink lu(s)` + (tidied ? `, ${tidied} archivé(s) dans Gmail` : '') + (re ? `, ${re} rapproché(s)` : '') + (auto ? ` · ${auto} ACC lié(s) automatiquement` : '') : 'Aucun nouvel e-mail Starlink');
     App.refresh(); return added;
   };
   L.needsAttention = () => cfg.accounts.some(a => !a.skip && a.err === 'reconnect');
@@ -190,13 +196,14 @@
     adopt();
     const row = (t, s, b) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${b || ''}</div>`;
     let body;
-    if (!clientId()) body = row('État', "Non configuré. L'application lit les e-mails de Starlink (échec de paiement, suspension, réactivation) et met à jour le client grâce à son numéro ACC. Lecture seule : rien n'est envoyé, rien n'est supprimé.", '<button class="btn sm" data-act="slm_setup">Configurer</button>');
+    if (!clientId()) body = row('État', "Non configuré. L'application lit les e-mails de Starlink (échec de paiement, suspension, réactivation) et met à jour le client grâce à son numéro ACC. Lecture seule par défaut : rien n'est envoyé, rien n'est supprimé.", '<button class="btn sm" data-act="slm_setup">Configurer</button>');
     else {
       const st = { busy: 'Lecture des e-mails…', error: 'Erreur : ' + esc(L.error) }[L.status] || (L.needsAttention() ? 'Reconnexion à Google nécessaire' : 'Prêt'), cls = { error: 'bad' }[L.status] || (L.needsAttention() ? 'warn' : 'ok');
       body = row('État', `<b class="${cls}">${st}</b><br>Dernière vérification : <b>${when(cfg.lastCheck)}</b>`, cfg.accounts.length ? '<button class="btn sm" data-act="slm_check">Vérifier maintenant</button>' : '')
-        + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.skip ? "Lue par vos autres appareils : les alertes arrivent ici par la synchronisation (cet appareil ne lit pas cette boîte)." : a.err === 'reconnect' ? '<span class="warn">La connexion à Google est à refaire sur cet appareil : touchez « Reconnecter » (Google demande le mot de passe de cette adresse).</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last), `<div style="display:grid;gap:6px">${a.err === 'reconnect' && !a.skip ? `<button class="btn sm" data-act="slm_reconnect" data-v="${i}">Reconnecter</button>` : ''}${a.skip ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Lire ici</button>` : a.err === 'reconnect' ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Ne pas lire ici</button>` : ''}<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button></div>`)).join('')
+        + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.skip ? "Lue par vos autres appareils : les alertes arrivent ici par la synchronisation (cet appareil ne lit pas cette boîte)." : a.err === 'reconnect' ? '<span class="warn">La connexion à Google est à refaire sur cet appareil : touchez « Reconnecter » (Google demande le mot de passe de cette adresse).</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last) + (a.tidyErr ? '<br><span class="warn">' + esc(a.tidyErr) + '</span>' : ''), `<div style="display:grid;gap:6px">${a.err === 'reconnect' && !a.skip ? `<button class="btn sm" data-act="slm_reconnect" data-v="${i}">Reconnecter</button>` : ''}${a.skip ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Lire ici</button>` : a.err === 'reconnect' ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Ne pas lire ici</button>` : ''}<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button></div>`)).join('')
         + row('Ajouter une boîte Gmail', 'Vous pouvez en lier plusieurs (par exemple la boîte qui reçoit les e-mails de paiement et celle qui reçoit les suspensions).', '<button class="btn sm" data-act="slm_add">+ Gmail</button>')
         + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Lecture automatique</b><small style="white-space:normal">À l'ouverture de l'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.</small></div><select id="slm_every" style="width:100%">${App.opts(EVERY, everyH())}</select></div>`
+        + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Après la lecture d'un e-mail Starlink</b><small style="white-space:normal">L'e-mail compris par l'application peut être marqué comme lu et archivé dans Gmail (jamais supprimé : il reste dans « Tous les messages »). Cela demande une autorisation de plus : voir « Modifier » dans Identifiant Google.</small></div><select id="slm_tidy" style="width:100%">${App.opts(TIDY, cfg.tidy ? 1 : 0)}</select></div>`
         + row('Alertes et journal', `${L.count()} alerte(s) en cours`, '<button class="btn sm sec" data-act="go" data-v="slmail">Ouvrir</button>')
         + row('Identifiant Google', `<span style="word-break:break-all;user-select:all">${esc(clientId())}</span><br>Si Google affiche « The OAuth client was not found », cet identifiant n'existe pas dans votre console Google : vérifiez-le (ou recréez-le) puis remplacez-le.`, `<div style="display:grid;gap:6px"><button class="btn sm sec" data-act="slm_setup">Modifier</button><button class="btn sm sec" data-act="copy" data-t="${esc(clientId())}">Copier</button></div>`);
     }
@@ -208,11 +215,11 @@
         <p style="margin:6px 0">Si la sauvegarde Google Drive est déjà configurée, c'est le <b>même projet Google</b> : il suffit d'y ajouter Gmail.</p>
         <ol style="margin:8px 0 0;padding-left:18px">
           <li>Sur <b>console.cloud.google.com</b>, dans votre projet : <b>APIs et services → Bibliothèque</b> → <b>Gmail API</b> → <b>Activer</b>.</li>
-          <li><b>Écran de consentement OAuth → Accès aux données</b> : ajoutez la portée <code>.../auth/gmail.readonly</code> (lecture seule).</li>
+          <li><b>Écran de consentement OAuth → Accès aux données</b> : ajoutez la portée <code>.../auth/gmail.readonly</code> (lecture seule). Pour ranger les e-mails lus (marquer comme lu + archiver), ajoutez aussi <code>.../auth/gmail.modify</code>.</li>
           <li>En mode « Test » : <b>Audience → Utilisateurs test</b> : ajoutez chaque adresse Gmail à lier.</li>
           <li>L'ID client est le même que pour Drive (il finit par <code>.apps.googleusercontent.com</code>). Vérifiez-le ci-dessous.</li></ol></div>
        ${F.text('slm_cid', 'ID client Google', clientId(), 'placeholder="123456789-abc….apps.googleusercontent.com" autocapitalize="none" autocomplete="off"')}
-       <p class="mut" style="font-size:13px">L'application ne lit que les e-mails venant de starlink.com. Elle ne peut ni envoyer, ni modifier, ni supprimer de message.</p><p id="slm_msg" class="warn"></p>`,
+       <p class="mut" style="font-size:13px">L'application ne lit que les e-mails venant de starlink.com. Elle ne peut ni envoyer ni supprimer de message. Elle ne peut les marquer comme lus et les archiver que si vous activez le réglage « Après la lecture » (portée <code>gmail.modify</code> à ajouter alors dans la console Google).</p><p id="slm_msg" class="warn"></p>`,
       () => {
         const id = App.v('slm_cid').replace(/\s+/g, ''); // a paste often carries a line break or a space
         if (!/^\d{5,}-[a-z0-9_-]+\.apps\.googleusercontent\.com$/i.test(id)) { $('slm_msg').textContent = "Cet identifiant n'a pas le format d'un ID client Google : une suite de chiffres, un tiret, des lettres et chiffres, puis .apps.googleusercontent.com (exemple : 123456789012-abc123….apps.googleusercontent.com). Copiez-le en entier."; return false; }
@@ -248,6 +255,12 @@
     } catch (e) { failAdd(e); }
   };
   App.actions.slm_remove = d => { const a = cfg.accounts[+d.v]; if (!a || !App.confirm('Retirer ' + a.email + ' ? Les alertes déjà créées sont conservées.')) return; if (toks[a.email.toLowerCase()] && window.google && google.accounts) { try { google.accounts.oauth2.revoke(toks[a.email.toLowerCase()].tok, () => {}); } catch (e) {} } delete toks[a.email.toLowerCase()]; cfg.accounts.splice(+d.v, 1); shareCfg(); App.refresh(); };
+  document.addEventListener('change', e => {
+    if (!e.target || e.target.id !== 'slm_tidy') return;
+    cfg.tidy = +e.target.value === 1; Object.keys(toks).forEach(k => delete toks[k]); // a token only holds the scope it was asked with
+    if (cfg.tidy) cfg.accounts.forEach(a => { if (!a.skip) a.err = 'reconnect'; }); else cfg.accounts.forEach(a => { delete a.tidyErr; });
+    shareCfg(); App.toast(cfg.tidy ? 'Touchez « Reconnecter » : Google demandera l\'autorisation de marquer comme lu et d\'archiver' : 'Gmail redevient en lecture seule'); App.refresh();
+  });
   document.addEventListener('change', e => { if (e.target && e.target.id === 'slm_every') { cfg.every = +e.target.value; shareCfg(); App.toast('Lecture automatique : ' + (EVERY.find(x => x[0] === cfg.every) || EVERY[1])[1].toLowerCase()); } });
   // one mailbox to sign in again: the Google window must open straight from the tap (a window opened after other requests is blocked on phones),
   // so this is the first thing done, and only this mailbox is read afterwards
