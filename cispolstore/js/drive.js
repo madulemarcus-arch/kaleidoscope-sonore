@@ -69,7 +69,7 @@
     try {
       await getToken(!!interactive);
       const fid = await folder(), name = `cispolstore-${App.today()}.json`, base = name.slice(0, -5);
-      await upsert(fid, name, JSON.stringify(App.exportData()));
+      await upsert(fid, name, App.bkProtect ? await App.bkProtect(JSON.stringify(App.exportData()), true) : JSON.stringify(App.exportData()));
       // readable Excel copy; the JSON above is what "Restaurer" uses, so a failure here is not fatal
       let extra = ''; const today = App.today(), wantXlsx = cfg.noXlsx !== true && !(auto && cfg.lastXlsx === today);
       if (wantXlsx) try { await upsert(fid, base + '.xlsx', App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); cfg.lastXlsx = today; } catch (e) { if (e.code === 'auth') throw e; extra = e.message; }

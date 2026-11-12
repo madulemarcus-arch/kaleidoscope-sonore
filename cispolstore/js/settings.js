@@ -110,17 +110,19 @@
 
   // ---------- Backup / restore ----------
   App.actions.backup = async () => {
-    const name = `cispolstore-sauvegarde-${App.today()}.json`, txt = JSON.stringify(App.exportData(), null, 1);
+    const name = `cispolstore-sauvegarde-${App.today()}.json`, plain = JSON.stringify(App.exportData(), null, 1), txt = App.bkProtect ? await App.bkProtect(plain) : plain;
+    if (txt === null) return;
     try {
       const f = new File([txt], name, { type: 'application/json' });
       if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Sauvegarde CISPOLstore' });
       else App.download(name, txt, 'application/json');
     } catch (e) { if (e.name === 'AbortError') return; App.download(name, txt, 'application/json'); }
-    App.db.settings.lastBackup = App.today(); delete App.db.settings.bkSnooze; App.save(); const v = App.verifyBackup ? App.verifyBackup(txt) : null;
+    App.db.settings.lastBackup = App.today(); delete App.db.settings.bkSnooze; App.save(); const v = App.verifyBackup ? App.verifyBackup(plain) : null;
     App.toast(!v ? 'Sauvegarde créée' : v.ok ? `Sauvegarde créée et vérifiée ✔ (${v.clients} clients, ${v.invoices} factures)` : '⚠ Sauvegarde incomplète : ' + v.bad.join(', ')); App.refresh();
   };
   // Restore from backup text (file or Google Drive)
   App.restoreData = text => {
+    if (App.bkEncrypted && App.bkEncrypted(text)) { App.bkOpen(text).then(t => { if (t !== null) App.restoreData(t); }); return false; }
     try {
       const o = JSON.parse(text);
       const d = o.v === 2 ? o : (Array.isArray(o.products) || Array.isArray(o.clients)) ? App.migrate(o) : null;
