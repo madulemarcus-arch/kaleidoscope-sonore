@@ -161,7 +161,7 @@
     const q = encodeURIComponent(`from:starlink.com after:${since}`), have = new Set(log().map(e => e.id)), seen = new Set(a.seen || []);
     let ids = [], page = ''; do { const r = await gq(`${API}/messages?q=${q}&maxResults=100${page ? '&pageToken=' + page : ''}`, tok); ids = ids.concat((r.messages || []).map(x => x.id)); page = r.nextPageToken || ''; } while (page && ids.length < MAX_MSG);
     let added = 0, denied = false, stop = false;
-    // marked as read and archived (never deleted): only e-mails whose notice was understood; a refusal (scope not granted yet) never stops the reading
+    // marked as read and archived (never deleted): only e-mails whose notice type is recognised (e.kind); an unknown type stays in the inbox, where it can be seen; a refusal (scope not granted yet) never stops the reading
     const tidy = async id => { if (!cfg.tidy || stop) return; try { await gq(`${API}/messages/${id}/modify`, tok, { removeLabelIds: ['UNREAD', 'INBOX'] }); tidied++; } catch (e) { stop = true; if (e.status === 403) denied = true; } };
     // newest first: if Gmail stops us half way, the most recent notices are already read and the next reading resumes where this one stopped
     try {
@@ -169,7 +169,7 @@
         if (have.has(a.email + ':' + id) || seen.has(id)) continue;
         const m = await gq(`${API}/messages/${id}?format=full`, tok), from = header(m, 'from');
         if (!/starlink\.com/i.test(from)) seen.add(id);
-        else { const e = L.ingest({ id, rid: header(m, 'message-id'), subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) { added++; await tidy(id); } else seen.add(id); }
+        else { const e = L.ingest({ id, rid: header(m, 'message-id'), subject: header(m, 'subject'), text: textOf(m.payload), ts: +m.internalDate || Date.now() }, a.email); if (e) { added++; if (e.kind) await tidy(id); } else seen.add(id); }
         if (L.pace) await L.delay(L.pace);
       }
     } finally { a.seen = [...seen].slice(-500); }
