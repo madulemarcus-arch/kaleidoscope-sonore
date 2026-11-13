@@ -42,22 +42,23 @@ await openCard();
 ok('the card offers the setting, « Ne rien changer » by default',await p.isVisible('#slm_tidy')&&await p.inputValue('#slm_tidy')==='0');
 ok('the card says the e-mail is archived, never deleted',/jamais supprimé/.test(await p.innerText('#view')));
 // ---- turn it on: Google must be asked again with the wider scope
-BOX[MAIL].unshift(msg('t4','Service Starlink suspendu',body.suspendu(acc(2)),T0+10*MIN),msg('t5','Échec du paiement Starlink',body.echec(acc(3),'20 000,00'),T0+11*MIN));
+BOX[MAIL].unshift(msg('t4','Service Starlink suspendu',body.suspendu(acc(2)),T0+10*MIN),msg('t5','Échec du paiement Starlink',body.echec(acc(3),'20 000,00'),T0+11*MIN),
+  msg('t0','Urgent : payez votre facture maintenant pour éviter une suspension','Pour le compte '+acc(8)+' : texte d\'un type que l\'application ne connaît pas.',T0+12*MIN)); // an unknown type of notice, with an account number
 await p.selectOption('#slm_tidy','1');await p.waitForTimeout(400);
 ok('setting saved (and shared with the other devices)',(await cfg()).tidy===true&&await p.evaluate(()=>App.db.settings.gmail.tidy)===true);
 ok('the mailbox asks to be reconnected, to grant the new permission',await p.isVisible('[data-act=slm_reconnect]'));
 await p.click('[data-act=slm_reconnect]');await p.waitForTimeout(1500);
 const sc=await scopes();
 ok('Google is asked for gmail.modify once the setting is on',/gmail\.modify$/.test(sc[sc.length-1]),sc.join(' | '));
-ok('the two new notices are read',await p.evaluate(()=>App.db.slmail.length)===3);
+ok('the two new notices and the unknown one are read (the unknown one is shown as « non reconnu »)',await p.evaluate(()=>App.db.slmail.length)===4&&await p.evaluate(()=>App.db.slmail.filter(e=>!e.kind).length)===1);
 ok('they are marked as read and archived (UNREAD and INBOX removed), and only they',JSON.stringify(modified.map(m=>m.id).sort())==='["t4","t5"]'&&modified.every(m=>m.method==='POST'&&JSON.stringify(m.body.removeLabelIds)==='["UNREAD","INBOX"]'&&!m.body.addLabelIds),JSON.stringify(modified));
-ok('the promotion and the other sender are left alone, nothing is ever deleted or trashed',!modified.some(m=>['t2','t3'].includes(m.id))&&deleteCalls===0);
+ok('the promotion, the other sender and the notice of an UNKNOWN type are left in the inbox; nothing is ever deleted or trashed',!modified.some(m=>['t0','t2','t3'].includes(m.id))&&deleteCalls===0);
 ok('no warning on the card when the permission is granted',!(await cfg()).accounts[0].tidyErr);
 // ---- Google refuses the modification (scope missing in the console): the reading goes on, a warning explains what to do, no retry storm
 deny=true;modified.length=0;
 BOX[MAIL].unshift(msg('t6','Échec du paiement Starlink',body.echec(acc(4),'30 000,00'),T0+20*MIN),msg('t7','Service Starlink suspendu',body.suspendu(acc(5)),T0+21*MIN));
 await check();
-ok('refused modification: the notices are still read',await p.evaluate(()=>App.db.slmail.length)===5);
+ok('refused modification: the notices are still read',await p.evaluate(()=>App.db.slmail.length)===6);
 ok('only one attempt is made, then it stops for this reading',modified.length===1,String(modified.length));
 await openCard();
 ok('the card explains how to fix it (gmail.modify in the Google console, then Reconnecter)',/gmail\.modify/.test(await p.innerText('#view'))&&/Reconnecter/.test(await p.innerText('#view')));
@@ -73,5 +74,5 @@ ok('turned off: saved, warning gone',(await cfg()).tidy===false&&!(await cfg()).
 modified.length=0;BOX[MAIL].unshift(msg('t9','Échec du paiement Starlink',body.echec(acc(7),'50 000,00'),T0+40*MIN));
 await check();
 const sc2=await scopes();
-ok('turned off: back to the read-only scope and nothing is changed in Gmail',/gmail\.readonly$/.test(sc2[sc2.length-1])&&modified.length===0&&await p.evaluate(()=>App.db.slmail.length)===7,sc2.join(' | ')+' '+modified.length);
+ok('turned off: back to the read-only scope and nothing is changed in Gmail',/gmail\.readonly$/.test(sc2[sc2.length-1])&&modified.length===0&&await p.evaluate(()=>App.db.slmail.length)===8,sc2.join(' | ')+' '+modified.length);
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
