@@ -32,7 +32,8 @@
 
   // ---------- reading one e-mail ----------
   // state shown on the client: kind of the last Starlink e-mail received for its ACC
-  const STATES = { echec: ['⚠️', 'Paiement échoué', 'warn', 1], avis: ['⏳', 'Suspension imminente', 'bad', 2], suspendu: ['⛔', 'Suspendu', 'bad', 3], actif: ['✅', 'Réactivé', 'ok', 0], paye: ['💳', 'Paiement traité', 'ok', 0] };
+  const STATES = { echec: ['⚠️', 'Paiement échoué', 'warn', 1], avis: ['⏳', 'Suspension imminente', 'bad', 2], retard: ['⏰', 'Paiement en retard', 'bad', 2], suspendu: ['⛔', 'Suspendu', 'bad', 3], actif: ['✅', 'Réactivé', 'ok', 0], paye: ['💳', 'Paiement traité', 'ok', 0] };
+  const INFO = { donnees: 1, activation: 1, ticket: 1 }; // information e-mails: recorded and tidied, never change a client
   const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   // ACC-DF-16170842-48858-58 : may be cut by a line break, glued to the previous word, or written with another hyphen
   const extractAcc = text => {
@@ -47,9 +48,13 @@
     const s = fold(subject), b = fold(body);
     if (/echec (du|de) paiement/.test(s) || /echec de paiement/.test(b)) return 'echec';
     if (/^suspension de votre service/.test(s) || /sera suspendu dans/.test(b) || /avis de suspension/.test(b)) return 'avis';
+    if (/payez votre facture maintenant|eviter une suspension/.test(s) || /paiement starlink est en retard/.test(b)) return 'retard'; // overdue payment: pay now to avoid a suspension (no number of days, no amount)
     if (/service (starlink )?suspendu/.test(s) || /service starlink a ete suspendu|service a ete suspendu/.test(b)) return 'suspendu';
     if (/reactiv/.test(s) || /reactiv/.test(b)) return 'actif';
     if (/paiement (a (bien )?ete )?(traite|recu|reussi|effectue|accepte)|(traitement|reception) (de votre|du) paiement|merci pour votre paiement|nous avons (bien )?recu votre paiement/.test(s) || /paiement (a (bien )?ete )?(traite|recu|reussi|effectue|accepte)|nous avons (bien )?recu votre paiement|merci pour votre paiement/.test(b)) return 'paye'; // the payment went through: closes a failed payment / suspension notice
+    if (/confirmation d.activation/.test(s) || /vous avez active votre service/.test(b)) return 'activation'; // information only: the service was just activated (first invoice follows)
+    if (/nouveau message/.test(s) || /\btik-df-/.test(b)) return 'ticket'; // information only: an answer in a support ticket (identity check, etc.)
+    if (/donnees prioritaires/.test(s)) return 'donnees'; // information only: priority data used up (80 %) or added; it never changes the state of the client
     if (/rappel de paiement automatique/.test(s) || /paiement programme/.test(b)) return 'programme'; // information only: next automatic debit
     return '';
   };
@@ -71,6 +76,7 @@
   const clientsFor = acc => { const k = accKey(acc); return k ? App.db.clients.filter(c => accKey(c.acc) === k) : []; };
   const apply = e => {
     if (!e.kind) { e.res = 'inconnu'; return; }
+    if (INFO[e.kind]) { e.res = 'info'; return; }
     const cs = clientsFor(e.acc); if (!cs.length) { e.res = 'sans-client'; return; } if (cs.length > 1) { e.res = 'ambigu'; return; }
     const c = cs[0]; e.clientId = c.id;
     // a payment reminder only tells when Starlink will debit next: it never changes the alert state of the client
@@ -80,6 +86,9 @@
     c[fld] = fld === 'slp' ? { ts: e.ts, due: e.due || '', from: e.from || '', to: e.to || '', amount: e.amount || 0, cur: e.cur || 'CDF', mid: e.id } : { state: e.kind, ts: e.ts, amount: e.amount || 0, cur: e.cur || '', mid: e.id };
     e.res = 'ok';
   };
+  // e-mails stored as « non reconnu » before the app knew their type are tried again from their subject (the body was not kept)
+  const reclass = () => { let n = 0; log().forEach(e => { if (e.res !== 'inconnu') return; const k = kindOf(e.subject, ''); if (!k) return; e.kind = k; apply(e); n++; }); return n; };
+  L.reclass = reclass;
   // an e-mail whose ACC was not known yet is tried again once the client has it
   const rematch = () => { let n = 0; log().slice().sort((a, b) => a.ts - b.ts).forEach(e => { if (e.res === 'sans-client' || e.res === 'ambigu') { apply(e); if (e.res === 'ok') n++; } }); return n; };
   // the same notice arriving in several mailboxes (forwarding, or Starlink writing to every contact address of the account) is counted once:
@@ -182,7 +191,7 @@
     let added = 0; const errs = []; tidied = 0;
     for (const a of (only ? [only] : cfg.accounts.filter(x => !x.skip))) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
     let auto = 0; try { auto = await L.autoLink(interactive); } catch (e) {}
-    const re = rematch();
+    reclass(); const re = rematch();
     cfg.lastCheck = Date.now(); saveCfg(); App.save();
     L.status = errs.length ? 'error' : 'idle'; L.error = errs.join(' · '); busy = false;
     if (interactive) App.toast(errs.length ? errs[0] : added || auto ? `${added} e-mail(s) Starlink lu(s)` + (tidied ? `, ${tidied} archivé(s) dans Gmail` : '') + (re ? `, ${re} rapproché(s)` : '') + (auto ? ` · ${auto} ACC lié(s) automatiquement` : '') : 'Aucun nouvel e-mail Starlink');
@@ -281,9 +290,10 @@
   const MSG = {
     echec: (n, c) => `Bonjour ${n}, Starlink n'a pas pu prélever le paiement de votre abonnement${c.slm.amount ? ' (' + App.nf(c.slm.amount, 2) + ' ' + (c.slm.cur || '') + ')' : ''}. Merci de régulariser rapidement pour éviter la suspension de votre service. CISPOLstore`,
     avis: n => `Bonjour ${n}, votre service Starlink va être suspendu très prochainement pour paiement non reçu. Merci de régulariser aujourd'hui pour ne pas perdre la connexion. CISPOLstore`,
+    retard: n => `Bonjour ${n}, Starlink nous signale que votre paiement est en retard. Merci de régler dès que possible pour éviter la suspension de votre service. CISPOLstore`,
     suspendu: n => `Bonjour ${n}, votre service Starlink est suspendu pour solde impayé. Dès que vous aurez régularisé, nous le faisons réactiver. CISPOLstore`
   };
-  const RES = { ok: ['✅', 'Appliqué'], ancien: ['🕓', 'Ancien : un e-mail plus récent est déjà appliqué'], 'sans-client': ['❓', 'Aucun client avec cet ACC'], ambigu: ['❗', 'Plusieurs clients ont cet ACC'], inconnu: ['📨', 'Type d\'e-mail non reconnu'], annule: ['↩️', 'Annulé'] };
+  const RES = { ok: ['✅', 'Appliqué'], ancien: ['🕓', 'Ancien : un e-mail plus récent est déjà appliqué'], 'sans-client': ['❓', 'Aucun client avec cet ACC'], ambigu: ['❗', 'Plusieurs clients ont cet ACC'], inconnu: ['📨', 'Type d\'e-mail non reconnu'], info: ['ℹ️', 'Information : aucune alerte'], annule: ['↩️', 'Annulé'] };
   App.views.slmail = () => {
     const al = L.alerts(), lg = log().slice().sort((a, b) => b.ts - a.ts), unk = L.unknown(), odd = lg.filter(e => e.res === 'inconnu'), okEv = lg.filter(e => e.kind === 'paye' || e.kind === 'actif'), autoL = L.autoLinked(), nTodo = unk.length + odd.length + autoL.length;
     if (rematch()) App.save();
@@ -295,8 +305,8 @@
         <div class="mut" style="margin-top:4px">${when(c.slm.ts)}${c.slm.amount ? ' · ' + App.nf(c.slm.amount, 2) + ' ' + esc(c.slm.cur || '') : ''}</div>
         <div class="bar">${c.phone ? `<button class="btn sm" data-act="slm_wa" data-id="${c.id}">💬 Relancer</button>` : ''}<button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche</button><button class="btn sm sec" data-act="slm_done" data-id="${c.id}">✔ Réglé</button></div></div>`; };
     const logRow = e => { const r = RES[e.res] || ['', e.res], k = STATES[e.kind], c = App.client(e.clientId);
-      return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : e.kind === 'programme' ? '📅 Paiement programmé' + (e.due ? ' pour le ' + App.fdate(e.due) : '') : '📨 ' + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}${(e.also || []).length ? ' · aussi reçu dans ' + e.also.map(esc).join(', ') : ''}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
-    const evLabel = e => STATES[e.kind] ? STATES[e.kind][0] + ' ' + STATES[e.kind][1] : e.kind === 'programme' ? '📅 Paiement programmé' : '📨 ' + esc(e.subject);
+      return `<div class="item"><div class="grow"><b style="white-space:normal">${k ? k[0] + ' ' + k[1] : e.kind === 'programme' ? '📅 Paiement programmé' + (e.due ? ' pour le ' + App.fdate(e.due) : '') : (INFO[e.kind] ? 'ℹ️ ' : '📨 ') + esc(e.subject)}${e.amount ? ' · ' + App.nf(e.amount, 2) + ' ' + esc(e.cur) : ''}</b><small style="white-space:normal">${when(e.ts)} · ${c ? esc(App.cname(c)) : '—'} · <span class="mono">${esc(e.acc)}</span><br>${r[0]} ${r[1]} · ${esc(e.mailbox)}${(e.also || []).length ? ' · aussi reçu dans ' + e.also.map(esc).join(', ') : ''}</small></div>${e.res === 'ok' ? `<button class="btn sm sec" data-act="slm_undo" data-id="${esc(e.id)}">Annuler</button>` : e.res === 'sans-client' || e.res === 'ambigu' ? `<button class="btn sm sec" data-act="copy" data-t="${esc(e.acc)}">Copier ACC</button>` : ''}</div>`; };
+    const evLabel = e => STATES[e.kind] ? STATES[e.kind][0] + ' ' + STATES[e.kind][1] : e.kind === 'programme' ? '📅 Paiement programmé' : (INFO[e.kind] ? 'ℹ️ ' : '📨 ') + esc(e.subject);
     const autoRow = c => `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill ok">ACC lié automatiquement</span></div><small class="mono" style="word-break:break-all">${esc(c.acc)}</small>
         <div class="mut" style="margin-top:4px;white-space:normal">${when(c.accAuto.ts)} · reconnu par : ${esc(c.accAuto.how)}${c.accAuto.name ? ' · facture au nom de « ' + esc(c.accAuto.name) + ' »' : ''}. Vérifiez que c'est bien ce client.</div>
         <div class="bar"><button class="btn sm" data-act="slm_ok" data-id="${c.id}">✔ C'est bon</button><button class="btn sm sec" data-act="slm_unlink" data-id="${c.id}">↩ Annuler le lien</button><button class="btn sm sec" data-act="go" data-v="client" data-id="${c.id}">Fiche</button></div></div>`;
@@ -312,7 +322,7 @@
       : al.length ? al.map(alertRow).join('') : '<div class="card"><div class="empty">Aucune alerte Starlink en cours 🎉</div></div>';
     return { title: 'Alertes Starlink', sub: 'D\'après les e-mails de Starlink', back: 'clients', nav: 'clients',
       html: `<section class="hero dhero"><div class="hero-top"><div><small>📧 Clients à suivre</small><div class="hero-num">${al.length}</div></div></div>
-        <div class="cstats"><div><b>${cnt('echec')}</b><small>paiement échoué</small></div><div><b>${cnt('avis')}</b><small>suspension imminente</small></div><div><b>${cnt('suspendu')}</b><small>suspendus</small></div></div></section>
+        <div class="cstats"><div><b>${cnt('echec')}</b><small>paiement échoué</small></div><div><b>${cnt('avis') + cnt('retard')}</b><small>suspension imminente</small></div><div><b>${cnt('suspendu')}</b><small>suspendus</small></div></div></section>
         <div class="bar"><button class="btn" data-act="slm_check" ${cfg.accounts.length ? '' : 'disabled'}>🔄 Vérifier les e-mails</button>${cfg.accounts.length ? '' : '<button class="btn sec" data-act="go" data-v="clients">Configurer Gmail</button>'}</div>
         <p class="mut" style="font-size:13px;margin:0 0 8px">Dernière vérification : ${when(cfg.lastCheck)} · ${cfg.accounts.length} boîte(s) Gmail liée(s)</p>
         <div class="chips">${chip('alerts', `Alertes (${al.length})`)}${chip('regles', `Réglés (${okEv.length})`)}${chip('journal', 'Journal')}${chip('todo', `À vérifier (${nTodo})`)}</div>${body}` };
