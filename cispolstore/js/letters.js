@@ -59,6 +59,11 @@
       subject: c => c.f.about || 'Ordre de mission',
       body: c => { const r = repOf(c.rep), n = co().name, job = c.f.job || '……', tasks = String(c.f.tasks || '').split('\n').map(x => x.trim()).filter(Boolean);
         return `Je soussigné, Monsieur ${r.name || '……………'}, ${r.job || '……………'}, atteste par la présente que Mr. **${c.who.name}** en qualité ${/^[aeiouyh]/i.test(job) ? 'd\'' : 'de '}${job}, est mandaté par l'entreprise **${n}** en vue de ${c.f.purpose || '……'}${c.f.init ? ` dont ${c.f.init} est l'initiateur du projet` : ''}.\n\nCependant, la mission est initialement prévue pour une durée de ${c.f.days || '…'} jours, à compter de la date d'arrivée de l'expert sur le lieu de la mission${c.f.place ? ' (' + c.f.place + ')' : ''}. La durée pourra être ajustée en fonction des besoins opérationnels et des constatations sur le terrain. Ainsi, la responsabilité de l'Expert est de :${tasks.length ? '\n\n' + tasks.map(t => '- ' + t).join('\n') : ''}${c.f.init ? '\n\nDe ce fait, nous demandons à l\'initiateur du projet de faciliter à l\'Expert l\'accès aux infrastructures et informations nécessaires à l\'exécution du projet.' : ''}`; } },
+    demission: { label: 'Lettre de démission', icon: '🚪', cat: 'person', emp: true, noclose: true,
+      f: [['appel', 'Adressée à', 'text', 'Monsieur le Directeur'], ['job', 'Poste occupé', 'text', ''], ['since', 'Dans la société depuis le (facultatif)', 'date', ''], ['notice', 'Préavis (jours, 0 = immédiat)', 'num', 30], ['reason', 'Motif (facultatif)', 'text', '']],
+      subject: c => `Démission${c.f.job ? ' de mon poste de ' + c.f.job : ''}`,
+      body: c => { const n = +c.f.notice || 0, a = c.f.appel || 'Monsieur le Directeur', end = n > 0 ? App.fdate(App.addDays(c.date, n)) : '';
+        return `${a},\n\nJe soussigné(e), ${c.who.name}, ${c.f.job ? c.f.job + ' ' : 'employé(e) '}${c.f.since ? `depuis le ${d(c, 'since')} ` : ''}au sein de ${co().name}, ai l'honneur de vous informer de ma décision de démissionner de mon poste.${c.f.reason ? `\n\nCette décision est motivée par : ${c.f.reason}.` : ''}\n\n${n > 0 ? `Conformément au préavis applicable, je m'engage à poursuivre mes fonctions pendant ${n} jours, soit jusqu'au ${end}, date à laquelle prendra fin ma collaboration avec ${co().name}.` : `Cette démission prend effet à compter de ce jour.`}\n\nJe m'engage à assurer la passation de mes dossiers et à restituer le matériel mis à ma disposition. Je vous remercie de la confiance que vous m'avez accordée durant cette période.\n\nVeuillez agréer, ${a}, l'expression de mes salutations distinguées.`; } },
     convocation: { label: 'Convocation', icon: '📣', cat: 'person',
       f: [['on', 'Date du rendez-vous', 'date', ''], ['hour', 'Heure', 'text', '10h00'], ['place', 'Lieu', 'text', ''], ['why', 'Objet de la convocation', 'text', '']],
       subject: c => `Convocation${c.f.why ? ' – ' + c.f.why : ''}`,
@@ -129,7 +134,7 @@
     const render = type => { const t = TYPES[type], ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('lt_cl') || c.clientId);
       if (cl) { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.since === undefined && cl.start) ex.since = cl.start; }
       if (ex.paid === undefined) ex.paid = t0; if (ex.first === undefined) ex.first = App.addDays(t0, 30); if (ex.on === undefined) ex.on = App.addDays(t0, type === 'suspension' || type === 'resiliation' ? 0 : 3);
-      $('lt_f').innerHTML = fieldHtml(t, ex); $('lt_clrow').style.display = t.cat === 'client' ? '' : 'none'; $('lt_techrow').style.display = t.order ? '' : 'none'; $('lt_party').hidden = (t.cat === 'client' && !!App.client($('lt_cl').value)) || (!!t.order && !!App.tech($('lt_tech').value)); $('lt_curRow').style.display = t.money || t.cur ? '' : 'none'; };
+      $('lt_f').innerHTML = fieldHtml(t, ex); $('lt_clrow').style.display = t.cat === 'client' ? '' : 'none'; $('lt_techrow').style.display = t.order || t.emp ? '' : 'none'; $('lt_party').hidden = (t.cat === 'client' && !!App.client($('lt_cl').value)) || (!!(t.order || t.emp) && !!App.tech($('lt_tech').value)); $('lt_curRow').style.display = t.money || t.cur ? '' : 'none'; };
     App.modal(isNew ? 'Nouvelle lettre' : 'Modifier ' + c.no,
       `${isNew ? F.sel('lt_type', 'Modèle de lettre', Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), c.type) : `<p class="mut" style="margin-top:0">${T(c).icon} ${esc(T(c).label)}</p>`}
        <div id="lt_techrow">${F.sel('lt_tech', 'Technicien / collaborateur', [['', '— Autre (saisir ci-dessous) —'], ...App.db.technicians.filter(x => x.active !== false || x.id === c.techId).map(x => [x.id, x.name + (x.role ? ' · ' + x.role : '')])], c.techId || '')}</div>
@@ -141,8 +146,8 @@
        ${isNew ? '' : `<label class="chk" style="display:block;margin-top:8px"><input type="checkbox" id="lt_regen"> Régénérer le texte depuis le modèle (efface vos modifications du texte)</label>`}`,
       () => { const type = isNew ? App.v('lt_type') : c.type, t = TYPES[type], f = {};
         t.f.forEach(([k, l, kind]) => { const raw = $('lf_' + k).value; f[k] = kind === 'num' ? (raw === '' ? '' : Math.max(0, +raw || 0)) : String(raw).trim(); });
-        const cl = t.cat === 'client' ? App.v('lt_cl') : '', tc = t.order ? App.tech(App.v('lt_tech')) : null, p = tc ? { name: tc.name, phone: tc.phone || '', address: tc.zone || '' } : { name: App.v('lt_pname'), phone: App.v('lt_pphone'), address: App.v('lt_paddr') };
-        if (!cl && !p.name) { App.toast(t.order ? 'Choisissez un technicien ou saisissez le nom de la personne en mission' : 'Choisissez un client ou saisissez le nom du destinataire'); return false; }
+        const cl = t.cat === 'client' ? App.v('lt_cl') : '', tc = t.order || t.emp ? App.tech(App.v('lt_tech')) : null, p = tc ? { name: tc.name, phone: tc.phone || '', address: tc.zone || '' } : { name: App.v('lt_pname'), phone: App.v('lt_pphone'), address: App.v('lt_paddr') };
+        if (!cl && !p.name) { App.toast(t.order ? 'Choisissez un technicien ou saisissez le nom de la personne en mission' : t.emp ? 'Choisissez un collaborateur ou saisissez le nom de la personne qui démissionne' : 'Choisissez un client ou saisissez le nom du destinataire'); return false; }
         if (t.money && !(f.amount > 0)) { App.toast('Saisissez le montant'); return false; }
         const date = App.v('lt_date') || t0, o = { type, clientId: cl, techId: tc ? tc.id : '', party: cl ? {} : p, date, currency: App.v('lt_cur') || 'USD', rep: App.v('lt_rep'), f };
         if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date) }); list().push(c); if (cl) App.log(cl, `Lettre ${c.no} : ${t.label}`); }
@@ -186,7 +191,18 @@
       <div style="margin-top:22px">${body}</div>
       <div style="text-align:right;font-weight:bold;margin-top:22px">Fait à ${e(city())}, le ${App.fdate(c.date)}</div>
       <div style="margin:8px 0 0 50%;page-break-inside:avoid;display:flex;align-items:center"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3.4cm;width:3.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5);flex:none"><div style="margin-left:.3cm;font-style:italic;text-align:left">${r.job ? e(r.job) + '<br>' : ''}<b>${e(r.name)}</b></div></div></div>`; };
+  // letter written by a person to the company (resignation): no company letterhead, the sender's block on the left, the recipient on the right, his signature
+  const personalDoc = c => {
+    const e = esc, w = whoOf(c), x = App.letterText(c), a = c.f.appel || 'Monsieur le Directeur';
+    return `<div class="paper"><style>.lsj td{font:inherit}</style>
+      <p class="ctp" style="margin:0;text-align:left"><b>${e(w.name)}</b>${c.f.job ? '<br>' + e(c.f.job) : ''}${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
+      <p class="ctp" style="text-align:right;margin-top:14px">${e(city())}, le ${App.fdate(c.date)}</p>
+      <p class="ctp" style="margin:18px 0 0 ${IND};text-align:left">À ${e(a)}<br><b>${e(co().name)}</b>${co().address ? '<br>' + e(co().address) : ''}</p>
+      ${x.subject ? `<table class="lsj" style="margin-top:16px;width:58%"><tr><td style="width:1.6cm;vertical-align:top"><b>Objet :</b></td><td style="vertical-align:top"><b>${e(x.subject)}</b></td></tr></table>` : ''}
+      <div style="margin-top:6px">${bodyHtml(x.body)}</div>
+      <div style="margin:18px 0 0 62%;page-break-inside:avoid;text-align:left"><span style="font-size:9.5pt">Signature</span><div style="height:2.4cm"></div><b>${e(w.name)}</b></div></div>`; };
   App.letterDoc = (c, logo, stamp) => {
+    if (T(c).emp) return personalDoc(c);
     if (T(c).order) return orderDoc(c, logo, stamp);
     const K = App.docKit, e = esc, w = whoOf(c), x = App.letterText(c), hon = T(c).hon && c.f.titre, rep = String(c.rep || '').split(/\s*,\s*/), repName = rep.slice(0, -1).join(', ') || rep[0] || '', repJob = rep.length > 1 ? rep[rep.length - 1] : '';
     return `<div class="paper"><style>.ltl{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.ltl,.ltl td{font:inherit}.ltl td{padding:2px 0;vertical-align:top;text-align:left;line-height:1.5}.ltl td.n{width:1.1cm}</style>${K.head(co(), logo)}

@@ -126,5 +126,16 @@ ok('from the technician sheet: the mission order form opens with him selected',a
 await p.evaluate(()=>App.close());
 await p.evaluate(()=>{App.db.technicians=App.db.technicians.filter(t=>t.id!=='tk1');});
 ok('if the technician is deleted the order keeps the name saved with it',await p.evaluate(()=>/Mr\. \*\*Jean Essai\*\*/.test(App.letterText(App.db.letters[App.db.letters.length-1]).body)));
+// resignation letter: written by the employee to the company (personal layout, no company letterhead)
+await p.evaluate(()=>{App.close();App.db.technicians.push({id:'tk9',name:'Paul Demissionnaire',phone:'0810000099',role:'Vendeur',zone:'Gombe',active:true});App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','demission');await p.waitForTimeout(250);
+ok('resignation: asks for the addressee, the post, the start date, the notice (30 days) and an optional reason, and offers the collaborators list',await p.inputValue('#lf_appel')==='Monsieur le Directeur'&&await p.isVisible('#lf_job')&&await p.isVisible('#lf_since')&&await p.inputValue('#lf_notice')==='30'&&await p.isVisible('#lf_reason')&&await p.isVisible('#lt_tech'));
+await p.selectOption('#lt_tech','tk9');await p.dispatchEvent('#lt_tech','change');await p.fill('#lf_job','Vendeur');await p.fill('#lf_since','2025-02-01');await create();
+const dm2=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{c:{date:c.date},t:App.letterText(c),html:App.letterDoc(c,'logo.png','stamp.png'),end:App.fdate(App.addDays(c.date,30))}});
+ok('subject and text: « Démission de mon poste de Vendeur », « Je soussigné(e), Paul … Vendeur depuis le … », 30-day notice with the end date, handover, closing formula',dm2.t.subject==='Démission de mon poste de Vendeur'&&/^Monsieur le Directeur,/.test(dm2.t.body)&&/Je soussigné\(e\), Paul Demissionnaire, Vendeur depuis le 01\/02\/2025 au sein de/.test(dm2.t.body)&&new RegExp('pendant 30 jours, soit jusqu\'au '+dm2.end.replace(/\//g,'\\/')).test(dm2.t.body)&&/passation de mes dossiers/.test(dm2.t.body)&&/Veuillez agréer, Monsieur le Directeur/.test(dm2.t.body));
+ok('personal layout: the sender\'s block (name, post, phone), « À Monsieur le Directeur » + the company, his signature; no company letterhead, no company stamp',/<b>Paul Demissionnaire<\/b><br>Vendeur/.test(dm2.html)&&/Tél\. 0810000099/.test(dm2.html)&&/À Monsieur le Directeur<br><b>/.test(dm2.html)&&/>Signature</.test(dm2.html)&&!/logo\.png/.test(dm2.html)&&!/stamp\.png/.test(dm2.html));
+ok('paragraphs are real paragraphs (no literal \\n in the text)',!/\\n/.test(dm2.t.body)&&dm2.t.body.split('\n\n').length>=5,JSON.stringify(dm2.t.body.slice(0,80)));
+await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.notice=0;c.f.reason='raisons personnelles';});
+ok('no notice: takes effect immediately; the reason is written when given',await p.evaluate(()=>{const b=App.letterText(App.db.letters[App.db.letters.length-1]).body;return /prend effet à compter de ce jour/.test(b)&&/motivée par : raisons personnelles\./.test(b)&&!/préavis/.test(b)}));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
