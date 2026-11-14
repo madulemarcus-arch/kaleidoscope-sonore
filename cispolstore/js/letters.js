@@ -141,14 +141,28 @@
   App.actions.lt_new = x => App.letterForm(null, x && x.cid);
 
   // ---------- printable document ----------
+  // layout of the model letter: date on the right, recipient block shifted to the right, bold subject, greeting and first paragraph shifted,
+  // bold headings, numbered list, closing formula shifted, signature block on the right (Pour <société> / Nom / Fonction / Signature et cachet)
+  const IND = '45%';
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const bodyHtml = body => {
+    const paras = String(body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean); let first = true;
+    return paras.map((b, i) => {
+      const lines = b.split('\n');
+      if (i === 0 && lines.length === 1 && b.length < 70 && /,$/.test(b)) return `<p class="ctp" style="margin:14px 0 6px ${IND};text-align:left">${inline(b)}</p>`; // greeting
+      if (/^#\s/.test(b)) return `<p class="ctp" style="margin:12px 0 3px;text-align:left"><b>${inline(b.replace(/^#\s+/, ''))}</b></p>`; // heading
+      if (/^\d+\.\s/.test(lines[0])) return `<table class="ltl">${lines.map(l => { const m = /^(\d+)\.\s+(.*)$/.exec(l); return m ? `<tr><td class="n">${m[1]}.</td><td>${inline(m[2])}</td></tr>` : `<tr><td></td><td>${inline(l)}</td></tr>`; }).join('')}</table>`; // numbered list
+      const closing = i === paras.length - 1 && /agr[ée]er|salutations/i.test(b), ti = first && i <= 1 && !closing ? `text-indent:${IND};` : ''; first = false;
+      return `<p class="ctp" style="margin:6px 0 ${closing ? '14px' : '6px'}${closing ? ' ' + IND : ''};text-align:left;${ti}">${inline(b).replace(/\n/g, '<br>')}</p>`; }).join(''); };
   App.letterDoc = (c, logo, stamp) => {
-    const K = App.docKit, e = esc, w = whoOf(c), x = App.letterText(c), paras = String(x.body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean).map(b => `<p class="ctp">${e(b).replace(/\n/g, '<br>')}</p>`).join('');
-    return `<div class="paper">${K.head(co(), logo)}
-      <p class="ctp" style="text-align:right;margin-top:10px">${e(city())}, le ${App.fdate(c.date)}<br><small>N/Réf : ${e(c.no)}/${e(co().name)}/${c.date.slice(0, 4)}</small></p>
-      <p class="ctp" style="margin:12px 0 0 55%"><b>${T(c).hon && c.f.titre ? e(c.f.titre) + ' ' : ''}${e(w.name)}</b>${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
-      ${x.subject ? `<p class="ctp" style="margin-top:14px"><b>Objet : ${e(x.subject)}</b></p>` : ''}
-      <div style="margin-top:10px">${paras}</div>
-      <table class="sg ctsg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co().name)}${c.rep ? '<br><small>' + e(c.rep) + '</small>' : ''}</td></tr></table>${c.f && c.f.copy ? `<p class="ctp" style="margin-top:10px"><i>Copie pour information : ${e(c.f.copy)}</i></p>` : ''}${K.foot(stamp, true)}</div>`; };
+    const K = App.docKit, e = esc, w = whoOf(c), x = App.letterText(c), hon = T(c).hon && c.f.titre, rep = String(c.rep || '').split(/\s*,\s*/), repName = rep.slice(0, -1).join(', ') || rep[0] || '', repJob = rep.length > 1 ? rep[rep.length - 1] : '';
+    return `<div class="paper"><style>.ltl{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.ltl td{padding:2px 0;vertical-align:top;text-align:left;line-height:1.45}.ltl td.n{width:1.1cm}</style>${K.head(co(), logo)}
+      <table style="width:100%;margin-top:8px"><tr><td style="font-size:9pt;color:#4A5568">N/Réf : ${e(c.no)}/${e(co().name)}/${c.date.slice(0, 4)}</td><td style="text-align:right">${e(city())}, le ${App.fdate(c.date)}</td></tr></table>
+      <p class="ctp" style="margin:18px 0 0 ${IND};text-align:left">${hon ? `<b>${e(c.f.titre)} ${e(w.name)}</b>` : `À l'attention de :<br><b>${e(w.name)}</b>`}${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
+      ${x.subject ? `<table style="margin-top:16px;width:100%"><tr><td style="width:1.6cm;vertical-align:top"><b>Objet :</b></td><td style="vertical-align:top"><b>${e(x.subject)}</b></td></tr></table>` : ''}
+      <div style="margin-top:6px">${bodyHtml(c.type !== 'libre' && !/agr[ée]er|salutations/i.test(x.body) ? x.body + '\n\nVeuillez agréer, Madame, Monsieur, l\'expression de nos salutations distinguées.' : x.body)}</div>
+      <div style="margin:16px 0 0 62%;page-break-inside:avoid;text-align:left"><b>Pour ${e(co().name)}</b><br><br>Nom : ${repName ? e(repName) : '……………………………'}<br>Fonction : ${repJob ? e(repJob) : '……………………………'}<div style="height:3.2cm;margin-top:8px"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3cm;width:3cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)"></div><span style="font-size:9.5pt">Signature et cachet</span></div>
+      ${c.f && c.f.copy ? `<p class="ctp" style="margin-top:10px;text-align:left"><i>Copie pour information : ${e(c.f.copy)}</i></p>` : ''}${K.foot(stamp, true)}</div>`; };
   App.letterFileName = c => App.docName(whoOf(c).name, 'Lettre ' + c.no);
   App.actions.lt_print = async x => { const c = list().find(y => y.id === x.id); if (c) App.docKit.print(App.letterFileName(c), App.letterDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.lt_pdf = async x => { const c = list().find(y => y.id === x.id); if (c) App.sharePdf(`${App.letterFileName(c)}.pdf`, App.letterDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
