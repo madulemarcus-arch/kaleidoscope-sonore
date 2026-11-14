@@ -94,5 +94,17 @@ ok('declines all responsibility for the equipment and for the service interrupti
 ok('printed with the Honorable line and the numbered points',/À l(?:'|&#39;)Honorable Francis ILUNGA/.test(dm.html)&&/class="ltl"/.test(dm.html)&&/Décharge de responsabilité de/.test(dm.html));
 await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.amount=1190;});
 ok('an amount, when given, is written in the letter',await p.evaluate(()=>/pour un montant total de 1\s190/.test(App.letterText(App.db.letters[App.db.letters.length-1]).body)));
+// « Ordre de mission »: who goes where, when, why, transport, expenses; no courtesy closing formula
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','mission');await p.waitForTimeout(250);
+ok('mission order asks for job, destination, purpose, dates (today +3 days by default), transport, companion and expenses',await p.isVisible('#lf_job')&&await p.isVisible('#lf_place')&&await p.isVisible('#lf_why')&&await p.inputValue('#lf_from')===await p.evaluate(()=>App.today())&&await p.inputValue('#lf_to')===await p.evaluate(()=>App.addDays(App.today(),3))&&await p.inputValue('#lf_transport')==='Véhicule de la société'&&await p.isVisible('#lf_team')&&await p.isVisible('#lf_amount')&&await p.isVisible('#lt_cur'));
+await p.fill('#lt_pname','Marie Test');await p.fill('#lf_place','Kole, province du Sankuru');await p.fill('#lf_team','Jean Essai, aide-technicien');await p.fill('#lf_amount','200');await p.selectOption('#lt_cur','USD');await create();
+const om=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{t:App.letterText(c),html:App.letterDoc(c,'','')}});
+ok('subject and order: names the person, job, destination, purpose',/^Ordre de mission – Kole, province du Sankuru$/.test(om.t.subject)&&/ordonnons à Marie Test, Technicien, de se rendre à Kole, province du Sankuru du /.test(om.t.body)&&/en vue de : Installation et maintenance de kits Starlink/.test(om.t.body));
+ok('transport, companion and expenses (200 $, borne by the company) as numbered points',/^1\. \*\*Moyen de transport\*\* — Véhicule de la société ;/m.test(om.t.body)&&/^2\. \*\*Accompagné\(e\) de\*\* — Jean Essai/m.test(om.t.body)&&/^3\. \*\*Frais de mission\*\* — 200\s\$, pris en charge par/m.test(om.t.body));
+ok('authorities asked to assist; valid for the duration of the mission',/autorités civiles, militaires et coutumières sont priées/.test(om.t.body)&&/valable pour la durée de la mission/.test(om.t.body));
+ok('no courtesy closing formula added to an order, but the signature block is there',!/salutations distinguées/.test(om.html)&&/Signature et cachet/.test(om.html)&&/<b>Moyen de transport<\/b>/.test(om.html));
+await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.team='';c.f.amount='';});
+ok('without a companion or expenses the points renumber (1 transport, 2 expenses « selon les modalités convenues »)',await p.evaluate(()=>{const b=App.letterText(App.db.letters[App.db.letters.length-1]).body;return /^1\. \*\*Moyen de transport/m.test(b)&&/^2\. \*\*Frais de mission\*\* — selon les modalités convenues/m.test(b)&&!/Accompagné/.test(b)}));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
