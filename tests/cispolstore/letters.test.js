@@ -1,0 +1,50 @@
+// Administrative letters: a model is filled in a few seconds (recipient + 2-3 fields), the text is generated, editable,
+// printable / PDF / WhatsApp, listed on the client's file. Fictitious data only.
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'cl1',code:'CL-L1',type:'gere',name:'Joseph Mbuyi',phone:'0810000011',address:'Av. du Test 12, Kinshasa',created:t,subs:[]});App.save();App.go('letters')});await p.waitForTimeout(400);
+ok('the Lettres screen opens and is empty',/Aucune lettre/.test(await p.innerText('#view')));
+ok('the menu offers « Lettres »',await p.evaluate(()=>{App.go('more');return true})&&(await p.waitForTimeout(300),/Lettres/.test(await p.innerText('#view'))));
+await p.evaluate(()=>App.go('letters'));await p.waitForTimeout(300);
+await p.click('[data-act=lt_new]');await p.waitForTimeout(400);
+ok('all the models are offered',await p.evaluate(()=>[...document.querySelectorAll('#lt_type option')].length===Object.keys(App.letterTypes).length&&Object.keys(App.letterTypes).length>=12));
+const create=async()=>{await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Créer la lettre/.test(b.textContent)).click()});await p.waitForTimeout(700)};
+await create();ok('refuses without a recipient',await p.evaluate(()=>App.db.letters.length===0));
+await p.selectOption('#lt_cl','cl1');await p.dispatchEvent('#lt_cl','change');await p.fill('#lf_ref','Facture FAC-2026-0042');await create();
+ok('refuses a formal notice without an amount',await p.evaluate(()=>App.db.letters.length===0));
+await p.fill('#lf_amount','150');await p.fill('#lf_days','5');await create();
+let c=await p.evaluate(()=>App.db.letters[0]);
+ok('created: numbered LET-YYYY-0001, linked to the client',c&&/^LET-\d{4}-0001$/.test(c.no)&&c.clientId==='cl1'&&c.type==='mise');
+const t=await p.evaluate(()=>App.letterText(App.db.letters[0]));
+ok('generated text: amount, reference, delay, subject',/150/.test(t.body)&&/FAC-2026-0042/.test(t.body)&&/5 jours/.test(t.body)&&/Mise en demeure/.test(t.subject),JSON.stringify(t));
+ok('the detail window opens with print / PDF / WhatsApp',await p.isVisible('[data-act=lt_print]')&&await p.isVisible('[data-act=lt_pdf]')&&await p.isVisible('[data-act=lt_wa]'));
+const html=await p.evaluate(()=>App.letterDoc(App.db.letters[0],'','stamp.png'));
+ok('printable letter: recipient, subject, reference, signature block',/Joseph Mbuyi/.test(html)&&/Objet : Mise en demeure/.test(html)&&/LET-\d{4}-0001/.test(html)&&/class="sg ctsg"/.test(html)&&/Av\. du Test 12/.test(html));
+// edit the text by hand
+await p.evaluate(()=>App.actions.lt_text({id:App.db.letters[0].id}));await p.waitForTimeout(500);
+await p.fill('#lt_body','Premier paragraphe modifié.\n\nSecond paragraphe.');await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(500);
+ok('the text can be edited by hand and is kept',await p.evaluate(()=>App.letterText(App.db.letters[0]).body==='Premier paragraphe modifié.\n\nSecond paragraphe.')&&/Second paragraphe/.test(await p.evaluate(()=>App.letterDoc(App.db.letters[0],'',''))));
+// free recipient + another model
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','travail');await p.waitForTimeout(250);
+ok('for an employee letter the client chooser is hidden and a name is asked',!(await p.isVisible('#lt_cl'))&&await p.isVisible('#lt_pname'));
+await p.fill('#lt_pname','Marie Test');await p.fill('#lf_job','Technicienne');await p.fill('#lf_since','2025-03-01');await create();
+const w=await p.evaluate(()=>App.db.letters[1]);
+ok('second letter numbered 0002, free recipient, text mentions the job',await p.evaluate(()=>{const w=App.db.letters[1],t=App.letterText(w).body;return /-0002$/.test(w.no)&&!w.clientId&&w.party.name==='Marie Test'&&/Technicienne/.test(t)&&/Marie Test/.test(t)}));
+// payment receipt in CDF
+await p.evaluate(()=>{App.close();App.letterForm(null,'cl1')});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','quittance');await p.waitForTimeout(250);await p.selectOption('#lt_cur','CDF');await p.fill('#lf_amount','50000');await create();
+ok('receipt in francs: amount written in letters',await p.evaluate(()=>/cinquante mille/i.test(App.letterText(App.db.letters[2]).body)&&/CDF|FC/.test(App.letterText(App.db.letters[2]).body)));
+// the client's sheet lists the client's letters
+await p.evaluate(()=>{App.close();App.go('client',{id:'cl1'})});await p.waitForTimeout(400);await p.evaluate(()=>{const b=[...document.querySelectorAll('[data-act=cltab]')].find(x=>x.dataset.t==='fac'||/Factures/.test(x.textContent));if(b)b.click()});await p.waitForTimeout(400);
+ok('the client sheet shows its 2 letters',(await p.innerText('#view')).match(/LET-\d{4}-000[13]/g)?.length>=2);
+// WhatsApp opens with the client's number
+await p.evaluate(()=>{window.__w=[];window.open=u=>{window.__w.push(u)}});await p.evaluate(()=>App.actions.lt_wa({id:App.db.letters[0].id}));
+ok('WhatsApp link goes to the client\'s number',await p.evaluate(()=>/wa\.me\/\d+/.test(window.__w[0]||'')));
+// duplicate and delete
+await p.evaluate(()=>App.actions.lt_dup({id:App.db.letters[0].id}));ok('duplicate gets the next number',await p.evaluate(()=>App.db.letters.length===4&&/-0004$/.test(App.db.letters[3].no)));
+await p.evaluate(()=>App.actions.lt_del({id:App.db.letters[3].id}));ok('delete removes it',await p.evaluate(()=>App.db.letters.length===3));
+ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
+ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
