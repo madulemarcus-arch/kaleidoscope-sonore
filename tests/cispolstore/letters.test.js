@@ -156,5 +156,14 @@ ok('text: notification of the dismissal, the reason (no double full stop), 30-da
 ok('printed as a letter of the company: letterhead, recipient block with the employee, company signature and stamp',/logo\.png/.test(lic.html)&&/À l(?:'|&#39;)attention de :<br><b>Paul Demissionnaire<\/b>/.test(lic.html)&&/Pour .+<\/b>/.test(lic.html)&&/Signature et cachet/.test(lic.html));
 await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.notice=0;});
 ok('no notice: takes effect on receipt',await p.evaluate(()=>{const b=App.letterText(App.db.letters[App.db.letters.length-1]).body;return /prend effet à compter de la réception/.test(b)&&!/préavis/.test(b)}));
+// leave request: personal letter written by the employee (emp layout), days counted from the dates
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','conge');await p.waitForTimeout(250);
+ok('leave request: collaborator chooser, dates, kind, optional cover person',await p.isVisible('#lt_tech')&&!(await p.isVisible('#lt_cl'))&&await p.isVisible('#lf_from')&&await p.isVisible('#lf_to')&&await p.inputValue('#lf_kind')==='Congé annuel'&&await p.isVisible('#lf_sub'));
+await p.selectOption('#lt_tech','tk9');await p.dispatchEvent('#lt_tech','change');await p.fill('#lf_job','Vendeur');await p.fill('#lf_from','2026-12-01');await p.fill('#lf_to','2026-12-05');await p.fill('#lf_sub','Awa K.');await create();
+const cg=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{c,t:App.letterText(c),html:App.letterDoc(c,'logo.png','stamp.png')}});
+ok('leave: linked to the collaborator, subject « Demande de congé annuel »',cg.c.type==='conge'&&cg.c.techId==='tk9'&&cg.t.subject==='Demande de congé annuel');
+ok('leave text: written in the first person, 5 calendar days, cover person, resumes work, closing, no literal \\n',/Je soussigné\(e\), Paul Demissionnaire/.test(cg.t.body)&&/soit 5 jours calendaires/.test(cg.t.body)&&/Awa K\. assurera la continuité/.test(cg.t.body)&&/Je reprendrai mes fonctions/.test(cg.t.body)&&/salutations distinguées/.test(cg.t.body)&&!/\\n/.test(cg.t.body));
+ok('leave printed as a personal letter (employee block, no company letterhead logo)',cg.html.length>200&&/Paul Demissionnaire/.test(cg.html));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
