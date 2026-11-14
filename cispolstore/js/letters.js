@@ -59,6 +59,11 @@
       subject: c => c.f.about || 'Ordre de mission',
       body: c => { const r = repOf(c.rep), n = co().name, job = c.f.job || '……', tasks = String(c.f.tasks || '').split('\n').map(x => x.trim()).filter(Boolean);
         return `Je soussigné, Monsieur ${r.name || '……………'}, ${r.job || '……………'}, atteste par la présente que Mr. **${c.who.name}** en qualité ${/^[aeiouyh]/i.test(job) ? 'd\'' : 'de '}${job}, est mandaté par l'entreprise **${n}** en vue de ${c.f.purpose || '……'}${c.f.init ? ` dont ${c.f.init} est l'initiateur du projet` : ''}.\n\nCependant, la mission est initialement prévue pour une durée de ${c.f.days || '…'} jours, à compter de la date d'arrivée de l'expert sur le lieu de la mission${c.f.place ? ' (' + c.f.place + ')' : ''}. La durée pourra être ajustée en fonction des besoins opérationnels et des constatations sur le terrain. Ainsi, la responsabilité de l'Expert est de :${tasks.length ? '\n\n' + tasks.map(t => '- ' + t).join('\n') : ''}${c.f.init ? '\n\nDe ce fait, nous demandons à l\'initiateur du projet de faciliter à l\'Expert l\'accès aux infrastructures et informations nécessaires à l\'exécution du projet.' : ''}`; } },
+    demission: { label: 'Lettre de démission', icon: '🚪', cat: 'person', emp: true, noclose: true,
+      f: [['appel', 'Adressée à', 'text', 'Monsieur le Directeur'], ['job', 'Poste occupé', 'text', ''], ['since', 'Dans la société depuis le (facultatif)', 'date', ''], ['notice', 'Préavis (jours, 0 = immédiat)', 'num', 30], ['reason', 'Motif (facultatif)', 'text', '']],
+      subject: c => `Démission${c.f.job ? ' de mon poste de ' + c.f.job : ''}`,
+      body: c => { const n = +c.f.notice || 0, a = c.f.appel || 'Monsieur le Directeur', end = n > 0 ? App.fdate(App.addDays(c.date, n)) : '';
+        return `${a},\n\nJe soussigné(e), ${c.who.name}, ${c.f.job ? c.f.job + ' ' : 'employé(e) '}${c.f.since ? `depuis le ${d(c, 'since')} ` : ''}au sein de ${co().name}, ai l'honneur de vous informer de ma décision de démissionner de mon poste.${c.f.reason ? `\n\nCette décision est motivée par : ${c.f.reason}.` : ''}\n\n${n > 0 ? `Conformément au préavis applicable, je m'engage à poursuivre mes fonctions pendant ${n} jours, soit jusqu'au ${end}, date à laquelle prendra fin ma collaboration avec ${co().name}.` : `Cette démission prend effet à compter de ce jour.`}\n\nJe m'engage à assurer la passation de mes dossiers et à restituer le matériel mis à ma disposition. Je vous remercie de la confiance que vous m'avez accordée durant cette période.\n\nVeuillez agréer, ${a}, l'expression de mes salutations distinguées.`; } },
     convocation: { label: 'Convocation', icon: '📣', cat: 'person',
       f: [['on', 'Date du rendez-vous', 'date', ''], ['hour', 'Heure', 'text', '10h00'], ['place', 'Lieu', 'text', ''], ['why', 'Objet de la convocation', 'text', '']],
       subject: c => `Convocation${c.f.why ? ' – ' + c.f.why : ''}`,
@@ -129,7 +134,7 @@
     const render = type => { const t = TYPES[type], ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('lt_cl') || c.clientId);
       if (cl) { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.since === undefined && cl.start) ex.since = cl.start; }
       if (ex.paid === undefined) ex.paid = t0; if (ex.first === undefined) ex.first = App.addDays(t0, 30); if (ex.on === undefined) ex.on = App.addDays(t0, type === 'suspension' || type === 'resiliation' ? 0 : 3);
-      $('lt_f').innerHTML = fieldHtml(t, ex); $('lt_clrow').style.display = t.cat === 'client' ? '' : 'none'; $('lt_techrow').style.display = t.order ? '' : 'none'; $('lt_party').hidden = (t.cat === 'client' && !!App.client($('lt_cl').value)) || (!!t.order && !!App.tech($('lt_tech').value)); $('lt_curRow').style.display = t.money || t.cur ? '' : 'none'; };
+      $('lt_f').innerHTML = fieldHtml(t, ex); $('lt_clrow').style.display = t.cat === 'client' ? '' : 'none'; $('lt_techrow').style.display = t.order || t.emp ? '' : 'none'; $('lt_party').hidden = (t.cat === 'client' && !!App.client($('lt_cl').value)) || (!!(t.order || t.emp) && !!App.tech($('lt_tech').value)); $('lt_curRow').style.display = t.money || t.cur ? '' : 'none'; };
     App.modal(isNew ? 'Nouvelle lettre' : 'Modifier ' + c.no,
       `${isNew ? F.sel('lt_type', 'Modèle de lettre', Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), c.type) : `<p class="mut" style="margin-top:0">${T(c).icon} ${esc(T(c).label)}</p>`}
        <div id="lt_techrow">${F.sel('lt_tech', 'Technicien / collaborateur', [['', '— Autre (saisir ci-dessous) —'], ...App.db.technicians.filter(x => x.active !== false || x.id === c.techId).map(x => [x.id, x.name + (x.role ? ' · ' + x.role : '')])], c.techId || '')}</div>
@@ -141,8 +146,8 @@
        ${isNew ? '' : `<label class="chk" style="display:block;margin-top:8px"><input type="checkbox" id="lt_regen"> Régénérer le texte depuis le modèle (efface vos modifications du texte)</label>`}`,
       () => { const type = isNew ? App.v('lt_type') : c.type, t = TYPES[type], f = {};
         t.f.forEach(([k, l, kind]) => { const raw = $('lf_' + k).value; f[k] = kind === 'num' ? (raw === '' ? '' : Math.max(0, +raw || 0)) : String(raw).trim(); });
-        const cl = t.cat === 'client' ? App.v('lt_cl') : '', tc = t.order ? App.tech(App.v('lt_tech')) : null, p = tc ? { name: tc.name, phone: tc.phone || '', address: tc.zone || '' } : { name: App.v('lt_pname'), phone: App.v('lt_pphone'), address: App.v('lt_paddr') };
-        if (!cl && !p.name) { App.toast(t.order ? 'Choisissez un technicien ou saisissez le nom de la personne en mission' : 'Choisissez un client ou saisissez le nom du destinataire'); return false; }
+        const cl = t.cat === 'client' ? App.v('lt_cl') : '', tc = t.order || t.emp ? App.tech(App.v('lt_tech')) : null, p = tc ? { name: tc.name, phone: tc.phone || '', address: tc.zone || '' } : { name: App.v('lt_pname'), phone: App.v('lt_pphone'), address: App.v('lt_paddr') };
+        if (!cl && !p.name) { App.toast(t.order ? 'Choisissez un technicien ou saisissez le nom de la personne en mission' : t.emp ? 'Choisissez un collaborateur ou saisissez le nom de la personne qui démissionne' : 'Choisissez un client ou saisissez le nom du destinataire'); return false; }
         if (t.money && !(f.amount > 0)) { App.toast('Saisissez le montant'); return false; }
         const date = App.v('lt_date') || t0, o = { type, clientId: cl, techId: tc ? tc.id : '', party: cl ? {} : p, date, currency: App.v('lt_cur') || 'USD', rep: App.v('lt_rep'), f };
         if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date) }); list().push(c); if (cl) App.log(cl, `Lettre ${c.no} : ${t.label}`); }
@@ -167,35 +172,47 @@
   const IND = '45%';
   const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   const bodyHtml = body => {
-    const paras = String(body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean); let first = true;
+    const paras = String(body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
     return paras.map((b, i) => {
       const lines = b.split('\n');
       if (i === 0 && lines.length === 1 && b.length < 70 && /,$/.test(b)) return `<p class="ctp" style="margin:14px 0 6px ${IND};text-align:left">${inline(b)}</p>`; // greeting
       if (/^#\s/.test(b)) return `<p class="ctp" style="margin:12px 0 3px;text-align:left"><b>${inline(b.replace(/^#\s+/, ''))}</b></p>`; // heading
       if (/^\d+\.\s/.test(lines[0])) return `<table class="ltl">${lines.map(l => { const m = /^(\d+)\.\s+(.*)$/.exec(l); return m ? `<tr><td class="n">${m[1]}.</td><td>${inline(m[2])}</td></tr>` : `<tr><td></td><td>${inline(l)}</td></tr>`; }).join('')}</table>`; // numbered list
-      const closing = i === paras.length - 1 && /agr[ée]er|salutations/i.test(b), ti = first && i <= 1 && !closing ? `text-indent:${IND};` : ''; first = false;
-      return `<p class="ctp" style="margin:6px 0 ${closing ? '14px' : '6px'}${closing ? ' ' + IND : ''};text-align:left;${ti}">${inline(b).replace(/\n/g, '<br>')}</p>`; }).join(''); };
+      const closing = i === paras.length - 1 && /agr[ée]er|salutations/i.test(b); // every paragraph starts under the recipient's name, the next lines go back to the left limit
+      return `<p class="ctp" style="margin:6px 0 ${closing ? '14px' : '6px'};text-align:left;text-indent:${IND}">${inline(b).replace(/\n/g, '<br>')}</p>`; }).join(''); };
+  const MG = 'padding:0 1.25cm'; // the letter keeps inside a left / right limit (the colon of « Objet : »)
   // mission order: title, Objet / Lieu / Initiateur / Nom lines, justified text with diamond bullets, « Fait à … », signature block with the stamp
   const orderDoc = (c, logo, stamp) => {
     const K = App.docKit, e = esc, x = App.letterText(c), r = repOf(c.rep), w = whoOf(c), job = c.f.job || '';
     const paras = String(x.body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean), nm = /^[aeiouyh]/i.test(job) ? 'de l\'' : 'du ';
     const body = paras.map((b, i) => /^- /.test(b) ? `<table class="omb">${b.split('\n').map(l => `<tr><td class="b">◆</td><td>${inline(l.replace(/^-\s*/, ''))}</td></tr>`).join('')}</table>` : `<p class="omp">${inline(b)}</p>`).join('');
-    return `<div class="paper"><style>.omp{margin:10px 0;text-align:justify;line-height:1.55;text-indent:1.3cm}.omb{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.omb,.omb td{font:inherit}.omb td{padding:1px 0;vertical-align:top;text-align:left;line-height:1.5}.omb td.b{width:.9cm;color:#d5522f;font-size:9pt}.omh{margin:6px 0;line-height:1.5}</style>${K.head(co(), logo)}
+    return `<div class="paper"><style>.omp{margin:10px 0;text-align:justify;line-height:1.55;text-indent:1.3cm}.omb{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.omb,.omb td{font:inherit}.omb td{padding:1px 0;vertical-align:top;text-align:left;line-height:1.5}.omb td.b{width:.9cm;color:#d5522f;font-size:9pt}.omh{margin:6px 0;line-height:1.5}</style>${K.head(co(), logo)}<div style="${MG}">
       <div style="text-align:center;font-size:15pt;font-weight:bold;margin:22px 0 14px;letter-spacing:.3px">ORDRE DE MISSION</div>
       ${x.subject ? `<div class="omh"><b>Objet :</b> <b>${e(x.subject)}</b></div>` : ''}${c.f.place ? `<div class="omh"><b>Lieu :</b> <b>${e(c.f.place)}</b></div>` : ''}${c.f.init ? `<div class="omh"><b>Initiateur du projet :</b> <b>${e(c.f.init)}</b></div>` : ''}<div class="omh"><b>Nom ${job ? nm + e(job) : 'de la personne en mission'} :</b> <b>${e(w.name)}</b></div>
       <div style="margin-top:22px">${body}</div>
       <div style="text-align:right;font-weight:bold;margin-top:22px">Fait à ${e(city())}, le ${App.fdate(c.date)}</div>
-      <div style="margin:8px 0 0 50%;page-break-inside:avoid;display:flex;align-items:center"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3.4cm;width:3.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5);flex:none"><div style="margin-left:.3cm;font-style:italic;text-align:left">${r.job ? e(r.job) + '<br>' : ''}<b>${e(r.name)}</b></div></div></div>`; };
+      <div style="margin:8px 0 0 50%;page-break-inside:avoid;display:flex;align-items:center"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3.4cm;width:3.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5);flex:none"><div style="margin-left:.3cm;font-style:italic;text-align:left">${r.job ? e(r.job) + '<br>' : ''}<b>${e(r.name)}</b></div></div></div></div>`; };
+  // letter written by a person to the company (resignation): no company letterhead, the sender's block on the left, the recipient on the right, his signature
+  const personalDoc = c => {
+    const e = esc, w = whoOf(c), x = App.letterText(c), a = c.f.appel || 'Monsieur le Directeur';
+    return `<div class="paper"><style>.lsj td{font:inherit}</style><div style="${MG}">
+      <p class="ctp" style="margin:0;text-align:left"><b>${e(w.name)}</b>${c.f.job ? '<br>' + e(c.f.job) : ''}${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
+      <p class="ctp" style="text-align:right;margin-top:14px">${e(city())}, le ${App.fdate(c.date)}</p>
+      <p class="ctp" style="margin:18px 0 0 ${IND};text-align:left">À ${e(a)}<br><b>${e(co().name)}</b>${co().address ? '<br>' + e(co().address) : ''}</p>
+      ${x.subject ? `<table class="lsj" style="margin-top:16px;width:58%"><tr><td style="width:1.6cm;vertical-align:top"><b>Objet :</b></td><td style="vertical-align:top"><b>${e(x.subject)}</b></td></tr></table>` : ''}
+      <div style="margin-top:6px">${bodyHtml(x.body)}</div>
+      <div style="margin:18px 0 0 62%;page-break-inside:avoid;text-align:left"><span style="font-size:9.5pt">Signature</span><div style="height:2.4cm"></div><b>${e(w.name)}</b></div></div></div>`; };
   App.letterDoc = (c, logo, stamp) => {
+    if (T(c).emp) return personalDoc(c);
     if (T(c).order) return orderDoc(c, logo, stamp);
     const K = App.docKit, e = esc, w = whoOf(c), x = App.letterText(c), hon = T(c).hon && c.f.titre, rep = String(c.rep || '').split(/\s*,\s*/), repName = rep.slice(0, -1).join(', ') || rep[0] || '', repJob = rep.length > 1 ? rep[rep.length - 1] : '';
-    return `<div class="paper"><style>.ltl{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.ltl,.ltl td{font:inherit}.ltl td{padding:2px 0;vertical-align:top;text-align:left;line-height:1.5}.ltl td.n{width:1.1cm}</style>${K.head(co(), logo)}
+    return `<div class="paper"><style>.ltl{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.ltl,.ltl td{font:inherit}.ltl td{padding:2px 0;vertical-align:top;text-align:left;line-height:1.5}.ltl td.n{width:1.1cm}</style>${K.head(co(), logo)}<div style="${MG}">
       <table style="width:100%;margin-top:8px"><tr><td style="font-size:9pt;color:#4A5568">N/Réf : ${e(c.no)}/${e(co().name)}/${c.date.slice(0, 4)}</td><td style="text-align:right">${e(city())}, le ${App.fdate(c.date)}</td></tr></table>
       <p class="ctp" style="margin:18px 0 0 ${IND};text-align:left">${hon ? `<b>${e(c.f.titre)} ${e(w.name)}</b>` : `À l'attention de :<br><b>${e(w.name)}</b>`}${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
       ${x.subject ? `<table class="lsj" style="margin-top:16px;width:58%"><tr><td style="width:1.6cm;vertical-align:top"><b>Objet :</b></td><td style="vertical-align:top"><b>${e(x.subject)}</b></td></tr></table>` : ''}
       <div style="margin-top:6px">${bodyHtml(c.type !== 'libre' && !T(c).noclose && !/agr[ée]er|salutations/i.test(x.body) ? x.body + '\n\nVeuillez agréer, Madame, Monsieur, l\'expression de nos salutations distinguées.' : x.body)}</div>
       <div style="margin:16px 0 0 62%;page-break-inside:avoid;text-align:left"><b>Pour ${e(co().name)}</b><br><br>Nom : ${repName ? e(repName) : '……………………………'}<br>Fonction : ${repJob ? e(repJob) : '……………………………'}<div style="height:3.2cm;margin-top:8px"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3cm;width:3cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)"></div><span style="font-size:9.5pt">Signature et cachet</span></div>
-      ${c.f && c.f.copy ? `<p class="ctp" style="margin-top:10px;text-align:left"><i>Copie pour information : ${e(c.f.copy)}</i></p>` : ''}${K.foot(stamp, true)}</div>`; };
+      ${c.f && c.f.copy ? `<p class="ctp" style="margin-top:10px;text-align:left"><i>Copie pour information : ${e(c.f.copy)}</i></p>` : ''}</div>${K.foot(stamp, true)}</div>`; };
   App.letterFileName = c => App.docName(whoOf(c).name, 'Lettre ' + c.no);
   App.actions.lt_print = async x => { const c = list().find(y => y.id === x.id); if (c) App.docKit.print(App.letterFileName(c), App.letterDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.lt_pdf = async x => { const c = list().find(y => y.id === x.id); if (c) App.sharePdf(`${App.letterFileName(c)}.pdf`, App.letterDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
