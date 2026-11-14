@@ -143,5 +143,18 @@ const lim=await p.evaluate(()=>{const mk=(type,f,extra)=>Object.assign({id:'x',t
  return{a,b,c,ind:(a.match(/text-indent:45%/g)||[]).length,paras:(App.letterText(mk('mise',{ref:'F1',amount:100,days:5})).body.split(/\n{2,}/).length)}});
 ok('the letter, the resignation letter and the mission order keep inside the left / right limit',/padding:0 1\.25cm/.test(lim.a)&&/padding:0 1\.25cm/.test(lim.b)&&/padding:0 1\.25cm/.test(lim.c));
 ok('every paragraph of the letter starts under the recipient\'s name (same 45 % as the recipient block); the greeting too',lim.ind>=lim.paras-1&&/margin:18px 0 0 45%/.test(lim.a)&&/margin:14px 0 6px 45%/.test(lim.a));
+// dismissal letter: from the company to the employee (company letterhead, recipient block), reason required, notice
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','licenciement');await p.waitForTimeout(250);
+ok('dismissal: asks for the post, start date, reason (required), notice (30 days) and offers the collaborators list',await p.isVisible('#lf_job')&&await p.isVisible('#lf_since')&&await p.isVisible('#lf_reason')&&await p.inputValue('#lf_notice')==='30'&&await p.isVisible('#lt_tech')&&!(await p.isVisible('#lt_cl')));
+await p.selectOption('#lt_tech','tk9');await p.dispatchEvent('#lt_tech','change');await p.fill('#lf_job','Vendeur');await create();
+ok('refuses a dismissal without a reason',await p.evaluate(()=>!App.db.letters.some(c=>c.type==='licenciement')));
+await p.fill('#lf_reason','Faute grave : absences injustifiées répétées.');await create();
+const lic=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{c,t:App.letterText(c),html:App.letterDoc(c,'logo.png','stamp.png'),end:App.fdate(App.addDays(c.date,30))}});
+ok('linked to the collaborator; subject « Notification de licenciement – poste de Vendeur »',lic.c.techId==='tk9'&&lic.t.subject==='Notification de licenciement – poste de Vendeur');
+ok('text: notification of the dismissal, the reason (no double full stop), 30-day notice with the end date, return of the equipment, final settlement, acknowledgement of receipt, closing formula',/nous vous notifions votre licenciement du poste de Vendeur que vous occupez au sein de/.test(lic.t.body)&&/pour le motif suivant : Faute grave : absences injustifiées répétées\.\n/.test(lic.t.body)&&new RegExp('préavis de 30 jours.*prend fin le '+lic.end.replace(/\//g,'\\/')).test(lic.t.body)&&/restituer le matériel/.test(lic.t.body)&&/solde de tout compte/.test(lic.t.body)&&/accusé de réception/.test(lic.t.body)&&/salutations distinguées/.test(lic.t.body));
+ok('printed as a letter of the company: letterhead, recipient block with the employee, company signature and stamp',/logo\.png/.test(lic.html)&&/À l(?:'|&#39;)attention de :<br><b>Paul Demissionnaire<\/b>/.test(lic.html)&&/Pour .+<\/b>/.test(lic.html)&&/Signature et cachet/.test(lic.html));
+await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.notice=0;});
+ok('no notice: takes effect on receipt',await p.evaluate(()=>{const b=App.letterText(App.db.letters[App.db.letters.length-1]).body;return /prend effet à compter de la réception/.test(b)&&!/préavis/.test(b)}));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
