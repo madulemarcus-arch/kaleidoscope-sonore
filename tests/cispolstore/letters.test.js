@@ -46,5 +46,16 @@ ok('WhatsApp link goes to the client\'s number',await p.evaluate(()=>/wa\.me\/\d
 // duplicate and delete
 await p.evaluate(()=>App.actions.lt_dup({id:App.db.letters[0].id}));ok('duplicate gets the next number',await p.evaluate(()=>App.db.letters.length===4&&/-0004$/.test(App.db.letters[3].no)));
 await p.evaluate(()=>App.actions.lt_del({id:App.db.letters[3].id}));ok('delete removes it',await p.evaluate(()=>App.db.letters.length===3));
+// letter to an authority (« À l'Honorable… »): same letterhead as the contracts and invoices
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','arrieres');await p.waitForTimeout(250);
+ok('authority model: asks for the greeting, number of kits, amount, delay and the copy line',await p.inputValue('#lf_titre')==="À l'Honorable"&&await p.inputValue('#lf_appel')==='Honorable'&&await p.isVisible('#lf_kits')&&await p.isVisible('#lf_amount')&&await p.inputValue('#lf_days')==='8'&&/^Archives /.test(await p.inputValue('#lf_copy')));
+await p.fill('#lt_pname','Francis ILUNGA');await p.fill('#lt_paddr','Territoire de Kole, Province du Sankuru');await p.fill('#lt_rep','Test Gérant, Gérant');
+await p.fill('#lf_kits','17');await p.fill('#lf_place','dans le territoire de Kole');await p.fill('#lf_period','3 mois');await p.fill('#lf_amount','1190');await create();
+const h=await p.evaluate(()=>{const c=App.db.letters[3];return{html:App.letterDoc(c,'logo.png','stamp.png'),text:App.letterText(c),head:App.docKit.head(App.db.settings.company,'logo.png'),ct:(()=>{App.db.contracts.push({id:'x',type:'libre',clientId:'',party:{name:'Z'},date:App.today(),start:App.today(),months:0,end:'',currency:'USD',rep:'',f:{body:'Texte',title:'T'},body:'Texte',no:'CTR-2026-0001',status:'draft'});return App.contractDoc(App.db.contracts[0],'logo.png','stamp.png')})()}});
+ok('recipient line « À l\'Honorable Francis ILUNGA », address, subject, N/Réf',/À l(?:'|&#39;|&apos;)Honorable Francis ILUNGA/.test(h.html)&&/Territoire de Kole/.test(h.html)&&/Objet : Non-paiement des abonnements Starlink/.test(h.html)&&/N\/Réf : LET-\d{4}-0004\//.test(h.html),JSON.stringify([/À l'Honorable Francis ILUNGA/.test(h.html),/Territoire de Kole/.test(h.html),/Objet : Non-paiement/.test(h.html),(h.html.match(/N.Réf[^<]*/)||[])[0]]));
+ok('text: 17 kits, Kole, amount, the three points, closing formula, copy line',/17 kits Starlink/.test(h.text.body)&&/territoire de Kole/.test(h.text.body)&&/1\s190/.test(h.text.body)&&/^1\. /m.test(h.text.body)&&/^3\. /m.test(h.text.body)&&/très haute considération/.test(h.text.body)&&/Copie pour information : Archives/.test(h.html));
+ok('same letterhead as the contracts and invoices (same document header)',h.html.includes(h.head)&&h.ct.includes(h.head));
+ok('the signer is remembered for the next letter',await p.evaluate(()=>{App.letterForm(null);return document.getElementById('lt_rep').value==='Test Gérant, Gérant'}));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();

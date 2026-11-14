@@ -62,6 +62,14 @@
       f: [['facts', 'Faits reprochés', 'area', ''], ['on', 'Date des faits', 'date', '']],
       subject: () => 'Avertissement',
       body: c => `Madame, Monsieur,\n\nNous avons constaté, le ${d(c, 'on')}, les faits suivants :\n\n${c.f.facts || '…'}\n\nCes faits constituent un manquement à vos obligations. Nous vous adressons le présent avertissement et vous invitons à respecter désormais les règles de la société. En cas de récidive, d'autres mesures pourront être prises.` },
+    autorite: { label: 'Lettre à une autorité (Honorable…)', icon: '🎩', cat: 'person', hon: true,
+      f: [['titre', 'Formule en tête du destinataire', 'text', 'À l\'Honorable'], ['appel', 'Appellation', 'text', 'Honorable'], ['about', 'Objet', 'text', ''], ['text', 'Texte de la lettre', 'area', ''], ['copy', 'Copie pour information', 'text', () => 'Archives ' + co().name]],
+      subject: c => c.f.about || '',
+      body: c => `${c.f.appel || 'Honorable'},\n\n${c.f.text || '…'}\n\nDans l'attente d'une suite favorable, nous vous prions d'agréer, ${c.f.appel || 'Honorable'}, l'expression de notre très haute considération.` },
+    arrieres: { label: 'Abonnements impayés – décharge (à une autorité)', icon: '🎩', cat: 'person', hon: true, money: true,
+      f: [['titre', 'Formule en tête du destinataire', 'text', 'À l\'Honorable'], ['appel', 'Appellation', 'text', 'Honorable'], ['kits', 'Nombre de kits installés', 'num', ''], ['place', 'Lieu des installations', 'text', 'dans le territoire de …'], ['period', 'Période non réglée', 'text', '… mois / depuis le …'], ['amount', 'Montant total des arriérés', 'num', ''], ['days', 'Délai de régularisation (jours)', 'num', 8], ['copy', 'Copie pour information', 'text', () => 'Archives ' + co().name]],
+      subject: () => `Non-paiement des abonnements Starlink – Décharge de responsabilité de ${co().name}`,
+      body: c => { const a = c.f.appel || 'Honorable', n = co().name; return `${a},\n\nNous avons l'honneur de nous adresser à votre haute personnalité, au sujet des ${c.f.kits || '…'} kits Starlink installés par nos équipes ${c.f.place || '…'}, afin de mettre fin à la situation de coupure totale de réseau que connaissait cette zone.\n\nNous tenons d'abord à vous exprimer notre profonde gratitude pour la confiance placée en ${n} ainsi que pour l'accueil réservé à nos équipes lors de cette mission.\n\nToutefois, nous constatons, à ce jour, que les abonnements mensuels afférents à ces kits n'ont pas été réglés pour la période de ${c.f.period || '…'}, pour un montant total de ${money(c.f.amount, c.cur)}. Or, le règlement régulier de ces abonnements conditionne la continuité du service Internet fourni par Starlink.\n\nEn conséquence, nous avons l'honneur de porter à votre connaissance ce qui suit :\n\n1. ${n} décline toute responsabilité quant à la suspension, l'interruption ou la résiliation du service Internet, ainsi qu'à toutes les conséquences, directes ou indirectes, qui en découleraient pour les utilisateurs de ces kits ;\n2. ${n} ne saurait être tenue pour responsable des désagréments ou préjudices résultant du défaut de paiement des abonnements, celui-ci relevant exclusivement du souscripteur ;\n3. La reprise normale du service demeure subordonnée à la régularisation préalable des arriérés d'abonnement.\n\nDans un esprit de collaboration, nous vous invitons à bien vouloir procéder à la régularisation de cette situation dans un délai de ${c.f.days || '…'} jours à compter de la réception de la présente. Nous restons, par ailleurs, entièrement disponibles pour examiner avec vous toute modalité pratique de règlement.\n\nDans l'attente d'une suite favorable, nous vous prions d'agréer, ${a}, l'expression de notre très haute considération.`; } },
     demande: { label: 'Demande / lettre à une administration', icon: '🏛️', cat: 'person',
       f: [['about', 'Objet de la demande', 'text', ''], ['text', 'Votre demande', 'area', '']],
       subject: c => c.f.about || 'Demande',
@@ -98,11 +106,11 @@
     return `<h2 class="sec">Lettres</h2><div class="bar"><button class="btn sm" data-act="lt_new" data-cid="${c.id}">+ Nouvelle lettre</button></div>${l.length ? `<div class="list">${l.map(x => `<button class="item" data-act="lt_open" data-id="${x.id}"><span class="avatar">${T(x).icon}</span><div class="grow"><b>${esc(x.no)}</b><small>${esc(T(x).label)} · ${App.fdate(x.date)}</small></div></button>`).join('')}</div>` : '<div class="empty">Aucune lettre pour ce client.</div>'}`; };
 
   // ---------- create / edit ----------
-  const fieldHtml = (t, ex) => t.f.map(([k, l, kind, def]) => { const v = ex && ex[k] !== undefined ? ex[k] : def, id = 'lf_' + k;
+  const fieldHtml = (t, ex) => t.f.map(([k, l, kind, def]) => { const v = ex && ex[k] !== undefined ? ex[k] : typeof def === 'function' ? def() : def, id = 'lf_' + k;
     return kind === 'num' ? F.num(id, l, v) : kind === 'date' ? F.date(id, l, v) : kind === 'area' ? F.area(id, l, v, 'rows="4"') : F.text(id, l, v); }).join('');
   App.letterForm = (c, cid) => {
     const isNew = !c, t0 = App.today();
-    c = c || { type: 'mise', clientId: cid || '', party: {}, date: t0, currency: 'USD', f: {} };
+    c = c || { type: 'mise', clientId: cid || '', party: {}, date: t0, currency: 'USD', f: {}, rep: (list().slice().reverse().find(x => x.rep) || {}).rep || '' };
     const render = type => { const t = TYPES[type], ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('lt_cl') || c.clientId);
       if (cl) { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.since === undefined && cl.start) ex.since = cl.start; }
       if (ex.paid === undefined) ex.paid = t0; if (ex.first === undefined) ex.first = App.addDays(t0, 30); if (ex.on === undefined) ex.on = App.addDays(t0, type === 'suspension' || type === 'resiliation' ? 0 : 3);
@@ -136,11 +144,11 @@
   App.letterDoc = (c, logo, stamp) => {
     const K = App.docKit, e = esc, w = whoOf(c), x = App.letterText(c), paras = String(x.body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean).map(b => `<p class="ctp">${e(b).replace(/\n/g, '<br>')}</p>`).join('');
     return `<div class="paper">${K.head(co(), logo)}
-      <p class="ctp" style="text-align:right;margin-top:10px">${e(city())}, le ${App.fdate(c.date)}<br><small>Réf. ${e(c.no)}</small></p>
-      <p class="ctp" style="margin:12px 0 0 55%"><b>${e(w.name)}</b>${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
+      <p class="ctp" style="text-align:right;margin-top:10px">${e(city())}, le ${App.fdate(c.date)}<br><small>N/Réf : ${e(c.no)}/${e(co().name)}/${c.date.slice(0, 4)}</small></p>
+      <p class="ctp" style="margin:12px 0 0 55%"><b>${T(c).hon && c.f.titre ? e(c.f.titre) + ' ' : ''}${e(w.name)}</b>${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
       ${x.subject ? `<p class="ctp" style="margin-top:14px"><b>Objet : ${e(x.subject)}</b></p>` : ''}
       <div style="margin-top:10px">${paras}</div>
-      <table class="sg ctsg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co().name)}${c.rep ? '<br><small>' + e(c.rep) + '</small>' : ''}</td></tr></table>${K.foot(stamp, true)}</div>`; };
+      <table class="sg ctsg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co().name)}${c.rep ? '<br><small>' + e(c.rep) + '</small>' : ''}</td></tr></table>${c.f && c.f.copy ? `<p class="ctp" style="margin-top:10px"><i>Copie pour information : ${e(c.f.copy)}</i></p>` : ''}${K.foot(stamp, true)}</div>`; };
   App.letterFileName = c => App.docName(whoOf(c).name, 'Lettre ' + c.no);
   App.actions.lt_print = async x => { const c = list().find(y => y.id === x.id); if (c) App.docKit.print(App.letterFileName(c), App.letterDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
   App.actions.lt_pdf = async x => { const c = list().find(y => y.id === x.id); if (c) App.sharePdf(`${App.letterFileName(c)}.pdf`, App.letterDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); };
