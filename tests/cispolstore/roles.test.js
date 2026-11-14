@@ -80,6 +80,24 @@ const nav = p => p.evaluate(() => [...document.querySelectorAll('#bottom [data-v
   // admin recovery
   await p.click('[data-lk=forgot]'); await p.fill('#rec', rec); await p.click('[data-lk=recok]'); await pin(p, '8888'); await pin(p, '8888'); await p.waitForTimeout(300); ok('recovery -> new PIN flow ran', /Code de récupération|CISPOL/.test(await p.innerText('#lock')) || await p.evaluate(() => App.user && App.user.role === 'admin'));
   await p.evaluate(() => { document.getElementById('lock').hidden = true; });
+  // manager (gérant): profile chip in the header, switch to any profile without its PIN, come back at once
+  await p.evaluate(() => { App.user = App.users()[0]; App.realAdmin = null; App.applyRole(); App.go('home'); });
+  ok('header shows the profile chip (icon + first name)', await p.evaluate(() => { const w = document.getElementById('whoBtn'); return !w.hidden && /Administrateur/.test(w.textContent) && !w.classList.contains('as'); }));
+  await p.click('#whoBtn'); await p.waitForTimeout(200);
+  ok('chip opens the list of all active profiles', await p.evaluate(() => document.querySelectorAll('dialog [data-act=me_pick]').length === App.users().filter(u => u.active !== false).length));
+  await p.click('dialog [data-act=me_pick][data-id="' + await p.evaluate(() => App.users().find(u => u.role === 'vendeur').id) + '"]'); await p.waitForTimeout(300);
+  ok('manager switches to the vendeur without PIN, chip highlighted', await p.evaluate(() => App.user.role === 'vendeur' && !!App.realAdmin && App.canView('reports') === false && document.getElementById('whoBtn').classList.contains('as') && /Victor/.test(document.getElementById('whoBtn').textContent)));
+  await p.click('#whoBtn'); await p.waitForTimeout(200);
+  ok('while viewing as someone, the manager still sees every profile', await p.evaluate(() => document.querySelectorAll('dialog [data-act=me_pick]').length === App.users().filter(u => u.active !== false).length));
+  await p.click('dialog [data-act=me_pick][data-id="' + await p.evaluate(() => App.users().find(u => u.role === 'technicien').id) + '"]'); await p.waitForTimeout(300);
+  ok('can go straight to a single-window profile (technicien)', await p.evaluate(() => App.user.role === 'technicien' && !document.getElementById('whoBtn').hidden));
+  await p.click('#whoBtn'); await p.waitForTimeout(200); await p.click('dialog [data-act=me_pick][data-id="' + await p.evaluate(() => App.users().find(u => u.role === 'admin').id) + '"]'); await p.waitForTimeout(300);
+  ok('back to the manager in one tap', await p.evaluate(() => App.user.role === 'admin' && !App.realAdmin && !document.getElementById('whoBtn').classList.contains('as') && App.canView('settings')));
+  // a vendeur who opens the chip cannot pick profiles without a PIN
+  await p.evaluate(() => { App.user = App.users().find(u => u.role === 'vendeur'); App.realAdmin = null; App.applyRole(); }); await p.click('#whoBtn'); await p.waitForTimeout(200);
+  ok('non-manager: no direct switch (PIN required)', await p.evaluate(() => !document.querySelector('dialog [data-act=me_pick]') && !!document.querySelector('dialog [data-act=lockNow]')));
+  await p.keyboard.press('Escape'); await p.evaluate(() => App.actions.me_pick({ id: App.users()[0].id })); ok('non-manager cannot force me_pick', await p.evaluate(() => App.user.role === 'vendeur'));
+  await p.evaluate(() => { App.user = App.users()[0]; App.realAdmin = null; App.applyRole(); });
   // disable profiles
   await p.evaluate(() => { App.user = App.users()[0]; App.applyRole(); }); await p.evaluate(() => App.actions.users_off()); ok('profiles off -> legacy', await p.evaluate(() => !App.multi() && App.canView('settings')));
   await p.screenshot({ path: 'roles.png' }); console.log('errors', errs); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close();

@@ -46,17 +46,36 @@
     document.querySelectorAll('#side nav .sgrp').forEach(h => { let n = h.nextElementSibling, any = false; while (n && !n.classList.contains('sgrp')) { if (!n.hidden) any = true; n = n.nextElementSibling; } h.hidden = !any; });
     let who = $('who'); if (!who) { who = document.createElement('div'); who.id = 'who'; who.className = 'sfoot'; $('side').appendChild(who); }
     who.innerHTML = App.multi() && m ? `<small>${r.icon} ${esc(m.name)} · ${r.label}</small>` : '';
+    const wb = $('whoBtn'); wb.hidden = !(App.multi() && m); wb.classList.toggle('as', !!App.realAdmin);
+    wb.innerHTML = m ? `${r.icon} <span>${esc(String(m.name || r.label).split(' ')[0])}</span>` : '';
     if (!App.canView(App.state.view)) App.go(r.home, {}, true);
   };
   const origGo = App.go;
   App.go = (view, params, replace) => { if (App.multi() && !App.user) return origGo(view, params, replace); // lock screen is up
     if (!App.canView(view)) { App.toast('Écran non disponible pour votre profil'); view = role().home; params = {}; } return origGo(view, params, replace); };
+  // the administrator (gérant) can switch to any active profile without its PIN, and come back at once; the others use the lock screen
+  App.realAdmin = null;
+  const isAdmin = () => (App.realAdmin || App.user || {}).role === 'admin';
+  App.switchList = () => {
+    const cur = App.user ? App.user.id : '', adm = isAdmin();
+    return App.users().filter(u => u.active !== false).map(u => { const r = ROLES[u.role] || ROLES.admin;
+      return `<button type="button" class="item" data-act="${adm ? 'me_pick' : 'lockNow'}" data-id="${u.id}" style="${u.id === cur ? 'outline:2px solid var(--acc,#d5522f)' : ''}"><span class="avatar">${r.icon}</span><div class="grow"><b>${esc(u.name)}</b><small>${r.label}${u.id === cur ? ' · profil actuel' : ''}</small></div><span class="mut">${u.id === cur ? '✓' : '›'}</span></button>`; }).join('');
+  };
+  App.actions.me_switch = () => { if (!App.multi() || !App.user) return;
+    App.modal('Changer de profil', `<div class="list">${App.switchList()}</div><p class="mut" style="font-size:13px">${isAdmin() ? 'Vous êtes le gérant : vous passez sur n\'importe quel profil sans son code, et vous revenez ici quand vous voulez.' : 'Pour passer à un autre profil, entrez son code PIN.'}</p>${!isAdmin() ? '<div class="bar"><button type="button" class="btn sm" data-act="lockNow">🔒 Changer de profil avec un code</button></div>' : ''}`); };
+  App.actions.me_pick = d => { if (!isAdmin()) return;
+    const u = App.users().find(x => x.id === d.id && x.active !== false); if (!u) return;
+    if (!App.realAdmin) App.realAdmin = App.user;
+    if (u.role === 'admin') { App.realAdmin = null; }
+    App.close(); App.me_login(u); App.toast(u.role === 'admin' ? 'Retour au profil gérant' : `Vous voyez l'application comme ${u.name}`); };
+  $('whoBtn').onclick = () => App.actions.me_switch();
+  { const sl = App.showLock; App.showLock = (...a) => { if (a[1] !== 'change' && a[1] !== 'setup') App.realAdmin = null; return sl(...a); }; } // a lock ends the « viewed as » session
   App.me_login = u => { const same = App.user && App.user.id === u.id; App.user = u; App.applyRole(); if (!same || !App.canView(App.state.view)) App.go(role().home, {}, true); else App.refresh(); };
   // sign out when the profile disappears (removed/deactivated, or sync switched the app to multi-user)
   setInterval(() => {
     if (!App.multi()) { if (App.user) { App.user = null; App.applyRole(); } return; }
     const u = App.user && App.users().find(x => x.id === App.user.id && x.active !== false);
-    if (App.user && !u) { App.user = null; App.showLock('enter', 'unlock'); }
+    if (App.user && !u) { App.realAdmin = null; App.user = null; App.showLock('enter', 'unlock'); }
     else if (!App.user && !App.locked) App.showLock('enter', 'unlock');
     else if (u && u.role !== App.user.role) { App.user = u; App.applyRole(); }
   }, 4000);
@@ -66,7 +85,8 @@
     const m = App.me(), r = role();
     return { title: 'Mon profil', back: 'more', nav: 'more', html: `<div class="card"><div class="row" style="align-items:center"><span class="avatar big" style="flex:none">${r.icon}</span><div><h2 style="font-size:18px">${esc(m.name)}</h2><span class="pill blue">${r.label}</span></div></div><p class="mut">${r.desc}</p></div>
       <div class="list"><button class="item" data-act="me_pin"><span class="ico avatar" style="background:var(--navy)">🔑</span><div class="grow"><b>Changer mon code PIN</b><small>Votre code personnel à 4 chiffres</small></div><span class="mut">›</span></button>
-      <button class="item" data-act="lockNow"><span class="ico avatar" style="background:var(--navy)">🔒</span><div class="grow"><b>Verrouiller / changer de profil</b><small>Un autre profil se connecte avec son propre code</small></div><span class="mut">›</span></button></div>` };
+      <button class="item" data-act="me_switch"><span class="ico avatar" style="background:var(--navy)">👥</span><div class="grow"><b>Changer de profil</b><small>${isAdmin() ? 'Gérant : passez sur n\'importe quel profil, sans code' : 'Voir tous les profils'}</small></div><span class="mut">›</span></button>
+      <button class="item" data-act="lockNow"><span class="ico avatar" style="background:var(--navy)">🔒</span><div class="grow"><b>Verrouiller</b><small>Un autre profil se connecte avec son propre code</small></div><span class="mut">›</span></button></div>` };
   };
   // footer of the single-window profiles: own PIN and sign out
   App.soloFoot = () => `<div class="bar" style="margin-top:24px;justify-content:center"><button class="btn sm sec" data-act="me_pin">🔑 Mon code PIN</button><button class="btn sm sec" data-act="lockNow">🔒 Quitter</button></div><p class="mut" style="text-align:center;font-size:13px">${esc((App.user || {}).name || '')}</p>`;
