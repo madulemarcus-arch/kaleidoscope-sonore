@@ -25,6 +25,9 @@ a { color:var(--blue); }
 #title small { display:block; font-weight:400; font-size:11px; opacity:.8; margin-top:-2px; }
 .ib { background:rgba(255,255,255,.12); color:#fff; border:0; width:38px; height:38px; border-radius:50%; font-size:18px; display:grid; place-items:center; flex:none; }
 .ib:active { background:rgba(255,255,255,.25); }
+#top .who { width:auto; max-width:132px; border-radius:19px; padding:0 11px; font-size:13px; font-weight:700; gap:5px; white-space:nowrap; display:flex; align-items:center; }
+#top .who span { overflow:hidden; text-overflow:ellipsis; }
+#top .who.as { background:var(--acc,#d5522f); }
 #view { max-width:940px; margin:0 auto; padding:14px 14px 20px; }
 
 /* ---------- bottom nav ---------- */
