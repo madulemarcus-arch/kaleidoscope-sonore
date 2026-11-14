@@ -54,6 +54,11 @@
       f: [['job', 'Fonction', 'text', ''], ['since', 'Employé(e) depuis le', 'date', ''], ['until', 'Jusqu\'au (vide = toujours en poste)', 'date', '']],
       subject: () => 'Attestation de travail',
       body: c => `Nous soussignés, ${co().name}, attestons que ${c.who.name} ${c.f.until ? 'a travaillé' : 'travaille'} au sein de notre société en qualité de ${c.f.job || '…'}${c.f.since ? ` depuis le ${d(c, 'since')}` : ''}${c.f.until ? ` jusqu'au ${d(c, 'until')}` : ''}.\n\nLa présente attestation est délivrée à l'intéressé(e) pour servir et valoir ce que de droit.` },
+    mission: { label: 'Ordre de mission', icon: '🧭', cat: 'person', order: true, noclose: true,
+      f: [['job', 'Qualité de la personne en mission', 'text', 'Expert en Réseau & Télécoms'], ['about', 'Objet de la mission', 'text', ''], ['place', 'Lieu', 'text', ''], ['init', 'Initiateur du projet (facultatif)', 'text', ''], ['purpose', 'En vue de', 'area', 'réaliser une mission d\'installation de …'], ['days', 'Durée prévue (jours)', 'num', 10], ['tasks', 'Responsabilités (une par ligne)', 'area', 'Assurer l\'exécution rigoureuse des activités prévues dans le cadre de cette mission ;\nRespecter les réglementations locales et internationales applicables dans le domaine des télécoms ;\nRespecter le cahier de charge du client ;\nFormer un technicien local pour la gestion efficiente du réseau.']],
+      subject: c => c.f.about || 'Ordre de mission',
+      body: c => { const r = repOf(c.rep), n = co().name, job = c.f.job || '……', tasks = String(c.f.tasks || '').split('\n').map(x => x.trim()).filter(Boolean);
+        return `Je soussigné, Monsieur ${r.name || '……………'}, ${r.job || '……………'}, atteste par la présente que Mr. **${c.who.name}** en qualité ${/^[aeiouyh]/i.test(job) ? 'd\'' : 'de '}${job}, est mandaté par l'entreprise **${n}** en vue de ${c.f.purpose || '……'}${c.f.init ? ` dont ${c.f.init} est l'initiateur du projet` : ''}.\n\nCependant, la mission est initialement prévue pour une durée de ${c.f.days || '…'} jours, à compter de la date d'arrivée de l'expert sur le lieu de la mission${c.f.place ? ' (' + c.f.place + ')' : ''}. La durée pourra être ajustée en fonction des besoins opérationnels et des constatations sur le terrain. Ainsi, la responsabilité de l'Expert est de :${tasks.length ? '\n\n' + tasks.map(t => '- ' + t).join('\n') : ''}${c.f.init ? '\n\nDe ce fait, nous demandons à l\'initiateur du projet de faciliter à l\'Expert l\'accès aux infrastructures et informations nécessaires à l\'exécution du projet.' : ''}`; } },
     convocation: { label: 'Convocation', icon: '📣', cat: 'person',
       f: [['on', 'Date du rendez-vous', 'date', ''], ['hour', 'Heure', 'text', '10h00'], ['place', 'Lieu', 'text', ''], ['why', 'Objet de la convocation', 'text', '']],
       subject: c => `Convocation${c.f.why ? ' – ' + c.f.why : ''}`,
@@ -91,6 +96,8 @@
   const nextNo = date => { const y = (date || App.today()).slice(0, 4); let m = 0; list().forEach(c => { const x = /^LET-(\d{4})-(\d+)$/.exec(c.no || ''); if (x && x[1] === y) m = Math.max(m, +x[2]); }); return `LET-${y}-${String(m + 1).padStart(4, '0')}`; };
   // recipient of a letter: the client's file, or the details typed in
   const whoOf = c => { const cl = c.clientId && App.client(c.clientId); return cl ? { name: App.cname(cl), phone: cl.phone || '', address: cl.address || cl.installAddr || '' } : { name: (c.party || {}).name || '—', phone: (c.party || {}).phone || '', address: (c.party || {}).address || '' }; };
+  // « Signée par » = « Nom, Fonction »
+  const repOf = rep => { const r = String(rep || '').split(/\s*,\s*/).filter(Boolean); return { name: r.length > 1 ? r.slice(0, -1).join(', ') : r[0] || '', job: r.length > 1 ? r[r.length - 1] : '' }; };
   const ctx = c => ({ ...c, who: whoOf(c), cur: c.currency || 'USD', f: c.f || {} });
   App.letterTypes = TYPES;
   App.letterText = c => { const x = ctx(c); return { subject: c.subject !== undefined ? c.subject : T(c).subject(x), body: c.body !== undefined ? c.body : T(c).body(x) }; };
@@ -162,13 +169,25 @@
       if (/^\d+\.\s/.test(lines[0])) return `<table class="ltl">${lines.map(l => { const m = /^(\d+)\.\s+(.*)$/.exec(l); return m ? `<tr><td class="n">${m[1]}.</td><td>${inline(m[2])}</td></tr>` : `<tr><td></td><td>${inline(l)}</td></tr>`; }).join('')}</table>`; // numbered list
       const closing = i === paras.length - 1 && /agr[ée]er|salutations/i.test(b), ti = first && i <= 1 && !closing ? `text-indent:${IND};` : ''; first = false;
       return `<p class="ctp" style="margin:6px 0 ${closing ? '14px' : '6px'}${closing ? ' ' + IND : ''};text-align:left;${ti}">${inline(b).replace(/\n/g, '<br>')}</p>`; }).join(''); };
+  // mission order: title, Objet / Lieu / Initiateur / Nom lines, justified text with diamond bullets, « Fait à … », signature block with the stamp
+  const orderDoc = (c, logo, stamp) => {
+    const K = App.docKit, e = esc, x = App.letterText(c), r = repOf(c.rep), w = whoOf(c), job = c.f.job || '';
+    const paras = String(x.body || '').split(/\n{2,}/).map(b => b.trim()).filter(Boolean), nm = /^[aeiouyh]/i.test(job) ? 'de l\'' : 'du ';
+    const body = paras.map((b, i) => /^- /.test(b) ? `<table class="omb">${b.split('\n').map(l => `<tr><td class="b">◆</td><td>${inline(l.replace(/^-\s*/, ''))}</td></tr>`).join('')}</table>` : `<p class="omp">${inline(b)}</p>`).join('');
+    return `<div class="paper"><style>.omp{margin:10px 0;text-align:justify;line-height:1.55;text-indent:1.3cm}.omb{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.omb,.omb td{font:inherit}.omb td{padding:1px 0;vertical-align:top;text-align:left;line-height:1.5}.omb td.b{width:.9cm;color:#d5522f;font-size:9pt}.omh{margin:6px 0;line-height:1.5}</style>${K.head(co(), logo)}
+      <div style="text-align:center;font-size:15pt;font-weight:bold;margin:22px 0 14px;letter-spacing:.3px">ORDRE DE MISSION</div>
+      ${x.subject ? `<div class="omh"><b>Objet :</b> <b>${e(x.subject)}</b></div>` : ''}${c.f.place ? `<div class="omh"><b>Lieu :</b> <b>${e(c.f.place)}</b></div>` : ''}${c.f.init ? `<div class="omh"><b>Initiateur du projet :</b> <b>${e(c.f.init)}</b></div>` : ''}<div class="omh"><b>Nom ${job ? nm + e(job) : 'de la personne en mission'} :</b> <b>${e(w.name)}</b></div>
+      <div style="margin-top:22px">${body}</div>
+      <div style="text-align:right;font-weight:bold;margin-top:22px">Fait à ${e(city())}, le ${App.fdate(c.date)}</div>
+      <div style="margin:8px 0 0 50%;page-break-inside:avoid;display:flex;align-items:center"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3.4cm;width:3.4cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5);flex:none"><div style="margin-left:.3cm;font-style:italic;text-align:left">${r.job ? e(r.job) + '<br>' : ''}<b>${e(r.name)}</b></div></div></div>`; };
   App.letterDoc = (c, logo, stamp) => {
+    if (T(c).order) return orderDoc(c, logo, stamp);
     const K = App.docKit, e = esc, w = whoOf(c), x = App.letterText(c), hon = T(c).hon && c.f.titre, rep = String(c.rep || '').split(/\s*,\s*/), repName = rep.slice(0, -1).join(', ') || rep[0] || '', repJob = rep.length > 1 ? rep[rep.length - 1] : '';
     return `<div class="paper"><style>.ltl{width:100%;margin:2px 0 6px 6px;border-collapse:collapse}.ltl,.ltl td{font:inherit}.ltl td{padding:2px 0;vertical-align:top;text-align:left;line-height:1.5}.ltl td.n{width:1.1cm}</style>${K.head(co(), logo)}
       <table style="width:100%;margin-top:8px"><tr><td style="font-size:9pt;color:#4A5568">N/Réf : ${e(c.no)}/${e(co().name)}/${c.date.slice(0, 4)}</td><td style="text-align:right">${e(city())}, le ${App.fdate(c.date)}</td></tr></table>
       <p class="ctp" style="margin:18px 0 0 ${IND};text-align:left">${hon ? `<b>${e(c.f.titre)} ${e(w.name)}</b>` : `À l'attention de :<br><b>${e(w.name)}</b>`}${w.address ? '<br>' + e(w.address) : ''}${w.phone ? '<br>Tél. ' + e(w.phone) : ''}</p>
       ${x.subject ? `<table class="lsj" style="margin-top:16px;width:58%"><tr><td style="width:1.6cm;vertical-align:top"><b>Objet :</b></td><td style="vertical-align:top"><b>${e(x.subject)}</b></td></tr></table>` : ''}
-      <div style="margin-top:6px">${bodyHtml(c.type !== 'libre' && !/agr[ée]er|salutations/i.test(x.body) ? x.body + '\n\nVeuillez agréer, Madame, Monsieur, l\'expression de nos salutations distinguées.' : x.body)}</div>
+      <div style="margin-top:6px">${bodyHtml(c.type !== 'libre' && !T(c).noclose && !/agr[ée]er|salutations/i.test(x.body) ? x.body + '\n\nVeuillez agréer, Madame, Monsieur, l\'expression de nos salutations distinguées.' : x.body)}</div>
       <div style="margin:16px 0 0 62%;page-break-inside:avoid;text-align:left"><b>Pour ${e(co().name)}</b><br><br>Nom : ${repName ? e(repName) : '……………………………'}<br>Fonction : ${repJob ? e(repJob) : '……………………………'}<div style="height:3.2cm;margin-top:8px"><img src="${e(stamp || 'stamp.png')}" alt="" style="height:3cm;width:3cm;transform:rotate(-6deg);filter:contrast(1.35) saturate(1.5)"></div><span style="font-size:9.5pt">Signature et cachet</span></div>
       ${c.f && c.f.copy ? `<p class="ctp" style="margin-top:10px;text-align:left"><i>Copie pour information : ${e(c.f.copy)}</i></p>` : ''}${K.foot(stamp, true)}</div>`; };
   App.letterFileName = c => App.docName(whoOf(c).name, 'Lettre ' + c.no);
