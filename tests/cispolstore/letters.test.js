@@ -109,5 +109,22 @@ ok('printed like the model: title, Objet / Lieu / Initiateur / Nom lines, diamon
 ok('no recipient block, no courtesy formula, no « Merci pour votre confiance » footer on the order',!/attention de/.test(om.html)&&!/salutations distinguées/.test(om.html)&&!/MERCI POUR VOTRE CONFIANCE/i.test(om.html));
 await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.init='';});
 ok('without an initiator: no « dont … » and no request to the initiator',await p.evaluate(()=>{const b=App.letterText(App.db.letters[App.db.letters.length-1]).body;return !/dont /.test(b)&&!/nous demandons à l'initiateur/.test(b)}));
+// mission order linked to the technicians
+await p.evaluate(()=>{App.close();App.db.technicians.push({id:'tk1',name:'Jean Essai',phone:'0810000077',role:'Technicien',zone:'Kole',active:true},{id:'tk2',name:'Ancien Tech',phone:'',role:'Technicien',zone:'',active:false});App.save();App.letterForm(null)});await p.waitForTimeout(300);
+ok('the technician chooser appears only for the mission order, and lists active technicians',!(await p.isVisible('#lt_tech'))&&(await p.selectOption('#lt_type','mission'),await p.waitForTimeout(250),await p.isVisible('#lt_tech'))&&await p.evaluate(()=>[...document.querySelectorAll('#lt_tech option')].map(o=>o.value).join()===',tk1'));
+await p.selectOption('#lt_tech','tk1');await p.dispatchEvent('#lt_tech','change');
+ok('choosing a technician hides the free name fields and fills the quality from his role',!(await p.isVisible('#lt_pname'))&&await p.inputValue('#lf_job')==='Technicien');
+await p.fill('#lf_place','Kole');await create();
+const lm=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{techId:c.techId,party:c.party,body:App.letterText(c).body,html:App.letterDoc(c,'','')}});
+ok('the order is linked to the technician (techId), his name appears in the order',lm.techId==='tk1'&&lm.party.name==='Jean Essai'&&/Mr\. \*\*Jean Essai\*\*/.test(lm.body)&&/<b>Jean Essai<\/b>/.test(lm.html));
+await p.evaluate(()=>{App.db.technicians.find(t=>t.id==='tk1').name='Jean Essai Modifié';});
+ok('the order follows the technician\'s file (renamed technician)',await p.evaluate(()=>/Jean Essai Modifié/.test(App.letterText(App.db.letters[App.db.letters.length-1]).body)&&/Jean Essai Modifié/.test(App.letterDoc(App.db.letters[App.db.letters.length-1],'',''))));
+await p.evaluate(()=>App.go('technician',{id:'tk1'}));await p.waitForTimeout(400);
+ok('the technician sheet lists his mission orders and offers « Nouvel ordre de mission »',/Ordres de mission/.test(await p.innerText('#view'))&&await p.isVisible('[data-act=lt_mission]')&&/LET-\d{4}-\d{4}/.test(await p.innerText('#view')));
+await p.evaluate(()=>document.querySelector('[data-act=lt_mission]').click());await p.waitForTimeout(400);
+ok('from the technician sheet: the mission order form opens with him selected',await p.inputValue('#lt_type')==='mission'&&await p.inputValue('#lt_tech')==='tk1'&&await p.inputValue('#lf_job')==='Technicien');
+await p.evaluate(()=>App.close());
+await p.evaluate(()=>{App.db.technicians=App.db.technicians.filter(t=>t.id!=='tk1');});
+ok('if the technician is deleted the order keeps the name saved with it',await p.evaluate(()=>/Mr\. \*\*Jean Essai\*\*/.test(App.letterText(App.db.letters[App.db.letters.length-1]).body)));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
