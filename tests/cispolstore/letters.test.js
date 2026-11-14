@@ -29,7 +29,7 @@ const p2=await ctx.newPage();await p2.setContent('<body style="margin:0"><div st
 const sj=await p2.evaluate(()=>{const t=document.querySelector('.lsj'),r=t.getBoundingClientRect(),c=t.querySelectorAll('td')[1],h=parseFloat(getComputedStyle(c).lineHeight)||16;return{w:r.width,page:document.querySelector('.paper').getBoundingClientRect().width,lines:Math.round(c.getBoundingClientRect().height/h)}});await p2.close();
 ok('a long subject wraps near the middle of the page instead of one very long line',sj.w<sj.page*0.62&&sj.lines>=2,JSON.stringify(sj));
 const lay=await p.evaluate(()=>{const c=App.db.letters[0];c.body='Madame, Monsieur,\n\nIntro.\n\n# Nos avantages :\n\n1. **Rappel** — texte un.\n2. **Dépannage** — texte deux.\n\nVeuillez agréer, Madame, Monsieur, nos salutations.';c.rep='Marie Test, Directrice';const h=App.letterDoc(c,'','');delete c.body;return h});
-ok('headings (#) in bold, numbered list with bold lead-ins, closing shifted and not duplicated, Nom / Fonction filled from « Signée par »',/<b>Nos avantages :<\/b>/.test(lay)&&/<table class="ltl">/.test(lay)&&/<b>Rappel<\/b>/.test(lay)&&/margin:6px 0 14px 45%/.test(lay)&&(lay.match(/salutations/g)||[]).length===1&&/Nom : Marie Test/.test(lay)&&/Fonction : Directrice/.test(lay));
+ok('headings (#) in bold, numbered list with bold lead-ins, closing shifted and not duplicated, Nom / Fonction filled from « Signée par »',/<b>Nos avantages :<\/b>/.test(lay)&&/<table class="ltl">/.test(lay)&&/<b>Rappel<\/b>/.test(lay)&&/margin:6px 0 14px;text-align:left;text-indent:45%/.test(lay)&&(lay.match(/salutations/g)||[]).length===1&&/Nom : Marie Test/.test(lay)&&/Fonction : Directrice/.test(lay));
 // edit the text by hand
 await p.evaluate(()=>App.actions.lt_text({id:App.db.letters[0].id}));await p.waitForTimeout(500);
 await p.fill('#lt_body','Premier paragraphe modifié.\n\nSecond paragraphe.');await p.evaluate(()=>{[...document.querySelectorAll('dialog button')].find(b=>/Enregistrer/.test(b.textContent)).click()});await p.waitForTimeout(500);
@@ -137,5 +137,11 @@ ok('personal layout: the sender\'s block (name, post, phone), « À Monsieur le 
 ok('paragraphs are real paragraphs (no literal \\n in the text)',!/\\n/.test(dm2.t.body)&&dm2.t.body.split('\n\n').length>=5,JSON.stringify(dm2.t.body.slice(0,80)));
 await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.notice=0;c.f.reason='raisons personnelles';});
 ok('no notice: takes effect immediately; the reason is written when given',await p.evaluate(()=>{const b=App.letterText(App.db.letters[App.db.letters.length-1]).body;return /prend effet à compter de ce jour/.test(b)&&/motivée par : raisons personnelles\./.test(b)&&!/préavis/.test(b)}));
+// limits of the letter: inside a left / right limit (1.25 cm), every paragraph starts under the recipient's name
+const lim=await p.evaluate(()=>{const mk=(type,f,extra)=>Object.assign({id:'x',type,clientId:'',party:{name:'Test Dest',address:'Adresse'},date:'2026-11-14',currency:'USD',rep:'A B, Chef',f,no:'LET-2026-0099',ts:1},extra);
+ const a=App.letterDoc(mk('mise',{ref:'F1',amount:100,days:5}),'l','s'),b=App.letterDoc(mk('demission',{appel:'Monsieur le Directeur',job:'X',notice:30}),'l','s'),c=App.letterDoc(mk('mission',{job:'Expert',about:'O',place:'P',days:10,tasks:'a'}),'l','s');
+ return{a,b,c,ind:(a.match(/text-indent:45%/g)||[]).length,paras:(App.letterText(mk('mise',{ref:'F1',amount:100,days:5})).body.split(/\n{2,}/).length)}});
+ok('the letter, the resignation letter and the mission order keep inside the left / right limit',/padding:0 1\.25cm/.test(lim.a)&&/padding:0 1\.25cm/.test(lim.b)&&/padding:0 1\.25cm/.test(lim.c));
+ok('every paragraph of the letter starts under the recipient\'s name (same 45 % as the recipient block); the greeting too',lim.ind>=lim.paras-1&&/margin:18px 0 0 45%/.test(lim.a)&&/margin:14px 0 6px 45%/.test(lim.a));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
