@@ -65,5 +65,12 @@ ok('recipient line « À l\'Honorable Francis ILUNGA », address, subject, N/Ré
 ok('text: 17 kits, Kole, amount, the three points, closing formula, copy line',/17 kits Starlink/.test(h.text.body)&&/territoire de Kole/.test(h.text.body)&&/1\s190/.test(h.text.body)&&/^1\. /m.test(h.text.body)&&/^3\. /m.test(h.text.body)&&/très haute considération/.test(h.text.body)&&/Copie pour information : Archives/.test(h.html));
 ok('same letterhead as the contracts and invoices (same document header)',h.html.includes(h.head)&&h.ct.includes(h.head));
 ok('the signer is remembered for the next letter',await p.evaluate(()=>{App.letterForm(null);return document.getElementById('lt_rep').value==='Test Gérant, Gérant'}));
+// « Autorités » category: the three official-letter models, with their own filter and counter
+await p.evaluate(()=>{App.go('letters')});await p.waitForTimeout(400);
+ok('authority models are in the « Autorités » category, the others are not',await p.evaluate(()=>['autorite','arrieres','demande'].every(k=>App.letterTypes[k].cat==='auth')&&['travail','convocation','avertissement','libre'].every(k=>App.letterTypes[k].cat==='person')&&App.letterTypes.mise.cat==='client'));
+ok('the list has an « Autorités » filter and an « autorités » counter',/Autorités/.test(await p.innerText('.chips'))&&/autorités/.test(await p.innerText('.cstats')));
+await p.evaluate(()=>{App.actions.lt_f({f:'auth'})});await p.waitForTimeout(300);
+ok('the Autorités filter shows only the letter to the Honorable (1 of 4)',await p.evaluate(()=>document.querySelectorAll('#view .list .item').length===1)&&/Francis ILUNGA/.test(await p.innerText('#view .list')));
+await p.evaluate(()=>{App.actions.lt_f({f:'all'})});
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
