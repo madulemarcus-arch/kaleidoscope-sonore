@@ -95,7 +95,7 @@
   const T = c => TYPES[c.type] || TYPES.libre;
   const nextNo = date => { const y = (date || App.today()).slice(0, 4); let m = 0; list().forEach(c => { const x = /^LET-(\d{4})-(\d+)$/.exec(c.no || ''); if (x && x[1] === y) m = Math.max(m, +x[2]); }); return `LET-${y}-${String(m + 1).padStart(4, '0')}`; };
   // recipient of a letter: the client's file, or the details typed in
-  const whoOf = c => { const cl = c.clientId && App.client(c.clientId); return cl ? { name: App.cname(cl), phone: cl.phone || '', address: cl.address || cl.installAddr || '' } : { name: (c.party || {}).name || '—', phone: (c.party || {}).phone || '', address: (c.party || {}).address || '' }; };
+  const whoOf = c => { const cl = c.clientId && App.client(c.clientId), tc = c.techId && App.tech && App.tech(c.techId); if (tc) return { name: tc.name, phone: tc.phone || '', address: tc.zone || (c.party || {}).address || '' }; return cl ? { name: App.cname(cl), phone: cl.phone || '', address: cl.address || cl.installAddr || '' } : { name: (c.party || {}).name || '—', phone: (c.party || {}).phone || '', address: (c.party || {}).address || '' }; };
   // « Signée par » = « Nom, Fonction »
   const repOf = rep => { const r = String(rep || '').split(/\s*,\s*/).filter(Boolean); return { name: r.length > 1 ? r.slice(0, -1).join(', ') : r[0] || '', job: r.length > 1 ? r[r.length - 1] : '' }; };
   const ctx = c => ({ ...c, who: whoOf(c), cur: c.currency || 'USD', f: c.f || {} });
@@ -123,27 +123,28 @@
   // ---------- create / edit ----------
   const fieldHtml = (t, ex) => t.f.map(([k, l, kind, def]) => { const v = ex && ex[k] !== undefined ? ex[k] : typeof def === 'function' ? def() : def, id = 'lf_' + k;
     return kind === 'num' ? F.num(id, l, v) : kind === 'date' ? F.date(id, l, v) : kind === 'area' ? F.area(id, l, v, 'rows="4"') : F.text(id, l, v); }).join('');
-  App.letterForm = (c, cid) => {
-    const isNew = !c, t0 = App.today();
-    c = c || { type: 'mise', clientId: cid || '', party: {}, date: t0, currency: 'USD', f: {}, rep: (list().slice().reverse().find(x => x.rep) || {}).rep || '' };
+  App.letterForm = (c, cid, tid) => {
+    const isNew = !c, t0 = App.today(), tc0 = tid && App.tech && App.tech(tid);
+    c = c || { type: tc0 ? 'mission' : 'mise', clientId: cid || '', techId: tc0 ? tc0.id : '', party: {}, date: t0, currency: 'USD', f: tc0 && tc0.role ? { job: tc0.role } : {}, rep: (list().slice().reverse().find(x => x.rep) || {}).rep || '' };
     const render = type => { const t = TYPES[type], ex = type === c.type ? { ...c.f } : {}, cl = App.client(App.v('lt_cl') || c.clientId);
       if (cl) { if (ex.plan === undefined && cl.plan) ex.plan = cl.plan; if (ex.site === undefined) ex.site = cl.installAddr || cl.address || ''; if (ex.since === undefined && cl.start) ex.since = cl.start; }
       if (ex.paid === undefined) ex.paid = t0; if (ex.first === undefined) ex.first = App.addDays(t0, 30); if (ex.on === undefined) ex.on = App.addDays(t0, type === 'suspension' || type === 'resiliation' ? 0 : 3);
-      $('lt_f').innerHTML = fieldHtml(t, ex); $('lt_clrow').style.display = t.cat === 'client' ? '' : 'none'; $('lt_party').hidden = t.cat === 'client' && !!App.client($('lt_cl').value); $('lt_curRow').style.display = t.money || t.cur ? '' : 'none'; };
+      $('lt_f').innerHTML = fieldHtml(t, ex); $('lt_clrow').style.display = t.cat === 'client' ? '' : 'none'; $('lt_techrow').style.display = t.order ? '' : 'none'; $('lt_party').hidden = (t.cat === 'client' && !!App.client($('lt_cl').value)) || (!!t.order && !!App.tech($('lt_tech').value)); $('lt_curRow').style.display = t.money || t.cur ? '' : 'none'; };
     App.modal(isNew ? 'Nouvelle lettre' : 'Modifier ' + c.no,
       `${isNew ? F.sel('lt_type', 'Modèle de lettre', Object.entries(TYPES).map(([k, t]) => [k, t.icon + ' ' + t.label]), c.type) : `<p class="mut" style="margin-top:0">${T(c).icon} ${esc(T(c).label)}</p>`}
+       <div id="lt_techrow">${F.sel('lt_tech', 'Technicien / collaborateur', [['', '— Autre (saisir ci-dessous) —'], ...App.db.technicians.filter(x => x.active !== false || x.id === c.techId).map(x => [x.id, x.name + (x.role ? ' · ' + x.role : '')])], c.techId || '')}</div>
        <div id="lt_clrow">${App.clientFinder('lt_cl')}${F.sel('lt_cl', 'Destinataire (client)', App.clientOpts('— Autre (saisir ci-dessous) —'), c.clientId)}</div>
-       <div id="lt_party" ${c.clientId ? 'hidden' : ''}>${F.text('lt_pname', 'Nom du destinataire', (c.party || {}).name || '')}<div class="row">${F.text('lt_pphone', 'Téléphone', (c.party || {}).phone || '')}${F.text('lt_paddr', 'Adresse', (c.party || {}).address || '')}</div></div>
+       <div id="lt_party" ${c.clientId || c.techId ? 'hidden' : ''}>${F.text('lt_pname', 'Nom du destinataire', (c.party || {}).name || '')}<div class="row">${F.text('lt_pphone', 'Téléphone', (c.party || {}).phone || '')}${F.text('lt_paddr', 'Adresse', (c.party || {}).address || '')}</div></div>
        <div class="row">${F.date('lt_date', 'Date de la lettre', c.date)}<div id="lt_curRow">${F.sel('lt_cur', 'Devise', CUR, c.currency)}</div></div>
        <div id="lt_f"></div>
        ${F.text('lt_rep', 'Signée par (nom et fonction, facultatif)', c.rep || '')}
        ${isNew ? '' : `<label class="chk" style="display:block;margin-top:8px"><input type="checkbox" id="lt_regen"> Régénérer le texte depuis le modèle (efface vos modifications du texte)</label>`}`,
       () => { const type = isNew ? App.v('lt_type') : c.type, t = TYPES[type], f = {};
         t.f.forEach(([k, l, kind]) => { const raw = $('lf_' + k).value; f[k] = kind === 'num' ? (raw === '' ? '' : Math.max(0, +raw || 0)) : String(raw).trim(); });
-        const cl = t.cat === 'client' ? App.v('lt_cl') : '', p = { name: App.v('lt_pname'), phone: App.v('lt_pphone'), address: App.v('lt_paddr') };
-        if (!cl && !p.name) { App.toast('Choisissez un client ou saisissez le nom du destinataire'); return false; }
+        const cl = t.cat === 'client' ? App.v('lt_cl') : '', tc = t.order ? App.tech(App.v('lt_tech')) : null, p = tc ? { name: tc.name, phone: tc.phone || '', address: tc.zone || '' } : { name: App.v('lt_pname'), phone: App.v('lt_pphone'), address: App.v('lt_paddr') };
+        if (!cl && !p.name) { App.toast(t.order ? 'Choisissez un technicien ou saisissez le nom de la personne en mission' : 'Choisissez un client ou saisissez le nom du destinataire'); return false; }
         if (t.money && !(f.amount > 0)) { App.toast('Saisissez le montant'); return false; }
-        const date = App.v('lt_date') || t0, o = { type, clientId: cl, party: cl ? {} : p, date, currency: App.v('lt_cur') || 'USD', rep: App.v('lt_rep'), f };
+        const date = App.v('lt_date') || t0, o = { type, clientId: cl, techId: tc ? tc.id : '', party: cl ? {} : p, date, currency: App.v('lt_cur') || 'USD', rep: App.v('lt_rep'), f };
         if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date) }); list().push(c); if (cl) App.log(cl, `Lettre ${c.no} : ${t.label}`); }
         else { Object.assign(c, o); if ($('lt_regen') && $('lt_regen').checked) { delete c.body; delete c.subject; } }
         App.save(); App.toast(isNew ? 'Lettre créée : ' + c.no : 'Lettre modifiée'); App.refresh(); if (isNew) setTimeout(() => App.actions.lt_open({ id: c.id }), 80); },
@@ -151,9 +152,14 @@
     render(c.type);
     if ($('lt_type')) $('lt_type').onchange = () => { $('lt_f').innerHTML = ''; render($('lt_type').value); };
     App.wireClientFinder('lt_cl', s => App.clientOpts('— Autre (saisir ci-dessous) —', null, s));
+    $('lt_tech').onchange = () => { const tc = App.tech($('lt_tech').value); $('lt_party').hidden = !!tc; if (tc && tc.role && $('lf_job')) $('lf_job').value = tc.role; };
     $('lt_cl').onchange = () => { const cl = App.client($('lt_cl').value); $('lt_party').hidden = !!cl; if (cl) { const pl = $('lf_plan'), s = $('lf_site'), sn = $('lf_since'); if (pl && cl.plan && !pl.value) pl.value = cl.plan; if (s && !s.value) s.value = cl.installAddr || cl.address || ''; if (sn && !sn.value && cl.start) sn.value = cl.start; } };
   };
   App.actions.lt_new = x => App.letterForm(null, x && x.cid);
+  App.actions.lt_mission = x => App.letterForm(null, '', x && x.tid);
+  // block shown on a technician's sheet: his mission orders
+  App.missionsBlock = t => { if (!App.canView('letters')) return ''; const l = list().filter(x => x.techId === t.id && T(x).order).sort((a, b) => b.date.localeCompare(a.date));
+    return `<h2 class="sec">Ordres de mission</h2><div class="bar"><button class="btn sm" data-act="lt_mission" data-tid="${t.id}">🧭 Nouvel ordre de mission</button></div>${l.length ? `<div class="list">${l.map(x => `<button class="item" data-act="lt_open" data-id="${x.id}"><span class="avatar">🧭</span><div class="grow"><b>${esc(x.no)}</b><small>${esc(App.letterText(x).subject)} · ${App.fdate(x.date)}</small></div></button>`).join('')}</div>` : '<div class="empty">Aucun ordre de mission pour ce technicien.</div>'}`; };
 
   // ---------- printable document ----------
   // layout of the model letter: date on the right, recipient block shifted to the right, bold subject, greeting and first paragraph shifted,
@@ -204,7 +210,7 @@
        <div class="bar noprint"><button type="button" class="btn sec" data-act="lt_print" data-id="${c.id}">🖨️ Imprimer</button><button type="button" class="btn sec" data-act="lt_pdf" data-id="${c.id}">📤 PDF</button><button type="button" class="btn sec" data-act="lt_wa" data-id="${c.id}">💬 WhatsApp</button></div>
        <div class="card" style="margin:0 0 10px"><b>${esc(t.subject || 'Lettre')}</b><div style="white-space:pre-wrap;margin-top:6px">${esc(t.body)}</div></div>
        <div class="bar"><button type="button" class="btn sec" data-act="lt_text" data-id="${c.id}">📝 Modifier le texte</button></div>
-       <div class="bar"><button type="button" class="btn sm sec" data-act="lt_edit" data-id="${c.id}">✏️ Modifier les champs</button><button type="button" class="btn sm sec" data-act="lt_dup" data-id="${c.id}">⎘ Dupliquer</button>${c.clientId ? `<button type="button" class="btn sm sec" data-act="go" data-v="client" data-id="${c.clientId}">👤 Client</button>` : ''}<button type="button" class="btn sm sec" data-act="lt_del" data-id="${c.id}">🗑 Supprimer</button></div>`);
+       <div class="bar"><button type="button" class="btn sm sec" data-act="lt_edit" data-id="${c.id}">✏️ Modifier les champs</button><button type="button" class="btn sm sec" data-act="lt_dup" data-id="${c.id}">⎘ Dupliquer</button>${c.clientId ? `<button type="button" class="btn sm sec" data-act="go" data-v="client" data-id="${c.clientId}">👤 Client</button>` : ''}${c.techId && App.tech(c.techId) ? `<button type="button" class="btn sm sec" data-act="go" data-v="technician" data-id="${c.techId}">🧰 Technicien</button>` : ''}<button type="button" class="btn sm sec" data-act="lt_del" data-id="${c.id}">🗑 Supprimer</button></div>`);
   };
   App.actions.lt_edit = x => { const c = list().find(y => y.id === x.id); if (c) { App.close(); setTimeout(() => App.letterForm(c), 30); } };
   App.actions.lt_text = x => { const c = list().find(y => y.id === x.id); if (!c) return; const t = App.letterText(c); App.close();
