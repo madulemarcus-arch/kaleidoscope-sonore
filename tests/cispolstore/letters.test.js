@@ -72,6 +72,15 @@ ok('the list has an « Autorités » filter and an « autorités » counter',/Au
 await p.evaluate(()=>{App.actions.lt_f({f:'auth'})});await p.waitForTimeout(300);
 ok('the Autorités filter shows only the letter to the Honorable (1 of 4)',await p.evaluate(()=>document.querySelectorAll('#view .list .item').length===1)&&/Francis ILUNGA/.test(await p.innerText('#view .list')));
 await p.evaluate(()=>{App.actions.lt_f({f:'all'})});
+// model « Réponse à une demande de prix » (letter to FONER): in the Autorités category, advantages as a numbered list with bold lead-ins
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','prix');await p.waitForTimeout(250);
+await p.fill('#lt_pname','FONDS NATIONAL D\'ENTRETIEN ROUTIER (FONER)');await p.fill('#lt_paddr','CGPMP — Tour D, Croisement OUA-Massamba, Ngaliema, Kinshasa');
+await p.fill('#lf_ref','n°028/FONER/CGPMP/2026');await p.fill('#lf_about','Fourniture d\'une connexion internet pour l\'Espace Grand Kasaï');await create();
+const px=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{cat:App.letterTypes[c.type].cat,t:App.letterText(c),html:App.letterDoc(c,'','')}});
+ok('FONER model: category Autorités, subject with the request number and the object',px.cat==='auth'&&/^Réponse à la demande des prix n°028\/FONER\/CGPMP\/2026 – Fourniture d/.test(px.t.subject),px.t.subject);
+ok('body: « Nos avantages » (4 numbered points) and « Notre engagement », pro-forma mentioned, standard closing',/# Nos avantages :/.test(px.t.body)&&(px.t.body.match(/^\d\. \*\*/gm)||[]).length===4&&/# Notre engagement :/.test(px.t.body)&&/ci-joint notre facture pro-forma/.test(px.t.body)&&/salutations distinguées/.test(px.t.body));
+ok('printed: attention block, bold headings and list, same layout',/À l(?:'|&#39;)attention de :/.test(px.html)&&/<b>Nos avantages :<\/b>/.test(px.html)&&/<b>Rappel d(?:'|&#39;)échéance<\/b>/.test(px.html)&&/<b>Notre engagement :<\/b>/.test(px.html));
 // model « Décharge de responsabilité – matériel installé » : presentation of the company, 3+ months unpaid, responsibility declined for the equipment
 await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
 await p.selectOption('#lt_type','decharge_mat');await p.waitForTimeout(250);
