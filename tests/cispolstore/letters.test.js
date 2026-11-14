@@ -72,5 +72,18 @@ ok('the list has an « Autorités » filter and an « autorités » counter',/Au
 await p.evaluate(()=>{App.actions.lt_f({f:'auth'})});await p.waitForTimeout(300);
 ok('the Autorités filter shows only the letter to the Honorable (1 of 4)',await p.evaluate(()=>document.querySelectorAll('#view .list .item').length===1)&&/Francis ILUNGA/.test(await p.innerText('#view .list')));
 await p.evaluate(()=>{App.actions.lt_f({f:'all'})});
+// model « Décharge de responsabilité – matériel installé » : presentation of the company, 3+ months unpaid, responsibility declined for the equipment
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','decharge_mat');await p.waitForTimeout(250);
+ok('the model asks for kits, place, months (3 by default), optional amount and delay',await p.isVisible('#lf_kits')&&await p.inputValue('#lf_months')==='3'&&await p.isVisible('#lf_amount')&&await p.isVisible('#lt_cur')&&await p.inputValue('#lf_days')==='8');
+await p.fill('#lt_pname','Francis ILUNGA');await p.fill('#lt_paddr','Territoire de Kole, Province du Sankuru');await p.fill('#lf_kits','17');await p.fill('#lf_place','dans le territoire de Kole');await create();
+const dm=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{cat:App.letterTypes[c.type].cat,t:App.letterText(c),html:App.letterDoc(c,'','')}});
+ok('created without an amount (optional), in the Autorités category',dm.cat==='auth'&&!/montant total/.test(dm.t.body));
+ok('the letter presents the company (« est une société spécialisée dans la vente et l\'installation de kits Starlink »)',/est une société spécialisée dans la vente et l'installation de kits Starlink/.test(dm.t.body));
+ok('17 kits installed in Kole, more than 3 months later the subscriptions are still unpaid',/17 kits Starlink que nos équipes ont installés dans le territoire de Kole/.test(dm.t.body)&&/plus de 3 mois après cette installation.*ne sont toujours pas payés/.test(dm.t.body));
+ok('declines all responsibility for the equipment and for the service interruption; payment is the subscriber\'s',/décline toute responsabilité relative au matériel installé/.test(dm.t.body)&&/décline toute responsabilité quant à la suspension/.test(dm.t.body)&&/relève exclusivement du souscripteur/.test(dm.t.body)&&/très haute considération/.test(dm.t.body));
+ok('printed with the Honorable line and the numbered points',/À l(?:'|&#39;)Honorable Francis ILUNGA/.test(dm.html)&&/class="ltl"/.test(dm.html)&&/Décharge de responsabilité de/.test(dm.html));
+await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];c.f.amount=1190;});
+ok('an amount, when given, is written in the letter',await p.evaluate(()=>/pour un montant total de 1\s190/.test(App.letterText(App.db.letters[App.db.letters.length-1]).body)));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
