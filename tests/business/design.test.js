@@ -5,7 +5,8 @@ const { check, launch, setup } = require('./helper');
     App.db.invoices.push({ id: 'i1', number: 'FAC-2026-0001', clientId: 'c0', date: App.today(), currency: 'USD', rate: 2800, lines: [{ desc: 'Riz', qty: 1, price: 50, cost: 20 }], sub: 50, total: 50, disc: {}, fields: {} }, { id: 'i0', number: 'FAC-2026-0000', clientId: 'c1', date: App.addDays(App.today(), -40), currency: 'USD', rate: 2800, lines: [{ desc: 'Riz', qty: 1, price: 30, cost: 10 }], sub: 30, total: 30, disc: {}, fields: {} }); App.save(); App.go('home'); App.render(); });
   // identity
   check('police Inter chargée', await p.evaluate(async () => { await document.fonts.ready; return document.fonts.check('16px Inter') && getComputedStyle(document.body).fontFamily.includes('Inter'); }));
-  check('palette CISPOLstore : marine, orange, jaune', await p.evaluate(() => { const c = getComputedStyle(document.documentElement); return c.getPropertyValue('--navy').trim() === '#12365d' && c.getPropertyValue('--pri').trim() === '#d5522f' && c.getPropertyValue('--yel').trim() === '#e5b044'; }));
+  check('jaune vif : FAB et filtre sélectionné', await p.evaluate(() => { const fab = getComputedStyle(document.querySelector('#fab')).backgroundImage, el = document.createElement('div'); el.className = 'chips'; el.innerHTML = '<button class="on">x</button>'; document.body.appendChild(el); const on = getComputedStyle(el.firstChild).backgroundImage; el.remove(); return fab.includes('255, 198, 26') && on.includes('255, 198, 26'); }));
+  check('palette CISPOLstore : marine, orange, jaune', await p.evaluate(() => { const c = getComputedStyle(document.documentElement); return c.getPropertyValue('--navy').trim() === '#0f3a72' && c.getPropertyValue('--pri').trim() === '#ee5a2c' && c.getPropertyValue('--yel').trim() === '#ffc61a'; }));
   check('marque Business dans l\'en-tête (logo par défaut)', (await p.getAttribute('#top img.logo', 'src')) === 'icons/logo.svg');
   check('salutation avec le nom de l\'entreprise', (await p.textContent('.hello')).includes('Ets Mavuela'));
   check('date en français avec majuscule initiale', /^[A-Z][a-zéû]+ \d{1,2} [a-zéû]+$/.test((await p.textContent('.hero-date')).trim()));
@@ -30,7 +31,7 @@ const { check, launch, setup } = require('./helper');
   await p.evaluate(() => { App.db.settings.logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; App.render(); }); check('le logo de l\'entreprise remplace la marque', (await p.getAttribute('#top img.logo', 'src')).startsWith('data:image/png'));
   // dark theme
   const bg1 = await p.evaluate(() => getComputedStyle(document.body).backgroundColor); await p.evaluate(() => { App.db.settings.theme = 'dark'; App.ui.applyTheme(); });
-  check('thème sombre : fond marine', (await p.evaluate(() => getComputedStyle(document.body).backgroundColor)) !== bg1 && (await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim())) === '#0a1a2c');
+  check('thème sombre : fond marine', (await p.evaluate(() => getComputedStyle(document.body).backgroundColor)) !== bg1 && (await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim())) === '#0b2038');
   await p.evaluate(() => { App.db.settings.theme = 'light'; App.ui.applyTheme(); });
   // count-up and celebration
   check('confettis sur l\'objectif atteint', await p.evaluate(() => { App.db.settings.goal = 40; App.db.settings.goalHit = ''; App.save(); App.render(); return true; }) && (await p.waitForSelector('#confetti', { timeout: 3000 }).then(() => true, () => false)));

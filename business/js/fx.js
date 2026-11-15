@@ -10,7 +10,7 @@
     if (reduce() || document.getElementById('confetti')) return;
     const cv = document.createElement('canvas'); cv.id = 'confetti'; cv.setAttribute('aria-hidden', 'true'); cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:80';
     const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; document.body.appendChild(cv); const g = cv.getContext('2d'); g.scale(dpr, dpr);
-    const C = ['#d5522f', '#e5b044', '#1f9d55', '#2f7de1', '#7c5cff', '#ffffff'], ps = Array.from({ length: 110 }, () => ({ x: W / 2 + (Math.random() - .5) * W * .5, y: -10 - Math.random() * 60, vx: (Math.random() - .5) * 9, vy: 2 + Math.random() * 5, s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: C[Math.floor(Math.random() * C.length)] })), t0 = performance.now();
+    const C = ['#ee5a2c', '#ffc61a', '#1f9d55', '#2f7de1', '#7c5cff', '#ffffff'], ps = Array.from({ length: 110 }, () => ({ x: W / 2 + (Math.random() - .5) * W * .5, y: -10 - Math.random() * 60, vx: (Math.random() - .5) * 9, vy: 2 + Math.random() * 5, s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: C[Math.floor(Math.random() * C.length)] })), t0 = performance.now();
     const step = now => { const k = (now - t0) / 1700; g.clearRect(0, 0, W, H); ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .12; p.vx *= .99; p.r += p.vr; g.save(); g.globalAlpha = Math.max(0, 1 - Math.max(0, k - .6) / .4); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * .6); g.restore(); }); if (k < 1) requestAnimationFrame(step); else cv.remove(); };
     requestAnimationFrame(step);
   };
