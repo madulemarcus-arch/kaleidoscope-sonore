@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CISPOLstore Business — L'application de gestion universelle hors-ligne</title>
+<meta name="description" content="Gérez votre commerce, atelier, restaurant, abonnements ou services directement sur votre téléphone ou PC. 100% Hors-Ligne, sans abonnement obligatoire.">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root {
+    --primary: #12365d;
+    --primary-light: #1f508a;
+    --accent: #22c55e;
+    --dark: #0f172a;
+    --light: #f8fafc;
+    --gray: #64748b;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary) 0%, #0a2540 100%);
+    color: white;
+    padding: 60px 20px 80px;
+    text-align: center;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+  h1 { font-size: clamp(28px, 5vw, 46px); font-weight: 800; line-height: 1.2; margin-bottom: 16px; }
+  p.lead { font-size: clamp(16px, 3vw, 20px); max-width: 650px; margin: 0 auto 30px; opacity: 0.9; }
+  .actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: 14px 26px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: #042f15; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(34,197,94,0.3); }
+  .btn-outline { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.25); }
+  .btn-outline:hover { background: rgba(255,255,255,0.2); }
+  
+  .container { max-width: 1050px; margin: -40px auto 60px; padding: 0 20px; }
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 50px;
+  }
+  .card {
+    background: var(--card);
+    padding: 26px;
+    border-radius: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid #e2e8f0;
+  }
+  .card .icon { font-size: 32px; margin-bottom: 12px; }
+  .card h3 { font-size: 19px; margin-bottom: 8px; color: var(--primary); }
+  .card p { color: var(--gray); font-size: 14px; }
+
+  .sectors {
+    background: white;
+    border-radius: 20px;
+    padding: 36px 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    margin-bottom: 50px;
+  }
+  .sectors h2 { text-align: center; margin-bottom: 24px; font-size: 26px; }
+  .grid-sectors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .sector-item {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+  }
+
+  .cta {
+    background: var(--primary);
+    color: white;
+    text-align: center;
+    padding: 40px 24px;
+    border-radius: 20px;
+  }
+  .cta h2 { font-size: 26px; margin-bottom: 12px; }
+  .cta p { margin-bottom: 24px; opacity: 0.9; }
+
+  footer { text-align: center; padding: 30px; color: var(--gray); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">⚡ 100% Hors-Ligne • Compatible Téléphone & PC</div>
+  <h1>L'application de gestion pour tous ceux qui gèrent une activité</h1>
+  <p class="lead">Ventes, stocks, caisse, factures, abonnements et clients. Tout votre business dans votre poche, sans avoir besoin d'internet.</p>
+  <div class="actions">
+    <a href="index.html" class="btn btn-primary">🚀 Lancer l'application</a>
+    <a href="#metiers" class="btn btn-outline">📋 Voir les métiers compatibles</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="features">
+    <div class="card">
+      <div class="icon">📶</div>
+      <h3>Zéro Internet Requis</h3>
+      <p>Fonctionne même sans connexion ou pendant les coupures de réseau. Vos données restent en sécurité sur votre appareil.</p>
+    </div>
+    <div class="card">
+      <div class="icon">💵</div>
+      <h3>Multi-Devises Automatique</h3>
+      <p>Gérez en USD et en Francs Congolais (CDF) avec calcul automatique selon le taux du jour. Fini les erreurs de caisse !</p>
+    </div>
+    <div class="card">
+      <div class="icon">📦</div>
+      <h3>Stock & Alertes Rupture</h3>
+      <p>Suivez vos entrées, vos sorties et sachez toujours exactement ce qu'il vous reste à vendre.</p>
+    </div>
+    <div class="card">
+      <div class="icon">🧾</div>
+      <h3>Factures & Reçus WhatsApp</h3>
+      <p>Créez des factures et devis professionnels avec votre logo et envoyez-les en PDF à vos clients en 2 clics.</p>
+    </div>
+    <div class="card">
+      <div class="icon">🔒</div>
+      <h3>Caisse & Clôture Sécurisée</h3>
+      <p>Comptage des billets en fin de journée, contrôle des écarts et historique de toutes les opérations.</p>
+    </div>
+    <div class="card">
+      <div class="icon">📱</div>
+      <h3>Application Installable</h3>
+      <p>Installez-la sur votre téléphone comme WhatsApp ou Facebook via la fonction "Ajouter à l'écran d'accueil".</p>
+    </div>
+  </div>
+
+  <div class="sectors" id="metiers">
+    <h2>🎯 Une application adaptée à chaque métier</h2>
+    <div class="grid-sectors">
+      <div class="sector-item">🛒 <span>Boutiques & Magasins</span></div>
+      <div class="sector-item">🍽️ <span>Restaurants, Bars & Terrasses</span></div>
+      <div class="sector-item">📡 <span>Abonnements Starlink & WiFi</span></div>
+      <div class="sector-item">🔧 <span>Garages & Ateliers de réparation</span></div>
+      <div class="sector-item">🚗 <span>Agences de location & Matériel</span></div>
+      <div class="sector-item">🚚 <span>Services de livraison & Colis</span></div>
+      <div class="sector-item">🏫 <span>Écoles & Centres de formation</span></div>
+      <div class="sector-item">💼 <span>Prestataires de services & Devis</span></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <h2>Prêt à simplifier la gestion de votre activité ?</h2>
+    <p>Testez l'application immédiatement sans engagement.</p>
+    <a href="index.html" class="btn btn-primary">👉 Ouvrir l'application maintenant</a>
+  </div>
+</div>
+
+<footer>
+  <p>© 2026 CISPOLstore Business. Développé pour les entrepreneurs et commerçants indépendants.</p>
+</footer>
+
+</body>
+</html>
