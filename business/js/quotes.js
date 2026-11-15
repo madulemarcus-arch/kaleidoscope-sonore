@@ -33,7 +33,7 @@
   };
   A.drawQuotes = (tab, el) => {
     const l = db().quotes.slice().sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number));
-    tab.innerHTML = '<div class="tools"><button class="btn primary" id="nq">+ Devis</button></div>' + (l.length ? '<div class="list">' + l.map(q => { const [t, c] = stat(q); return '<div class="swr" style="--n:0"><div class="item" role="button" tabindex="0" data-id="' + q.id + '"><span class="av">📝</span><span class="tx"><b>' + esc(A.cname(q)) + '</b><small>' + esc(q.number) + ' · ' + App.fmtDate(q.date) + '</small></span><span class="end"><b>' + M.fmt(q.total, q.currency) + '</b><span class="pill ' + c + '">' + t + '</span></span></div></div>'; }).join('') + '</div>' : '<div class="empty"><div class="big">📝</div><h2>Aucun devis</h2></div>');
+    tab.innerHTML = '<div class="tools"><button class="btn primary" id="nq">+ Devis</button></div>' + (l.length ? '<div class="list">' + l.map(q => { const [t, c] = stat(q); return '<div class="swr" style="--n:0"><div class="item" role="button" tabindex="0" data-id="' + q.id + '"><span class="av">📝</span><span class="tx"><b>' + esc(A.cname(q)) + '</b><small>' + esc(q.number) + ' · ' + App.fmtDate(q.date) + '</small></span><span class="end"><b>' + M.fmt(q.total, q.currency) + '</b><span class="pill ' + c + '">' + t + '</span></span></div></div>'; }).join('') + '</div>' : App.ui.empty('📝', 'Aucun devis', 'Faites un devis, puis transformez-le en facture en un geste.', { label: '+ Devis', to: '#nq' }));
     tab.querySelector('#nq').onclick = () => Q.form(); tab.querySelectorAll('.item[data-id]').forEach(i => i.onclick = () => Q.profile(i.dataset.id));
   };
 })();
