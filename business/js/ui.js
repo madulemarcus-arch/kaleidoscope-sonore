@@ -63,6 +63,15 @@
     if (dd) { dd.closest('.datef').querySelector('input').value = App.addDays(App.today(), +dd.dataset.dd); }
   });
 
+  // Empty-state card with one clear action. cta = {label, to}: `to` is a selector of a button already on the screen
+  // (e.g. '#np'), or 'quick:<screen>' to run the matching quick-create entry (the "+" menu).
+  ui.empty = (icon, title, text, cta) => '<div class="empty"><div class="big">' + esc(icon) + '</div><h2>' + esc(title) + '</h2>' + (text ? '<p class="muted">' + esc(text) + '</p>' : '') + (cta ? '<button type="button" class="btn primary" data-cta="' + esc(cta.to) + '">' + esc(cta.label) + '</button>' : '') + '</div>';
+  document.addEventListener('click', e => {
+    const c = e.target.closest('[data-cta]'); if (!c) return; const to = c.dataset.cta;
+    if (to.startsWith('quick:')) { const q = App.quick.find(x => x.to === to.slice(6)); if (q) q.run ? q.run() : App.go(q.to, { add: 1 }); return; }
+    const b = App.$('#view ' + to); if (b && b !== c) b.click();
+  });
+
   // Reads an image file, shrinks it and returns a PNG/JPEG data URL (logo, stamp).
   ui.pickImage = (file, max) => new Promise((res, rej) => {
     if (!file) return rej(); const r = new FileReader();
