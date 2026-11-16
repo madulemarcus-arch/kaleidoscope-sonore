@@ -26,9 +26,12 @@
   };
 
   // end-of-service thank-you: the client's latest finished service (installation done, delivery done, invoice fully paid) not yet followed by a thank-you
-  App.thanksText = c => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name };
-    const links = String(co.social || '').split('\n').map(x => x.trim()).filter(Boolean);
-    return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.join('\n') : ''); };
+  // social networks: one field per network (Paramètres), filled in by hand; empty ones are left out
+  const NETS = [['facebook', 'Facebook', 'https://facebook.com/votrepage'], ['instagram', 'Instagram', 'https://instagram.com/votrecompte'], ['tiktok', 'TikTok', 'https://tiktok.com/@votrecompte'], ['youtube', 'YouTube', 'https://youtube.com/@votrechaine'], ['whatsapp', 'WhatsApp (lien ou numéro)', '+243 8xx xxx xxx'], ['linkedin', 'LinkedIn', 'https://linkedin.com/company/votrepage'], ['x', 'X (Twitter)', 'https://x.com/votrecompte'], ['site', 'Site web', 'https://votresite.com']];
+  const netUrl = (k, v) => { v = String(v || '').trim(); if (!v) return ''; if (/^https?:\/\//i.test(v)) return v; if (k === 'whatsapp' && /^[+\d][\d\s().-]{6,}$/.test(v)) return 'https://wa.me/' + v.replace(/\D/g, ''); return 'https://' + v.replace(/^\/+/, ''); };
+  App.socialLinks = () => { const s = App.db.settings.company.socials || {}; return NETS.map(([k, label]) => [label.replace(/ \(.*\)$/, ''), netUrl(k, s[k])]).filter(x => x[1]); };
+  App.thanksText = c => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name }, links = App.socialLinks();
+    return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.map(([n, u]) => `${n} : ${u}`).join('\n') : ''); };
   const THX_DAYS = 14;
   App.thanksDue = () => {
     const db = App.db, ev = {}, add = (cid, date, why) => { if (cid && date && (!ev[cid] || date > ev[cid].date)) ev[cid] = { date, why }; };
@@ -42,12 +45,12 @@
   App.actions.thx_skip = d => { const c = App.client(d.id); if (!c) return; c.thanksAt = App.today(); App.log(c.id, 'Pas de message de fin de service'); App.save(); App.refresh(); App.toast('Marqué : pas de message'); };
   // the same thank-you as a printable / PDF document in the receipt model: letterhead, client box, text, social links, stamp
   const EMO = '[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\uFE0F]+', noEmoji = t => String(t).replace(new RegExp('(\\p{L})\\s*' + EMO + '\\s*(?=\\p{Lu})', 'gu'), '$1,\n\n').replace(new RegExp('\\s*' + EMO, 'gu'), '');
-  App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = String(co.social || '').split('\n').map(x => x.trim()).filter(Boolean);
+  App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks();
     const body = noEmoji(tpl('merci').replace(/\{(\w+)\}/g, (m, k) => ({ prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name })[k] ?? m));
     return `<div class="paper">${K.head(co, logo)}
       ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', 'Fin de service']], 'CLIENT', [['Nom', `<b>${e(App.cname(c))}</b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
       <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line">${e(body)}</div>
-      ${links.length ? `<div class="rc" style="margin-top:6px"><b>Faites un tour sur nos réseaux :</b><br>${links.map(l => e(l)).join('<br>')}</div>` : ''}
+      ${links.length ? `<div class="rc" style="margin-top:6px"><b>Faites un tour sur nos réseaux :</b><br>${links.map(([n, u]) => `${e(n)} : ${e(u)}`).join('<br>')}</div>` : ''}
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
   const thxName = c => App.docName(App.cname(c), 'Remerciement');
   App.actions.thx_print = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); App.docKit.print(thxName(c), App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
@@ -144,16 +147,18 @@
   App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
       <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
-      ${F.area('thx_social', 'Liens de vos réseaux sociaux (un par ligne, ajoutés à la fin du remerciement)', (App.db.settings.company.social || ''), 'rows="3" placeholder="https://facebook.com/votrepage&#10;https://instagram.com/votrecompte"')}
+      <h3 style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
+      ${NETS.map(([k, label, ph]) => F.text('soc_' + k, label, (App.db.settings.company.socials || {})[k] || '', `placeholder="${ph}" autocapitalize="off" autocomplete="off" inputmode="url"`)).join('')}
       <h3 style="margin:12px 0 4px;font-size:15px">Aperçu du remerciement</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
   // live preview of the thank-you with a real client's name (first client with a phone, else a sample)
   const prev = () => { const el = $('thx_prev'); if (!el) return; const real = App.db.clients.find(c => c.phone) || App.db.clients[0], c = real || { first: 'Awa', last: 'Diallo', name: 'Awa Diallo' };
     el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small><br>${esc(App.thanksText(c))}`; };
-  document.addEventListener('input', e => { if ((e.target.id || '') === 'thx_social' || (e.target.id || '') === 'm_merci') { if (e.target.id === 'thx_social') App.db.settings.company.social = e.target.value; else { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), merci: e.target.value }; } prev(); } });
+  const socSet = (e, save) => { const k = String(e.target.id || '').slice(4), C = App.db.settings.company; C.socials = { ...(C.socials || {}), [k]: e.target.value.trim() }; if (save) { App.save(); App.toast('Lien enregistré'); } prev(); };
+  document.addEventListener('input', e => { const id = e.target.id || ''; if (id.startsWith('soc_')) socSet(e, false); else if (id === 'm_merci') { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), merci: e.target.value }; prev(); } });
   new MutationObserver(() => { if ($('thx_prev') && !$('thx_prev').dataset.ok) { $('thx_prev').dataset.ok = '1'; prev(); } }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('change', e => {
-    if (e.target.id === 'thx_social') { App.db.settings.company.social = e.target.value.trim(); App.save(); App.toast('Liens enregistrés'); prev(); return; }
+    if (String(e.target.id || '').startsWith('soc_')) return socSet(e, true);
     const k = (e.target.id || '').startsWith('m_') && e.target.id.slice(2); if (!k || !(k in DEFAULT)) return;
     const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [k]: e.target.value.trim() || DEFAULT[k] }; App.save(); App.toast('Message enregistré');
   });
