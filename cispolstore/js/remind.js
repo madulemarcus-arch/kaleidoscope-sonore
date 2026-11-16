@@ -69,18 +69,18 @@
   App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks(), nm = App.cname(c);
     const NAVY = '#12365d', ORG = '#d5522f', GOLD = '#e5b044', big = `<b><i style="font-size:17pt;color:${NAVY};letter-spacing:.3px">${e(nm)}</i></b>`;
     const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: nm, nom: nm, entreprise: co.name })[k] ?? m));
-    const corner = pos => `<span style="position:absolute;font-size:22px;color:${GOLD};${pos}">❦</span>`;
-    return `<div class="paper" style="position:relative;background:#fffdf8;border:2px solid ${GOLD};outline:6px solid #fffdf8;outline-offset:-12px;padding:34px 40px;box-sizing:border-box">
-      ${corner('top:6px;left:10px')}${corner('top:6px;right:10px')}${corner('bottom:6px;left:10px')}${corner('bottom:6px;right:10px')}
+    const corner = pos => `<span style="position:absolute;font-size:16px;line-height:1;color:${GOLD};${pos}">❦</span>`;
+    return `<div class="paper" data-fit="1" style="position:relative;background:#fffdf8;box-shadow:0 0 0 12px #fffdf8;outline:2px solid ${GOLD};outline-offset:12px">
+      ${corner('top:-9px;left:-9px')}${corner('top:-9px;right:-9px')}${corner('bottom:-9px;left:-9px')}${corner('bottom:-9px;right:-9px')}
       <img class="wm" src="${e(logo || 'logo.png')}" alt="" style="position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);width:62%;max-width:480px;opacity:.07">
-      ${K.head(co, logo, true)}
+      ${K.head(co, logo)}
       ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b><i>${e(nm)}</i></b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
-      <div style="text-align:center;margin:6px 0 4px;color:${GOLD};letter-spacing:10px;font-size:15px">✦ ✦ ✦</div>
-      <div style="text-align:center;font:italic 700 46px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
-      <div style="margin:8px auto 14px;width:62%;height:2px;background:linear-gradient(90deg,transparent,${GOLD},${ORG},${GOLD},transparent)"></div>
-      <div class="rc" style="text-align:justify;line-height:1.85;white-space:pre-line;font-size:13pt;border-left:none;background:transparent;padding:6px 8px;position:relative">${e(body).split(e(nm)).join(big)}</div>
-      <div style="text-align:center;color:${GOLD};font-size:20px;margin:4px 0 10px">❧ ❦ ☙</div>
-      ${links.length ? `<div class="rc" style="margin-top:6px;position:relative"><b>Faites un tour sur nos réseaux :</b><br>${links.map(([n, u, k]) => `<div style="margin:4px 0">${netLogo(k, 16)}${e(n)} : ${e(u)}</div>`).join('')}</div>` : ''}
+      <div style="text-align:center;margin:0;color:${GOLD};letter-spacing:10px;font-size:12px;line-height:1.4">✦ ✦ ✦</div>
+      <div style="text-align:center;font:italic 700 38px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
+      <div style="margin:4px auto 8px;width:62%;height:2px;background:linear-gradient(90deg,transparent,${GOLD},${ORG},${GOLD},transparent)"></div>
+      <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line;font-size:12pt;border-left:none;background:transparent;padding:2px 8px;margin:0 0 6px;position:relative">${e(body).split(e(nm)).join(big)}</div>
+      <div style="text-align:center;color:${GOLD};font-size:15px;line-height:1.2;margin:0 0 6px">❧ ❦ ☙</div>
+      ${links.length ? `<div class="rc" style="margin:0 0 8px;padding:8px 12px;font-size:10.5pt;line-height:1.4;position:relative"><b>Faites un tour sur nos réseaux :</b><div style="display:flex;flex-wrap:wrap;margin-top:4px">${links.map(([n, u, k]) => `<div style="width:50%;box-sizing:border-box;padding:2px 6px 2px 0;word-break:break-all">${netLogo(k, 15)}<b>${e(n)}</b> : ${e(u.replace(/^https?:\/\//, ''))}</div>`).join('')}</div></div>` : ''}
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
   const thxName = c => App.docName(App.cname(c), 'Remerciement');
   App.actions.thx_print = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); App.docKit.print(thxName(c), App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
@@ -89,7 +89,7 @@
   // preview of the message with the client's name, then send
   App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 ${esc(App.thanksKindName(c))}</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
       <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${App.thanksHtml(c)}</div></div>
-      <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
+      ${App.socialStatus()}<div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
       <div class="bar"><button type="button" class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 Remerciement en PDF (avec entête et sceau)</button><button type="button" class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
   App.actions.thx_send = d => { const c = App.client(d.id); if (!c) return; if (!c.phone) return App.toast('Pas de numéro de téléphone'); App.thanksPreview(c);
     $('tsend').onclick = () => { window.open(App.waUrl(c.phone, App.thanksText(c)), '_blank', 'noopener'); App.thanksMark(c); App.save(); App.close(); App.refresh(); App.toast('Message de remerciement ouvert dans WhatsApp'); }; };
@@ -158,6 +158,10 @@
     };
   };
   App.actions.rel_f = d => { rst.f = d.f; App.refresh(); };
+  // jump straight to the social-network fields of the settings (Paramètres › Messages de rappel WhatsApp › Vos réseaux sociaux)
+  App.actions.soc_go = () => { App.foldOpen('msgs'); App.close(); App.go('settings'); setTimeout(() => { const el = $('soc_facebook'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 400); };
+  // short status line + button, shown on the client's 💛 tab and in the preview
+  App.socialStatus = () => { const l = App.socialLinks(); return l.length ? `<p class="mut" style="margin:8px 0 0;font-size:13px">🔗 ${l.length} réseau(x) ajouté(s) au message : ${l.map(x => esc(x[0])).join(', ')} · <a href="#" data-act="soc_go">Modifier</a></p>` : `<div class="warn" style="margin:8px 0 0;font-size:13px">Aucun réseau social renseigné : ils n'apparaîtront ni dans le message ni sur le PDF.</div><div class="bar" style="margin-top:6px"><button type="button" class="btn sm" data-act="soc_go">➕ Ajouter mes réseaux sociaux</button></div>`; };
   App.actions.thx_go = () => { rst.f = 'thx'; App.go('relances'); };
   // choose any client (with a phone) to send the end-of-service message to, whenever the user wants
   App.actions.thx_pick = () => {
@@ -184,7 +188,7 @@
   App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
       <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
-      <h3 style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
+      <h3 id="soc_anchor" style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
       ${NETS.map(([k, label, ph]) => F.text('soc_' + k, netLogo(k, 18) + label, (App.db.settings.company.socials || {})[k] || '', `placeholder="${ph}" autocapitalize="off" autocomplete="off" inputmode="url"`)).join('')}
       <h3 style="margin:12px 0 4px;font-size:15px">Aperçu des remerciements</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);

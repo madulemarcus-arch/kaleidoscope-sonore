@@ -91,8 +91,23 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   const art = await p.evaluate(() => { const c = App.client('k_gere'); c.last = 'Diallo Mukendi'; c.name = 'Awa Diallo Mukendi'; const h = App.thanksDoc(c, '', ''); return { h, txt: App.thanksHtml(c) }; });
   ok('document: full name in bold italic in the greeting and in the client box', /<b><i[^>]*>Awa Diallo Mukendi<\/i><\/b>/.test(art.h) && /Nom :?[\s\S]{0,80}<b><i>Awa Diallo Mukendi<\/i><\/b>|<b><i>Awa Diallo Mukendi<\/i><\/b>/.test(art.h) && (art.h.match(/Awa Diallo Mukendi/g) || []).length >= 2);
   ok('document: « Merci ! » title and decorative frame', /Merci&nbsp;!/.test(art.h) && /❦/.test(art.h) && /e5b044/i.test(art.h));
-  ok('document: no company-name / tagline block in the header (logo only), RDC kept with the address', await p.evaluate(() => { const c = App.client('k_gere'); App.db.settings.company.address = '14 Av. Bandundu Kinshasa/gombe, RDC'; const h = App.thanksDoc(c, '', ''); return !/class=\"nm\"/.test(h) && !/class=\"sub\"/.test(h) && /Kinshasa\/gombe,&nbsp;RDC/.test(h) && /<img/.test(h.split('REMERCIEMENT')[0]); }));
+  ok('document: the same header as the invoices and letters (logo, company name, tagline), RDC kept with the address', await p.evaluate(() => { const c = App.client('k_gere'); App.db.settings.company.address = '14 Av. Bandundu Kinshasa/gombe, RDC'; const h = App.thanksDoc(c, '', ''); return /class="hd"/.test(h) && /class="nm"/.test(h) && /class="sub"/.test(h) && /Kinshasa\/gombe,&nbsp;RDC/.test(h) && /<img/.test(h.split('REMERCIEMENT')[0]); }));
   ok('document: the company logo as a faint watermark in the background', /<img class="wm"/.test(art.h));
   ok('previews show the name in bold italic (no asterisks)', /<b><i>Awa Diallo Mukendi<\/i><\/b>/.test(art.txt) && !/\*_/.test(art.txt));
+  // the PDF stays on ONE page even with the 8 networks filled in (they used to slip onto a second page)
+  const pages = await p.evaluate(async () => { const C = App.db.settings.company; C.socials = { facebook: 'facebook.com/cispolstore', instagram: 'instagram.com/cispolstore', tiktok: 'tiktok.com/@cispolstore', youtube: 'youtube.com/@cispol', whatsapp: '+243 814 048 480', linkedin: 'linkedin.com/company/cispol', x: 'x.com/cispol', site: 'cispolstore.com' };
+    let got = null; navigator.canShare = () => true; navigator.share = async o => { got = o.files[0]; };
+    const c = App.client('k_mat'); await App.sharePdf('t.pdf', App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData()));
+    const txt = got ? new TextDecoder('latin1').decode(new Uint8Array(await got.arrayBuffer())) : ''; const m = /\/Count (\d+)/.exec(txt); return m ? +m[1] : -1; });
+  ok('PDF of the thank-you with 8 networks fits on one page', pages === 1, 'pages=' + pages);
+  ok('networks listed in two columns with their logo', await p.evaluate(() => { const h = App.thanksDoc(App.client('k_mat'), '', ''); return /width:50%/.test(h) && /data-fit/.test(h) && (h.match(/<svg/g) || []).length >= 8; }));
+  // logo on the left in the thank-you header; a clear way to add the social networks
+  ok('document header is the shared one (same as the invoice)', await p.evaluate(() => { const t = App.thanksDoc(App.client('k_mat'), '', '').match(/<table class="hd">[\s\S]*?<\/table>/)[0], k = App.docKit.head(App.db.settings.company, ''); return k.startsWith(t) && App.thanksDoc(App.client('k_mat'), '', '').includes(k); }));
+  await p.evaluate(() => { App.db.settings.company.socials = {}; App.go('client', { id: 'k_mat', tab: 'thx' }); }); await p.waitForTimeout(300);
+  ok('client tab tells that no network is set and offers « Ajouter mes réseaux sociaux »', await p.evaluate(() => /Aucun réseau social renseigné/.test(document.getElementById('view').innerText) && !!document.querySelector('#view [data-act=soc_go]')));
+  await p.evaluate(() => document.querySelector('#view [data-act=soc_go]').click()); await p.waitForTimeout(700);
+  ok('the button opens the settings on the social-network fields (fold open, first field focused)', await p.evaluate(() => App.state.view === 'settings' && !!document.querySelector('details[data-fold=msgs][open]') && document.activeElement && document.activeElement.id === 'soc_facebook'));
+  await p.evaluate(() => { App.db.settings.company.socials = { facebook: 'facebook.com/x', instagram: 'instagram.com/x' }; App.go('client', { id: 'k_mat', tab: 'thx' }); }); await p.waitForTimeout(300);
+  ok('client tab lists the networks already added', await p.evaluate(() => /2 réseau\(x\) ajouté\(s\)[^]*Facebook, Instagram/.test(document.getElementById('view').innerText)));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
