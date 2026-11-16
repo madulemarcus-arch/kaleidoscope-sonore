@@ -51,5 +51,11 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   ok('settings: social links field and preview box', hasField);
   if (hasField) { await p.fill('#thx_social', 'https://tiktok.com/@boutique'); await p.waitForTimeout(250);
     const pt = await p.innerText('#thx_prev'); ok('preview shows a real client name and updates live with the links', /Aperçu avec/.test(pt) && /Bonjour /.test(pt) && /tiktok\.com\/@boutique/.test(pt), pt.slice(0, 200)); }
+  // receipt-style document: letterhead, client box, text, social links, stamp
+  const doc = await p.evaluate(() => { App.db.settings.company.social = 'https://facebook.com/boutique'; return App.thanksDoc(App.client('c1'), 'logo.png', 'stamp.png'); });
+  ok('document uses the receipt model: letterhead (logo), REMERCIEMENT + CLIENT boxes, stamp', /logo\.png/.test(doc) && />REMERCIEMENT</.test(doc) && />CLIENT</.test(doc) && /stamp\.png/.test(doc) && /class="paper"/.test(doc));
+  ok('document: client name, thank-you text without emoji, social links, company name under the stamp', /Awa D/.test(doc) && /Merci d&#39;avoir choisi Boutique Test|Merci d'avoir choisi Boutique Test/.test(doc) && !/😊/.test(doc) && /Faites un tour sur nos réseaux/.test(doc) && /facebook\.com\/boutique/.test(doc) && /class="ln">Boutique Test</.test(doc));
+  await p.evaluate(() => { App.db.settings.company.social = ''; App.thanksPreview(App.client('c1')); }); await p.waitForTimeout(200);
+  ok('preview offers PDF and print with letterhead and stamp', await p.evaluate(() => !!document.querySelector('#dlg [data-act=thx_pdf]') && !!document.querySelector('#dlg [data-act=thx_print]')));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
