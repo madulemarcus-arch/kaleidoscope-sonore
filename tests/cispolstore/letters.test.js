@@ -165,5 +165,13 @@ const cg=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];r
 ok('leave: linked to the collaborator, subject « Demande de congé annuel »',cg.c.type==='conge'&&cg.c.techId==='tk9'&&cg.t.subject==='Demande de congé annuel');
 ok('leave text: written in the first person, 5 calendar days, cover person, resumes work, closing, no literal \\n',/Je soussigné\(e\), Paul Demissionnaire/.test(cg.t.body)&&/soit 5 jours calendaires/.test(cg.t.body)&&/Awa K\. assurera la continuité/.test(cg.t.body)&&/Je reprendrai mes fonctions/.test(cg.t.body)&&/salutations distinguées/.test(cg.t.body)&&!/\\n/.test(cg.t.body));
 ok('leave printed as a personal letter (employee block, no company letterhead logo)',cg.html.length>200&&/Paul Demissionnaire/.test(cg.html));
+// debt acknowledgement: first person of the client, amount in words, due date, signature line, no courtesy formula
+await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
+await p.selectOption('#lt_type','reconnaissance');await p.waitForTimeout(250);
+await p.selectOption('#lt_cl','cl1');await p.dispatchEvent('#lt_cl','change');await p.fill('#lf_ref','Facture FAC-2026-0099');await p.fill('#lf_amount','120');await p.fill('#lf_due','2026-12-20');await create();
+const rd=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{c,t:App.letterText(c),html:App.letterDoc(c,'logo.png','stamp.png')}});
+ok('debt acknowledgement: linked to the client, subject « Reconnaissance de dette – Facture … »',rd.c.type==='reconnaissance'&&rd.c.clientId==='cl1'&&rd.t.subject==='Reconnaissance de dette – Facture FAC-2026-0099');
+ok('text: first person, amount in figures and words, due date, recovery clause, signature line « Lu et approuvé », no courtesy formula',/Je soussigné\(e\), Joseph Mbuyi, reconnais devoir à/.test(rd.t.body)&&/120/.test(rd.t.body)&&/\(.+\)/.test(rd.t.body.split('\n')[0])&&/au plus tard le \d/.test(rd.t.body)&&/recouvrement/.test(rd.t.body)&&/Lu et approuvé/.test(rd.t.body)&&!/salutations distinguées/.test(rd.t.body)&&!/\\n/.test(rd.t.body));
+ok('printed with letterhead and stamp',/logo\.png/.test(rd.html)&&/Joseph Mbuyi/.test(rd.html));
 ok('backup and sync know the letters',await p.evaluate(()=>JSON.stringify(App.db).includes('"letters"')));
 ok('no page errors',errs.length===0,errs.join('|'));await b.close();process.exit(f?1:0)})();
