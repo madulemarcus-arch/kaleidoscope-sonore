@@ -10,14 +10,19 @@
     impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}',
     merci: "Bonjour {prenom} 😊 Merci d'avoir choisi {entreprise} ! Votre service est en place : profitez-en pleinement. Et si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_achat: "Bonjour {prenom} 😊 Merci pour votre achat chez {entreprise} ! Nous espérons que votre matériel vous donnera entière satisfaction. Si vous avez la moindre question ou le moindre souci, écrivez-nous : nous sommes là pour vous. À très bientôt ! {entreprise}",
+    merci_abo: "Bonjour {prenom} 😊 Merci de nous faire confiance pour votre abonnement chez {entreprise} ! Votre connexion est active : profitez-en pleinement. Si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_install: "Bonjour {prenom} 😊 Merci d'avoir confié votre installation à {entreprise} ! Elle est terminée : profitez-en pleinement. Pour tout réglage ou toute question, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}"
   };
-  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_install: 'Remerciement · installation' };
+  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_abo: 'Remerciement · abonnement (payé chez nous)', merci_install: 'Remerciement · installation' };
   const tpl = k => (App.db.settings.msgs && App.db.settings.msgs[k]) || DEFAULT[k];
   // the thank-you depends on what the client got: a purchase (matériel), an installation, or the complete service (managed client)
-  const KINDS = { achat: ['merci_achat', '🛒 Achat', 'Merci pour votre achat'], install: ['merci_install', '🔧 Installation', 'Installation terminée'], complet: ['merci', '📡 Service complet', 'Fin de service'] };
-  App.thanksKind = c => c.type === 'mat' ? 'achat' : c.type === 'install' ? 'install' : 'complet';
+  const KINDS = { achat: ['merci_achat', '🛒 Achat / vente', 'Merci pour votre achat'], install: ['merci_install', '🔧 Installation', 'Installation terminée'], complet: ['merci', '📡 Service complet', 'Fin de service'], abonnement: ['merci_abo', '📶 Abonnement', 'Merci pour votre abonnement'] };
+  // the kind is chosen on the client's 💛 tab or in the preview; until then it follows the client type
+  App.thanksKind = c => KINDS[c.thanksKind] ? c.thanksKind : c.type === 'mat' ? 'achat' : c.type === 'install' ? 'install' : c.aboOnly ? 'abonnement' : 'complet';
   App.thanksKindName = c => KINDS[App.thanksKind(c)][1];
+  // the three kinds as buttons: what did we provide to this client? (m = 'modal' when shown in the preview)
+  App.thanksKindChips = (c, m) => `<div class="chips" style="margin:8px 0 0;flex-wrap:wrap;overflow:visible"><span class="mut" style="font-size:13px;flex-basis:100%">Service fourni au client :</span>${Object.keys(KINDS).map(k => `<button type="button" class="chip ${App.thanksKind(c) === k ? 'on' : ''}" data-act="thx_kind" data-id="${c.id}" data-k="${k}" data-m="${m || ''}">${KINDS[k][1]}</button>`).join('')}</div>`;
+  App.actions.thx_kind = d => { const c = App.client(d.id); if (!c || !KINDS[d.k]) return; c.thanksKind = d.k; App.save(); if (d.m === 'modal') App.actions.thx_send({ id: c.id }); else App.refresh(); };
 
   App.reminderText = c => {
     const s = App.sub(c), co = App.db.settings.company, n = c.first || App.cname(c);
@@ -87,7 +92,7 @@
   App.actions.thx_pdf = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); await App.sharePdf(thxName(c) + '.pdf', App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
 
   // preview of the message with the client's name, then send
-  App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 ${esc(App.thanksKindName(c))}</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
+  App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 ${esc(App.thanksKindName(c))}</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>${App.thanksKindChips(c, 'modal')}
       <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${App.thanksHtml(c)}</div></div>
       ${App.socialStatus()}<div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
       <div class="bar"><button type="button" class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 Remerciement en PDF (avec entête et sceau)</button><button type="button" class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
