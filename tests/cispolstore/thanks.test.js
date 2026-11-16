@@ -43,7 +43,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   // social links appended at the end + live preview in settings
   await p.evaluate(() => { App.db.settings.company.socials = { facebook: 'https://facebook.com/boutique', instagram: 'instagram.com/boutique ', tiktok: '', whatsapp: '+243 814 048 480' }; });
   const tx2 = await p.evaluate(() => App.thanksText(App.client('c1')));
-  ok('social links are added at the end of the message, one per line, blanks ignored', /À très bientôt ! Boutique Test\n\nFaites un tour sur nos réseaux :\nFacebook : https:\/\/facebook\.com\/boutique\nInstagram : https:\/\/instagram\.com\/boutique\nWhatsApp : https:\/\/wa\.me\/243814048480$/.test(tx2), tx2.slice(-140));
+  ok('social links are added at the end of the message, one per line, blanks ignored', /À très bientôt ! Boutique Test\n\nFaites un tour sur nos réseaux :\n📘 Facebook : https:\/\/facebook\.com\/boutique\n📸 Instagram : https:\/\/instagram\.com\/boutique\n💬 WhatsApp : https:\/\/wa\.me\/243814048480$/.test(tx2), tx2.slice(-140));
   await p.evaluate(() => { App.db.settings.company.socials = {}; });
   ok('no links = no extra block', !/réseaux/.test(await p.evaluate(() => App.thanksText(App.client('c1')))));
   await p.evaluate(() => { App.go('settings'); }); await p.waitForTimeout(300); await p.evaluate(() => { const d = document.querySelector('details[data-fold=msgs]'); if (d) d.open = true; }); await p.waitForTimeout(250);
@@ -54,6 +54,8 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   // receipt-style document: letterhead, client box, text, social links, stamp
   const doc = await p.evaluate(() => { App.db.settings.company.socials = { facebook: 'https://facebook.com/boutique' }; return App.thanksDoc(App.client('c1'), 'logo.png', 'stamp.png'); });
   ok('document uses the receipt model: letterhead (logo), REMERCIEMENT + CLIENT boxes, stamp', /logo\.png/.test(doc) && />REMERCIEMENT</.test(doc) && />CLIENT</.test(doc) && /stamp\.png/.test(doc) && /class="paper"/.test(doc));
+  ok('document: the social link starts with the brand logo (inline SVG, Facebook blue)', /<svg[^>]*fill="#0866FF"[^>]*><path d="M9\.101/.test(doc));
+  ok('settings fields carry the brand logos', await p.evaluate(() => { App.go('settings'); const d = document.querySelector('details[data-fold=msgs]'); if (d) d.open = true; return document.querySelectorAll('label[for^=soc_] svg').length === 8; }));
   ok('document: client name, thank-you text without emoji, social links, company name under the stamp', /Awa D/.test(doc) && /Merci d&#39;avoir choisi Boutique Test|Merci d'avoir choisi Boutique Test/.test(doc) && !/😊/.test(doc) && /Faites un tour sur nos réseaux/.test(doc) && /facebook\.com\/boutique/.test(doc) && /class="ln">Boutique Test</.test(doc));
   await p.evaluate(() => { App.db.settings.company.socials = {}; App.thanksPreview(App.client('c1')); }); await p.waitForTimeout(200);
   ok('preview offers PDF and print with letterhead and stamp', await p.evaluate(() => !!document.querySelector('#dlg [data-act=thx_pdf]') && !!document.querySelector('#dlg [data-act=thx_print]')));
