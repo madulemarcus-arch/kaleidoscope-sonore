@@ -10,14 +10,15 @@
     impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}',
     merci: "Bonjour {prenom} 😊 Merci d'avoir choisi {entreprise} ! Votre service est en place : profitez-en pleinement. Et si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_achat: "Bonjour {prenom} 😊 Merci pour votre achat chez {entreprise} ! Nous espérons que votre matériel vous donnera entière satisfaction. Si vous avez la moindre question ou le moindre souci, écrivez-nous : nous sommes là pour vous. À très bientôt ! {entreprise}",
+    merci_abo: "Bonjour {prenom} 😊 Merci de nous faire confiance pour votre abonnement chez {entreprise} ! Votre connexion est active : profitez-en pleinement. Si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_install: "Bonjour {prenom} 😊 Merci d'avoir confié votre installation à {entreprise} ! Elle est terminée : profitez-en pleinement. Pour tout réglage ou toute question, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}"
   };
-  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_install: 'Remerciement · installation' };
+  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_abo: 'Remerciement · abonnement (payé chez nous)', merci_install: 'Remerciement · installation' };
   const tpl = k => (App.db.settings.msgs && App.db.settings.msgs[k]) || DEFAULT[k];
   // the thank-you depends on what the client got: a purchase (matériel), an installation, or the complete service (managed client)
-  const KINDS = { achat: ['merci_achat', '🛒 Achat / vente', 'Merci pour votre achat'], install: ['merci_install', '🔧 Installation', 'Installation terminée'], complet: ['merci', '📡 Service complet', 'Fin de service'] };
+  const KINDS = { achat: ['merci_achat', '🛒 Achat / vente', 'Merci pour votre achat'], install: ['merci_install', '🔧 Installation', 'Installation terminée'], complet: ['merci', '📡 Service complet', 'Fin de service'], abonnement: ['merci_abo', '📶 Abonnement', 'Merci pour votre abonnement'] };
   // the kind is chosen on the client's 💛 tab or in the preview; until then it follows the client type
-  App.thanksKind = c => KINDS[c.thanksKind] ? c.thanksKind : c.type === 'mat' ? 'achat' : c.type === 'install' ? 'install' : 'complet';
+  App.thanksKind = c => KINDS[c.thanksKind] ? c.thanksKind : c.type === 'mat' ? 'achat' : c.type === 'install' ? 'install' : c.aboOnly ? 'abonnement' : 'complet';
   App.thanksKindName = c => KINDS[App.thanksKind(c)][1];
   // the three kinds as buttons: what did we provide to this client? (m = 'modal' when shown in the preview)
   App.thanksKindChips = (c, m) => `<div class="chips" style="margin:8px 0 0;flex-wrap:wrap;overflow:visible"><span class="mut" style="font-size:13px;flex-basis:100%">Service fourni au client :</span>${Object.keys(KINDS).map(k => `<button type="button" class="chip ${App.thanksKind(c) === k ? 'on' : ''}" data-act="thx_kind" data-id="${c.id}" data-k="${k}" data-m="${m || ''}">${KINDS[k][1]}</button>`).join('')}</div>`;

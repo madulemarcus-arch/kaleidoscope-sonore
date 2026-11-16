@@ -111,7 +111,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   ok('client tab lists the networks already added', await p.evaluate(() => /2 réseau\(x\) ajouté\(s\)[^]*Facebook, Instagram/.test(document.getElementById('view').innerText)));
   // the kind of service can be chosen (achat / installation / service complet), in the client tab and in the preview
   await p.evaluate(() => { const c = App.client('k_gere'); delete c.thanksKind; App.go('client', { id: 'k_gere', tab: 'thx' }); }); await p.waitForTimeout(300);
-  ok('client tab shows the 3 kinds as buttons, « Service complet » selected for a managed client', await p.evaluate(() => { const b = [...document.querySelectorAll('#view [data-act=thx_kind]')]; return b.length === 3 && /Service complet/.test(document.querySelector('#view [data-act=thx_kind].on').textContent); }));
+  ok('client tab shows the 4 kinds as buttons, « Service complet » selected for a managed client', await p.evaluate(() => { const b = [...document.querySelectorAll('#view [data-act=thx_kind]')]; return b.length === 4 && /Service complet/.test(document.querySelector('#view [data-act=thx_kind].on').textContent); }));
   await p.evaluate(() => document.querySelector('#view [data-act=thx_kind][data-k=install]').click()); await p.waitForTimeout(300);
   ok('choosing « Installation » changes the message and is remembered', await p.evaluate(() => App.client('k_gere').thanksKind === 'install' && /installation/i.test(App.thanksText(App.client('k_gere'))) && /Installation/.test(document.querySelector('#view [data-act=thx_kind].on').textContent)));
   await p.evaluate(() => document.querySelector('#view [data-act=thx_send]').click()); await p.waitForTimeout(300);
@@ -119,5 +119,13 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   await p.evaluate(() => document.querySelector('#dlg [data-act=thx_kind][data-k=achat]').click()); await p.waitForTimeout(300);
   ok('switching the kind inside the preview updates the message', await p.evaluate(() => { const d = document.getElementById('dlg'); return /achat/i.test(d.innerText) && /Achat/.test(d.querySelector('[data-act=thx_kind].on').textContent) && App.client('k_gere').thanksKind === 'achat'; }));
   await p.keyboard.press('Escape');
+  // 4th kind: subscription paid with us (client « abonnement seul »)
+  const abo = await p.evaluate(() => { const c = { id: 'k_abo', code: 'K-abo', type: 'gere', aboOnly: true, first: 'Awa', last: 'Diallo', name: 'Awa Diallo', phone: '0812345678', subs: [] }; App.db.clients.push(c); return { k: App.thanksKind(c), n: App.thanksKindName(c), t: App.thanksText(c), d: App.thanksDoc(c, '', '') }; });
+  ok('« abonnement seul » client → abonnement kind with its own message and subject', abo.k === 'abonnement' && /abonnement/i.test(abo.t) && /Merci pour votre abonnement/.test(abo.d) && /Abonnement/.test(abo.n));
+  await p.evaluate(() => App.go('client', { id: 'k_abo', tab: 'thx' })); await p.waitForTimeout(300);
+  ok('the kind buttons now offer 4 choices, « Abonnement » selected', await p.evaluate(() => document.querySelectorAll('#view [data-act=thx_kind]').length === 4 && /Abonnement/.test(document.querySelector('#view [data-act=thx_kind].on').textContent)));
+  await p.evaluate(() => document.querySelector('#view [data-act=thx_kind][data-k=complet]').click()); await p.waitForTimeout(250);
+  ok('a managed client can be switched to « Abonnement » too (and back)', await p.evaluate(() => { const c = App.client('k_gere'); c.thanksKind = 'abonnement'; const ok1 = App.thanksKind(c) === 'abonnement' && /abonnement/i.test(App.thanksText(c)); delete c.thanksKind; return ok1 && App.thanksKind(c) === 'complet' && App.thanksKind(App.client('k_abo')) === 'complet'; }));
+  ok('settings list 4 editable templates (achat, installation, service complet, abonnement)', await p.evaluate(() => { App.db.settings.msgs = {}; App.go('settings'); return true; }) && (await p.waitForTimeout(300), await p.evaluate(() => { const d = document.querySelector('details[data-fold=msgs]'); if (d) d.open = true; return ['m_merci', 'm_merci_achat', 'm_merci_install', 'm_merci_abo'].every(i => !!document.getElementById(i)); })));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
