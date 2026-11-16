@@ -40,10 +40,24 @@
   App.thanksCount = () => App.thanksDue().length;
   App.thanksMark = c => { c.thanksAt = App.today(); App.log(c.id, 'Message de fin de service envoyé'); };
   App.actions.thx_skip = d => { const c = App.client(d.id); if (!c) return; c.thanksAt = App.today(); App.log(c.id, 'Pas de message de fin de service'); App.save(); App.refresh(); App.toast('Marqué : pas de message'); };
+  // the same thank-you as a printable / PDF document in the receipt model: letterhead, client box, text, social links, stamp
+  const EMO = '[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\uFE0F]+', noEmoji = t => String(t).replace(new RegExp('(\\p{L})\\s*' + EMO + '\\s*(?=\\p{Lu})', 'gu'), '$1,\n\n').replace(new RegExp('\\s*' + EMO, 'gu'), '');
+  App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = String(co.social || '').split('\n').map(x => x.trim()).filter(Boolean);
+    const body = noEmoji(tpl('merci').replace(/\{(\w+)\}/g, (m, k) => ({ prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name })[k] ?? m));
+    return `<div class="paper">${K.head(co, logo)}
+      ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', 'Fin de service']], 'CLIENT', [['Nom', `<b>${e(App.cname(c))}</b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
+      <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line">${e(body)}</div>
+      ${links.length ? `<div class="rc" style="margin-top:6px"><b>Faites un tour sur nos réseaux :</b><br>${links.map(l => e(l)).join('<br>')}</div>` : ''}
+      <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
+  const thxName = c => App.docName(App.cname(c), 'Remerciement');
+  App.actions.thx_print = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); App.docKit.print(thxName(c), App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
+  App.actions.thx_pdf = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); await App.sharePdf(thxName(c) + '.pdf', App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
+
   // preview of the message with the client's name, then send
   App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 Remerciement</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
       <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${esc(App.thanksText(c))}</div></div>
-      <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
+      <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
+      <div class="bar"><button type="button" class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 Remerciement en PDF (avec entête et sceau)</button><button type="button" class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
   App.actions.thx_send = d => { const c = App.client(d.id); if (!c) return; if (!c.phone) return App.toast('Pas de numéro de téléphone'); App.thanksPreview(c);
     $('tsend').onclick = () => { window.open(App.waUrl(c.phone, App.thanksText(c)), '_blank', 'noopener'); App.thanksMark(c); App.save(); App.close(); App.refresh(); App.toast('Message de remerciement ouvert dans WhatsApp'); }; };
 
