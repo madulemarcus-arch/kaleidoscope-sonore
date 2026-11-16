@@ -166,13 +166,13 @@
       body = (c.serial ? `<div class="card"><span class="mut">Numéro de série</span><br><b>${esc(c.serial)}</b></div><div style="height:10px"></div>` : '') + listOrEmpty(rows, 'Aucun matériel vendu à ce client.');
     }
     if (tab === 'dep') body = App.clientDepTab(c);
-    if (tab === 'hist') body = listOrEmpty(db.log.filter(x => x.clientId === c.id).slice().reverse().map(x => `<div class="item"><div class="grow"><b>${esc(x.text)}</b><small>${App.fdate(x.date)}</small></div></div>`), 'Aucune opération.');
+    if (tab === 'hist') body = (c.phone ? `<div class="bar" style="margin:0 0 10px"><button class="btn sm sec" data-act="thx_send" data-id="${c.id}">💛 Message de fin de service${c.thanksAt ? ' · envoyé le ' + App.fdate(c.thanksAt) : ''}</button></div>` : '') + listOrEmpty(db.log.filter(x => x.clientId === c.id).slice().reverse().map(x => `<div class="item"><div class="grow"><b>${esc(x.text)}</b><small>${App.fdate(x.date)}</small></div></div>`), 'Aucune opération.');
     const wa = App.waLink(c);
     return {
       title: App.cname(c), sub: 'Fiche client', back: 'clients', nav: 'clients',
       html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span></div><button class="typebtn" data-act="cl_type" data-id="${c.id}">${esc(App.typeName(c))} <i>Changer ▾</i></button>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
         <div class="cstats">${cstats(c)}</div>
-        <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
+        <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.phone && App.thanksDue && App.thanksDue().some(x => x.c.id === c.id) ? `<button data-act="thx_send" data-id="${c.id}"><span>💛</span>Merci</button>` : ''}${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
         <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`
     };
   };

@@ -7,9 +7,10 @@
     sursis: "Bonjour {prenom}, votre abonnement Starlink a expiré le {fin}. Vous êtes en période de sursis jusqu'au {sursis}. Pensez à le renouveler. {entreprise}",
     inactif: 'Bonjour {prenom}, votre abonnement Starlink est inactif depuis le {sursis}. Contactez-nous pour le réactiver. {entreprise}',
     penalite: 'Bonjour {prenom}, une pénalité de {montant} ({motif}) est à régler pour votre abonnement Starlink. Merci de passer la régler. {entreprise}',
-    impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}'
+    impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}',
+    merci: "Bonjour {prenom} 😊 Merci d'avoir choisi {entreprise} ! Votre service est en place : profitez-en pleinement. Et si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}"
   };
-  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée' };
+  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement de fin de service' };
   const tpl = k => (App.db.settings.msgs && App.db.settings.msgs[k]) || DEFAULT[k];
 
   App.reminderText = c => {
@@ -23,6 +24,28 @@
     const co = App.db.settings.company, v = { prenom: (c && c.first) || App.cname(c), nom: App.cname(c), solde: App.fmt(App.invDue(i), i.currency), numero: i.number, date: App.fdate(i.date), entreprise: co.name };
     return tpl('impaye').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
   };
+
+  // end-of-service thank-you: the client's latest finished service (installation done, delivery done, invoice fully paid) not yet followed by a thank-you
+  App.thanksText = c => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name };
+    const links = String(co.social || '').split('\n').map(x => x.trim()).filter(Boolean);
+    return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.join('\n') : ''); };
+  const THX_DAYS = 14;
+  App.thanksDue = () => {
+    const db = App.db, ev = {}, add = (cid, date, why) => { if (cid && date && (!ev[cid] || date > ev[cid].date)) ev[cid] = { date, why }; };
+    (db.installs || []).forEach(x => add(x.clientId, x.date, x.kind || 'Installation'));
+    (db.deliveries || []).filter(x => x.status === 'done').forEach(x => add(x.clientId, x.doneAt || x.date, 'Livraison faite'));
+    db.invoices.filter(i => !i.pending && App.invStatus(i) === 'paid').forEach(i => { const last = db.payments.filter(p => p.invoiceId === i.id).map(p => p.date).sort().pop(); add(i.clientId, last || i.date, 'Facture ' + i.number + ' payée'); });
+    return Object.keys(ev).map(id => ({ c: App.client(id), ...ev[id] })).filter(x => x.c && (!x.c.thanksAt || x.date > x.c.thanksAt) && App.diff(x.date, App.today()) <= THX_DAYS).sort((a, b) => b.date.localeCompare(a.date));
+  };
+  App.thanksCount = () => App.thanksDue().length;
+  App.thanksMark = c => { c.thanksAt = App.today(); App.log(c.id, 'Message de fin de service envoyé'); };
+  App.actions.thx_skip = d => { const c = App.client(d.id); if (!c) return; c.thanksAt = App.today(); App.log(c.id, 'Pas de message de fin de service'); App.save(); App.refresh(); App.toast('Marqué : pas de message'); };
+  // preview of the message with the client's name, then send
+  App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 Remerciement</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
+      <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${esc(App.thanksText(c))}</div></div>
+      <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
+  App.actions.thx_send = d => { const c = App.client(d.id); if (!c) return; if (!c.phone) return App.toast('Pas de numéro de téléphone'); App.thanksPreview(c);
+    $('tsend').onclick = () => { window.open(App.waUrl(c.phone, App.thanksText(c)), '_blank', 'noopener'); App.thanksMark(c); App.save(); App.close(); App.refresh(); App.toast('Message de remerciement ouvert dans WhatsApp'); }; };
 
   App.penaltyText = (p, c) => {
     const co = App.db.settings.company, v = { prenom: (c && c.first) || App.cname(c), nom: App.cname(c), montant: App.fmt(p.amount, p.currency), motif: p.reason, date: App.fdate(p.date), entreprise: co.name };
@@ -64,10 +87,11 @@
       out.push({ kind: 'inv', icon: '🧾', label: 'Impayé', c, last: i.lastRemind, tone: d > 60 ? 'bad' : d > 30 ? 'warn' : '', rank: -300 - d, sub: `${i.number} · ${d} j`, amount: App.fmt(App.invDue(i), i.currency), text: () => App.unpaidText(i, c), mark: () => { i.lastRemind = App.today(); App.log(c.id, 'Relance impayé ' + i.number); } }); });
     (db.penalties || []).filter(p => !p.paid).forEach(p => { const c = App.client(p.clientId); if (!c) return;
       out.push({ kind: 'pen', icon: '⚠️', label: 'Pénalité', c, last: p.lastRemind, tone: 'warn', rank: -250, sub: p.reason || 'Pénalité', amount: App.fmt(p.amount, p.currency), text: () => App.penaltyText(p, c), mark: () => { p.lastRemind = App.today(); App.log(c.id, 'Relance pénalité'); } }); });
+    App.thanksDue().forEach(x => out.push({ kind: 'thx', icon: '💛', label: 'Fin de service', c: x.c, last: '', tone: 'ok', rank: 50, sub: x.why + ' · ' + App.fdate(x.date), text: () => App.thanksText(x.c), mark: () => App.thanksMark(x.c) }));
     return out.sort((a, b) => a.rank - b.rank);
   };
   const isRecent = it => it.last && App.diff(it.last, App.today()) <= 2;
-  App.relanceCount = () => App.relanceItems().filter(it => it.c.phone && !isRecent(it)).length;
+  App.relanceCount = () => App.relanceItems().filter(it => it.kind !== 'thx' && it.c.phone && !isRecent(it)).length;
   let cache = [];
   const send = (it) => { window.open(App.waUrl(it.c.phone, it.text()), '_blank', 'noopener'); it.mark(); App.save(); };
   App.views.relances = () => {
@@ -79,14 +103,15 @@
       html: `<section class="hero dhero"><div class="hero-top"><div><small>💬 À relancer aujourd'hui</small><div class="hero-num" data-count="${todo.length}" data-int="1">${todo.length}</div></div></div>
           <div class="cstats"><div><b>${done}</b><small>déjà relancé(s)</small></div><div class="${nophone ? 'bad' : ''}"><b>${nophone}</b><small>sans téléphone</small></div><div><b>${cache.length}</b><small>au total</small></div></div></section>
         ${todo.length ? `<div class="bar"><button class="btn" data-act="rel_series">💬 Tout relancer en série (${todo.length})</button></div>` : ''}
-        <div class="chips">${[['all', 'Tout'], ['sub', '📡 Abonnements'], ['inv', '🧾 Impayés'], ['pen', '⚠️ Pénalités']].map(([k, t]) => `<button class="chip ${rst.f === k ? 'on' : ''}" data-act="rel_f" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
+        <div class="chips">${[['all', 'Tout'], ['sub', '📡 Abonnements'], ['inv', '🧾 Impayés'], ['pen', '⚠️ Pénalités'], ['thx', '💛 Remerciements']].map(([k, t]) => `<button class="chip ${rst.f === k ? 'on' : ''}" data-act="rel_f" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
         <p class="mut" style="font-size:13px;margin:0 0 10px">Un message prêt s'ouvre dans WhatsApp : il ne reste qu'à l'envoyer. Les clients relancés depuis moins de 2 jours sont mis de côté.</p>
         ${shown.length ? `<div class="list">${shown.map((it, i) => { const k = cache.indexOf(it), rec = isRecent(it);
-          return `<div class="item" style="${rec ? 'opacity:.6' : ''}"><span class="avatar ${it.tone || ''}">${it.icon}</span><div class="grow" data-act="go" data-v="client" data-id="${it.c.id}" style="cursor:pointer"><b>${esc(App.cname(it.c))}</b><small>${esc(it.label)} · ${esc(it.sub)}${it.last ? ' · relancé le ' + App.fdate(it.last) : ''}</small></div>${it.amount ? `<div class="end"><b>${it.amount}</b></div>` : ''}${it.c.phone ? `<button class="btn sm" data-act="rel_one" data-k="${k}" aria-label="WhatsApp">💬</button>` : '<span class="mut" style="font-size:12px">sans n°</span>'}</div>`; }).join('')}</div>` : '<div class="empty big"><div class="ei">🎉</div><b>Rien à relancer</b><p class="mut">Tous vos clients sont à jour.</p></div>'}`
+          return `<div class="item" style="${rec ? 'opacity:.6' : ''}"><span class="avatar ${it.tone || ''}">${it.icon}</span><div class="grow" data-act="go" data-v="client" data-id="${it.c.id}" style="cursor:pointer"><b>${esc(App.cname(it.c))}</b><small>${esc(it.label)} · ${esc(it.sub)}${it.last ? ' · relancé le ' + App.fdate(it.last) : ''}</small></div>${it.amount ? `<div class="end"><b>${it.amount}</b></div>` : ''}${it.c.phone ? `<button class="btn sm" data-act="rel_one" data-k="${k}" aria-label="WhatsApp">💬</button>` : '<span class="mut" style="font-size:12px">sans n°</span>'}${it.kind === 'thx' ? `<button class="btn sm sec" data-act="thx_skip" data-id="${it.c.id}" aria-label="Pas de message" title="Pas de message pour ce client">✖</button>` : ''}</div>`; }).join('')}</div>` : '<div class="empty big"><div class="ei">🎉</div><b>Rien à relancer</b><p class="mut">Tous vos clients sont à jour.</p></div>'}`
     };
   };
   App.actions.rel_f = d => { rst.f = d.f; App.refresh(); };
-  App.actions.rel_one = d => { const it = cache[+d.k]; if (!it || !it.c.phone) return App.toast('Pas de numéro de téléphone'); send(it); App.refresh(); };
+  App.actions.thx_go = () => { rst.f = 'thx'; App.go('relances'); };
+  App.actions.rel_one = d => { const it = cache[+d.k]; if (!it || !it.c.phone) return App.toast('Pas de numéro de téléphone'); if (it.kind === 'thx') return App.actions.thx_send({ id: it.c.id }); send(it); App.refresh(); };
   App.actions.rel_series = () => {
     const q = (cache.length ? cache : App.relanceItems()).filter(it => it.c.phone && !isRecent(it) && (rst.f === 'all' || it.kind === rst.f)); if (!q.length) return App.toast('Personne à relancer');
     let k = 0, sent = 0;
@@ -103,10 +128,18 @@
 
   // ---------- Settings card: message templates ----------
   App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
-      <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
+      <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
+      ${F.area('thx_social', 'Liens de vos réseaux sociaux (un par ligne, ajoutés à la fin du remerciement)', (App.db.settings.company.social || ''), 'rows="3" placeholder="https://facebook.com/votrepage&#10;https://instagram.com/votrecompte"')}
+      <h3 style="margin:12px 0 4px;font-size:15px">Aperçu du remerciement</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
+  // live preview of the thank-you with a real client's name (first client with a phone, else a sample)
+  const prev = () => { const el = $('thx_prev'); if (!el) return; const real = App.db.clients.find(c => c.phone) || App.db.clients[0], c = real || { first: 'Awa', last: 'Diallo', name: 'Awa Diallo' };
+    el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small><br>${esc(App.thanksText(c))}`; };
+  document.addEventListener('input', e => { if ((e.target.id || '') === 'thx_social' || (e.target.id || '') === 'm_merci') { if (e.target.id === 'thx_social') App.db.settings.company.social = e.target.value; else { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), merci: e.target.value }; } prev(); } });
+  new MutationObserver(() => { if ($('thx_prev') && !$('thx_prev').dataset.ok) { $('thx_prev').dataset.ok = '1'; prev(); } }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('change', e => {
+    if (e.target.id === 'thx_social') { App.db.settings.company.social = e.target.value.trim(); App.save(); App.toast('Liens enregistrés'); prev(); return; }
     const k = (e.target.id || '').startsWith('m_') && e.target.id.slice(2); if (!k || !(k in DEFAULT)) return;
     const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [k]: e.target.value.trim() || DEFAULT[k] }; App.save(); App.toast('Message enregistré');
   });
