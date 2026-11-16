@@ -69,11 +69,11 @@
   App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks(), nm = App.cname(c);
     const NAVY = '#12365d', ORG = '#d5522f', GOLD = '#e5b044', big = `<b><i style="font-size:17pt;color:${NAVY};letter-spacing:.3px">${e(nm)}</i></b>`;
     const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: nm, nom: nm, entreprise: co.name })[k] ?? m));
-    const corner = pos => `<span style="position:absolute;font-size:22px;color:${GOLD};${pos}">❦</span>`;
-    return `<div class="paper" data-fit="1" style="position:relative;background:#fffdf8;border:2px solid ${GOLD};outline:6px solid #fffdf8;outline-offset:-12px;padding:20px 32px;box-sizing:border-box">
-      ${corner('top:6px;left:10px')}${corner('top:6px;right:10px')}${corner('bottom:6px;left:10px')}${corner('bottom:6px;right:10px')}
+    const corner = pos => `<span style="position:absolute;font-size:16px;line-height:1;color:${GOLD};${pos}">❦</span>`;
+    return `<div class="paper" data-fit="1" style="position:relative;background:#fffdf8;box-shadow:0 0 0 12px #fffdf8;outline:2px solid ${GOLD};outline-offset:12px">
+      ${corner('top:-9px;left:-9px')}${corner('top:-9px;right:-9px')}${corner('bottom:-9px;left:-9px')}${corner('bottom:-9px;right:-9px')}
       <img class="wm" src="${e(logo || 'logo.png')}" alt="" style="position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);width:62%;max-width:480px;opacity:.07">
-      ${K.head(co, logo, true)}
+      ${K.head(co, logo)}
       ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b><i>${e(nm)}</i></b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
       <div style="text-align:center;margin:0;color:${GOLD};letter-spacing:10px;font-size:12px;line-height:1.4">✦ ✦ ✦</div>
       <div style="text-align:center;font:italic 700 38px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
