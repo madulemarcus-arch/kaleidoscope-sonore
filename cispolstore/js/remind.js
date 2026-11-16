@@ -72,7 +72,7 @@
     const corner = pos => `<span style="position:absolute;font-size:22px;color:${GOLD};${pos}">❦</span>`;
     return `<div class="paper" style="position:relative;background:#fffdf8;border:2px solid ${GOLD};outline:6px solid #fffdf8;outline-offset:-12px;padding:34px 40px;box-sizing:border-box">
       ${corner('top:6px;left:10px')}${corner('top:6px;right:10px')}${corner('bottom:6px;left:10px')}${corner('bottom:6px;right:10px')}
-      <div style="position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);font-size:340px;line-height:1;color:${ORG};opacity:.05">♥</div>
+      <img class="wm" src="${e(logo || 'logo.png')}" alt="" style="position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);width:62%;max-width:480px;opacity:.07">
       ${K.head(co, logo)}
       ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b><i>${e(nm)}</i></b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
       <div style="text-align:center;margin:6px 0 4px;color:${GOLD};letter-spacing:10px;font-size:15px">✦ ✦ ✦</div>
