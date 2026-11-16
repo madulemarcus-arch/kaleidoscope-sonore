@@ -125,7 +125,7 @@
   const TABS = { gere: ['infos', 'abo', 'pay', 'dep', 'fac', 'inst', 'mat', 'thx', 'hist'], mat: ['infos', 'pay', 'dep', 'fac', 'mat', 'thx', 'hist'], install: ['infos', 'pay', 'dep', 'fac', 'inst', 'thx', 'hist'] };
   const TAB_NAMES = { infos: 'Infos', abo: 'Abonnement', pay: 'Paiements', fac: 'Factures', inst: 'Installations', mat: 'Matériel', hist: 'Historique', dep: 'Dépôts', thx: '💛 Merci' };
   // end-of-service thank-you tab: status, message text and the send / PDF / print actions for this client
-  const thxTab = c => `<div class="card"><div class="spread"><b>Message de fin de service</b>${c.thanksAt ? `<span class="pill ok">Envoyé le ${App.fdate(c.thanksAt)}</span>` : '<span class="pill warn">Pas encore envoyé</span>'}</div>
+  const thxTab = c => `<div class="card"><div class="spread"><b>Message de fin de service · ${esc(App.thanksKindName(c))}</b>${c.thanksAt ? `<span class="pill ok">Envoyé le ${App.fdate(c.thanksAt)}</span>` : '<span class="pill warn">Pas encore envoyé</span>'}</div>
     <p class="mut" style="white-space:pre-wrap;margin:10px 0">${esc(App.thanksText(c))}</p>
     <div class="bar"><button class="btn" data-act="thx_send" data-id="${c.id}">💬 ${c.thanksAt ? 'Renvoyer' : 'Envoyer'} sur WhatsApp</button><button class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 PDF</button><button class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}</div>`;
   const copyBtn = t => `<button class="btn sm sec" data-act="copy" data-t="${esc(t)}">Copier</button>`;
