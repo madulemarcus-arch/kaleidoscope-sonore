@@ -8,10 +8,16 @@
     inactif: 'Bonjour {prenom}, votre abonnement Starlink est inactif depuis le {sursis}. Contactez-nous pour le réactiver. {entreprise}',
     penalite: 'Bonjour {prenom}, une pénalité de {montant} ({motif}) est à régler pour votre abonnement Starlink. Merci de passer la régler. {entreprise}',
     impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}',
-    merci: "Bonjour {prenom} 😊 Merci d'avoir choisi {entreprise} ! Votre service est en place : profitez-en pleinement. Et si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}"
+    merci: "Bonjour {prenom} 😊 Merci d'avoir choisi {entreprise} ! Votre service est en place : profitez-en pleinement. Et si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
+    merci_achat: "Bonjour {prenom} 😊 Merci pour votre achat chez {entreprise} ! Nous espérons que votre matériel vous donnera entière satisfaction. Si vous avez la moindre question ou le moindre souci, écrivez-nous : nous sommes là pour vous. À très bientôt ! {entreprise}",
+    merci_install: "Bonjour {prenom} 😊 Merci d'avoir confié votre installation à {entreprise} ! Elle est terminée : profitez-en pleinement. Pour tout réglage ou toute question, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}"
   };
-  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement de fin de service' };
+  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_install: 'Remerciement · installation' };
   const tpl = k => (App.db.settings.msgs && App.db.settings.msgs[k]) || DEFAULT[k];
+  // the thank-you depends on what the client got: a purchase (matériel), an installation, or the complete service (managed client)
+  const KINDS = { achat: ['merci_achat', '🛒 Achat', 'Merci pour votre achat'], install: ['merci_install', '🔧 Installation', 'Installation terminée'], complet: ['merci', '📡 Service complet', 'Fin de service'] };
+  App.thanksKind = c => c.type === 'mat' ? 'achat' : c.type === 'install' ? 'install' : 'complet';
+  App.thanksKindName = c => KINDS[App.thanksKind(c)][1];
 
   App.reminderText = c => {
     const s = App.sub(c), co = App.db.settings.company, n = c.first || App.cname(c);
@@ -43,8 +49,8 @@
   const netLogo = (k, px = 16) => ICON[k] ? `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="#${ICON[k][0]}" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;flex:none"><path d="${ICON[k][1]}"/></svg>` : '';
   const netUrl = (k, v) => { v = String(v || '').trim(); if (!v) return ''; if (/^https?:\/\//i.test(v)) return v; if (k === 'whatsapp' && /^[+\d][\d\s().-]{6,}$/.test(v)) return 'https://wa.me/' + v.replace(/\D/g, ''); return 'https://' + v.replace(/^\/+/, ''); };
   App.socialLinks = () => { const s = App.db.settings.company.socials || {}; return NETS.map(([k, label]) => [label.replace(/ \(.*\)$/, ''), netUrl(k, s[k]), k]).filter(x => x[1]); };
-  App.thanksText = c => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name }, links = App.socialLinks();
-    return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.map(([n, u, k]) => `${EMOJI[k]} ${n} : ${u}`).join('\n') : ''); };
+  App.thanksText = (c, kind) => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name }, links = App.socialLinks();
+    return tpl(KINDS[kind || App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.map(([n, u, k]) => `${EMOJI[k]} ${n} : ${u}`).join('\n') : ''); };
   const THX_DAYS = 30;
   App.thanksDue = () => {
     const db = App.db, ev = {}, add = (cid, date, why) => { if (cid && date && (!ev[cid] || date > ev[cid].date)) ev[cid] = { date, why }; };
@@ -59,9 +65,9 @@
   // the same thank-you as a printable / PDF document in the receipt model: letterhead, client box, text, social links, stamp
   const EMO = '[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\uFE0F]+', noEmoji = t => String(t).replace(new RegExp('(\\p{L})\\s*' + EMO + '\\s*(?=\\p{Lu})', 'gu'), '$1,\n\n').replace(new RegExp('\\s*' + EMO, 'gu'), '');
   App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks();
-    const body = noEmoji(tpl('merci').replace(/\{(\w+)\}/g, (m, k) => ({ prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name })[k] ?? m));
+    const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name })[k] ?? m));
     return `<div class="paper">${K.head(co, logo)}
-      ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', 'Fin de service']], 'CLIENT', [['Nom', `<b>${e(App.cname(c))}</b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
+      ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b>${e(App.cname(c))}</b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
       <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line">${e(body)}</div>
       ${links.length ? `<div class="rc" style="margin-top:6px"><b>Faites un tour sur nos réseaux :</b><br>${links.map(([n, u, k]) => `<div style="margin:4px 0">${netLogo(k, 16)}${e(n)} : ${e(u)}</div>`).join('')}</div>` : ''}
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
@@ -70,7 +76,7 @@
   App.actions.thx_pdf = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); await App.sharePdf(thxName(c) + '.pdf', App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
 
   // preview of the message with the client's name, then send
-  App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 Remerciement</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
+  App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 ${esc(App.thanksKindName(c))}</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
       <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${esc(App.thanksText(c))}</div></div>
       <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
       <div class="bar"><button type="button" class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 Remerciement en PDF (avec entête et sceau)</button><button type="button" class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
@@ -117,7 +123,7 @@
       out.push({ kind: 'inv', icon: '🧾', label: 'Impayé', c, last: i.lastRemind, tone: d > 60 ? 'bad' : d > 30 ? 'warn' : '', rank: -300 - d, sub: `${i.number} · ${d} j`, amount: App.fmt(App.invDue(i), i.currency), text: () => App.unpaidText(i, c), mark: () => { i.lastRemind = App.today(); App.log(c.id, 'Relance impayé ' + i.number); } }); });
     (db.penalties || []).filter(p => !p.paid).forEach(p => { const c = App.client(p.clientId); if (!c) return;
       out.push({ kind: 'pen', icon: '⚠️', label: 'Pénalité', c, last: p.lastRemind, tone: 'warn', rank: -250, sub: p.reason || 'Pénalité', amount: App.fmt(p.amount, p.currency), text: () => App.penaltyText(p, c), mark: () => { p.lastRemind = App.today(); App.log(c.id, 'Relance pénalité'); } }); });
-    App.thanksDue().forEach(x => out.push({ kind: 'thx', icon: '💛', label: 'Fin de service', c: x.c, last: '', tone: 'ok', rank: 50, sub: x.why + ' · ' + App.fdate(x.date), text: () => App.thanksText(x.c), mark: () => App.thanksMark(x.c) }));
+    App.thanksDue().forEach(x => out.push({ kind: 'thx', icon: '💛', label: 'Remerciement · ' + App.thanksKindName(x.c).replace(/^\S+ /, ''), c: x.c, last: '', tone: 'ok', rank: 50, sub: x.why + ' · ' + App.fdate(x.date), text: () => App.thanksText(x.c), mark: () => App.thanksMark(x.c) }));
     return out.sort((a, b) => a.rank - b.rank);
   };
   const isRecent = it => it.last && App.diff(it.last, App.today()) <= 2;
@@ -169,13 +175,13 @@
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
       <h3 style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
       ${NETS.map(([k, label, ph]) => F.text('soc_' + k, netLogo(k, 18) + label, (App.db.settings.company.socials || {})[k] || '', `placeholder="${ph}" autocapitalize="off" autocomplete="off" inputmode="url"`)).join('')}
-      <h3 style="margin:12px 0 4px;font-size:15px">Aperçu du remerciement</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
+      <h3 style="margin:12px 0 4px;font-size:15px">Aperçu des remerciements</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
   // live preview of the thank-you with a real client's name (first client with a phone, else a sample)
   const prev = () => { const el = $('thx_prev'); if (!el) return; const real = App.db.clients.find(c => c.phone) || App.db.clients[0], c = real || { first: 'Awa', last: 'Diallo', name: 'Awa Diallo' };
-    el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small><br>${esc(App.thanksText(c))}`; };
+    el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small>` + Object.keys(KINDS).map(k => `<div style="margin-top:8px"><b>${KINDS[k][1]}</b><br>${esc(App.thanksText(c, k))}</div>`).join(''); };
   const socSet = (e, save) => { const k = String(e.target.id || '').slice(4), C = App.db.settings.company; C.socials = { ...(C.socials || {}), [k]: e.target.value.trim() }; if (save) { App.save(); App.toast('Lien enregistré'); } prev(); };
-  document.addEventListener('input', e => { const id = e.target.id || ''; if (id.startsWith('soc_')) socSet(e, false); else if (id === 'm_merci') { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), merci: e.target.value }; prev(); } });
+  document.addEventListener('input', e => { const id = e.target.id || ''; if (id.startsWith('soc_')) socSet(e, false); else if (/^m_merci/.test(id)) { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [id.slice(2)]: e.target.value }; prev(); } });
   new MutationObserver(() => { if ($('thx_prev') && !$('thx_prev').dataset.ok) { $('thx_prev').dataset.ok = '1'; prev(); } }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('change', e => {
     if (String(e.target.id || '').startsWith('soc_')) return socSet(e, true);

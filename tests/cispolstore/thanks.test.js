@@ -7,7 +7,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   await p.evaluate(() => { const t = App.today(), d = App.db; d.settings.company.name = 'Boutique Test';
-    d.clients.push({ id: 'c1', code: 'CL-1', type: 'mat', first: 'Awa', last: 'D', name: 'Awa D', phone: '0812345678', subs: [], created: t }, { id: 'c2', code: 'CL-2', type: 'mat', first: 'Bob', last: 'K', name: 'Bob K', phone: '', subs: [], created: t }, { id: 'c3', code: 'CL-3', type: 'mat', first: 'Cleo', last: 'M', name: 'Cleo M', phone: '0899999999', subs: [], created: t }, { id: 'c4', code: 'CL-4', type: 'mat', first: 'Old', last: 'Z', name: 'Old Z', phone: '0877777777', subs: [], created: t });
+    d.clients.push({ id: 'c1', code: 'CL-1', type: 'gere', first: 'Awa', last: 'D', name: 'Awa D', phone: '0812345678', subs: [], created: t }, { id: 'c2', code: 'CL-2', type: 'gere', first: 'Bob', last: 'K', name: 'Bob K', phone: '', subs: [], created: t }, { id: 'c3', code: 'CL-3', type: 'gere', first: 'Cleo', last: 'M', name: 'Cleo M', phone: '0899999999', subs: [], created: t }, { id: 'c4', code: 'CL-4', type: 'gere', first: 'Old', last: 'Z', name: 'Old Z', phone: '0877777777', subs: [], created: t });
     d.installs.push({ id: 'in1', clientId: 'c1', date: App.addDays(t, -1), kind: 'Installation Starlink' }, { id: 'in4', clientId: 'c4', date: App.addDays(t, -60), kind: 'Installation Starlink' });
     d.invoices.push({ id: 'i2', number: 'FAC-2026-0002', type: 'materiel', clientId: 'c2', date: App.addDays(t, -3), currency: 'USD', lines: [{ desc: 'X', qty: 1, price: 50 }], created: t });
     d.payments.push({ id: 'p2', date: App.addDays(t, -2), clientId: 'c2', invoiceId: 'i2', amount: 50, currency: 'USD', mode: 'Cash', ref: '', comment: '' });
@@ -78,5 +78,14 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   await p.evaluate(() => document.querySelector('#view [data-act=thx_send]').click()); await p.waitForTimeout(250);
   ok('the tab button opens the message preview', await p.evaluate(() => /Message de fin de service/.test(document.getElementById('dlg').innerText)));
   await p.keyboard.press('Escape');
+  // the thank-you differs for a purchase, an installation and the complete service
+  const kinds = await p.evaluate(() => { const mk = t => ({ id: 'k_' + t, code: 'K-' + t, type: t, first: 'Awa', last: 'Diallo', name: 'Awa Diallo', phone: '0812345678', subs: [] }); const r = {}; ['mat', 'install', 'gere'].forEach(t => { const c = mk(t); App.db.clients.push(c); r[t] = { k: App.thanksKind(c), n: App.thanksKindName(c), txt: App.thanksText(c), doc: App.thanksDoc(c, '', '') }; }); return r; });
+  ok('kinds: mat → achat, install → install, gere → complet', kinds.mat.k === 'achat' && kinds.install.k === 'install' && kinds.gere.k === 'complet');
+  ok('3 different messages (achat / installation / service complet)', new Set([kinds.mat.txt, kinds.install.txt, kinds.gere.txt]).size === 3 && /achat/.test(kinds.mat.txt) && /installation/i.test(kinds.install.txt) && /Bonjour Awa/.test(kinds.gere.txt));
+  ok('document subject follows the kind', /Merci pour votre achat/.test(kinds.mat.doc) && /Installation terminée/.test(kinds.install.doc) && /Fin de service/.test(kinds.gere.doc));
+  await p.evaluate(() => App.go('client', { id: 'k_mat', tab: 'thx' })); await p.waitForTimeout(300);
+  ok('client tab names the kind', await p.evaluate(() => /Achat/.test(document.getElementById('view').innerText)));
+  await p.evaluate(() => { App.db.settings.msgs = { ...(App.db.settings.msgs || {}), merci_achat: 'Achat OK {prenom}' }; });
+  ok('each kind has its own editable template', await p.evaluate(() => App.thanksText(App.client('k_mat')).startsWith('Achat OK Awa') && !/Achat OK/.test(App.thanksText(App.client('k_install')))));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
