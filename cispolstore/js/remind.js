@@ -45,7 +45,7 @@
   App.socialLinks = () => { const s = App.db.settings.company.socials || {}; return NETS.map(([k, label]) => [label.replace(/ \(.*\)$/, ''), netUrl(k, s[k]), k]).filter(x => x[1]); };
   App.thanksText = c => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name }, links = App.socialLinks();
     return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.map(([n, u, k]) => `${EMOJI[k]} ${n} : ${u}`).join('\n') : ''); };
-  const THX_DAYS = 14;
+  const THX_DAYS = 30;
   App.thanksDue = () => {
     const db = App.db, ev = {}, add = (cid, date, why) => { if (cid && date && (!ev[cid] || date > ev[cid].date)) ev[cid] = { date, why }; };
     (db.installs || []).forEach(x => add(x.clientId, x.date, x.kind || 'Installation'));
@@ -134,6 +134,7 @@
           <div class="cstats"><div><b>${done}</b><small>déjà relancé(s)</small></div><div class="${nophone ? 'bad' : ''}"><b>${nophone}</b><small>sans téléphone</small></div><div><b>${cache.length}</b><small>au total</small></div></div></section>
         ${todo.length ? `<div class="bar"><button class="btn" data-act="rel_series">💬 Tout relancer en série (${todo.length})</button></div>` : ''}
         <div class="chips">${[['all', 'Tout'], ['sub', '📡 Abonnements'], ['inv', '🧾 Impayés'], ['pen', '⚠️ Pénalités'], ['thx', '💛 Remerciements']].map(([k, t]) => `<button class="chip ${rst.f === k ? 'on' : ''}" data-act="rel_f" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
+        ${rst.f === 'thx' ? '<div class="bar" style="margin:0 0 10px"><button class="btn" data-act="thx_pick">💛 Remercier un autre client…</button></div>' : ''}
         <p class="mut" style="font-size:13px;margin:0 0 10px">Un message prêt s'ouvre dans WhatsApp : il ne reste qu'à l'envoyer. Les clients relancés depuis moins de 2 jours sont mis de côté.</p>
         ${shown.length ? `<div class="list">${shown.map((it, i) => { const k = cache.indexOf(it), rec = isRecent(it);
           return `<div class="item" style="${rec ? 'opacity:.6' : ''}"><span class="avatar ${it.tone || ''}">${it.icon}</span><div class="grow" data-act="go" data-v="client" data-id="${it.c.id}" style="cursor:pointer"><b>${esc(App.cname(it.c))}</b><small>${esc(it.label)} · ${esc(it.sub)}${it.last ? ' · relancé le ' + App.fdate(it.last) : ''}</small></div>${it.amount ? `<div class="end"><b>${it.amount}</b></div>` : ''}${it.c.phone ? `<button class="btn sm" data-act="rel_one" data-k="${k}" aria-label="WhatsApp">💬</button>` : '<span class="mut" style="font-size:12px">sans n°</span>'}${it.kind === 'thx' ? `<button class="btn sm sec" data-act="thx_skip" data-id="${it.c.id}" aria-label="Pas de message" title="Pas de message pour ce client">✖</button>` : ''}</div>`; }).join('')}</div>` : '<div class="empty big"><div class="ei">🎉</div><b>Rien à relancer</b><p class="mut">Tous vos clients sont à jour.</p></div>'}`
@@ -141,6 +142,12 @@
   };
   App.actions.rel_f = d => { rst.f = d.f; App.refresh(); };
   App.actions.thx_go = () => { rst.f = 'thx'; App.go('relances'); };
+  // choose any client (with a phone) to send the end-of-service message to, whenever the user wants
+  App.actions.thx_pick = () => {
+    const l = App.db.clients.filter(c => c.phone).sort((a, b) => App.cname(a).localeCompare(App.cname(b)));
+    App.modal('Remercier un client', `<input id="thx_q" placeholder="Chercher un client…" autocomplete="off" style="margin-bottom:8px"><div class="list" id="thx_l" style="max-height:50vh;overflow:auto">${l.length ? l.map(c => `<button type="button" class="item" data-act="thx_send" data-id="${c.id}" data-n="${esc(App.cname(c).toLowerCase())}"><span class="avatar">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small>${esc(c.phone)}${c.thanksAt ? ' · remercié le ' + App.fdate(c.thanksAt) : ''}</small></div><span class="mut">💛</span></button>`).join('') : '<div class="empty">Aucun client avec un numéro de téléphone.</div>'}</div>`);
+    const q = $('thx_q'); if (q) q.oninput = () => { const v = q.value.trim().toLowerCase(); document.querySelectorAll('#thx_l [data-n]').forEach(b => { b.hidden = !!v && !b.dataset.n.includes(v); }); };
+  };
   App.actions.rel_one = d => { const it = cache[+d.k]; if (!it || !it.c.phone) return App.toast('Pas de numéro de téléphone'); if (it.kind === 'thx') return App.actions.thx_send({ id: it.c.id }); send(it); App.refresh(); };
   App.actions.rel_series = () => {
     const q = (cache.length ? cache : App.relanceItems()).filter(it => it.c.phone && !isRecent(it) && (rst.f === 'all' || it.kind === rst.f)); if (!q.length) return App.toast('Personne à relancer');

@@ -59,5 +59,17 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   ok('document: client name, thank-you text without emoji, social links, company name under the stamp', /Awa D/.test(doc) && /Merci d&#39;avoir choisi Boutique Test|Merci d'avoir choisi Boutique Test/.test(doc) && !/😊/.test(doc) && /Faites un tour sur nos réseaux/.test(doc) && /facebook\.com\/boutique/.test(doc) && /class="ln">Boutique Test</.test(doc));
   await p.evaluate(() => { App.db.settings.company.socials = {}; App.thanksPreview(App.client('c1')); }); await p.waitForTimeout(200);
   ok('preview offers PDF and print with letterhead and stamp', await p.evaluate(() => !!document.querySelector('#dlg [data-act=thx_pdf]') && !!document.querySelector('#dlg [data-act=thx_print]')));
+  // visibility: permanent entries, whatever the number of clients to thank
+  await p.evaluate(() => { App.db.clients.forEach(c => { c.thanksAt = App.today(); }); App.db.installs.forEach(x => { x.date = App.addDays(App.today(), -90); }); App.db.deliveries.forEach(x => { x.doneAt = App.addDays(App.today(), -90); x.date = x.doneAt; }); App.go('home'); }); await p.waitForTimeout(300);
+  ok('none to thank: the 💛 card stays on the dashboard (quiet version)', await p.evaluate(() => App.thanksCount() === 0 && /Message de fin de service/.test(document.getElementById('view').innerText) && !!document.querySelector('#view [data-act=thx_go]')));
+  await p.evaluate(() => App.go('more')); await p.waitForTimeout(300);
+  ok('Plus menu: permanent « Message de fin de service » entry', await p.evaluate(() => !!document.querySelector('#view [data-act=thx_go]') && /Message de fin de service/.test(document.getElementById('view').innerText)));
+  await p.evaluate(() => document.querySelector('#view [data-act=thx_go]').click()); await p.waitForTimeout(300);
+  ok('the entry opens the 💛 list with a « Remercier un autre client » button', await p.evaluate(() => !!document.querySelector('[data-act=thx_pick]')));
+  await p.evaluate(() => document.querySelector('[data-act=thx_pick]').click()); await p.waitForTimeout(250);
+  ok('the picker lists the clients with a phone, searchable', await p.evaluate(() => { const n = document.querySelectorAll('#thx_l [data-act=thx_send]').length; const q = document.getElementById('thx_q'); q.value = 'awa'; q.dispatchEvent(new Event('input')); const v = [...document.querySelectorAll('#thx_l [data-act=thx_send]')].filter(b => !b.hidden).length; return n >= 3 && v === 1; }));
+  await p.evaluate(() => document.querySelector('#thx_l [data-act=thx_send]:not([hidden])').click()); await p.waitForTimeout(250);
+  ok('choosing a client opens the message preview', await p.evaluate(() => /Message de fin de service/.test(document.getElementById('dlg').innerText) && /Bonjour Awa/.test(document.getElementById('dlg').innerText)));
+  await p.keyboard.press('Escape');
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
