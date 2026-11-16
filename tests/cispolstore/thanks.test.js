@@ -91,6 +91,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   const art = await p.evaluate(() => { const c = App.client('k_gere'); c.last = 'Diallo Mukendi'; c.name = 'Awa Diallo Mukendi'; const h = App.thanksDoc(c, '', ''); return { h, txt: App.thanksHtml(c) }; });
   ok('document: full name in bold italic in the greeting and in the client box', /<b><i[^>]*>Awa Diallo Mukendi<\/i><\/b>/.test(art.h) && /Nom :?[\s\S]{0,80}<b><i>Awa Diallo Mukendi<\/i><\/b>|<b><i>Awa Diallo Mukendi<\/i><\/b>/.test(art.h) && (art.h.match(/Awa Diallo Mukendi/g) || []).length >= 2);
   ok('document: « Merci ! » title and decorative frame', /Merci&nbsp;!/.test(art.h) && /❦/.test(art.h) && /e5b044/i.test(art.h));
+  ok('document: no company-name / tagline block in the header (logo only), RDC kept with the address', await p.evaluate(() => { const c = App.client('k_gere'); App.db.settings.company.address = '14 Av. Bandundu Kinshasa/gombe, RDC'; const h = App.thanksDoc(c, '', ''); return !/class=\"nm\"/.test(h) && !/class=\"sub\"/.test(h) && /Kinshasa\/gombe,&nbsp;RDC/.test(h) && /<img/.test(h.split('REMERCIEMENT')[0]); }));
   ok('document: the company logo as a faint watermark in the background', /<img class="wm"/.test(art.h));
   ok('previews show the name in bold italic (no asterisks)', /<b><i>Awa Diallo Mukendi<\/i><\/b>/.test(art.txt) && !/\*_/.test(art.txt));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);

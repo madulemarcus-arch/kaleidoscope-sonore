@@ -288,10 +288,12 @@
   const money = (n, cur) => cur === 'CDF' ? App.nf(n, 0) + ' CDF' : App.nf(n, 2) + ' $';
   const lines = a => a.filter(Boolean).map(([k, v]) => `<div>${k ? `<b>${k} : </b>` : ''}${v}</div>`).join('');
   const docName = co => /^cispol\s*store$/i.test(co.name || '') ? 'CISPOL STORE' : String(co.name || '').toUpperCase();
-  const paperHead = (co, logo) => {
+  // bare = logo only, centred (no company name / tagline); the last words of the address are kept together so « RDC » never sits alone on a line
+  const paperHead = (co, logo, bare) => {
     const legal = [co.rccm && ['RCCM', esc(co.rccm)], co.idnat && ['Id. Nat.', esc(co.idnat)], co.impot && ['N° Impôt', esc(co.impot)]];
-    return `<table class="hd"><tr><td style="width:6.2cm"><img src="${esc(logo || co.logo || 'logo.png')}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td><td style="width:6.2cm"></td></tr></table>
-      <table class="legal"><tr><td>${lines(legal)}</td><td class="r">${lines([['Siège Social', esc(co.address)], ['Contact', esc(co.email)], ['Téléphone', esc(co.phone)]])}</td></tr></table>`;
+    const adr = esc(co.address).replace(/ (\S+)$/, '&nbsp;$1'), img = esc(logo || co.logo || 'logo.png');
+    return `${bare ? `<table class="hd"><tr><td style="width:100%!important;text-align:center"><img src="${img}" alt="" style="max-width:6.2cm"></td></tr></table>` : `<table class="hd"><tr><td style="width:6.2cm"><img src="${img}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td><td style="width:6.2cm"></td></tr></table>`}
+      <table class="legal"><tr><td>${lines(legal)}</td><td class="r">${lines([['Siège Social', adr], ['Contact', esc(co.email)], ['Téléphone', esc(co.phone)]])}</td></tr></table>`;
   };
   const twoBoxes = (t1, r1, t2, r2) => `<table class="two"><tr><td class="box"><div class="bh">${t1}</div>${lines(r1)}</td><td class="gap"></td>${t2 ? `<td class="box"><div class="bh">${t2}</div>${lines(r2)}</td>` : '<td class="box" style="border:0;background:none"></td>'}</tr></table>`;
   // QR code: opens WhatsApp to the company with the invoice number already typed, so the client can send the payment proof
