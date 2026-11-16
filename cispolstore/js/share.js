@@ -32,7 +32,10 @@
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
     const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
     const S = 2, cw = W * S, ph = Math.round(cw * 841.89 / 595.28), full = document.createElement('canvas'); full.width = cw; full.height = H * S;
-    const g = full.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, full.height); g.drawImage(img, 0, 0, cw, H * S);
+    const g = full.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, full.height);
+    // a document marked data-fit (the thank-you) is shrunk to one page when it is only a little too tall, so nothing slips onto a second page
+    if (/data-fit/.test(html) && H > ph / S && H < 1.5 * ph / S) { const f = ph / S / H; full.height = ph; g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ph); g.drawImage(img, (cw - cw * f) / 2, 0, cw * f, H * S * f); }
+    else g.drawImage(img, 0, 0, cw, H * S);
     const pages = []; for (let y = 0; y < full.height || !pages.length; y += ph) {
       const h = Math.min(ph, full.height - y), c = document.createElement('canvas'); c.width = cw; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cw, h); x.drawImage(full, 0, y, cw, h, 0, 0, cw, h);
       pages.push({ w: cw, h, jpg: dataUrlBytes(c.toDataURL('image/jpeg', 0.92)) });

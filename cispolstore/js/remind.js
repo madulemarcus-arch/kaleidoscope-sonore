@@ -70,17 +70,17 @@
     const NAVY = '#12365d', ORG = '#d5522f', GOLD = '#e5b044', big = `<b><i style="font-size:17pt;color:${NAVY};letter-spacing:.3px">${e(nm)}</i></b>`;
     const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: nm, nom: nm, entreprise: co.name })[k] ?? m));
     const corner = pos => `<span style="position:absolute;font-size:22px;color:${GOLD};${pos}">❦</span>`;
-    return `<div class="paper" style="position:relative;background:#fffdf8;border:2px solid ${GOLD};outline:6px solid #fffdf8;outline-offset:-12px;padding:34px 40px;box-sizing:border-box">
+    return `<div class="paper" data-fit="1" style="position:relative;background:#fffdf8;border:2px solid ${GOLD};outline:6px solid #fffdf8;outline-offset:-12px;padding:20px 32px;box-sizing:border-box">
       ${corner('top:6px;left:10px')}${corner('top:6px;right:10px')}${corner('bottom:6px;left:10px')}${corner('bottom:6px;right:10px')}
       <img class="wm" src="${e(logo || 'logo.png')}" alt="" style="position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);width:62%;max-width:480px;opacity:.07">
       ${K.head(co, logo, true)}
       ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b><i>${e(nm)}</i></b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
-      <div style="text-align:center;margin:6px 0 4px;color:${GOLD};letter-spacing:10px;font-size:15px">✦ ✦ ✦</div>
-      <div style="text-align:center;font:italic 700 46px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
-      <div style="margin:8px auto 14px;width:62%;height:2px;background:linear-gradient(90deg,transparent,${GOLD},${ORG},${GOLD},transparent)"></div>
-      <div class="rc" style="text-align:justify;line-height:1.85;white-space:pre-line;font-size:13pt;border-left:none;background:transparent;padding:6px 8px;position:relative">${e(body).split(e(nm)).join(big)}</div>
-      <div style="text-align:center;color:${GOLD};font-size:20px;margin:4px 0 10px">❧ ❦ ☙</div>
-      ${links.length ? `<div class="rc" style="margin-top:6px;position:relative"><b>Faites un tour sur nos réseaux :</b><br>${links.map(([n, u, k]) => `<div style="margin:4px 0">${netLogo(k, 16)}${e(n)} : ${e(u)}</div>`).join('')}</div>` : ''}
+      <div style="text-align:center;margin:0;color:${GOLD};letter-spacing:10px;font-size:12px;line-height:1.4">✦ ✦ ✦</div>
+      <div style="text-align:center;font:italic 700 38px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
+      <div style="margin:4px auto 8px;width:62%;height:2px;background:linear-gradient(90deg,transparent,${GOLD},${ORG},${GOLD},transparent)"></div>
+      <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line;font-size:12pt;border-left:none;background:transparent;padding:2px 8px;margin:0 0 6px;position:relative">${e(body).split(e(nm)).join(big)}</div>
+      <div style="text-align:center;color:${GOLD};font-size:15px;line-height:1.2;margin:0 0 6px">❧ ❦ ☙</div>
+      ${links.length ? `<div class="rc" style="margin:0 0 8px;padding:8px 12px;font-size:10.5pt;line-height:1.4;position:relative"><b>Faites un tour sur nos réseaux :</b><div style="display:flex;flex-wrap:wrap;margin-top:4px">${links.map(([n, u, k]) => `<div style="width:50%;box-sizing:border-box;padding:2px 6px 2px 0;word-break:break-all">${netLogo(k, 15)}<b>${e(n)}</b> : ${e(u.replace(/^https?:\/\//, ''))}</div>`).join('')}</div></div>` : ''}
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
   const thxName = c => App.docName(App.cname(c), 'Remerciement');
   App.actions.thx_print = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); App.docKit.print(thxName(c), App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };

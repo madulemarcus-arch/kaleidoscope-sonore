@@ -292,7 +292,7 @@
   const paperHead = (co, logo, bare) => {
     const legal = [co.rccm && ['RCCM', esc(co.rccm)], co.idnat && ['Id. Nat.', esc(co.idnat)], co.impot && ['N° Impôt', esc(co.impot)]];
     const adr = esc(co.address).replace(/ (\S+)$/, '&nbsp;$1'), img = esc(logo || co.logo || 'logo.png');
-    return `${bare ? `<table class="hd"><tr><td style="width:100%!important;text-align:center"><img src="${img}" alt="" style="max-width:6.2cm"></td></tr></table>` : `<table class="hd"><tr><td style="width:6.2cm"><img src="${img}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td><td style="width:6.2cm"></td></tr></table>`}
+    return `${bare ? `<table class="hd"><tr><td style="width:100%!important;text-align:center"><img src="${img}" alt="" style="max-width:4.6cm"></td></tr></table>` : `<table class="hd"><tr><td style="width:6.2cm"><img src="${img}" alt=""></td><td><div class="nm">${esc(docName(co))}</div><div class="sub">${esc(co.tagline || '')}</div></td><td style="width:6.2cm"></td></tr></table>`}
       <table class="legal"><tr><td>${lines(legal)}</td><td class="r">${lines([['Siège Social', adr], ['Contact', esc(co.email)], ['Téléphone', esc(co.phone)]])}</td></tr></table>`;
   };
   const twoBoxes = (t1, r1, t2, r2) => `<table class="two"><tr><td class="box"><div class="bh">${t1}</div>${lines(r1)}</td><td class="gap"></td>${t2 ? `<td class="box"><div class="bh">${t2}</div>${lines(r2)}</td>` : '<td class="box" style="border:0;background:none"></td>'}</tr></table>`;
@@ -329,7 +329,7 @@
   const printRaw = async (title, html) => {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     f.srcdoc = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${DOC_CSS}</style>${html}${made()}`;
-    f.onload = () => readyThen(f, () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
+    f.onload = () => readyThen(f, () => { try { const fit = f.contentDocument.querySelector('[data-fit]'); if (fit) { const hh = fit.getBoundingClientRect().height; if (hh > 1020) f.contentDocument.body.style.zoom = 1020 / hh; } } catch (e) {} try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { App.toast('Impression indisponible'); } setTimeout(() => f.remove(), 60000); });
     document.body.appendChild(f);
   };
   App.actions.recprint = async d => { const p = App.db.payments.find(x => x.id === d.id); if (p) App.rcptSent(p.id); if (p) printRaw(App.recFileName(p), App.receiptDoc(p, await logoData(), await stampData())); };
