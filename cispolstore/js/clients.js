@@ -122,8 +122,12 @@
   };
 
   // ---------- Client file ----------
-  const TABS = { gere: ['infos', 'abo', 'pay', 'dep', 'fac', 'inst', 'mat', 'hist'], mat: ['infos', 'pay', 'dep', 'fac', 'mat', 'hist'], install: ['infos', 'pay', 'dep', 'fac', 'inst', 'hist'] };
-  const TAB_NAMES = { infos: 'Infos', abo: 'Abonnement', pay: 'Paiements', fac: 'Factures', inst: 'Installations', mat: 'Matériel', hist: 'Historique', dep: 'Dépôts' };
+  const TABS = { gere: ['infos', 'abo', 'pay', 'dep', 'fac', 'inst', 'mat', 'thx', 'hist'], mat: ['infos', 'pay', 'dep', 'fac', 'mat', 'thx', 'hist'], install: ['infos', 'pay', 'dep', 'fac', 'inst', 'thx', 'hist'] };
+  const TAB_NAMES = { infos: 'Infos', abo: 'Abonnement', pay: 'Paiements', fac: 'Factures', inst: 'Installations', mat: 'Matériel', hist: 'Historique', dep: 'Dépôts', thx: '💛 Merci' };
+  // end-of-service thank-you tab: status, message text and the send / PDF / print actions for this client
+  const thxTab = c => `<div class="card"><div class="spread"><b>Message de fin de service</b>${c.thanksAt ? `<span class="pill ok">Envoyé le ${App.fdate(c.thanksAt)}</span>` : '<span class="pill warn">Pas encore envoyé</span>'}</div>
+    <p class="mut" style="white-space:pre-wrap;margin:10px 0">${esc(App.thanksText(c))}</p>
+    <div class="bar"><button class="btn" data-act="thx_send" data-id="${c.id}">💬 ${c.thanksAt ? 'Renvoyer' : 'Envoyer'} sur WhatsApp</button><button class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 PDF</button><button class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}</div>`;
   const copyBtn = t => `<button class="btn sm sec" data-act="copy" data-t="${esc(t)}">Copier</button>`;
   App.actions.copy = d => { const done = () => App.toast('Copié'); try { navigator.clipboard.writeText(d.t).then(done, () => window.prompt('Copiez :', d.t)); } catch (e) { window.prompt('Copiez :', d.t); } };
   App.actions.cltab = d => App.go('client', { id: d.id, tab: d.tab }, true);
@@ -166,6 +170,7 @@
       body = (c.serial ? `<div class="card"><span class="mut">Numéro de série</span><br><b>${esc(c.serial)}</b></div><div style="height:10px"></div>` : '') + listOrEmpty(rows, 'Aucun matériel vendu à ce client.');
     }
     if (tab === 'dep') body = App.clientDepTab(c);
+    if (tab === 'thx') body = thxTab(c);
     if (tab === 'hist') body = (c.phone ? `<div class="bar" style="margin:0 0 10px"><button class="btn sm sec" data-act="thx_send" data-id="${c.id}">💛 Message de fin de service${c.thanksAt ? ' · envoyé le ' + App.fdate(c.thanksAt) : ''}</button></div>` : '') + listOrEmpty(db.log.filter(x => x.clientId === c.id).slice().reverse().map(x => `<div class="item"><div class="grow"><b>${esc(x.text)}</b><small>${App.fdate(x.date)}</small></div></div>`), 'Aucune opération.');
     const wa = App.waLink(c);
     return {

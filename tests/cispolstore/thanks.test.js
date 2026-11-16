@@ -71,5 +71,12 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   await p.evaluate(() => document.querySelector('#thx_l [data-act=thx_send]:not([hidden])').click()); await p.waitForTimeout(250);
   ok('choosing a client opens the message preview', await p.evaluate(() => /Message de fin de service/.test(document.getElementById('dlg').innerText) && /Bonjour Awa/.test(document.getElementById('dlg').innerText)));
   await p.keyboard.press('Escape');
+  // « 💛 Merci » tab on the client file, next to Abonnement / Factures / …
+  await p.evaluate(() => { const c = App.db.clients.find(x => x.phone && x.type === 'gere') || App.db.clients.find(x => x.phone); window.__tc = c.id; App.go('client', { id: c.id, tab: 'thx' }); }); await p.waitForTimeout(350);
+  ok('client file has a « 💛 Merci » tab', await p.evaluate(() => [...document.querySelectorAll('.tabs button')].some(b => /Merci/.test(b.textContent))));
+  ok('the tab shows the status, the message and the send / PDF / print buttons', await p.evaluate(() => { const v = document.getElementById('view'); return /Message de fin de service/.test(v.innerText) && /Bonjour/.test(v.innerText) && !!v.querySelector('[data-act=thx_send]') && !!v.querySelector('[data-act=thx_pdf]') && !!v.querySelector('[data-act=thx_print]'); }));
+  await p.evaluate(() => document.querySelector('#view [data-act=thx_send]').click()); await p.waitForTimeout(250);
+  ok('the tab button opens the message preview', await p.evaluate(() => /Message de fin de service/.test(document.getElementById('dlg').innerText)));
+  await p.keyboard.press('Escape');
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
