@@ -101,5 +101,13 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
     const txt = got ? new TextDecoder('latin1').decode(new Uint8Array(await got.arrayBuffer())) : ''; const m = /\/Count (\d+)/.exec(txt); return m ? +m[1] : -1; });
   ok('PDF of the thank-you with 8 networks fits on one page', pages === 1, 'pages=' + pages);
   ok('networks listed in two columns with their logo', await p.evaluate(() => { const h = App.thanksDoc(App.client('k_mat'), '', ''); return /width:50%/.test(h) && /data-fit/.test(h) && (h.match(/<svg/g) || []).length >= 8; }));
+  // logo on the left in the thank-you header; a clear way to add the social networks
+  ok('document header: logo on the left (not centred)', await p.evaluate(() => { const h = App.thanksDoc(App.client('k_mat'), '', ''); return /text-align:left"><img/.test(h) && !/text-align:center"><img/.test(h); }));
+  await p.evaluate(() => { App.db.settings.company.socials = {}; App.go('client', { id: 'k_mat', tab: 'thx' }); }); await p.waitForTimeout(300);
+  ok('client tab tells that no network is set and offers « Ajouter mes réseaux sociaux »', await p.evaluate(() => /Aucun réseau social renseigné/.test(document.getElementById('view').innerText) && !!document.querySelector('#view [data-act=soc_go]')));
+  await p.evaluate(() => document.querySelector('#view [data-act=soc_go]').click()); await p.waitForTimeout(700);
+  ok('the button opens the settings on the social-network fields (fold open, first field focused)', await p.evaluate(() => App.state.view === 'settings' && !!document.querySelector('details[data-fold=msgs][open]') && document.activeElement && document.activeElement.id === 'soc_facebook'));
+  await p.evaluate(() => { App.db.settings.company.socials = { facebook: 'facebook.com/x', instagram: 'instagram.com/x' }; App.go('client', { id: 'k_mat', tab: 'thx' }); }); await p.waitForTimeout(300);
+  ok('client tab lists the networks already added', await p.evaluate(() => /2 réseau\(x\) ajouté\(s\)[^]*Facebook, Instagram/.test(document.getElementById('view').innerText)));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();

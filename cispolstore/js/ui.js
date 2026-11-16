@@ -28,6 +28,7 @@
   // collapsible section: closed by default, and it stays as the user left it when the screen redraws
   const folds = {};
   document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('fold')) folds[e.target.dataset.fold] = e.target.open; }, true);
+  App.foldOpen = id => { folds[id] = true; };
   App.fold = (id, title, body) => `<details class="fold" data-fold="${id}"${folds[id] ? ' open' : ''}><summary>${title}</summary>${body}</details>`;
   App.f = {
     text: (id, label, val = '', x = '') => `<div class="fld"><label class="l" for="${id}">${label}</label><input id="${id}" value="${esc(val)}" ${x}></div>`,

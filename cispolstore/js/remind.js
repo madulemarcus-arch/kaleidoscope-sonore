@@ -89,7 +89,7 @@
   // preview of the message with the client's name, then send
   App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 ${esc(App.thanksKindName(c))}</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
       <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${App.thanksHtml(c)}</div></div>
-      <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
+      ${App.socialStatus()}<div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
       <div class="bar"><button type="button" class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 Remerciement en PDF (avec entête et sceau)</button><button type="button" class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
   App.actions.thx_send = d => { const c = App.client(d.id); if (!c) return; if (!c.phone) return App.toast('Pas de numéro de téléphone'); App.thanksPreview(c);
     $('tsend').onclick = () => { window.open(App.waUrl(c.phone, App.thanksText(c)), '_blank', 'noopener'); App.thanksMark(c); App.save(); App.close(); App.refresh(); App.toast('Message de remerciement ouvert dans WhatsApp'); }; };
@@ -158,6 +158,10 @@
     };
   };
   App.actions.rel_f = d => { rst.f = d.f; App.refresh(); };
+  // jump straight to the social-network fields of the settings (Paramètres › Messages de rappel WhatsApp › Vos réseaux sociaux)
+  App.actions.soc_go = () => { App.foldOpen('msgs'); App.close(); App.go('settings'); setTimeout(() => { const el = $('soc_facebook'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 400); };
+  // short status line + button, shown on the client's 💛 tab and in the preview
+  App.socialStatus = () => { const l = App.socialLinks(); return l.length ? `<p class="mut" style="margin:8px 0 0;font-size:13px">🔗 ${l.length} réseau(x) ajouté(s) au message : ${l.map(x => esc(x[0])).join(', ')} · <a href="#" data-act="soc_go">Modifier</a></p>` : `<div class="warn" style="margin:8px 0 0;font-size:13px">Aucun réseau social renseigné : ils n'apparaîtront ni dans le message ni sur le PDF.</div><div class="bar" style="margin-top:6px"><button type="button" class="btn sm" data-act="soc_go">➕ Ajouter mes réseaux sociaux</button></div>`; };
   App.actions.thx_go = () => { rst.f = 'thx'; App.go('relances'); };
   // choose any client (with a phone) to send the end-of-service message to, whenever the user wants
   App.actions.thx_pick = () => {
@@ -184,7 +188,7 @@
   App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
       <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
-      <h3 style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
+      <h3 id="soc_anchor" style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
       ${NETS.map(([k, label, ph]) => F.text('soc_' + k, netLogo(k, 18) + label, (App.db.settings.company.socials || {})[k] || '', `placeholder="${ph}" autocapitalize="off" autocomplete="off" inputmode="url"`)).join('')}
       <h3 style="margin:12px 0 4px;font-size:15px">Aperçu des remerciements</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
