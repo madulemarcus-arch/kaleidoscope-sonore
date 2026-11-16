@@ -41,21 +41,42 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   await p.evaluate(() => { delete App.db.settings.msgs; App.go('settings'); }); await p.waitForTimeout(300); await p.evaluate(() => { const f = document.querySelector('[data-fold=msgs], [data-id=msgs]'); if (f) f.click(); });
   ok('settings list the new template', await p.evaluate(() => !!document.getElementById('m_merci') || /Remerciement de fin de service/.test(document.body.innerText)));
   // social links appended at the end + live preview in settings
-  await p.evaluate(() => { App.db.settings.company.social = 'https://facebook.com/boutique\n\nhttps://instagram.com/boutique '; });
+  await p.evaluate(() => { App.db.settings.company.socials = { facebook: 'https://facebook.com/boutique', instagram: 'instagram.com/boutique ', tiktok: '', whatsapp: '+243 814 048 480' }; });
   const tx2 = await p.evaluate(() => App.thanksText(App.client('c1')));
-  ok('social links are added at the end of the message, one per line, blanks ignored', /À très bientôt ! Boutique Test\n\nFaites un tour sur nos réseaux :\nhttps:\/\/facebook\.com\/boutique\nhttps:\/\/instagram\.com\/boutique$/.test(tx2), tx2.slice(-140));
-  await p.evaluate(() => { App.db.settings.company.social = ''; });
+  ok('social links are added at the end of the message, one per line, blanks ignored', /À très bientôt ! Boutique Test\n\nFaites un tour sur nos réseaux :\n📘 Facebook : https:\/\/facebook\.com\/boutique\n📸 Instagram : https:\/\/instagram\.com\/boutique\n💬 WhatsApp : https:\/\/wa\.me\/243814048480$/.test(tx2), tx2.slice(-140));
+  await p.evaluate(() => { App.db.settings.company.socials = {}; });
   ok('no links = no extra block', !/réseaux/.test(await p.evaluate(() => App.thanksText(App.client('c1')))));
   await p.evaluate(() => { App.go('settings'); }); await p.waitForTimeout(300); await p.evaluate(() => { const d = document.querySelector('details[data-fold=msgs]'); if (d) d.open = true; }); await p.waitForTimeout(250);
-  const hasField = await p.evaluate(() => !!document.getElementById('thx_social') && !!document.getElementById('thx_prev'));
-  ok('settings: social links field and preview box', hasField);
-  if (hasField) { await p.fill('#thx_social', 'https://tiktok.com/@boutique'); await p.waitForTimeout(250);
-    const pt = await p.innerText('#thx_prev'); ok('preview shows a real client name and updates live with the links', /Aperçu avec/.test(pt) && /Bonjour /.test(pt) && /tiktok\.com\/@boutique/.test(pt), pt.slice(0, 200)); }
+  const hasField = await p.evaluate(() => ['facebook', 'instagram', 'tiktok', 'youtube', 'whatsapp', 'linkedin', 'x', 'site'].every(k => !!document.getElementById('soc_' + k)) && !!document.getElementById('thx_prev'));
+  ok('settings: one field per social network, and the preview box', hasField);
+  if (hasField) { await p.fill('#soc_tiktok', 'tiktok.com/@boutique'); await p.waitForTimeout(250);
+    const pt = await p.innerText('#thx_prev'); ok('preview shows a real client name and updates live with the links', /Aperçu avec/.test(pt) && /Bonjour /.test(pt) && /TikTok : https:\/\/tiktok\.com\/@boutique/.test(pt), pt.slice(0, 200)); }
   // receipt-style document: letterhead, client box, text, social links, stamp
-  const doc = await p.evaluate(() => { App.db.settings.company.social = 'https://facebook.com/boutique'; return App.thanksDoc(App.client('c1'), 'logo.png', 'stamp.png'); });
+  const doc = await p.evaluate(() => { App.db.settings.company.socials = { facebook: 'https://facebook.com/boutique' }; return App.thanksDoc(App.client('c1'), 'logo.png', 'stamp.png'); });
   ok('document uses the receipt model: letterhead (logo), REMERCIEMENT + CLIENT boxes, stamp', /logo\.png/.test(doc) && />REMERCIEMENT</.test(doc) && />CLIENT</.test(doc) && /stamp\.png/.test(doc) && /class="paper"/.test(doc));
+  ok('document: the social link starts with the brand logo (inline SVG, Facebook blue)', /<svg[^>]*fill="#0866FF"[^>]*><path d="M9\.101/.test(doc));
+  ok('settings fields carry the brand logos', await p.evaluate(() => { App.go('settings'); const d = document.querySelector('details[data-fold=msgs]'); if (d) d.open = true; return document.querySelectorAll('label[for^=soc_] svg').length === 8; }));
   ok('document: client name, thank-you text without emoji, social links, company name under the stamp', /Awa D/.test(doc) && /Merci d&#39;avoir choisi Boutique Test|Merci d'avoir choisi Boutique Test/.test(doc) && !/😊/.test(doc) && /Faites un tour sur nos réseaux/.test(doc) && /facebook\.com\/boutique/.test(doc) && /class="ln">Boutique Test</.test(doc));
-  await p.evaluate(() => { App.db.settings.company.social = ''; App.thanksPreview(App.client('c1')); }); await p.waitForTimeout(200);
+  await p.evaluate(() => { App.db.settings.company.socials = {}; App.thanksPreview(App.client('c1')); }); await p.waitForTimeout(200);
   ok('preview offers PDF and print with letterhead and stamp', await p.evaluate(() => !!document.querySelector('#dlg [data-act=thx_pdf]') && !!document.querySelector('#dlg [data-act=thx_print]')));
+  // visibility: permanent entries, whatever the number of clients to thank
+  await p.evaluate(() => { App.db.clients.forEach(c => { c.thanksAt = App.today(); }); App.db.installs.forEach(x => { x.date = App.addDays(App.today(), -90); }); App.db.deliveries.forEach(x => { x.doneAt = App.addDays(App.today(), -90); x.date = x.doneAt; }); App.go('home'); }); await p.waitForTimeout(300);
+  ok('none to thank: the 💛 card stays on the dashboard (quiet version)', await p.evaluate(() => App.thanksCount() === 0 && /Message de fin de service/.test(document.getElementById('view').innerText) && !!document.querySelector('#view [data-act=thx_go]')));
+  await p.evaluate(() => App.go('more')); await p.waitForTimeout(300);
+  ok('Plus menu: permanent « Message de fin de service » entry', await p.evaluate(() => !!document.querySelector('#view [data-act=thx_go]') && /Message de fin de service/.test(document.getElementById('view').innerText)));
+  await p.evaluate(() => document.querySelector('#view [data-act=thx_go]').click()); await p.waitForTimeout(300);
+  ok('the entry opens the 💛 list with a « Remercier un autre client » button', await p.evaluate(() => !!document.querySelector('[data-act=thx_pick]')));
+  await p.evaluate(() => document.querySelector('[data-act=thx_pick]').click()); await p.waitForTimeout(250);
+  ok('the picker lists the clients with a phone, searchable', await p.evaluate(() => { const n = document.querySelectorAll('#thx_l [data-act=thx_send]').length; const q = document.getElementById('thx_q'); q.value = 'awa'; q.dispatchEvent(new Event('input')); const v = [...document.querySelectorAll('#thx_l [data-act=thx_send]')].filter(b => !b.hidden).length; return n >= 3 && v === 1; }));
+  await p.evaluate(() => document.querySelector('#thx_l [data-act=thx_send]:not([hidden])').click()); await p.waitForTimeout(250);
+  ok('choosing a client opens the message preview', await p.evaluate(() => /Message de fin de service/.test(document.getElementById('dlg').innerText) && /Bonjour Awa/.test(document.getElementById('dlg').innerText)));
+  await p.keyboard.press('Escape');
+  // « 💛 Merci » tab on the client file, next to Abonnement / Factures / …
+  await p.evaluate(() => { const c = App.db.clients.find(x => x.phone && x.type === 'gere') || App.db.clients.find(x => x.phone); window.__tc = c.id; App.go('client', { id: c.id, tab: 'thx' }); }); await p.waitForTimeout(350);
+  ok('client file has a « 💛 Merci » tab', await p.evaluate(() => [...document.querySelectorAll('.tabs button')].some(b => /Merci/.test(b.textContent))));
+  ok('the tab shows the status, the message and the send / PDF / print buttons', await p.evaluate(() => { const v = document.getElementById('view'); return /Message de fin de service/.test(v.innerText) && /Bonjour/.test(v.innerText) && !!v.querySelector('[data-act=thx_send]') && !!v.querySelector('[data-act=thx_pdf]') && !!v.querySelector('[data-act=thx_print]'); }));
+  await p.evaluate(() => document.querySelector('#view [data-act=thx_send]').click()); await p.waitForTimeout(250);
+  ok('the tab button opens the message preview', await p.evaluate(() => /Message de fin de service/.test(document.getElementById('dlg').innerText)));
+  await p.keyboard.press('Escape');
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();

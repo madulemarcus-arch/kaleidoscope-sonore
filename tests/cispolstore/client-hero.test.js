@@ -8,7 +8,7 @@ App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',d
 await p.waitForTimeout(600);
 ok('client hero',await p.isVisible('.chero')&&/Jean Mukendi/.test(await p.innerText('.chero h2')));
 const st=await p.innerText('.cstats');ok('client stats: 20 j, 600 $ facturé, 400 $ à payer',/20 j/.test(st)&&/600 \$/.test(st)&&/400 \$/.test(st),st.replace(/\n/g,' | '));
-ok('4 action tiles',(await p.$$('.ctiles > *')).length===4);
+ok('5 action tiles (call, WhatsApp, invoice, 💛 Merci, renew)',(await p.$$('.ctiles > *')).length===5);
 ok('ACC copy chip',await p.isVisible('.acc'));
 await p.click('.ctiles [data-act=renew]');await p.waitForTimeout(400);ok('renew tile opens form',/Renouveler/.test(await p.innerText('dialog')));await p.keyboard.press('Escape');await p.waitForTimeout(300);
 await p.screenshot({path:'s9-client.png'});
