@@ -49,8 +49,10 @@
   const netLogo = (k, px = 16) => ICON[k] ? `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="#${ICON[k][0]}" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;flex:none"><path d="${ICON[k][1]}"/></svg>` : '';
   const netUrl = (k, v) => { v = String(v || '').trim(); if (!v) return ''; if (/^https?:\/\//i.test(v)) return v; if (k === 'whatsapp' && /^[+\d][\d\s().-]{6,}$/.test(v)) return 'https://wa.me/' + v.replace(/\D/g, ''); return 'https://' + v.replace(/^\/+/, ''); };
   App.socialLinks = () => { const s = App.db.settings.company.socials || {}; return NETS.map(([k, label]) => [label.replace(/ \(.*\)$/, ''), netUrl(k, s[k]), k]).filter(x => x[1]); };
-  App.thanksText = (c, kind) => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name }, links = App.socialLinks();
+  App.thanksText = (c, kind) => { const co = App.db.settings.company, v = { prenom: '*_' + App.cname(c) + '_*', nom: '*_' + App.cname(c) + '_*', entreprise: co.name }, links = App.socialLinks();
     return tpl(KINDS[kind || App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.map(([n, u, k]) => `${EMOJI[k]} ${n} : ${u}`).join('\n') : ''); };
+  // the message as HTML for the previews: the WhatsApp *_name_* markup shown as bold italic
+  App.thanksHtml = (c, kind) => esc(App.thanksText(c, kind)).replace(/\*_(.+?)_\*/g, '<b><i>$1</i></b>');
   const THX_DAYS = 30;
   App.thanksDue = () => {
     const db = App.db, ev = {}, add = (cid, date, why) => { if (cid && date && (!ev[cid] || date > ev[cid].date)) ev[cid] = { date, why }; };
@@ -64,12 +66,21 @@
   App.actions.thx_skip = d => { const c = App.client(d.id); if (!c) return; c.thanksAt = App.today(); App.log(c.id, 'Pas de message de fin de service'); App.save(); App.refresh(); App.toast('Marqué : pas de message'); };
   // the same thank-you as a printable / PDF document in the receipt model: letterhead, client box, text, social links, stamp
   const EMO = '[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\uFE0F]+', noEmoji = t => String(t).replace(new RegExp('(\\p{L})\\s*' + EMO + '\\s*(?=\\p{Lu})', 'gu'), '$1,\n\n').replace(new RegExp('\\s*' + EMO, 'gu'), '');
-  App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks();
-    const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name })[k] ?? m));
-    return `<div class="paper">${K.head(co, logo)}
-      ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b>${e(App.cname(c))}</b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
-      <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line">${e(body)}</div>
-      ${links.length ? `<div class="rc" style="margin-top:6px"><b>Faites un tour sur nos réseaux :</b><br>${links.map(([n, u, k]) => `<div style="margin:4px 0">${netLogo(k, 16)}${e(n)} : ${e(u)}</div>`).join('')}</div>` : ''}
+  App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks(), nm = App.cname(c);
+    const NAVY = '#12365d', ORG = '#d5522f', GOLD = '#e5b044', big = `<b><i style="font-size:17pt;color:${NAVY};letter-spacing:.3px">${e(nm)}</i></b>`;
+    const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: nm, nom: nm, entreprise: co.name })[k] ?? m));
+    const corner = pos => `<span style="position:absolute;font-size:22px;color:${GOLD};${pos}">❦</span>`;
+    return `<div class="paper" style="position:relative;background:#fffdf8;border:2px solid ${GOLD};outline:6px solid #fffdf8;outline-offset:-12px;padding:34px 40px;box-sizing:border-box">
+      ${corner('top:6px;left:10px')}${corner('top:6px;right:10px')}${corner('bottom:6px;left:10px')}${corner('bottom:6px;right:10px')}
+      <div style="position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);font-size:340px;line-height:1;color:${ORG};opacity:.05">♥</div>
+      ${K.head(co, logo)}
+      ${K.boxes('REMERCIEMENT', [['Date', App.fdate(App.today())], ['Objet', KINDS[App.thanksKind(c)][2]]], 'CLIENT', [['Nom', `<b><i>${e(nm)}</i></b>`], ['Code Client', e(c.code || '—')], c.phone && ['Téléphone', e(c.phone)]])}
+      <div style="text-align:center;margin:6px 0 4px;color:${GOLD};letter-spacing:10px;font-size:15px">✦ ✦ ✦</div>
+      <div style="text-align:center;font:italic 700 46px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
+      <div style="margin:8px auto 14px;width:62%;height:2px;background:linear-gradient(90deg,transparent,${GOLD},${ORG},${GOLD},transparent)"></div>
+      <div class="rc" style="text-align:justify;line-height:1.85;white-space:pre-line;font-size:13pt;border-left:none;background:transparent;padding:6px 8px;position:relative">${e(body).split(e(nm)).join(big)}</div>
+      <div style="text-align:center;color:${GOLD};font-size:20px;margin:4px 0 10px">❧ ❦ ☙</div>
+      ${links.length ? `<div class="rc" style="margin-top:6px;position:relative"><b>Faites un tour sur nos réseaux :</b><br>${links.map(([n, u, k]) => `<div style="margin:4px 0">${netLogo(k, 16)}${e(n)} : ${e(u)}</div>`).join('')}</div>` : ''}
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
   const thxName = c => App.docName(App.cname(c), 'Remerciement');
   App.actions.thx_print = async d => { const c = App.client(d.id); if (!c) return; App.thanksMark(c); App.save(); App.close(); App.docKit.print(thxName(c), App.thanksDoc(c, await App.docKit.logoData(), await App.docKit.stampData())); App.refresh(); };
@@ -77,7 +88,7 @@
 
   // preview of the message with the client's name, then send
   App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 ${esc(App.thanksKindName(c))}</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
-      <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${esc(App.thanksText(c))}</div></div>
+      <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${App.thanksHtml(c)}</div></div>
       <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>
       <div class="bar"><button type="button" class="btn sec" data-act="thx_pdf" data-id="${c.id}">📤 Remerciement en PDF (avec entête et sceau)</button><button type="button" class="btn sec" data-act="thx_print" data-id="${c.id}">🖨️ Imprimer</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
   App.actions.thx_send = d => { const c = App.client(d.id); if (!c) return; if (!c.phone) return App.toast('Pas de numéro de téléphone'); App.thanksPreview(c);
@@ -179,7 +190,7 @@
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
   // live preview of the thank-you with a real client's name (first client with a phone, else a sample)
   const prev = () => { const el = $('thx_prev'); if (!el) return; const real = App.db.clients.find(c => c.phone) || App.db.clients[0], c = real || { first: 'Awa', last: 'Diallo', name: 'Awa Diallo' };
-    el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small>` + Object.keys(KINDS).map(k => `<div style="margin-top:8px"><b>${KINDS[k][1]}</b><br>${esc(App.thanksText(c, k))}</div>`).join(''); };
+    el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small>` + Object.keys(KINDS).map(k => `<div style="margin-top:8px"><b>${KINDS[k][1]}</b><br>${App.thanksHtml(c, k)}</div>`).join(''); };
   const socSet = (e, save) => { const k = String(e.target.id || '').slice(4), C = App.db.settings.company; C.socials = { ...(C.socials || {}), [k]: e.target.value.trim() }; if (save) { App.save(); App.toast('Lien enregistré'); } prev(); };
   document.addEventListener('input', e => { const id = e.target.id || ''; if (id.startsWith('soc_')) socSet(e, false); else if (/^m_merci/.test(id)) { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [id.slice(2)]: e.target.value }; prev(); } });
   new MutationObserver(() => { if ($('thx_prev') && !$('thx_prev').dataset.ok) { $('thx_prev').dataset.ok = '1'; prev(); } }).observe(document.body, { childList: true, subtree: true });

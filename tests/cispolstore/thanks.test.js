@@ -14,7 +14,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
     d.deliveries.push({ id: 'd3', clientId: 'c3', status: 'done', doneAt: t, date: t, items: 'Kit' }); App.save(); });
   ok('3 clients are due (install, paid invoice, delivery); the 60-day-old one is not', await p.evaluate(() => App.thanksDue().map(x => x.c.id).sort().join() === 'c1,c2,c3'));
   const txt = await p.evaluate(() => App.thanksText(App.client('c1')));
-  ok('friendly text: first name, thanks for choosing the company, enjoy the service, stays short', /Bonjour Awa/.test(txt) && /Merci d'avoir choisi Boutique Test/.test(txt) && /profitez-en/.test(txt) && txt.length < 400, txt);
+  ok('friendly text: full name in bold italic, thanks for choosing the company, enjoy the service, stays short', /Bonjour \*_Awa D_\*/.test(txt) && /Merci d'avoir choisi Boutique Test/.test(txt) && /profitez-en/.test(txt) && txt.length < 400, txt);
   await p.evaluate(() => App.go('home')); await p.waitForTimeout(300); const home = (await p.innerText('#view')).replace(/\n/g, ' ');
   ok('dashboard reminder: 3 clients have not received the end-of-service message', /3 clients n'ont pas encore reçu le message de fin de service/.test(home), home.slice(0, 200));
   await p.click('[data-act=thx_go]'); await p.waitForTimeout(300);
@@ -37,7 +37,7 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   await p.evaluate(() => App.go('client', { id: 'c1', tab: 'hist' })); await p.waitForTimeout(300);
   ok('history tab: manual 💛 end-of-service button', await p.evaluate(() => !!document.querySelector('#view .bar [data-act=thx_send][data-id=c1]')));
   await p.evaluate(() => { App.db.settings.msgs = { merci: 'Merci {prenom} !' }; });
-  ok('message is editable in settings (template merci)', await p.evaluate(() => App.thanksText(App.client('c1')) === 'Merci Awa !'));
+  ok('message is editable in settings (template merci)', await p.evaluate(() => App.thanksText(App.client('c1')) === 'Merci *_Awa D_* !'));
   await p.evaluate(() => { delete App.db.settings.msgs; App.go('settings'); }); await p.waitForTimeout(300); await p.evaluate(() => { const f = document.querySelector('[data-fold=msgs], [data-id=msgs]'); if (f) f.click(); });
   ok('settings list the new template', await p.evaluate(() => !!document.getElementById('m_merci') || /Remerciement de fin de service/.test(document.body.innerText)));
   // social links appended at the end + live preview in settings
@@ -81,11 +81,16 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   // the thank-you differs for a purchase, an installation and the complete service
   const kinds = await p.evaluate(() => { const mk = t => ({ id: 'k_' + t, code: 'K-' + t, type: t, first: 'Awa', last: 'Diallo', name: 'Awa Diallo', phone: '0812345678', subs: [] }); const r = {}; ['mat', 'install', 'gere'].forEach(t => { const c = mk(t); App.db.clients.push(c); r[t] = { k: App.thanksKind(c), n: App.thanksKindName(c), txt: App.thanksText(c), doc: App.thanksDoc(c, '', '') }; }); return r; });
   ok('kinds: mat → achat, install → install, gere → complet', kinds.mat.k === 'achat' && kinds.install.k === 'install' && kinds.gere.k === 'complet');
-  ok('3 different messages (achat / installation / service complet)', new Set([kinds.mat.txt, kinds.install.txt, kinds.gere.txt]).size === 3 && /achat/.test(kinds.mat.txt) && /installation/i.test(kinds.install.txt) && /Bonjour Awa/.test(kinds.gere.txt));
+  ok('3 different messages (achat / installation / service complet)', new Set([kinds.mat.txt, kinds.install.txt, kinds.gere.txt]).size === 3 && /achat/.test(kinds.mat.txt) && /installation/i.test(kinds.install.txt) && /Bonjour \*_Awa Diallo_\*/.test(kinds.gere.txt));
   ok('document subject follows the kind', /Merci pour votre achat/.test(kinds.mat.doc) && /Installation terminée/.test(kinds.install.doc) && /Fin de service/.test(kinds.gere.doc));
   await p.evaluate(() => App.go('client', { id: 'k_mat', tab: 'thx' })); await p.waitForTimeout(300);
   ok('client tab names the kind', await p.evaluate(() => /Achat/.test(document.getElementById('view').innerText)));
   await p.evaluate(() => { App.db.settings.msgs = { ...(App.db.settings.msgs || {}), merci_achat: 'Achat OK {prenom}' }; });
-  ok('each kind has its own editable template', await p.evaluate(() => App.thanksText(App.client('k_mat')).startsWith('Achat OK Awa') && !/Achat OK/.test(App.thanksText(App.client('k_install')))));
+  ok('each kind has its own editable template', await p.evaluate(() => App.thanksText(App.client('k_mat')).startsWith('Achat OK *_Awa Diallo_*') && !/Achat OK/.test(App.thanksText(App.client('k_install')))));
+  // artistic document: full name in bold italic (greeting and client box), « Merci ! » title, gold frame
+  const art = await p.evaluate(() => { const c = App.client('k_gere'); c.last = 'Diallo Mukendi'; c.name = 'Awa Diallo Mukendi'; const h = App.thanksDoc(c, '', ''); return { h, txt: App.thanksHtml(c) }; });
+  ok('document: full name in bold italic in the greeting and in the client box', /<b><i[^>]*>Awa Diallo Mukendi<\/i><\/b>/.test(art.h) && /Nom :?[\s\S]{0,80}<b><i>Awa Diallo Mukendi<\/i><\/b>|<b><i>Awa Diallo Mukendi<\/i><\/b>/.test(art.h) && (art.h.match(/Awa Diallo Mukendi/g) || []).length >= 2);
+  ok('document: « Merci ! » title and decorative frame', /Merci&nbsp;!/.test(art.h) && /❦/.test(art.h) && /e5b044/i.test(art.h));
+  ok('previews show the name in bold italic (no asterisks)', /<b><i>Awa Diallo Mukendi<\/i><\/b>/.test(art.txt) && !/\*_/.test(art.txt));
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();
