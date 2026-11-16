@@ -21,8 +21,12 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   const rel = (await p.innerText('#view')).replace(/\n/g, ' ');
   ok("Relances du jour opens on the 💛 filter with the 3 clients", /Remerciements \(2\)/.test(rel) && /Awa D/.test(rel) && /Bob K/.test(rel) && /Cleo M/.test(rel) && !/Old Z/.test(rel));
   ok('thank-you items do not count as regular reminders', await p.evaluate(() => App.relanceCount() === 0));
-  const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 10000 }).catch(() => null), p.evaluate(() => document.querySelector('[data-act=rel_one]').click())]);
-  ok('WhatsApp opens with the thank-you text, client marked', !!pop && await p.evaluate(() => App.client('c1').thanksAt === App.today() || App.client('c3').thanksAt === App.today()));
+  await p.evaluate(() => document.querySelector('[data-act=rel_one]').click()); await p.waitForTimeout(250);
+  const pv = await p.evaluate(() => document.getElementById('dlg').innerText.replace(/\n/g, ' '));
+  ok('a preview opens first, with the client name and the message', /Cleo M/.test(pv) && /Bonjour Cleo/.test(pv) && /Merci d'avoir choisi Boutique Test/.test(pv), pv.slice(0, 160));
+  ok('nothing is marked before sending', await p.evaluate(() => !App.client('c3').thanksAt));
+  const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 10000 }).catch(() => null), p.click('#tsend')]);
+  ok('WhatsApp opens with the thank-you text, client marked', !!pop && await p.evaluate(() => App.client('c3').thanksAt === App.today()));
   ok('the client leaves the list once thanked', await p.evaluate(() => App.thanksDue().length === 2));
   await p.evaluate(() => document.querySelector('[data-act=thx_skip]').click()); await p.waitForTimeout(200);
   ok('"no message" mark removes a client without sending', await p.evaluate(() => App.thanksDue().length === 1));
@@ -36,5 +40,16 @@ let fails = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
   ok('message is editable in settings (template merci)', await p.evaluate(() => App.thanksText(App.client('c1')) === 'Merci Awa !'));
   await p.evaluate(() => { delete App.db.settings.msgs; App.go('settings'); }); await p.waitForTimeout(300); await p.evaluate(() => { const f = document.querySelector('[data-fold=msgs], [data-id=msgs]'); if (f) f.click(); });
   ok('settings list the new template', await p.evaluate(() => !!document.getElementById('m_merci') || /Remerciement de fin de service/.test(document.body.innerText)));
+  // social links appended at the end + live preview in settings
+  await p.evaluate(() => { App.db.settings.company.social = 'https://facebook.com/boutique\n\nhttps://instagram.com/boutique '; });
+  const tx2 = await p.evaluate(() => App.thanksText(App.client('c1')));
+  ok('social links are added at the end of the message, one per line, blanks ignored', /À très bientôt ! Boutique Test\n\nFaites un tour sur nos réseaux :\nhttps:\/\/facebook\.com\/boutique\nhttps:\/\/instagram\.com\/boutique$/.test(tx2), tx2.slice(-140));
+  await p.evaluate(() => { App.db.settings.company.social = ''; });
+  ok('no links = no extra block', !/réseaux/.test(await p.evaluate(() => App.thanksText(App.client('c1')))));
+  await p.evaluate(() => { App.go('settings'); }); await p.waitForTimeout(300); await p.evaluate(() => { const d = document.querySelector('details[data-fold=msgs]'); if (d) d.open = true; }); await p.waitForTimeout(250);
+  const hasField = await p.evaluate(() => !!document.getElementById('thx_social') && !!document.getElementById('thx_prev'));
+  ok('settings: social links field and preview box', hasField);
+  if (hasField) { await p.fill('#thx_social', 'https://tiktok.com/@boutique'); await p.waitForTimeout(250);
+    const pt = await p.innerText('#thx_prev'); ok('preview shows a real client name and updates live with the links', /Aperçu avec/.test(pt) && /Bonjour /.test(pt) && /tiktok\.com\/@boutique/.test(pt), pt.slice(0, 200)); }
   console.log('errors', errs); ok('no page error', errs.length === 0); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await b.close(); process.exit(fails ? 1 : 0);
 })();

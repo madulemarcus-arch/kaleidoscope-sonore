@@ -27,7 +27,8 @@
 
   // end-of-service thank-you: the client's latest finished service (installation done, delivery done, invoice fully paid) not yet followed by a thank-you
   App.thanksText = c => { const co = App.db.settings.company, v = { prenom: c.first || App.cname(c), nom: App.cname(c), entreprise: co.name };
-    return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m); };
+    const links = String(co.social || '').split('\n').map(x => x.trim()).filter(Boolean);
+    return tpl('merci').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m) + (links.length ? '\n\nFaites un tour sur nos réseaux :\n' + links.join('\n') : ''); };
   const THX_DAYS = 14;
   App.thanksDue = () => {
     const db = App.db, ev = {}, add = (cid, date, why) => { if (cid && date && (!ev[cid] || date > ev[cid].date)) ev[cid] = { date, why }; };
@@ -39,7 +40,12 @@
   App.thanksCount = () => App.thanksDue().length;
   App.thanksMark = c => { c.thanksAt = App.today(); App.log(c.id, 'Message de fin de service envoyé'); };
   App.actions.thx_skip = d => { const c = App.client(d.id); if (!c) return; c.thanksAt = App.today(); App.log(c.id, 'Pas de message de fin de service'); App.save(); App.refresh(); App.toast('Marqué : pas de message'); };
-  App.actions.thx_send = d => { const c = App.client(d.id); if (!c || !c.phone) return App.toast('Pas de numéro de téléphone'); window.open(App.waUrl(c.phone, App.thanksText(c)), '_blank', 'noopener'); App.thanksMark(c); App.save(); App.refresh(); App.toast('Message de remerciement ouvert dans WhatsApp'); };
+  // preview of the message with the client's name, then send
+  App.thanksPreview = c => App.modal('Message de fin de service', `<div class="card"><div class="spread"><b>${esc(App.cname(c))}</b><span class="pill">💛 Remerciement</span></div><div class="mut">${esc(c.phone || 'sans numéro')}</div>
+      <div style="white-space:pre-wrap;background:var(--card2,#f3f5f8);border-radius:12px;padding:12px;margin-top:8px">${esc(App.thanksText(c))}</div></div>
+      <div class="bar" style="margin-top:10px"><button type="button" class="btn" id="tsend"${c.phone ? '' : ' disabled'}>💬 Envoyer sur WhatsApp</button></div>${c.phone ? '' : '<p class="warn">Ce client n\'a pas de numéro de téléphone.</p>'}`);
+  App.actions.thx_send = d => { const c = App.client(d.id); if (!c) return; if (!c.phone) return App.toast('Pas de numéro de téléphone'); App.thanksPreview(c);
+    $('tsend').onclick = () => { window.open(App.waUrl(c.phone, App.thanksText(c)), '_blank', 'noopener'); App.thanksMark(c); App.save(); App.close(); App.refresh(); App.toast('Message de remerciement ouvert dans WhatsApp'); }; };
 
   App.penaltyText = (p, c) => {
     const co = App.db.settings.company, v = { prenom: (c && c.first) || App.cname(c), nom: App.cname(c), montant: App.fmt(p.amount, p.currency), motif: p.reason, date: App.fdate(p.date), entreprise: co.name };
@@ -105,7 +111,7 @@
   };
   App.actions.rel_f = d => { rst.f = d.f; App.refresh(); };
   App.actions.thx_go = () => { rst.f = 'thx'; App.go('relances'); };
-  App.actions.rel_one = d => { const it = cache[+d.k]; if (!it || !it.c.phone) return App.toast('Pas de numéro de téléphone'); send(it); App.refresh(); };
+  App.actions.rel_one = d => { const it = cache[+d.k]; if (!it || !it.c.phone) return App.toast('Pas de numéro de téléphone'); if (it.kind === 'thx') return App.actions.thx_send({ id: it.c.id }); send(it); App.refresh(); };
   App.actions.rel_series = () => {
     const q = (cache.length ? cache : App.relanceItems()).filter(it => it.c.phone && !isRecent(it) && (rst.f === 'all' || it.kind === rst.f)); if (!q.length) return App.toast('Personne à relancer');
     let k = 0, sent = 0;
@@ -124,8 +130,16 @@
   App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
       <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
+      ${F.area('thx_social', 'Liens de vos réseaux sociaux (un par ligne, ajoutés à la fin du remerciement)', (App.db.settings.company.social || ''), 'rows="3" placeholder="https://facebook.com/votrepage&#10;https://instagram.com/votrecompte"')}
+      <h3 style="margin:12px 0 4px;font-size:15px">Aperçu du remerciement</h3><div id="thx_prev" class="card" style="white-space:pre-wrap;margin:0 0 8px"></div>
       <div class="bar"><button class="btn sm sec" data-act="msgreset">Remettre les messages d'origine</button> <button class="btn sm sec" data-act="go" data-v="rappels">📲 Voir les rappels</button></div></div>`);
+  // live preview of the thank-you with a real client's name (first client with a phone, else a sample)
+  const prev = () => { const el = $('thx_prev'); if (!el) return; const real = App.db.clients.find(c => c.phone) || App.db.clients[0], c = real || { first: 'Awa', last: 'Diallo', name: 'Awa Diallo' };
+    el.innerHTML = `<small class="mut">Aperçu avec ${esc(App.cname(c))}${real ? '' : ' (exemple)'}</small><br>${esc(App.thanksText(c))}`; };
+  document.addEventListener('input', e => { if ((e.target.id || '') === 'thx_social' || (e.target.id || '') === 'm_merci') { if (e.target.id === 'thx_social') App.db.settings.company.social = e.target.value; else { const S = App.db.settings; S.msgs = { ...(S.msgs || {}), merci: e.target.value }; } prev(); } });
+  new MutationObserver(() => { if ($('thx_prev') && !$('thx_prev').dataset.ok) { $('thx_prev').dataset.ok = '1'; prev(); } }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('change', e => {
+    if (e.target.id === 'thx_social') { App.db.settings.company.social = e.target.value.trim(); App.save(); App.toast('Liens enregistrés'); prev(); return; }
     const k = (e.target.id || '').startsWith('m_') && e.target.id.slice(2); if (!k || !(k in DEFAULT)) return;
     const S = App.db.settings; S.msgs = { ...(S.msgs || {}), [k]: e.target.value.trim() || DEFAULT[k] }; App.save(); App.toast('Message enregistré');
   });
