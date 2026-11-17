@@ -17,12 +17,14 @@
 
   // ---------- List ----------
   const st = App.clState = { f: 'all', q: '', sel: false, picked: new Set() };
-  const FILTERS = [['all', 'Tous'], ['gere', '📡 Gérés'], ['abo', '📶 Abonnement seul'], ['mat', '📦 Kit / matériel'], ['install', '🔧 Installation'], ['actif', '🟢 Actifs'], ['sursis', '🟠 Sursis'], ['inactif', '🔴 Inactifs']];
+  const FILTERS = [['all', 'Tous'], ['gere', '📡 Gérés'], ['abo', '📶 Abonnement seul'], ['mat', '📦 Kit / matériel'], ['install', '🔧 Installation'], ['actif', '🟢 Actifs'], ['sursis', '🟠 Sursis'], ['inactif', '🔴 Inactifs'], ['payeur', '🎁 Payeurs'], ['offert', '🎁 Kits offerts']];
   const filtered = () => {
     const q = st.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
     return App.db.clients.filter(c => {
       if (['gere', 'mat', 'install'].includes(st.f) && c.type !== st.f) return false;
       if (st.f === 'abo' && !(c.type === 'gere' && c.aboOnly)) return false;
+      if (st.f === 'payeur' && !App.isPayer(c)) return false;
+      if (st.f === 'offert' && !App.payerOf(c)) return false;
       if (['actif', 'sursis', 'inactif'].includes(st.f)) { const s = App.sub(c); if (!s || s.status !== st.f) return false; }
       if (!q) return true;
       return [App.cname(c), c.code, c.acc, c.phone, c.phone2, c.address, c.city, c.quarter, c.installAddr, c.serial, c.kit, c.article].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q);
@@ -33,7 +35,7 @@
     if ($('clbar')) $('clbar').innerHTML = !App.guard('delclients') ? '' : st.sel ? `<button class="btn sm sec" data-act="cl_all">☑ Tout (${l.length})</button><button class="btn sm del" data-act="delclients">🗑 Supprimer (${st.picked.size})</button><button class="btn sm sec" data-act="cl_sel">Terminer</button>` : '<button class="btn sm sec" data-act="cl_sel">☑ Sélectionner pour supprimer</button>';
     const dayTxt = (c, s) => !s ? '' : s.status === 'actif' ? (s.left === 0 ? "aujourd'hui" : `dans ${s.left} j`) : s.status === 'sursis' ? `sursis · ${s.left} j` : `depuis ${-s.left} j`;
     const row = c => { const s = App.sub(c), t = tone(c);
-      const body = `<span class="avatar ${t}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small><span class="mono">${esc(c.acc || c.article || c.code)}</span>${c.phone ? ' · ' + esc(c.phone) : ''}</small></div><div class="end">${badge(c)}${App.slBadge ? App.slBadge(c) : ''}${s ? `<small class="${t}">${dayTxt(c, s)}</small>` : `<small>${esc(App.typeName(c))}</small>`}</div>`;
+      const body = `<span class="avatar ${t}">${esc(App.initials(c))}</span><div class="grow"><b>${esc(App.cname(c))}</b><small><span class="mono">${esc(c.acc || c.article || c.code)}</span>${c.phone ? ' · ' + esc(c.phone) : ''}${App.payerOf(c) ? ' · 🎁 ' + esc(App.cname(App.payerOf(c))) : ''}</small></div><div class="end">${badge(c)}${App.slBadge ? App.slBadge(c) : ''}${s ? `<small class="${t}">${dayTxt(c, s)}</small>` : `<small>${esc(App.typeName(c))}</small>`}</div>`;
       if (st.sel) return `<button class="item rw t-${t}" data-act="cl_pick" data-v="client" data-id="${c.id}"><span style="font-size:20px">${st.picked.has(c.id) ? '☑️' : '⬜'}</span>${body}</button>`;
       const acts = [], tel = String(c.phone || '').replace(/[^+\d]/g, '');
       if (tel) acts.push(`<a class="sw sw-call" href="tel:${esc(tel)}"><span>📞</span>Appeler</a>`);
@@ -46,7 +48,7 @@
     $('clist').innerHTML = l.length ? `<div class="list">${l.map(c => { const L = App.letterOf(App.cname(c)), h = L !== last ? `<div class="lh">${L}</div>` : ''; last = L; return h + row(c); }).join('')}</div>` : `<div class="empty big"><div class="ei">👥</div><b>${App.db.clients.length ? 'Aucun client pour ce filtre' : 'Aucun client pour le moment'}</b><p>${App.db.clients.length ? 'Essayez un autre filtre ou une autre recherche.' : 'Ajoutez votre premier client, ou importez votre fichier Excel.'}</p>${App.db.clients.length ? '' : '<button class="btn" data-act="newclient">+ Nouveau client</button>'}</div>`;
   };
   App.views.clients = () => {
-    const all = App.db.clients, cnt = f => f === 'all' ? all.length : f === 'abo' ? all.filter(c => c.type === 'gere' && c.aboOnly).length : ['gere', 'mat', 'install'].includes(f) ? all.filter(c => c.type === f).length : all.filter(c => (App.sub(c) || {}).status === f).length;
+    const all = App.db.clients, cnt = f => f === 'all' ? all.length : f === 'abo' ? all.filter(c => c.type === 'gere' && c.aboOnly).length : f === 'payeur' ? all.filter(App.isPayer).length : f === 'offert' ? all.filter(c => App.payerOf(c)).length : ['gere', 'mat', 'install'].includes(f) ? all.filter(c => c.type === f).length : all.filter(c => (App.sub(c) || {}).status === f).length;
     return {
       title: 'Clients', sub: `${all.length} au total`, nav: 'clients',
       html: `${App.slmailPanel ? App.slmailPanel() : ''}<div class="search"><input id="cq" placeholder="Rechercher un client, ACC, téléphone…" value="${esc(st.q)}" autocomplete="off"></div>
@@ -80,11 +82,11 @@
      <button class="opt" data-act="cf_type" data-t="mat"><span class="ico">📦</span><span><b>Kit / matériel seulement</b><small>Achat de matériel sans gestion d'abonnement</small></span></button>
      <button class="opt" data-act="cf_type" data-t="install"><span class="ico">🔧</span><span><b>Installation uniquement</b><small>Le client possède déjà son matériel</small></span></button>`);
   App.actions.cf_type = d => d.t === 'abo' ? App.clientForm(null, 'gere', true) : App.clientForm(null, d.t);
-  App.clientForm = (c, type, aboOnly) => {
+  App.clientForm = (c, type, aboOnly, preset) => {
     if (!c && !type) return typeChooser();
     const S = App.db.settings, isNew = !c;
-    c = c || { type, first: '', last: '', phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: '', payMode: 'Cash', start: App.today(), period: S.period, grace: S.grace, note: '', article: '', subs: [], aboOnly: !!aboOnly };
-    const g = c.type === 'gere';
+    c = c || { type, first: '', last: '', phone: '', phone2: '', address: '', city: '', quarter: '', installAddr: '', acc: '', serial: '', kit: '', plan: '', price: '', payMode: 'Cash', start: App.today(), period: S.period, grace: S.grace, note: '', article: '', subs: [], aboOnly: !!aboOnly, ...(preset || {}) };
+    const g = c.type === 'gere', payers = App.db.clients.filter(x => x.id !== c.id && App.isPayer(x)), pOpen = !!(c.payer || c.payerId || preset);
     App.modal((isNew ? 'Nouveau client · ' : 'Modifier · ') + App.typeName(c),
       `${isNew ? '' : `<button type="button" class="typebtn on-light" data-act="cl_type" data-id="${c.id}">Type : ${esc(App.typeName(c))} <i>Changer ▾</i></button>`}<div class="row">${F.text('f_first', 'Prénom', c.first)}${F.text('f_last', 'Nom', c.last)}</div>
        <div class="row">${F.text('f_phone', 'Téléphone', c.phone, 'type="tel" inputmode="tel"')}${F.text('f_phone2', 'Deuxième téléphone', c.phone2, 'type="tel" inputmode="tel"')}</div>
@@ -100,6 +102,11 @@
          <div class="row">${F.date('f_start', 'Date de début', c.start)}${F.num('f_period', 'Durée (jours)', c.period, 'min="1"')}${F.num('f_grace', 'Sursis (jours)', c.grace)}</div>
          <div class="card" id="prev" style="margin-top:10px"></div>` : ''}
        ${c.type === 'mat' ? F.text('f_serial', 'Numéro de série (matériel)', c.serial) : ''}
+       <details class="fold"${pOpen ? ' open' : ''}><summary>🎁 Payeur / kit offert</summary>
+         ${F.sel('f_payer', 'Ce kit est payé par (payeur)', [['', '— Personne : client normal —'], ...payers.map(x => [x.id, App.cname(x)])], c.payerId || '')}
+         ${F.sel('f_subby', 'Abonnement pris en charge par', [['payer', '🎁 Le payeur'], ['self', '👤 Le bénéficiaire']], c.subBy || 'payer')}
+         <label class="chk" style="display:block;margin:8px 0"><input type="checkbox" id="f_ispayer"${c.payer ? ' checked' : ''}> 🎁 Ce client est un payeur / gros client (il paie ou offre des kits à d'autres)</label>
+         ${F.sel('f_paycat', 'Catégorie du payeur', [['', '—'], ...Object.entries(App.PAYCAT).map(([k, v]) => [k, v[0] + ' ' + v[1]])], c.payCat || '')}</details>
        ${F.area('f_note', 'Note', c.note)}`,
       () => {
         if (!App.v('f_first') && !App.v('f_last')) { App.toast('Saisissez au moins un nom'); return false; }
@@ -108,6 +115,11 @@
         if (c.type !== 'mat') o.installAddr = App.v('f_inst');
         if (c.type === 'mat') { o.article = App.v('f_article'); o.serial = App.v('f_serial'); }
         if (g) Object.assign(o, { acc: App.v('f_acc'), serial: $('f_serial') ? App.v('f_serial') : c.serial, kit: $('f_kit') ? App.v('f_kit') : c.kit, plan: App.v('f_plan'), price: App.n('f_price'), payMode: App.v('f_pay'), start: App.v('f_start') || App.today(), period: Math.max(1, Math.round(App.n('f_period')) || S.period), grace: Math.max(0, Math.round(App.n('f_grace'))) });
+        const pid = App.v('f_payer'), P = pid ? App.client(pid) : null;
+        if (P && (P.payerId === c.id && c.id)) { App.toast(`${App.cname(P)} est déjà payé par ce client`); return false; }
+        if (P && c.id && App.kitsOf(c.id).length) { App.toast('Ce client est lui-même un payeur : détachez d’abord ses bénéficiaires'); return false; }
+        o.payerId = P ? P.id : ''; o.subBy = P ? (App.v('f_subby') || 'payer') : ''; o.payer = !!$('f_ispayer').checked; o.payCat = App.v('f_paycat');
+        if (P) P.payer = true;
         Object.assign(c, o);
         if (isNew) { c.id = App.uid(); c.code = App.nextClientCode(); c.created = App.today(); c.subs = []; App.db.clients.push(c); App.log(c.id, 'Client créé (' + App.TYPES[c.type] + ')'); App.save(); App.toast('Client enregistré'); App.go('client', { id: c.id }); return; }
         App.log(c.id, 'Fiche modifiée'); App.save(); App.toast('Modifications enregistrées'); App.refresh();
@@ -152,15 +164,16 @@
     const st = [];
     if (c.type === 'gere') st.push(s ? [s.status === 'inactif' ? `−${-s.left} j` : `${s.left} j`, s.status === 'inactif' ? 'expiré' : 'restants'] : ['—', 'abonnement']);
     st.push([App.fmt(tot), `facturé · ${inv.length}`]); st.push([App.fmt(due), 'à payer', due > 0.004 ? 'bad' : '']);
+    if (App.isPayer(c)) st.push([String(App.kitsOf(c.id).length), 'kits offerts']);
     const hd = App.can('finance') && App.depHeldBy ? App.depHeldBy(c.id) : 0; if (hd > 0.004) st.push([App.fmt(hd), 'dépôt en attente']);
     return st.map(([v, l, k]) => `<div class="${k || ''}"><b>${v}</b><small>${l}</small></div>`).join('');
   };
   App.views.client = p => {
     const c = App.client(p.id); if (!c) return { title: 'Client', back: 'clients', html: '<div class="empty">Client introuvable.</div>' };
-    const tabs = TABS[c.type].filter(t => t !== 'dep' || App.can('finance')), tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
+    const tabs = TABS[c.type].filter(t => t !== 'dep' || App.can('finance')); if (App.isPayer(c)) tabs.splice(1, 0, 'kits'); const tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
     let body = '';
-    if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd>${App.slRow ? App.slRow(c) : ''}<dt>Type</dt><dd>${esc(App.typeName(c))} <button class="btn sm sec" data-act="cl_type" data-id="${c.id}" style="margin-left:6px">Changer</button></dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Référence</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
-      <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button><button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
+    if (tab === 'infos') body = `<div class="card"><dl class="kv"><dt>Code client</dt><dd>${esc(c.code)}</dd>${App.slRow ? App.slRow(c) : ''}<dt>Type</dt><dd>${esc(App.typeName(c))} <button class="btn sm sec" data-act="cl_type" data-id="${c.id}" style="margin-left:6px">Changer</button></dd><dt>Téléphone</dt><dd>${tel(c.phone)}</dd>${c.phone2 ? `<dt>2e téléphone</dt><dd>${tel(c.phone2)}</dd>` : ''}<dt>Adresse</dt><dd>${esc(c.address || '—')}</dd><dt>Ville / quartier</dt><dd>${esc([c.city, c.quarter].filter(Boolean).join(' / ') || '—')}</dd>${c.type !== 'mat' ? `<dt>Référence</dt><dd>${esc(c.installAddr || '—')}</dd>` : ''}${c.type === 'gere' ? `<dt>ACC</dt><dd>${esc(c.acc || '—')} ${c.acc ? copyBtn(c.acc) : ''}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd><dt>Kit</dt><dd>${esc(c.kit || '—')}</dd>` : ''}${c.type === 'mat' ? `<dt>Matériel</dt><dd>${esc(c.article || '—')}</dd><dt>N° de série</dt><dd>${esc(c.serial || '—')}</dd>` : ''}${App.payerOf(c) ? `<dt>Payé par</dt><dd><a href="#" data-act="go" data-v="client" data-id="${App.payerOf(c).id}">🎁 ${esc(App.cname(App.payerOf(c)))}</a></dd><dt>Abonnement</dt><dd>pris en charge par ${c.subBy === 'self' ? 'le bénéficiaire' : 'le payeur'}</dd>` : ''}${App.isPayer(c) ? `<dt>Payeur</dt><dd>${esc(App.catOf(c)[0] + ' ' + App.catOf(c)[1])} · ${App.kitsOf(c.id).length} kit(s)</dd>` : ''}<dt>Créé le</dt><dd>${App.fdate(c.created)}</dd>${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ''}</dl>
+      <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button>${App.payerOf(c) ? `<button class="btn sec" data-act="kit_unlink" data-id="${c.id}">Détacher du payeur</button>` : ''}<button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
     if (tab === 'abo') body = aboTab(c) + App.penaltyBlock(c);
     if (tab === 'pay') body = `<div class="bar"><button class="btn sm" data-act="newpay" data-cid="${c.id}">+ Paiement</button></div>` + listOrEmpty(db.payments.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => { const i = App.invoice(x.invoiceId); return `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${i ? esc(i.number) : 'Sans facture'}${x.ref ? ' · ' + esc(x.ref) : ''}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`; }), 'Aucun paiement enregistré.');
     if (tab === 'fac') body = `<div class="bar"><button class="btn sm" data-act="newinv" data-cid="${c.id}">+ Nouvelle facture</button></div>` + listOrEmpty(db.invoices.filter(i => i.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)).map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }), 'Aucune facture.') + (App.contractsBlock ? App.contractsBlock(c) : '') + (App.lettersBlock ? App.lettersBlock(c) : '');
@@ -170,15 +183,17 @@
       body = (c.serial ? `<div class="card"><span class="mut">Numéro de série</span><br><b>${esc(c.serial)}</b></div><div style="height:10px"></div>` : '') + listOrEmpty(rows, 'Aucun matériel vendu à ce client.');
     }
     if (tab === 'dep') body = App.clientDepTab(c);
+    if (tab === 'kits') body = App.kitsTab(c);
     if (tab === 'thx') body = thxTab(c);
     if (tab === 'hist') body = (c.phone ? `<div class="bar" style="margin:0 0 10px"><button class="btn sm sec" data-act="thx_send" data-id="${c.id}">💛 Message de fin de service${c.thanksAt ? ' · envoyé le ' + App.fdate(c.thanksAt) : ''}</button></div>` : '') + listOrEmpty(db.log.filter(x => x.clientId === c.id).slice().reverse().map(x => `<div class="item"><div class="grow"><b>${esc(x.text)}</b><small>${App.fdate(x.date)}</small></div></div>`), 'Aucune opération.');
     const wa = App.waLink(c);
     return {
       title: App.cname(c), sub: 'Fiche client', back: 'clients', nav: 'clients',
-      html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span></div><button class="typebtn" data-act="cl_type" data-id="${c.id}">${esc(App.typeName(c))} <i>Changer ▾</i></button>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
+      after: () => { const t = document.querySelector('.tabs button.on'); if (t && t.scrollIntoView) t.scrollIntoView({ inline: 'center', block: 'nearest' }); },
+      html: `<section class="hero chero"><div class="chead"><span class="avatar big ${tone(c)}">${esc(App.initials(c))}</span><div><h2>${esc(App.cname(c))}</h2><div class="cbadges">${badge(c)} <span class="pill">${esc(c.code)}</span>${App.isPayer(c) ? ` <span class="pill">${esc(App.catOf(c)[0] + ' ' + App.catOf(c)[1])}</span>` : ''}${App.payerOf(c) ? ` <span class="pill">🎁 offert par ${esc(App.cname(App.payerOf(c)))}</span>` : ''}</div><button class="typebtn" data-act="cl_type" data-id="${c.id}">${esc(App.typeName(c))} <i>Changer ▾</i></button>${c.acc ? `<button class="acc" data-act="copy" data-t="${esc(c.acc)}" title="Copier l'ACC">${esc(c.acc)} 📋</button>` : ''}</div></div>
         <div class="cstats">${cstats(c)}</div>
         <div class="ctiles">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}"><span>📞</span>Appeler</a>` : ''}${wa ? `<a href="${wa}" target="_blank" rel="noopener"><span>💬</span>WhatsApp</a>` : ''}<button data-act="newinv" data-cid="${c.id}"><span>🧾</span>Facture</button>${c.phone ? `<button data-act="thx_send" data-id="${c.id}" title="Message de fin de service"><span>💛</span>Merci</button>` : ''}${c.type === 'gere' && App.guard('q_renew') ? `<button data-act="renew" data-id="${c.id}"><span>📡</span>Renouveler</button>` : ''}</div></section>
-        <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('')}</div>${body}`
+        <div class="tabs">${tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-act="cltab" data-id="${c.id}" data-tab="${t}">${t === 'kits' ? '🎁 Kits (' + App.kitsOf(c.id).length + ')' : TAB_NAMES[t]}</button>`).join('')}</div>${body}`
     };
   };
   // change the kind of client: everything entered (ACC, dates, kit…) is kept, only what is shown and counted changes
