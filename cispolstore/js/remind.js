@@ -74,6 +74,7 @@
   App.thanksDoc = (c, logo, stamp) => { const K = App.docKit, e = esc, co = App.db.settings.company, links = App.socialLinks(), nm = App.cname(c);
     const NAVY = '#12365d', ORG = '#d5522f', GOLD = '#e5b044', big = `<b><i style="font-size:17pt;color:${NAVY};letter-spacing:.3px">${e(nm)}</i></b>`;
     const body = noEmoji(tpl(KINDS[App.thanksKind(c)][0]).replace(/\{(\w+)\}/g, (m, k) => ({ prenom: nm, nom: nm, entreprise: co.name })[k] ?? m));
+    const html = e(body).split(e(nm)).join(big), gm = /^([^\n]*Bonjour[^\n]*)\n+([\s\S]*)$/i.exec(html), greet = gm ? gm[1] : '', rest = gm ? gm[2] : html;
     const corner = pos => `<span style="position:absolute;font-size:16px;line-height:1;color:${GOLD};${pos}">❦</span>`;
     return `<div class="paper" data-fit="1" style="position:relative;background:#fffdf8;box-shadow:0 0 0 12px #fffdf8;outline:2px solid ${GOLD};outline-offset:12px">
       ${corner('top:-9px;left:-9px')}${corner('top:-9px;right:-9px')}${corner('bottom:-9px;left:-9px')}${corner('bottom:-9px;right:-9px')}
@@ -83,7 +84,7 @@
       <div style="text-align:center;margin:0;color:${GOLD};letter-spacing:10px;font-size:12px;line-height:1.4">✦ ✦ ✦</div>
       <div style="text-align:center;font:italic 700 38px/1.1 'Brush Script MT','Segoe Script','Snell Roundhand',cursive,Georgia,serif;color:${ORG}">Merci&nbsp;!</div>
       <div style="margin:4px auto 8px;width:62%;height:2px;background:linear-gradient(90deg,transparent,${GOLD},${ORG},${GOLD},transparent)"></div>
-      <div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line;font-size:12pt;border-left:none;background:transparent;padding:2px 8px;margin:0 0 6px;position:relative">${e(body).split(e(nm)).join(big)}</div>
+      ${greet ? `<div style="text-align:center;font-size:13pt;line-height:1.5;margin:2px 0 4px;position:relative">${greet}</div>` : ''}<div class="rc" style="text-align:justify;line-height:1.6;white-space:pre-line;font-size:12pt;border-left:none;background:transparent;padding:2px 8px;margin:0 0 6px;position:relative">${rest}</div>
       <div style="text-align:center;color:${GOLD};font-size:15px;line-height:1.2;margin:0 0 6px">❧ ❦ ☙</div>
       ${links.length ? `<div class="rc" style="margin:0 0 8px;padding:8px 12px;font-size:10.5pt;line-height:1.4;position:relative"><b>Faites un tour sur nos réseaux :</b><div style="display:flex;flex-wrap:wrap;margin-top:4px">${links.map(([n, u, k]) => `<div style="width:50%;box-sizing:border-box;padding:2px 6px 2px 0;word-break:break-all">${netLogo(k, 15)}<b>${e(n)}</b> : ${e(u.replace(/^https?:\/\//, ''))}</div>`).join('')}</div></div>` : ''}
       <table class="sg"><tr><td></td><td class="gp"></td><td class="s2"><img src="${e(stamp || 'stamp.png')}" alt=""></td></tr><tr><td></td><td class="gp"></td><td class="ln">${e(co.name)}</td></tr></table>${K.foot(stamp, true)}</div>`; };
