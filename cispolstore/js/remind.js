@@ -7,13 +7,15 @@
     sursis: "Bonjour {prenom}, votre abonnement Starlink a expiré le {fin}. Vous êtes en période de sursis jusqu'au {sursis}. Pensez à le renouveler. {entreprise}",
     inactif: 'Bonjour {prenom}, votre abonnement Starlink est inactif depuis le {sursis}. Contactez-nous pour le réactiver. {entreprise}',
     penalite: 'Bonjour {prenom}, une pénalité de {montant} ({motif}) est à régler pour votre abonnement Starlink. Merci de passer la régler. {entreprise}',
+    don: "Bonjour {prenom}, votre abonnement Starlink offert par {payeur} {etat}. {payeur} est prévenu(e) du renouvellement ; écrivez-nous si besoin. {entreprise}",
+    groupe: "Bonjour {prenom} 😊 {nombre} de vos kits Starlink arrivent à expiration ou ont expiré :\n{liste}\nÉcrivez-nous pour les renouveler. {entreprise}",
     impaye: 'Bonjour {prenom}, il reste {solde} à régler sur la facture {numero} du {date}. Merci de passer au règlement. {entreprise}',
     merci: "Bonjour {prenom} 😊 Merci d'avoir choisi {entreprise} ! Votre service est en place : profitez-en pleinement. Et si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_achat: "Bonjour {prenom} 😊 Merci pour votre achat chez {entreprise} ! Nous espérons que votre matériel vous donnera entière satisfaction. Si vous avez la moindre question ou le moindre souci, écrivez-nous : nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_abo: "Bonjour {prenom} 😊 Merci de nous faire confiance pour votre abonnement chez {entreprise} ! Votre connexion est active : profitez-en pleinement. Si vous avez la moindre question ou le moindre souci, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}",
     merci_install: "Bonjour {prenom} 😊 Merci d'avoir confié votre installation à {entreprise} ! Elle est terminée : profitez-en pleinement. Pour tout réglage ou toute question, écrivez-nous, nous sommes là pour vous. À très bientôt ! {entreprise}"
   };
-  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_abo: 'Remerciement · abonnement (payé chez nous)', merci_install: 'Remerciement · installation' };
+  const LABEL = { actif: 'Abonnement bientôt expiré', sursis: 'Période de sursis', inactif: 'Abonnement inactif', penalite: 'Pénalité à payer', impaye: 'Facture impayée', don: 'Rappel · kit offert (au bénéficiaire)', groupe: 'Rappel · groupe de kits (au payeur)', merci: 'Remerciement · service complet (kit + installation + abonnement)', merci_achat: 'Remerciement · achat de matériel', merci_abo: 'Remerciement · abonnement (payé chez nous)', merci_install: 'Remerciement · installation' };
   const tpl = k => (App.db.settings.msgs && App.db.settings.msgs[k]) || DEFAULT[k];
   // the thank-you depends on what the client got: a purchase (matériel), an installation, or the complete service (managed client)
   const KINDS = { achat: ['merci_achat', '🛒 Achat / vente', 'Merci pour votre achat'], install: ['merci_install', '🔧 Installation', 'Installation terminée'], complet: ['merci', '📡 Service complet', 'Fin de service'], abonnement: ['merci_abo', '📶 Abonnement', 'Merci pour votre abonnement'] };
@@ -27,6 +29,9 @@
   App.reminderText = c => {
     const s = App.sub(c), co = App.db.settings.company, n = c.first || App.cname(c);
     if (!s) return `Bonjour ${n}, ici ${co.name}.`;
+    const P = App.payerOf && App.payerOf(c);
+    if (P && c.subBy !== 'self') { const etat = s.status === 'actif' ? `arrive à expiration le ${App.fdate(s.end)} (dans ${Math.max(0, s.left)} jour${s.left > 1 ? 's' : ''})` : s.status === 'sursis' ? `a expiré le ${App.fdate(s.end)} : période de sursis jusqu'au ${App.fdate(s.gEnd)}` : `est inactif depuis le ${App.fdate(s.gEnd)}`;
+      return tpl('don').replace(/\{(\w+)\}/g, (m, k) => ({ prenom: n, payeur: App.cname(P), etat, entreprise: co.name })[k] ?? m); }
     const v = { prenom: n, nom: App.cname(c), fin: App.fdate(s.end), sursis: App.fdate(s.gEnd), jours: Math.max(0, s.status === 'actif' ? s.left : 0), entreprise: co.name, acc: c.acc || '' };
     return tpl(s.status).replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
   };
@@ -131,11 +136,20 @@
   const rst = { f: 'all' };
   const subDue = () => App.db.clients.map(c => ({ c, s: App.sub(c) })).filter(x => x.s && (x.s.status === 'actif' ? x.s.left <= 7 : x.s.status === 'sursis' || x.s.left >= -30));
   const dayOld = d => Math.max(0, App.diff(d, App.today()));
+  // kits of a payer that need a reminder (same rule as the single-kit reminders), and the one message listing them for the payer
+  const kitDue = c => { const s = App.sub(c); return !!s && (s.status === 'actif' ? s.left <= 7 : s.status === 'sursis' || s.left >= -30); };
+  App.groupDue = p => App.kitsOf(p.id).filter(kitDue);
+  const kitLine = c => { const s = App.sub(c), where = c.quarter || c.city, st = s.status === 'actif' ? (s.left === 0 ? "expire aujourd'hui" : `dans ${s.left} jour${s.left > 1 ? 's' : ''}`) : s.status === 'sursis' ? `expiré, sursis encore ${s.left} jour${s.left > 1 ? 's' : ''}` : `inactif depuis ${-s.left} jour${-s.left > 1 ? 's' : ''}`;
+    return `• ${App.cname(c)}${where ? ' (' + where + ')' : ''} — ${st}${c.subBy === 'self' ? ' · abonnement payé par lui' : ''}`; };
+  App.groupText = (p, kits) => { const co = App.db.settings.company, n = (kits || App.groupDue(p)).length, v = { prenom: App.cname(p), nombre: String(n), liste: (kits || App.groupDue(p)).map(kitLine).join('\n'), entreprise: co.name };
+    return tpl('groupe').replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m); };
   // every thing to chase: { kind, key, c, title, sub, amount, tone, text(), mark(), last }
   App.relanceItems = () => {
     const out = [], db = App.db;
-    subDue().forEach(({ c, s }) => out.push({ kind: 'sub', icon: '📡', label: 'Abonnement', c, last: c.lastRemind, tone: { actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status], rank: s.status === 'actif' ? s.left : s.status === 'sursis' ? s.left - 100 : -200 + s.left,
+    subDue().filter(({ c }) => !(!c.phone && App.payerOf(c) && App.payerOf(c).phone)).forEach(({ c, s }) => out.push({ kind: 'sub', icon: '📡', label: 'Abonnement', c, last: c.lastRemind, tone: { actif: 'ok', sursis: 'warn', inactif: 'bad' }[s.status], rank: s.status === 'actif' ? s.left : s.status === 'sursis' ? s.left - 100 : -200 + s.left,
       sub: s.status === 'actif' ? (s.left === 0 ? "Fin aujourd'hui" : `Fin dans ${s.left} j`) : s.status === 'sursis' ? `En sursis jusqu'au ${App.fdate(s.gEnd)}` : `Inactif depuis le ${App.fdate(s.gEnd)}`, text: () => App.reminderText(c), mark: () => { c.lastRemind = App.today(); App.log(c.id, 'Rappel WhatsApp ouvert'); } }));
+    db.clients.filter(App.isPayer).forEach(p => { const kits = App.groupDue(p); if (!kits.length) return; const worst = kits.map(c => App.sub(c)).sort((a, b) => (a.status === 'actif' ? a.left : a.status === 'sursis' ? a.left - 100 : -200 + a.left) - (b.status === 'actif' ? b.left : b.status === 'sursis' ? b.left - 100 : -200 + b.left))[0];
+      out.push({ kind: 'grp', icon: '🎁', label: 'Groupe', c: p, last: p.lastGroupRemind, tone: worst.status === 'inactif' ? 'bad' : worst.status === 'sursis' ? 'warn' : 'ok', rank: worst.status === 'actif' ? worst.left - 1 : worst.status === 'sursis' ? worst.left - 101 : -201 + worst.left, sub: `${kits.length} kit${kits.length > 1 ? 's' : ''} à renouveler`, text: () => App.groupText(p), mark: () => { p.lastGroupRemind = App.today(); App.log(p.id, `Rappel de groupe (${kits.length} kit${kits.length > 1 ? 's' : ''})`); } }); });
     db.invoices.filter(i => App.invDue(i) > 0.004).forEach(i => { const c = App.client(i.clientId); if (!c) return; const d = dayOld(i.date);
       out.push({ kind: 'inv', icon: '🧾', label: 'Impayé', c, last: i.lastRemind, tone: d > 60 ? 'bad' : d > 30 ? 'warn' : '', rank: -300 - d, sub: `${i.number} · ${d} j`, amount: App.fmt(App.invDue(i), i.currency), text: () => App.unpaidText(i, c), mark: () => { i.lastRemind = App.today(); App.log(c.id, 'Relance impayé ' + i.number); } }); });
     (db.penalties || []).filter(p => !p.paid).forEach(p => { const c = App.client(p.clientId); if (!c) return;
@@ -156,13 +170,17 @@
       html: `<section class="hero dhero"><div class="hero-top"><div><small>💬 À relancer aujourd'hui</small><div class="hero-num" data-count="${todo.length}" data-int="1">${todo.length}</div></div></div>
           <div class="cstats"><div><b>${done}</b><small>déjà relancé(s)</small></div><div class="${nophone ? 'bad' : ''}"><b>${nophone}</b><small>sans téléphone</small></div><div><b>${cache.length}</b><small>au total</small></div></div></section>
         ${todo.length ? `<div class="bar"><button class="btn" data-act="rel_series">💬 Tout relancer en série (${todo.length})</button></div>` : ''}
-        <div class="chips">${[['all', 'Tout'], ['sub', '📡 Abonnements'], ['inv', '🧾 Impayés'], ['pen', '⚠️ Pénalités'], ['thx', '💛 Remerciements']].map(([k, t]) => `<button class="chip ${rst.f === k ? 'on' : ''}" data-act="rel_f" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
+        <div class="chips">${[['all', 'Tout'], ['sub', '📡 Abonnements'], ['inv', '🧾 Impayés'], ['pen', '⚠️ Pénalités'], ['grp', '🎁 Groupes'], ['thx', '💛 Remerciements']].map(([k, t]) => `<button class="chip ${rst.f === k ? 'on' : ''}" data-act="rel_f" data-f="${k}">${t} (${cnt(k)})</button>`).join('')}</div>
         ${rst.f === 'thx' ? '<div class="bar" style="margin:0 0 10px"><button class="btn" data-act="thx_pick">💛 Remercier un autre client…</button></div>' : ''}
         <p class="mut" style="font-size:13px;margin:0 0 10px">Un message prêt s'ouvre dans WhatsApp : il ne reste qu'à l'envoyer. Les clients relancés depuis moins de 2 jours sont mis de côté.</p>
         ${shown.length ? `<div class="list">${shown.map((it, i) => { const k = cache.indexOf(it), rec = isRecent(it);
           return `<div class="item" style="${rec ? 'opacity:.6' : ''}"><span class="avatar ${it.tone || ''}">${it.icon}</span><div class="grow" data-act="go" data-v="client" data-id="${it.c.id}" style="cursor:pointer"><b>${esc(App.cname(it.c))}</b><small>${esc(it.label)} · ${esc(it.sub)}${it.last ? ' · relancé le ' + App.fdate(it.last) : ''}</small></div>${it.amount ? `<div class="end"><b>${it.amount}</b></div>` : ''}${it.c.phone ? `<button class="btn sm" data-act="rel_one" data-k="${k}" aria-label="WhatsApp">💬</button>` : '<span class="mut" style="font-size:12px">sans n°</span>'}${it.kind === 'thx' ? `<button class="btn sm sec" data-act="thx_skip" data-id="${it.c.id}" aria-label="Pas de message" title="Pas de message pour ce client">✖</button>` : ''}</div>`; }).join('')}</div>` : '<div class="empty big"><div class="ei">🎉</div><b>Rien à relancer</b><p class="mut">Tous vos clients sont à jour.</p></div>'}`
     };
   };
+  App.actions.kit_remind = d => { const p = App.client(d.id); if (!p) return; const its = App.relanceItems().filter(it => (it.kind === 'grp' && it.c.id === p.id) || (it.kind === 'sub' && it.c.payerId === p.id));
+    if (!App.groupDue(p).length) return App.toast('Aucun kit à renouveler pour le moment');
+    const todo = its.filter(it => it.c.phone && !isRecent(it)); if (!todo.length) return App.toast(p.phone ? 'Tout le groupe a déjà été relancé récemment' : "Ajoutez le numéro du payeur ou des bénéficiaires pour envoyer les rappels");
+    App.relanceSeries(todo); };
   App.actions.rel_f = d => { rst.f = d.f; App.refresh(); };
   // jump straight to the social-network fields of the settings (Paramètres › Messages de rappel WhatsApp › Vos réseaux sociaux)
   App.actions.soc_go = () => { App.foldOpen('msgs'); App.close(); App.go('settings'); setTimeout(() => { const el = $('soc_facebook'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 400); };
@@ -176,8 +194,10 @@
     const q = $('thx_q'); if (q) q.oninput = () => { const v = q.value.trim().toLowerCase(); document.querySelectorAll('#thx_l [data-n]').forEach(b => { b.hidden = !!v && !b.dataset.n.includes(v); }); };
   };
   App.actions.rel_one = d => { const it = cache[+d.k]; if (!it || !it.c.phone) return App.toast('Pas de numéro de téléphone'); if (it.kind === 'thx') return App.actions.thx_send({ id: it.c.id }); send(it); App.refresh(); };
-  App.actions.rel_series = () => {
-    const q = (cache.length ? cache : App.relanceItems()).filter(it => it.c.phone && !isRecent(it) && (rst.f === 'all' || it.kind === rst.f)); if (!q.length) return App.toast('Personne à relancer');
+  App.actions.rel_series = () => App.relanceSeries((cache.length ? cache : App.relanceItems()).filter(it => it.c.phone && !isRecent(it) && (rst.f === 'all' || it.kind === rst.f)));
+  // one reminder after the other: the message is previewed, « Envoyer » opens WhatsApp, then the next one
+  App.relanceSeries = q => {
+    if (!q.length) return App.toast('Personne à relancer');
     let k = 0, sent = 0;
     const show = () => {
       if (k >= q.length) { App.modal('Relances terminées', `<p>✅ ${sent} relance(s) envoyée(s) sur ${q.length}.</p>`); App.refresh(); if (sent && App.celebrate) App.celebrate(); return; }
@@ -192,7 +212,7 @@
 
   // ---------- Settings card: message templates ----------
   App.remindCard = () => App.fold('msgs', 'Messages de rappel WhatsApp', `<div class="card">
-      <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
+      <p class="mut" style="font-size:13px;margin:0 0 6px">Mots remplacés automatiquement : {prenom} {nom} {fin} {sursis} {jours} {entreprise} {acc} (le remerciement utilise {prenom} {nom} {entreprise}) · kit offert : {payeur} {etat} · groupe : {nombre} {liste} · impayés : {solde} {numero} {date} · pénalités : {montant} {motif}</p>
       ${Object.keys(DEFAULT).map(k => F.area('m_' + k, LABEL[k], tpl(k), 'rows="3"')).join('')}
       <h3 id="soc_anchor" style="margin:12px 0 2px;font-size:15px">Vos réseaux sociaux</h3><p class="mut" style="font-size:13px;margin:0 0 6px">Remplissez seulement ceux que vous avez : ils sont ajoutés à la fin du message de remerciement. Laissez vide pour ne pas l'afficher.</p>
       ${NETS.map(([k, label, ph]) => F.text('soc_' + k, netLogo(k, 18) + label, (App.db.settings.company.socials || {})[k] || '', `placeholder="${ph}" autocapitalize="off" autocomplete="off" inputmode="url"`)).join('')}
