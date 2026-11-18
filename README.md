@@ -29,4 +29,4 @@ Application personnelle indépendante (page `index.html`, animations dans `fx.js
 
 ## CISPOLstore Business (`business/`)
 
-Application de gestion générale (clients, stock, ventes, caisse, abonnements, etc.), installable sur Android et utilisable hors ligne. Une fois publiée sur GitHub Pages : `/business/` à la suite de l'adresse du site. Tests : `cd tests && node business/run.js`.
+Application de gestion générale (clients, stock, ventes, caisse, abonnements, mobile money et banque, etc.), installable sur Android et utilisable hors ligne. Une fois publiée sur GitHub Pages : `/business/` à la suite de l'adresse du site. Tests : `cd tests && node business/run.js`.
