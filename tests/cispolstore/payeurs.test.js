@@ -23,8 +23,9 @@ let f = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + 
   ok('payer file has the « Kits » tab with the 3 buttons', await p.evaluate(() => [...document.querySelectorAll('.tabs button')].some(b => /Kits \(0\)/.test(b.textContent)) && !!document.querySelector('[data-act=kit_add]') && !!document.querySelector('[data-act=kit_many]') && !!document.querySelector('[data-act=kit_link]')));
   await p.click('[data-act=kit_many]'); await p.waitForTimeout(300);
   const fill = async (i, n, ph, lieu, acc) => { const r = (await p.$$('#km_rows .km'))[i]; await (await r.$('.km_n')).fill(n); await (await r.$('.km_p')).fill(ph); await (await r.$('.km_l')).fill(lieu); await (await r.$('.km_a')).fill(acc); };
+  await p.evaluate(() => { document.getElementById('km_det').open = true; }); await p.click('#km_more'); await p.click('#km_more');
+  ok('the details grid starts with 2 blocks, « + Ajouter un kit » adds more', (await p.$$('#km_rows .km')).length === 4);
   await fill(0, 'Awa Diallo', '', 'Kinshasa / Gombe', 'acc-1001'); await fill(1, 'Marie Kalala', '0833333333', 'Lubumbashi / Golf', 'ACC-1002'); await fill(2, 'Paul Tshibanda', '', 'Goma / Himbi', 'ACC-EXIST'); await fill(3, '', '', '', '');
-  await p.click('#km_more'); ok('« + Ajouter un kit » adds a block', (await p.$$('#km_rows .km')).length === 5);
   await p.selectOption('#km_by', 'self'); await p.click('#dok'); await p.waitForTimeout(500);
   let r = await p.evaluate(() => App.kitsOf('pay1').map(c => ({ n: c.name, acc: c.acc, ph: c.phone, city: c.city, q: c.quarter, by: c.subBy, st: App.sub(c) && App.sub(c).status, type: c.type })));
   ok('2 beneficiaries created (the known ACC skipped), phone optional', r.length === 2 && r.some(x => x.n === 'Awa Diallo' && x.acc === 'ACC-1001' && x.ph === '' && x.city === 'Kinshasa' && x.q === 'Gombe') && r.some(x => x.n === 'Marie Kalala' && x.ph === '0833333333' && x.city === 'Lubumbashi'), JSON.stringify(r));
@@ -77,5 +78,18 @@ let f = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + 
   ok('« Nouveau payeur » opens the form with the payer box ticked', await p.evaluate(() => document.getElementById('f_ispayer').checked));
   await p.fill('#f_first', 'Sté'); await p.fill('#f_last', 'Kivu Logistique'); await p.selectOption('#f_paycat', 'entreprise'); await p.click('#dok'); await p.waitForTimeout(500);
   ok('new payer saved with its category', await p.evaluate(() => { const c = App.db.clients.find(x => x.name === 'Sté Kivu Logistique'); return c && c.payer === true && c.payCat === 'entreprise' && App.isPayer(c); }));
+  // 8) quick entry: just the names, one per line; the rest is completed later
+  await p.evaluate(() => { App.db.clients.push({ id: 'pay3', code: 'P3', type: 'mat', first: 'Hon.', last: 'Kabasele', name: 'Hon. Kabasele', phone: '0855555555', subs: [], created: App.today(), payer: true, payCat: 'politicien' }); App.save(); App.go('client', { id: 'pay3', tab: 'kits' }); }); await p.waitForTimeout(400);
+  await p.click('[data-act=kit_many]'); await p.waitForTimeout(300);
+  ok('« Ajouter plusieurs » opens on a names box; the details grid is folded', await p.evaluate(() => !!document.getElementById('km_names') && !document.getElementById('km_det').open));
+  await p.fill('#km_names', 'Grâce Makengo\n- Joseph Kabila\n3. Rose Mukeba\n\n   '); await p.fill('#km_place', 'Kinshasa / Kitambo'); await p.click('#dok'); await p.waitForTimeout(500);
+  r = await p.evaluate(() => App.kitsOf('pay3').map(c => ({ n: c.name, acc: c.acc, ph: c.phone, city: c.city, q: c.quarter, st: App.sub(c) && App.sub(c).status })));
+  ok('3 beneficiaries created from the names alone (bullets and numbers removed), common place applied', r.length === 3 && r.map(x => x.n).sort().join('|') === 'Grâce Makengo|Joseph Kabila|Rose Mukeba' && r.every(x => x.acc === '' && x.ph === '' && x.city === 'Kinshasa' && x.q === 'Kitambo' && x.st === 'actif'), JSON.stringify(r));
+  ok('the kits tab shows what is left to complete (the ACC)', /À compléter : ACC/.test(await p.innerText('#view')) && !/À compléter : ACC, lieu/.test(await p.innerText('#view')));
+  await p.click('[data-act=kit_many]'); await p.waitForTimeout(300); await p.fill('#km_names', 'Grâce Makengo\nPaul Sans-Lieu'); await p.click('#dok'); await p.waitForTimeout(500);
+  ok('an existing name of this payer is skipped, the new one is created without place', await p.evaluate(() => App.kitsOf('pay3').length === 4 && App.kitsOf('pay3').filter(c => c.name === 'Grâce Makengo').length === 1 && App.kitsOf('pay3').find(c => c.name === 'Paul Sans-Lieu').city === ''));
+  ok('« À compléter : ACC, lieu » for the kit without place', /À compléter : ACC, lieu/.test(await p.innerText('#view')));
+  await p.click('[data-act=kit_many]'); await p.waitForTimeout(300); await p.fill('#km_names', 'Joseph Kabila'); await p.click('#dok'); await p.waitForTimeout(300);
+  ok('only existing names: nothing created, the form stays open', await p.evaluate(() => App.kitsOf('pay3').length === 4 && !!document.getElementById('km_names')));
   console.log('errors', errs); ok('no page error', errs.length === 0); await b.close(); process.exit(f ? 1 : 0);
 })();
