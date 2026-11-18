@@ -9,6 +9,7 @@
     more: '<rect class="f s" x="3.5" y="3.5" width="7" height="7" rx="2"/><rect class="f s" x="13.5" y="3.5" width="7" height="7" rx="2"/><rect class="f s" x="3.5" y="13.5" width="7" height="7" rx="2"/><rect class="f s" x="13.5" y="13.5" width="7" height="7" rx="2"/>',
     sales: '<path class="f s" d="M5.5 3.5h13v17l-2.2-1.5-2.1 1.5-2.2-1.5-2.2 1.5-2.1-1.5-2.2 1.5z"/><path class="s" d="M9 8.5h6M9 12h6M9 15.3h3.5"/>',
     services: '<path class="f s" d="M14.7 6.3a4.2 4.2 0 0 0-5.4 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4.2 4.2 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>',
+    mm: '<rect class="f s" x="6.5" y="2.8" width="10" height="18.4" rx="2.4"/><path class="s" d="M10.2 18.2h2.6"/><path class="s" d="M3 9.2h6M6.2 6.6 9 9.2 6.2 11.8M21 14.8h-6M17.8 12.2 15 14.8l2.8 2.6"/>',
     delivery: '<path class="f s" d="M2.8 6.8h11.4v9.6H2.8z"/><path class="f s" d="M14.2 9.6h3.7l3.3 3.3v3.5h-7z"/><circle class="f s" cx="7" cy="17.6" r="2"/><circle class="f s" cx="17.4" cy="17.6" r="2"/>',
     subs: '<path class="f s" d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7V4"/><path class="f s" d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3V20"/><path class="s" d="M20 8.7h-4.7M4 15.3h4.7"/>',
     rental: '<circle class="f s" cx="8" cy="12" r="4.2"/><path class="s" d="M12.2 12H21M17.5 12v3.2M20.7 12v2.2"/><circle class="s" cx="8" cy="12" r="1.3"/>',
