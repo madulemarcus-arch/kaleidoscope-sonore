@@ -6,7 +6,7 @@ await p.addInitScript(()=>{document.addEventListener('DOMContentLoaded',()=>new 
 await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
 await p.evaluate(()=>{const t=App.today();App.db.clients.push({id:'c1',code:'CL-1',type:'mat',first:'Awa',last:'Diop',name:'Awa Diop',phone:'1',subs:[],created:t});App.save();App.invoiceForm('materiel')});
 await p.selectOption('#f_cl','c1');await p.fill('#f_desc','Kit');await p.fill('#f_price','100');await p.click('#f_add');
-ok('neg hidden when full',!(await p.isVisible('#f_neg')));
+ok('neg always offered in the payment card',await p.isVisible('#f_neg'));
 await p.fill('#f_paid','80');ok('neg visible when less',await p.isVisible('#f_neg'));await p.check('#f_neg');ok('stays checked',await p.isChecked('#f_neg'));
 await p.click('#dok');await p.waitForTimeout(300);
 const r=await p.evaluate(()=>{const i=App.db.invoices[0];return{ag:i.agreed,due:App.invDue(i),st:App.invStatus(i),tot:App.invTotal(i),doc:App.invoiceDoc(i)}});
