@@ -24,8 +24,10 @@
 
   // ---------- Kits tab on the payer's file ----------
   const kf = {};  // city filter per payer
+  // what is still missing on a kit (added later, on the beneficiary's file)
+  const todoOf = k => { const m = [!k.acc && 'ACC', !(k.city || k.quarter || k.installAddr) && 'lieu'].filter(Boolean); return m.length ? `<small class="warn">✏️ À compléter : ${m.join(', ')}</small>` : ''; };
   const kitRow = k => { const s = App.sub(k), who = k.subBy === 'self' ? '👤 Abonnement payé par lui' : '🎁 Abonnement payé par le payeur', contact = k.phone ? ' · 📞 ' + esc(k.phone) : ' · ☎ via le payeur';
-    return `<div class="item rw" role="button" tabindex="0" data-act="go" data-v="client" data-id="${k.id}"><span class="avatar ${tone(k)}">${esc(App.initials(k))}</span><div class="grow"><b>${esc(App.cname(k))}</b><small>📍 ${esc(App.kitPlace(k) || 'Lieu non précisé')}</small><small class="mut">${who}${contact}</small></div><div class="end">${s ? `${App.pill(s.status)}<small class="${tone(k)}">${dayTxt(s)}</small>` : '<span class="pill">Sans abonnement</span>'}</div></div>`; };
+    return `<div class="item rw" role="button" tabindex="0" data-act="go" data-v="client" data-id="${k.id}"><span class="avatar ${tone(k)}">${esc(App.initials(k))}</span><div class="grow"><b>${esc(App.cname(k))}</b><small>📍 ${esc(App.kitPlace(k) || 'Lieu non précisé')}</small><small class="mut">${who}${contact}</small>${todoOf(k)}</div><div class="end">${s ? `${App.pill(s.status)}<small class="${tone(k)}">${dayTxt(s)}</small>` : '<span class="pill">Sans abonnement</span>'}</div></div>`; };
   App.kitsTab = c => {
     const all = kitsOf(c.id), city = k => k.city || 'Sans ville', cities = {}; all.forEach(k => { cities[city(k)] = (cities[city(k)] || 0) + 1; });
     const f = cities[kf[c.id]] ? kf[c.id] : '', list = f ? all.filter(k => city(k) === f) : all, g = grp(all), due = App.groupDue ? App.groupDue(c).length : 0;
@@ -54,19 +56,25 @@
   const kmRow = () => `<div class="card km" style="padding:10px;margin:8px 0"><div class="row">${fld('Nom', 'km_n')}${fld('Téléphone (facultatif)', 'km_p', 'type="tel" inputmode="tel"')}</div><div class="row">${fld('Lieu (ville / quartier)', 'km_l')}${fld('ACC', 'km_a', 'autocapitalize="characters"')}</div></div>`;
   App.actions.kit_many = d => { const p = App.client(d.id); if (!p) return; const S = App.db.settings;
     App.modal('Ajouter plusieurs · ' + App.cname(p),
-      `<p class="mut" style="margin:0 0 6px">Un bloc par kit. Seul le nom ou l'ACC est obligatoire ; laissez le téléphone vide si le contact passe par le payeur ou un représentant.</p><div id="km_rows">${[0, 1, 2, 3].map(kmRow).join('')}</div><div class="bar"><button type="button" class="btn sec sm" id="km_more">+ Ajouter un kit</button></div>
+      `<p class="mut" style="margin:0 0 6px">Tapez <b>un nom par ligne</b> : c'est tout ce qu'il faut. Le lieu, l'ACC et le téléphone se complètent plus tard, sur la fiche de chacun.</p>
+       <div class="fld"><label class="l" for="km_names">Noms (un par ligne)</label><textarea id="km_names" rows="6" placeholder="Awa Diallo&#10;Jean Mbuyi&#10;Marie Kalala" autocomplete="off"></textarea></div>
+       ${F.text('km_place', 'Lieu commun à tous (facultatif)', '', 'placeholder="ex. Kinshasa / Gombe"')}
+       <details class="fold" id="km_det"><summary>➕ Saisir plus de détails (lieu, ACC, téléphone)</summary><div id="km_rows">${[0, 1].map(kmRow).join('')}</div><div class="bar"><button type="button" class="btn sec sm" id="km_more">+ Ajouter un kit</button></div></details>
        ${F.sel('km_by', 'Abonnement pris en charge par', [['payer', '🎁 Le payeur'], ['self', '👤 Le bénéficiaire']], 'payer')}
        <div class="row">${F.date('km_start', "Début de l'abonnement", App.today())}${F.num('km_period', 'Durée (jours)', S.period, 'min="1"')}</div>
-       <p class="mut" style="font-size:12px;margin:0">Videz la date si l'abonnement ne démarre pas tout de suite : le kit sera créé « sans abonnement ».</p>`,
-      () => { const rows = [...document.querySelectorAll('#km_rows .km')].map(r => ({ n: r.querySelector('.km_n').value.trim(), p: r.querySelector('.km_p').value.trim(), l: r.querySelector('.km_l').value.trim(), a: r.querySelector('.km_a').value.trim().toUpperCase() })).filter(r => r.n || r.a);
-        if (!rows.length) { App.toast("Saisissez au moins un nom ou un ACC"); return false; }
-        const start = App.v('km_start'), period = Math.max(1, Math.round(App.n('km_period')) || S.period), by = App.v('km_by') || 'payer', known = new Set(App.db.clients.map(c => String(c.acc || '').toUpperCase()).filter(Boolean)); let made = 0, dup = 0;
-        rows.forEach(r => { if (r.a && known.has(r.a)) { dup++; return; } if (r.a) known.add(r.a);
-          const name = r.n || ('Kit ' + r.a), parts = name.split(/\s+/), place = r.l.split(/\s*[\/,;]\s*/).filter(Boolean);
+       <p class="mut" style="font-size:12px;margin:0">Videz la date si l'abonnement ne démarre pas tout de suite : les kits seront créés « sans abonnement ».</p>`,
+      () => { const clean = x => x.replace(/^[\s\-•*·]*(\d+\s*[.)\-]\s*)?/, '').trim(), place0 = App.v('km_place');
+        const rows = [...document.querySelectorAll('#km_rows .km')].map(r => ({ n: r.querySelector('.km_n').value.trim(), p: r.querySelector('.km_p').value.trim(), l: r.querySelector('.km_l').value.trim() || place0, a: r.querySelector('.km_a').value.trim().toUpperCase() })).filter(r => r.n || r.a);
+        $('km_names').value.split(/\r?\n/).map(clean).filter(Boolean).forEach(n => rows.push({ n, p: '', l: place0, a: '' }));
+        if (!rows.length) { App.toast('Saisissez au moins un nom'); return false; }
+        const start = App.v('km_start'), period = Math.max(1, Math.round(App.n('km_period')) || S.period), by = App.v('km_by') || 'payer', known = new Set(App.db.clients.map(c => String(c.acc || '').toUpperCase()).filter(Boolean)), have = new Set(kitsOf(p.id).map(c => nrm(App.cname(c)).trim())); let made = 0, dup = 0;
+        rows.forEach(r => { const name = r.n || ('Kit ' + r.a), key = nrm(name).trim();
+          if ((r.a && known.has(r.a)) || (!r.a && have.has(key))) { dup++; return; } if (r.a) known.add(r.a); have.add(key);
+          const parts = name.split(/\s+/), place = (r.l || '').split(/\s*[\/,;]\s*/).filter(Boolean);
           const c = { id: App.uid(), code: App.nextClientCode(), type: 'gere', aboOnly: false, first: parts[0] || '', last: parts.slice(1).join(' '), name, phone: r.p, phone2: '', address: '', city: place[0] || '', quarter: place.slice(1).join(' / '), installAddr: '', acc: r.a, serial: '', kit: '', plan: '', price: '', payMode: 'Cash', start: start || '', period, grace: S.grace, note: '', article: '', subs: [], created: App.today(), payerId: p.id, subBy: by };
           App.db.clients.push(c); App.log(c.id, `Client créé (kit offert · payeur ${App.cname(p)})`); made++; });
-        if (!made) { App.toast(dup === 1 ? 'Cet ACC existe déjà' : 'Ces ACC existent déjà'); return false; }
-        p.payer = true; App.log(p.id, `${made} bénéficiaire(s) ajouté(s)`); App.save(); App.refresh(); App.toast(`${made} bénéficiaire(s) créé(s)${dup ? ` · ${dup} ACC déjà existant(s) ignoré(s)` : ''}`); },
+        if (!made) { App.toast(dup === 1 ? 'Ce bénéficiaire existe déjà' : 'Ces bénéficiaires existent déjà'); return false; }
+        p.payer = true; App.log(p.id, `${made} bénéficiaire(s) ajouté(s)`); App.save(); App.refresh(); App.toast(`${made} bénéficiaire(s) créé(s)${dup ? ` · ${dup} déjà existant(s) ignoré(s)` : ''}`); },
       'Créer');
     $('km_more').onclick = () => { $('km_rows').insertAdjacentHTML('beforeend', kmRow()); }; };
 
