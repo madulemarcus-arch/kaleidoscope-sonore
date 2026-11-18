@@ -156,7 +156,8 @@
        <div id="lt_party" ${c.clientId || c.techId ? 'hidden' : ''}>${F.text('lt_pname', 'Nom du destinataire', (c.party || {}).name || '')}<div class="row">${F.text('lt_pphone', 'Téléphone', (c.party || {}).phone || '')}${F.text('lt_paddr', 'Adresse', (c.party || {}).address || '')}</div></div>
        <div class="row">${F.date('lt_date', 'Date de la lettre', c.date)}<div id="lt_curRow">${F.sel('lt_cur', 'Devise', CUR, c.currency)}</div></div>
        <div id="lt_f"></div>
-       ${F.text('lt_rep', 'Signée par (nom et fonction, facultatif)', c.rep || '')}
+       <div class="row">${F.text('lt_rep', 'Nom du signataire', repOf(c.rep).name)}${F.text('lt_repjob', 'Fonction du signataire', repOf(c.rep).job)}</div>
+       <small class="muted">Le nom et la fonction s'impriment en bas de la lettre ; la signature et le cachet restent à faire à la main.</small>
        ${isNew ? '' : `<label class="chk" style="display:block;margin-top:8px"><input type="checkbox" id="lt_regen"> Régénérer le texte depuis le modèle (efface vos modifications du texte)</label>`}`,
       () => { const type = isNew ? App.v('lt_type') : c.type, t = TYPES[type], f = {};
         t.f.forEach(([k, l, kind]) => { const raw = $('lf_' + k).value; f[k] = kind === 'num' ? (raw === '' ? '' : Math.max(0, +raw || 0)) : String(raw).trim(); });
@@ -164,7 +165,7 @@
         if (!cl && !p.name) { App.toast(t.order ? 'Choisissez un technicien ou saisissez le nom de la personne en mission' : t.emp ? 'Choisissez un collaborateur ou saisissez le nom de la personne qui écrit la lettre' : t.hr ? 'Choisissez un collaborateur ou saisissez le nom de la personne concernée' : 'Choisissez un client ou saisissez le nom du destinataire'); return false; }
         if (t.money && !(f.amount > 0)) { App.toast('Saisissez le montant'); return false; }
         if (type === 'licenciement' && !f.reason) { App.toast('Un licenciement exige un motif : saisissez-le'); return false; }
-        const date = App.v('lt_date') || t0, o = { type, clientId: cl, techId: tc ? tc.id : '', party: cl ? {} : p, date, currency: App.v('lt_cur') || 'USD', rep: App.v('lt_rep'), f };
+        const date = App.v('lt_date') || t0, o = { type, clientId: cl, techId: tc ? tc.id : '', party: cl ? {} : p, date, currency: App.v('lt_cur') || 'USD', rep: [App.v('lt_rep').trim(), App.v('lt_repjob').trim()].filter(Boolean).join(', '), f };
         if (isNew) { Object.assign(c, o, { id: App.uid(), ts: Date.now(), no: nextNo(date) }); list().push(c); if (cl) App.log(cl, `Lettre ${c.no} : ${t.label}`); }
         else { Object.assign(c, o); if ($('lt_regen') && $('lt_regen').checked) { delete c.body; delete c.subject; } }
         App.save(); App.toast(isNew ? 'Lettre créée : ' + c.no : 'Lettre modifiée'); App.refresh(); if (isNew) setTimeout(() => App.actions.lt_open({ id: c.id }), 80); },

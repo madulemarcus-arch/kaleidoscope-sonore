@@ -58,13 +58,13 @@ await p.evaluate(()=>App.actions.lt_del({id:App.db.letters[3].id}));ok('delete r
 await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
 await p.selectOption('#lt_type','arrieres');await p.waitForTimeout(250);
 ok('authority model: asks for the greeting, number of kits, amount, delay and the copy line',await p.inputValue('#lf_titre')==="À l'Honorable"&&await p.inputValue('#lf_appel')==='Honorable'&&await p.isVisible('#lf_kits')&&await p.isVisible('#lf_amount')&&await p.inputValue('#lf_days')==='8'&&/^Archives /.test(await p.inputValue('#lf_copy')));
-await p.fill('#lt_pname','Francis ILUNGA');await p.fill('#lt_paddr','Territoire de Kole, Province du Sankuru');await p.fill('#lt_rep','Test Gérant, Gérant');
+await p.fill('#lt_pname','Francis ILUNGA');await p.fill('#lt_paddr','Territoire de Kole, Province du Sankuru');await p.fill('#lt_rep','Test Gérant');await p.fill('#lt_repjob','Gérant');
 await p.fill('#lf_kits','17');await p.fill('#lf_place','dans le territoire de Kole');await p.fill('#lf_period','3 mois');await p.fill('#lf_amount','1190');await create();
 const h=await p.evaluate(()=>{const c=App.db.letters[3];return{html:App.letterDoc(c,'logo.png','stamp.png'),text:App.letterText(c),head:App.docKit.head(App.db.settings.company,'logo.png'),ct:(()=>{App.db.contracts.push({id:'x',type:'libre',clientId:'',party:{name:'Z'},date:App.today(),start:App.today(),months:0,end:'',currency:'USD',rep:'',f:{body:'Texte',title:'T'},body:'Texte',no:'CTR-2026-0001',status:'draft'});return App.contractDoc(App.db.contracts[0],'logo.png','stamp.png')})()}});
 ok('recipient line « À l\'Honorable Francis ILUNGA », address, subject, N/Réf',/À l(?:'|&#39;|&apos;)Honorable Francis ILUNGA/.test(h.html)&&/Territoire de Kole/.test(h.html)&&/Objet :<\/b><\/td><td[^>]*><b>Non-paiement des abonnements Starlink/.test(h.html)&&/N\/Réf : LET-\d{4}-0004\//.test(h.html),JSON.stringify([/À l'Honorable Francis ILUNGA/.test(h.html),/Territoire de Kole/.test(h.html),/Objet : Non-paiement/.test(h.html),(h.html.match(/N.Réf[^<]*/)||[])[0]]));
 ok('text: 17 kits, Kole, amount, the three points, closing formula, copy line',/17 kits Starlink/.test(h.text.body)&&/territoire de Kole/.test(h.text.body)&&/1\s190/.test(h.text.body)&&/^1\. /m.test(h.text.body)&&/^3\. /m.test(h.text.body)&&/très haute considération/.test(h.text.body)&&/Copie pour information : Archives/.test(h.html));
 ok('same letterhead as the contracts and invoices (same document header)',h.html.includes(h.head)&&h.ct.includes(h.head));
-ok('the signer is remembered for the next letter',await p.evaluate(()=>{App.letterForm(null);return document.getElementById('lt_rep').value==='Test Gérant, Gérant'}));
+ok('the signer is remembered for the next letter',await p.evaluate(()=>{App.letterForm(null);return document.getElementById('lt_rep').value==='Test Gérant'&&document.getElementById('lt_repjob').value==='Gérant'}));
 // « Autorités » category: the three official-letter models, with their own filter and counter
 await p.evaluate(()=>{App.go('letters')});await p.waitForTimeout(400);
 ok('authority models are in the « Autorités » category, the others are not',await p.evaluate(()=>['autorite','arrieres','demande'].every(k=>App.letterTypes[k].cat==='auth')&&['travail','convocation','avertissement','libre'].every(k=>App.letterTypes[k].cat==='person')&&App.letterTypes.mise.cat==='client'));
@@ -98,7 +98,7 @@ ok('an amount, when given, is written in the letter',await p.evaluate(()=>/pour 
 await p.evaluate(()=>{App.close();App.letterForm(null)});await p.waitForTimeout(300);
 await p.selectOption('#lt_type','mission');await p.waitForTimeout(250);
 ok('mission order asks for: quality, object, place, initiator, purpose, duration (10 days), responsibilities',await p.inputValue('#lf_job')==='Expert en Réseau & Télécoms'&&await p.isVisible('#lf_about')&&await p.isVisible('#lf_place')&&await p.isVisible('#lf_init')&&await p.isVisible('#lf_purpose')&&await p.inputValue('#lf_days')==='10'&&(await p.inputValue('#lf_tasks')).split('\n').length===4);
-await p.fill('#lt_pname','TAMUKEY MADULE Cicéron');await p.fill('#lt_rep','Emmanuel Kabasele, Directeur Technique');
+await p.fill('#lt_pname','TAMUKEY MADULE Cicéron');await p.fill('#lt_rep','Emmanuel Kabasele');await p.fill('#lt_repjob','Directeur Technique');
 await p.fill('#lf_about',"Mission d'expertise pour l'installation d'un réseau wifi public");await p.fill('#lf_place','Province du SANKURU');await p.fill('#lf_init',"l'honorable FRANCIS ILUNGA WA ILUNGA");
 await p.fill('#lf_purpose',"réaliser une mission d'installation d'un système de wifi public au profit de la population du SANKURU");await create();
 const om=await p.evaluate(()=>{const c=App.db.letters[App.db.letters.length-1];return{t:App.letterText(c),html:App.letterDoc(c,'','stamp.png')}});
