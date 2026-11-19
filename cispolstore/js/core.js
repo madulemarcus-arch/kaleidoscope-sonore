@@ -23,7 +23,7 @@
   App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Commission technicien', 'Internet / Abonnement', 'Marketing', 'Autre'];
   App.PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   App.KITS = ['Starlink Mini', 'Starlink Standard'];
-  App.BUILD = 'v196'; // keep equal to CACHE in sw.js
+  App.BUILD = 'v197'; // keep equal to CACHE in sw.js
   App.typeName = c => c.type === 'gere' && c.aboOnly ? 'Abonnement seulement' : App.TYPES[c.type];
   App.TYPES = { gere: 'Client géré', mat: 'Matériel uniquement', install: 'Installation uniquement' };
 
@@ -91,7 +91,7 @@
     if (App.afterSave) App.afterSave();
   };
   // Backup content: everything except this device's PIN
-  App.exportData = () => { const d = JSON.parse(JSON.stringify(db)); delete d.settings.pin; delete d.settings.users; return d; };
+  App.exportData = () => { const d = JSON.parse(JSON.stringify(db)); delete d.settings.pin; delete d.settings.bio; delete d.settings.users; return d; };
   App.recover = () => idb('readonly', st => st.get('db2')).then(t => { if (!t) return false; const d = JSON.parse(t); if (App.hasData(d)) { db = normalize(d); if (App.auditReset) App.auditReset(); App.save(); return true; } return false; }).catch(() => false);
 
   // ---------- Money ----------
