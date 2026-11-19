@@ -31,6 +31,18 @@
   MM.entries = r => MM.inRange(r).filter(o => MM.gain(o)).map(o => { const g = MM.gain(o); return { k: g > 0 ? 'in' : 'out', t: 'mm', id: o.id, date: o.date, at: o.at, amount: Math.abs(g), cur: o.currency, rate: o.rate, mode: F.cashMode(), label: (g > 0 ? 'Frais et commission ' : 'Frais de mouvement ') + o.number }; });
   MM.totalMain = () => accs().reduce((s, a) => s + F.toMain(MM.balance(a.id), a.currency, db().settings.rate), 0);
 
+  // ---------- fee / commission schedules ----------
+  // A schedule is a list of tiers { upTo, v, pct }: the first tier whose upTo is >= the amount applies (upTo 0 = « and above »); v is a fixed amount, or a % of the amount when pct is true.
+  MM.tier = (rows, amt) => { const r = rows.slice().sort((x, y) => (x.upTo || Infinity) - (y.upTo || Infinity)).find(x => !x.upTo || amt <= x.upTo); return r ? (r.pct ? amt * r.v / 100 : r.v) : 0; };
+  // suggested fee and commission of an operation: the schedule when the account has one (limited to deposits / withdrawals if so chosen), else the simple % and minimum
+  MM.suggest = (a, type, amt) => {
+    const k = MM.TYPES[type][2]; if (!a || !(amt > 0) || (k !== 'give' && k !== 'take')) return { fee: 0, commission: 0 };
+    const use = f => !f || f === 'all' || f === (k === 'give' ? 'give' : 'take'), has = g => g && g.length;
+    const fee = has(a.feeGrid) ? (use(a.feeFor) ? MM.tier(a.feeGrid, amt) : 0) : (a.feePct ? Math.max(amt * a.feePct / 100, a.feeMin || 0) : (a.feeMin || 0));
+    const com = has(a.commGrid) ? (use(a.commFor) ? MM.tier(a.commGrid, amt) : 0) : (a.commPct ? amt * a.commPct / 100 : 0);
+    return { fee: M.round(fee, a.currency), commission: M.round(com, a.currency) };
+  };
+
   // ---------- recording ----------
   MM.addOp = f => {
     const a = MM.acc(f.accountId), t = MM.TYPES[f.type]; if (!a || !t) return null; const k = t[2];
@@ -80,10 +92,9 @@
       q('toId').innerHTML = tos.map(opt).join(''); q('toId').value = tos.some(a => a.id === keepTo) ? keepTo : (tos[0] ? tos[0].id : '');
     };
     const vis = () => sh.el.querySelectorAll('[data-k]').forEach(e => { e.hidden = !e.dataset.k.split(' ').includes(k()); });
-    const auto = () => { // suggested fee and commission from the account's percentages, until the user types their own
+    const auto = () => { // suggested fee and commission from the account's schedule or percentages, until the user types their own
       const a = MM.acc(q('accountId').value), amt = parseFloat(String(q('amount').value).replace(',', '.')) || 0; if (!a || kind({ type: q('type').value }) === 'move') return;
-      if (!dirty.fee) q('fee').value = a.feePct && amt ? Math.max(M.round(amt * a.feePct / 100, a.currency), a.feeMin || 0) || '' : (a.feeMin && amt ? a.feeMin : '');
-      if (!dirty.commission) q('commission').value = a.commPct && amt ? M.round(amt * a.commPct / 100, a.currency) || '' : '';
+      const sg = MM.suggest(a, q('type').value, amt); if (!dirty.fee) q('fee').value = sg.fee || ''; if (!dirty.commission) q('commission').value = sg.commission || '';
     };
     const pv = () => { const f = ui.read(sh.body), a = MM.acc(f.accountId); if (!a || !(f.amount > 0)) { sh.q('#pv').textContent = ''; return; } const tmp = { type: f.type, accountId: a.id, toId: f.toId, currency: a.currency, amount: f.amount, fee: f.fee || 0, commission: f.commission || 0, status: 'Terminé' }; sh.q('#pv').innerHTML = MM.legs(tmp).map(([id, d]) => esc(aname(id)) + ' : <b>' + (d > 0 ? '+' : '') + M.fmt(M.round(d, a.currency), a.currency) + '</b> → ' + M.fmt(MM.balance(id) + d, a.currency)).join('<br>'); };
     sh.body.addEventListener('input', e => { if (e.target.name === 'fee' || e.target.name === 'commission') dirty[e.target.name] = true; if (e.target.name === 'type') { dirty = {}; fillAccs(); vis(); } if (e.target.name === 'accountId') { dirty = {}; fillAccs(); } if (['type', 'accountId', 'amount'].includes(e.target.name)) auto(); pv(); });
@@ -102,17 +113,28 @@
       } }] });
     return sh;
   };
+  // editor of one schedule: rows « jusqu'à / valeur / fixe ou % »
+  const gridRow = r => { r = r || {}; return '<div class="gr" style="display:grid;grid-template-columns:1fr 1fr 78px 36px;gap:6px;margin:6px 0"><input data-k="upTo" inputmode="decimal" placeholder="Jusqu\'à" value="' + esc(r.upTo || '') + '"><input data-k="v" inputmode="decimal" placeholder="Valeur" value="' + esc(r.v == null ? '' : r.v) + '"><select data-k="u"><option value="fix"' + (r.pct ? '' : ' selected') + '>Fixe</option><option value="pct"' + (r.pct ? ' selected' : '') + '>%</option></select><button type="button" class="btn ghost" data-del aria-label="Supprimer la tranche">×</button></div>'; };
+  const gridBox = (k, title, rows, forWhat) => '<div class="card" data-grid="' + k + '"><h4>' + esc(title) + '</h4><p class="muted">Quand elle est remplie, la grille remplace le pourcentage. Laissez « Jusqu\'à » vide pour la dernière tranche (au-delà).</p>' + ui.field('S\'applique à', ui.select(k + 'For', [['all', 'Toutes les opérations'], ['give', 'Dépôts, envois et paiements'], ['take', 'Retraits et transferts reçus']], forWhat || 'all')) + '<div class="gr-rows">' + (rows || []).map(gridRow).join('') + '</div><button type="button" class="btn ghost" data-add="' + k + '">+ Tranche</button></div>';
+  const num = v => parseFloat(String(v).replace(',', '.')) || 0;
+  const readGrid = (root, k) => [...root.querySelectorAll('[data-grid=' + k + '] .gr')].filter(r => r.querySelector('[data-k=v]').value.trim() !== '').map(r => ({ upTo: num(r.querySelector('[data-k=upTo]').value), v: num(r.querySelector('[data-k=v]').value), pct: r.querySelector('[data-k=u]').value === 'pct' })).sort((x, y) => (x.upTo || Infinity) - (y.upTo || Infinity));
   MM.accountForm = id => {
     const a = id ? MM.acc(id) : null, s = db().settings, src = a || { kind: 'emoney', currency: s.currency };
     const sh = ui.sheet({ title: a ? 'Modifier ' + a.name : 'Nouveau compte', wide: true, html: ui.field('Nom', ui.input('name', src.name, { ph: 'Ex. Illico Cash' })) + '<div class="row2">' + ui.field('Type', ui.select('kind', Object.entries(MM.KINDS).map(([k, v]) => [k, v[1] + ' ' + v[0]]), src.kind)) + ui.field('Devise', ui.select('currency', [s.currency, s.cur2], src.currency)) + '</div>' + ui.field('Solde de départ', ui.input('opening', src.opening || '', { num: 1 }), 'Ce que contient le compte aujourd\'hui, avant vos opérations') +
-        '<div data-fees><div class="row2">' + ui.field('Frais perçus (%)', ui.input('feePct', src.feePct || '', { num: 1 }), 'Proposés à chaque opération') + ui.field('Frais minimum', ui.input('feeMin', src.feeMin || '', { num: 1 })) + '</div>' + ui.field('Commission de l\'opérateur (%)', ui.input('commPct', src.commPct || '', { num: 1 })) + '</div>',
+        '<div data-fees><div class="row2">' + ui.field('Frais perçus (%)', ui.input('feePct', src.feePct || '', { num: 1 }), 'Proposés à chaque opération') + ui.field('Frais minimum', ui.input('feeMin', src.feeMin || '', { num: 1 })) + '</div>' + ui.field('Commission de l\'opérateur (%)', ui.input('commPct', src.commPct || '', { num: 1 })) + gridBox('fee', 'Grille de frais par tranches', src.feeGrid, src.feeFor) + gridBox('comm', 'Grille de commission par tranches', src.commGrid, src.commFor) + '<div class="card"><b>Essai</b><div class="row2">' + ui.field('Montant', '<input id="gt" inputmode="decimal" placeholder="100">') + '<div id="gtr" class="muted" style="align-self:end"></div></div></div></div>',
       actions: [...(a ? [{ label: 'Supprimer', cls: 'danger', fn: async x => { if (ops().some(o => o.accountId === a.id || o.toId === a.id)) { App.toast('Ce compte a des opérations : il ne peut pas être supprimé', 'err'); return false; } if (await ui.confirm('Supprimer ' + a.name + ' ?', 'Supprimer', true)) { db().mmAccounts = accs().filter(y => y.id !== a.id); App.save(); x.close(); App.render(); } return false; } }] : []), { label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', cls: 'primary', fn: x => {
         const f = ui.read(x.body); if (!f.name) { App.toast('Donnez un nom au compte', 'err'); return false; }
         if (a && f.currency !== a.currency && ops().some(o => o.accountId === a.id || o.toId === a.id)) { App.toast('La devise ne peut plus changer : le compte a des opérations', 'err'); return false; }
-        const rec = { name: f.name, kind: f.kind, currency: f.currency, opening: M.round(f.opening, f.currency), feePct: f.kind === 'cash' ? 0 : f.feePct, feeMin: f.kind === 'cash' ? 0 : f.feeMin, commPct: f.kind === 'cash' ? 0 : f.commPct };
+        const rec = { name: f.name, kind: f.kind, currency: f.currency, opening: M.round(f.opening, f.currency), feePct: f.kind === 'cash' ? 0 : f.feePct, feeMin: f.kind === 'cash' ? 0 : f.feeMin, commPct: f.kind === 'cash' ? 0 : f.commPct, feeGrid: f.kind === 'cash' ? [] : readGrid(x.body, 'fee'), feeFor: f.feeFor, commGrid: f.kind === 'cash' ? [] : readGrid(x.body, 'comm'), commFor: f.commFor };
         if (a) Object.assign(a, rec); else accs().push({ id: App.uid(), ...rec }); App.log(a ? 'mm.account.edit' : 'mm.account.add', f.name); App.save(); App.toast('Compte enregistré'); App.render();
       } }] });
     const fees = () => { sh.q('[data-fees]').hidden = sh.q('[name=kind]').value === 'cash'; }; sh.q('[name=kind]').onchange = fees; fees();
+    sh.body.addEventListener('click', e => { const ad = e.target.closest('[data-add]'), dl = e.target.closest('[data-del]'); if (ad) sh.q('[data-grid=' + ad.dataset.add + '] .gr-rows').insertAdjacentHTML('beforeend', gridRow()); if (dl) { dl.closest('.gr').remove(); sh.body.dispatchEvent(new Event('input')); } });
+    const test = () => { // live check of what the schedules give for an amount
+      const amt = num(sh.q('#gt').value), f = ui.read(sh.body), tmp = { currency: f.currency, feePct: f.feePct, feeMin: f.feeMin, commPct: f.commPct, feeGrid: readGrid(sh.body, 'fee'), feeFor: f.feeFor, commGrid: readGrid(sh.body, 'comm'), commFor: f.commFor };
+      sh.q('#gtr').innerHTML = amt > 0 ? ['deposit', 'withdraw'].map(t => { const r = MM.suggest(tmp, t, amt); return esc(MM.TYPES[t][0]) + ' : frais <b>' + esc(M.fmt(r.fee, f.currency)) + '</b> · commission <b>' + esc(M.fmt(r.commission, f.currency)) + '</b>'; }).join('<br>') : '';
+    };
+    sh.body.addEventListener('input', test); sh.body.addEventListener('change', test);
     return sh;
   };
   // reconciliation: compare the real balance (wallet app, bank statement, drawer count) with the calculated one
