@@ -6,7 +6,7 @@
   // ---------- canvas ----------
   const resize = () => { const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2); const nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
     if (W) { A.view.ox += (nw - W) / 2; A.view.oy += (nh - H) / 2; } W = nw; H = nh; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); A.redraw(); };
-  const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true, struct: A.doc.struct.show !== false }); };
+  const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true, struct: A.doc.struct.show !== false, mode: A.mode }); };
   A.redraw = () => { if (!raf) raf = requestAnimationFrame(paint); };
   A.fitView = () => { A.fit(W, H); A.redraw(); };
   new ResizeObserver(() => { if (A.mode === '3d') A.v3.resize(); else resize(); }).observe($('stage'));
@@ -26,13 +26,13 @@
   A.setMode = m => {
     if (m === A.mode) return;
     if (m === '3d') { A.cancel(); if (!A.v3.init(cv3)) { alert('La vue 3D demande WebGL, absent de ce navigateur.'); return; } if (first3) { A.v3.initInput(cv3); first3 = false; } }
-    if (m === 'fer') A.cancel();
+    if (m === 'fer' || m === 'axes') { A.cancel(); A.tool = 'select'; }
     A.mode = m; const d3 = m === '3d';
-    document.body.dataset.mode = m; cv.hidden = m !== '2d'; cv3.hidden = !d3; $('bar3').hidden = !d3; $('fer').hidden = m !== 'fer';
-    [['mode2', '2d'], ['mode3', '3d'], ['mode4', 'fer']].forEach(([id, k]) => $(id).setAttribute('aria-pressed', String(m === k)));
+    document.body.dataset.mode = m; cv.hidden = m !== '2d' && m !== 'axes'; cv3.hidden = !d3; $('bar3').hidden = !d3; $('fer').hidden = m !== 'fer';
+    [['mode1', 'axes'], ['mode2', '2d'], ['mode3', '3d'], ['mode4', 'fer']].forEach(([id, k]) => $(id).setAttribute('aria-pressed', String(m === k)));
     if (d3) { A.v3.rebuild(); A.v3.resize(); A.v3.preset('iso'); const none = !A.v3.mesh.stats.walls; $('msg3').hidden = !none; $('msg3').textContent = 'Aucun mur à afficher : dessinez d\'abord en 2D.'; }
     else $('msg3').hidden = true;
-    if (m === '2d') resize();
+    if (m === '2d' || m === 'axes') resize();
     A.emit(); drawRender();
   };
   // ---------- reinforcement drawings (Ferraillage mode) ----------
@@ -48,7 +48,7 @@
   $('ferList').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; A.ferView = v; drawFer(); $('ferMain').scrollTop = 0; };
   $('ferMain').onclick = e => { if (e.target.id === 'ferCalc') A.struct.run(); else if (e.target.id === 'ferExport') { const html = A.rebar.document(A.doc); if (html) A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-plans-de-ferraillage.html', new Blob([html], { type: 'text/html' })); } };
   $('mode4').onclick = () => A.setMode('fer');
-  $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
+  $('mode1').onclick = () => A.setMode('axes'); $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
   $('bar3').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; if (v === 'png') A.v3.snapshot(2, b => A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-3d.png', b)); else if (v === 'panel') $('panel3').classList.toggle('open'); else A.v3.preset(v); };
 
   // ---------- furniture picker (header, visible with the Meuble tool) ----------
@@ -163,7 +163,7 @@
   }
 
   // ---------- status + global refresh ----------
-  A.status = () => { if (A.mode === '3d') { $('coords').textContent = ''; $('hint').textContent = 'Glissez pour tourner · Maj ou clic droit + glisser : déplacer · molette ou deux doigts : zoom'; return; } const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m · ${A.fmt(A.view.s, 0)} px/m`;
+  A.status = () => { if (A.mode === '3d') { $('coords').textContent = ''; $('hint').textContent = 'Glissez pour tourner · Maj ou clic droit + glisser : déplacer · molette ou deux doigts : zoom'; return; } if (A.mode === 'axes') { const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m`; $('hint').textContent = 'Axes : définissez la grille, les niveaux et l\'ancrage à droite · glisser : déplacer la vue · molette : zoom · 2 : dessiner sur les axes'; return; } const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m · ${A.fmt(A.view.s, 0)} px/m`;
     $('hint').textContent = A.typed ? `Saisie : ${A.typed} (Entrée pour valider)` : A.hint(); };
   A.on(() => {
     tools.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === A.tool)));

@@ -24,14 +24,14 @@
       mk.cad = String(k); bars.push(bar(String(k), 'Cadres HA' + cad + ' e=' + b.st + ' cm', nCad, cad, cadLen, 'stirrup'));
       target.push({ nerv, id: b.id, from: b.from, to: b.to, L: b.L, Ln, b: b.b, h: b.h, aA, aB, bot: { n, d }, mont, chapA, chapB, capA: b.capA, capB: b.capB, endA: b.endA, endB: b.endB, MA: b.MA, MB: b.MB, Mt: b.Mt, M0: b.M0, method: b.method, chain: b.chain, pos: b.pos, nSpans: b.nSpans, mk, st: b.st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: b.b * b.h * Ln }); };
     r.beams.forEach(b => beamModel(b, out.beams, false)); if (r.raft) r.raft.nerv.forEach(b => beamModel(b, out.nerv, true));
-    r.columns.forEach(c => { const N = c.levels.length, ft = c.footing, g = c.levels[N - 1], d = g.bars.d, n = g.bars.n, tieSt = lv => Math.max(5, Math.floor(Math.min(15 * lv.bars.d / 10, 40, lv.a * 100 + 10) / 5) * 5), st = tieSt(g), nCad = Math.floor(r.H / (st / 100)) + 2, fh = c.strips || c.raft ? c.fh : ft.h;
+    r.columns.forEach(c => { const N = c.levels.length, ft = c.footing, g = c.levels[N - 1], d = g.bars.d, n = g.bars.n, tieSt = lv => Math.max(5, Math.floor(Math.min(15 * lv.bars.d / 10, 40, lv.a * 100 + 10) / 5) * 5), st = tieSt(g), nCad = Math.floor(r.H / (st / 100)) + 2, fh = c.strips || c.raft ? c.fh : ft.h, sh = Math.max(0, (r.anchor || fh) - fh);   // sh: buried shaft between the top of the footing and the ground (foundation depth D - footing thickness)
       // one segment per level, ground floor first (marks 1 and 2, drawn); upper segments extend by their lap ls above the floor, the last one stops 3 cm under the top
       const order = [N - 1, ...Array.from({ length: N - 1 }, (_, i) => N - 2 - i)], bars = [], lvInfo = []; let mk = 1, lap = 0;
-      order.forEach(i => { const lv = c.levels[i], k = i + 1, dd = lv.bars.d, ls = k > 1 ? R.ls(dd, m) : 0, stk = tieSt(lv), ncad = Math.floor(r.H / (stk / 100)) + (k === N ? 2 : 0), len = r.H + (k > 1 ? ls : -C) + (k === N ? (fh - CF) + hook90(dd) : 0), cadLen = 4 * (lv.a - 2 * C) + 2 * 10 * ST / 1000;
+      order.forEach(i => { const lv = c.levels[i], k = i + 1, dd = lv.bars.d, ls = k > 1 ? R.ls(dd, m) : 0, stk = tieSt(lv), ncad = Math.floor(r.H / (stk / 100)) + (k === N ? 2 : 0), len = r.H + (k > 1 ? ls : -C) + (k === N ? sh + (fh - CF) + hook90(dd) : 0), cadLen = 4 * (lv.a - 2 * C) + 2 * 10 * ST / 1000;
         if (k === N) lap = ls; const tag = N > 1 ? 'Niveau ' + lv.name + ' : ' : '';
         bars.push(bar(String(mk++), tag + 'Armatures longitudinales ' + lv.bars.text.replace(/^\d+/, '') + (ls ? ' (attentes de ' + A.fmt(ls) + ' m au niveau supérieur)' : ''), lv.bars.n, dd, len, 'column')); bars.push(bar(String(mk++), tag + 'Cadres HA' + ST + ' e=' + stk + ' cm (section ' + Math.round(lv.a * 100) + ' × ' + Math.round(lv.a * 100) + ' cm)', ncad, ST, cadLen, 'stirrup'));
         lvInfo.push({ name: lv.name, a: lv.a, n: lv.bars.n, d: dd, st: stk }); });
-      out.cols.push({ id: c.id, label: c.label, a: c.a, H: r.H, n, d, st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: c.levels.reduce((s, lv) => s + lv.a * lv.a * r.H, 0), lap, levels: lvInfo, strips: c.strips || null, raft: !!c.raft, fh: c.fh, fw: c.fw });
+      out.cols.push({ id: c.id, label: c.label, a: c.a, H: r.H, shaft: sh, D: r.anchor || fh, n, d, st, nCad, bars, kg: bars.reduce((s, x) => s + x.kg, 0), conc: c.levels.reduce((s, lv) => s + lv.a * lv.a * r.H, 0), lap, levels: lvInfo, strips: c.strips || null, raft: !!c.raft, fh: c.fh, fw: c.fw });
       if (c.node && (c.node.rive.length || c.node.pairs.length)) out.nodes.push({ id: 'ND-' + c.label, label: c.label, node: c.node, levels: c.levels, a: g.a, aTop: c.levels[0].a, st, beams: (c.node.rive.length ? c.node.rive.map(n => out.beams.find(x => x.id === n.beam)) : c.node.pairs[0].beams.map(id => out.beams.find(x => x.id === id))).filter(Boolean) });
       if (c.strips || c.raft) return;
       const fb = ft.bars, fbar = bar('1', 'Aciers de semelle, sens x et sens y (' + fb.n + ' HA' + fb.d + ' par sens)', 2 * fb.n, fb.d, ft.side - 2 * CF + 2 * hook90(fb.d), 'footing');
@@ -105,13 +105,14 @@
     return svg(W, H, out.join('')); };
 
   // ---------- column: elevation + cross section ----------
-  R.colSVG = (e, f) => { const W = 640, Hm = e.H + f.h + 0.3, s = 400 / Hm, H = Hm * s + 90, cx = 150, base = 40 + e.H * s, c = C * s, a = e.a * s, d = e.d / 1000 * s, out = [];
-    out.push(Rc(cx - f.side * s / 2, base, f.side * s, f.h * s, GREY), Rc(cx - f.side * s / 2, base + f.h * s, f.side * s, 0.05 * s, '#f6f6f6', INK, 1, 'stroke-dasharray="3 2"'), Rc(cx - a / 2, 40, a, e.H * s, '#fff'));
+  R.colSVG = (e, f) => { const sh0 = e.shaft || 0, W = 640, Hm = e.H + sh0 + f.h + 0.3, s = 400 / Hm, H = Hm * s + 90, cx = sh0 ? 200 : 150, base = 40 + e.H * s, sh = sh0 * s, c = C * s, a = e.a * s, d = e.d / 1000 * s, out = [];
+    out.push(Rc(cx - f.side * s / 2, base + sh, f.side * s, f.h * s, GREY), Rc(cx - f.side * s / 2, base + sh + f.h * s, f.side * s, 0.05 * s, '#f6f6f6', INK, 1, 'stroke-dasharray="3 2"'), Rc(cx - a / 2, 40, a, e.H * s + sh, '#fff'));
+    if (sh0) out.push(L(cx - f.side * s / 2 - 40, base, cx + f.side * s / 2 + 40, base, INK, 1.4), T(cx + f.side * s / 2 + 44, base + 4, 'T.N. ±0,00', 'start', MUTE, 10));
     for (let i = 0; i < e.nCad; i++) { const y = base - 0.05 * s - i * e.st / 100 * s; if (y > 40 + c) out.push(L(cx - a / 2 + c, y, cx + a / 2 - c, y, BLUE, 1)); }
-    const xl = cx - a / 2 + c + 2, xr = cx + a / 2 - c - 2, yTop = 40 + c, yFoot = base + (f.h - CF) * s, ret = 15 * e.d / 1000 * s, w = Math.max(2, d);
+    const xl = cx - a / 2 + c + 2, xr = cx + a / 2 - c - 2, yTop = 40 + c, yFoot = base + sh + (f.h - CF) * s, ret = 15 * e.d / 1000 * s, w = Math.max(2, d);
     out.push(Pth([[xl + ret, yFoot], [xl, yFoot], [xl, yTop]], RED, w), Pth([[xr - ret, yFoot], [xr, yFoot], [xr, yTop]], RED, w));
-    out.push(Pth([[cx - f.side * s / 2 + CF * s, base + (f.h - CF) * s - 3], [cx + f.side * s / 2 - CF * s, base + (f.h - CF) * s - 3]], RED, 1.5, 'stroke-dasharray="4 2"'));
-    out.push(dimV(cx - f.side * s / 2 - 14, 40, base, f1(e.H) + ' m'), dimV(cx - f.side * s / 2 - 14, base, base + f.h * s, Math.round(f.h * 100) + ' cm'), dimH(cx - f.side * s / 2, cx + f.side * s / 2, base + f.h * s + 34, 'semelle ' + f1(f.side) + ' m'));
+    out.push(Pth([[cx - f.side * s / 2 + CF * s, base + sh + (f.h - CF) * s - 3], [cx + f.side * s / 2 - CF * s, base + sh + (f.h - CF) * s - 3]], RED, 1.5, 'stroke-dasharray="4 2"'));
+    out.push(dimV(cx - f.side * s / 2 - 14, 40, base, f1(e.H) + ' m'), dimV(cx - f.side * s / 2 - 14, base + sh, base + sh + f.h * s, Math.round(f.h * 100) + ' cm'), ...(sh0 ? [dimV(cx - f.side * s / 2 - 44, base, base + sh + f.h * s, 'D = ' + f1(e.D) + ' m')] : []), dimH(cx - f.side * s / 2, cx + f.side * s / 2, base + sh + f.h * s + 34, 'semelle ' + f1(f.side) + ' m'));
     out.push(T(30, 22, `${e.label} — ${Math.round(e.a * 100)} × ${Math.round(e.a * 100)} cm — ${e.n}HA${e.d}`, 'start', INK, 14, 'font-weight="700"'), mark(cx + a / 2 + 26, 40 + e.H * s / 2 - 20, '1'), mark(cx + a / 2 + 26, 40 + e.H * s / 2 + 20, '2'));
     // section
     const S = 220, ox = 380, oy = 80, k = S / e.a, cs = C * k, dd = e.d / 1000 * k, dt = ST / 1000 * k;

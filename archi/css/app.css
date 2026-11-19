@@ -35,15 +35,17 @@ main { flex: 1; display: flex; min-height: 0; }
 #ferMain .bars { border-collapse: collapse; width: 100%; margin: 8px 0; } #ferMain .bars td, #ferMain .bars th { border: 1px solid #bbb; padding: 3px 6px; text-align: left; font-size: 13px; } #ferMain .bars th { background: #eef2f7; } #ferMain tr.tot td { font-weight: 700; background: #f6f6f6; }
 #ferMain button { background: #12365d; color: #fff; border-color: #12365d; } #ferMain .notes { color: #444; font-size: 13px; }
 #ferMain .warn { background: #fff4e5; border: 1px solid #e5b044; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; }
-[data-mode="fer"] #tools, [data-mode="fer"] #panel, [data-mode="fer"] #tools2d, [data-mode="fer"] #panel3 { display: none; }
+[data-mode="fer"] #panelAx, [data-mode="fer"] #tools, [data-mode="fer"] #panel, [data-mode="fer"] #tools2d, [data-mode="fer"] #panel3, #panelAx { display: none; }
+[data-mode="axes"] #tools, [data-mode="axes"] #panel, [data-mode="axes"] #panel3 { display: none; } [data-mode="axes"] #panelAx { display: block; }
+[data-mode="3d"] #panelAx { display: none; } [data-mode="axes"] #cv { cursor: grab; }
 #panel3 { display: none; }
 [data-mode="3d"] #tools, [data-mode="3d"] #panel, [data-mode="3d"] #tools2d { display: none; }
 [data-mode="3d"] #panel3 { display: block; }
 input[type=range] { width: 100%; padding: 0; min-height: 28px; }
 .chk { display: flex; align-items: center; gap: 8px; margin: 8px 0; } .chk input { min-height: 0; width: 18px; height: 18px; }
-#panel, #panel3 { width: 250px; padding: 10px; background: var(--panel); border-left: 1px solid var(--line); overflow: auto; }
-#panel h2, #panel3 h2 { margin: 6px 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
-#panel section, #panel3 section { margin-bottom: 14px; }
+#panel, #panel3, #panelAx { width: 290px; padding: 10px; background: var(--panel); border-left: 1px solid var(--line); overflow: auto; }
+#panel h2, #panel3 h2, #panelAx h2 { margin: 6px 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+#panel section, #panel3 section, #panelAx section { margin-bottom: 14px; }
 .wide { width: 100%; margin-top: 6px; }
 .layer { display: flex; align-items: center; gap: 4px; padding: 3px 0; }
 .layer button { min-height: 30px; padding: 3px 7px; } .layer .nm { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -54,13 +56,16 @@ input[type=range] { width: 100%; padding: 0; min-height: 28px; }
 #status { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; background: #0a0f18; border-top: 1px solid var(--line); color: var(--mute); font-size: 12.5px; }
 #hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #coords { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .only-small { display: none; }
+.seg { display: flex; gap: 6px; } .seg button { flex: 1; }
+.axt { width: 100%; border-collapse: collapse; margin-bottom: 4px; } .axt th { font-size: 11px; color: var(--mute); text-align: left; font-weight: 500; padding: 0 2px 2px; } .axt td { padding: 2px; } .axt input { width: 100%; min-width: 0; min-height: 30px; padding: 3px 6px; } .axt td:first-child { width: 62px; } .axt td.pos { color: var(--mute); font-size: 12px; text-align: right; white-space: nowrap; padding-right: 6px; } .axt button { min-height: 30px; padding: 2px 8px; }
 @media (max-width: 760px) {
   main { flex-direction: column-reverse; }
   #tools { flex-direction: row; border-right: 0; border-top: 1px solid var(--line); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   #tools button { width: auto; flex: 0 0 auto; } #tools button small { display: none; }
   .only-small { display: inline-block; }
-  #panel, #panel3 { display: none; position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; max-width: 86vw; box-shadow: -10px 0 30px #0008; }
+  #panel, #panel3, #panelAx { display: none; position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; max-width: 86vw; box-shadow: -10px 0 30px #0008; }
   #panel.open, [data-mode="3d"] #panel3.open { display: block; }
+  [data-mode="axes"] #panelAx { display: block; position: static; width: auto; max-width: none; max-height: 46vh; box-shadow: none; border-left: 0; border-top: 1px solid var(--line); }
   #fer { flex-direction: column; } #ferList { width: auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); flex: 0 0 auto; } #ferList button { flex: 0 0 auto; }
   [data-mode="3d"] #panel3 { display: none; }
   main { position: relative; }

@@ -20,6 +20,7 @@
         for (const q of A.endpoints(it)) { const d = A.dist(raw, q); if (d < best) { best = d; p = q.slice(); kind = 'end'; } } }
       if (!kind) { best = 10 / V.s; for (const it of A.doc.items) { if (!A.free(it) || skip.includes(it.id) || (it.t !== 'wall' && it.t !== 'line')) continue;
         const m = [(it.a[0] + it.b[0]) / 2, (it.a[1] + it.b[1]) / 2], d = A.dist(raw, m); if (d < best) { best = d; p = m; kind = 'mid'; } } } }
+    if (!kind && A.axes && A.doc.grid.snap !== false && A.mode !== 'axes') { const s = A.axes.snap(raw, V.s, A.opts.grid ? A.gridStep() : 0); if (s) { p = s.p; kind = s.kind; } }
     if (!kind) {
       if (A.opts.grid) { const st = A.gridStep(); p = [Math.round(p[0] / st) * st, Math.round(p[1] / st) * st]; kind = 'grid'; }
       if (from && (A.opts.ortho || shiftKey)) { const dx = raw[0] - from[0], dy = raw[1] - from[1];
@@ -146,6 +147,7 @@
       if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; gest = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, c: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], v: { ...V } }; drag = null; down = null; return; }
       if (ptrs.size > 2) return;
       const p = pos(e);
+      if (A.mode === 'axes') { pan = { p0: p, ox: V.ox, oy: V.oy, moved: false, right: false }; return; }
       if (e.button === 1 || e.button === 2 || spaceKey) { pan = { p0: p, ox: V.ox, oy: V.oy, moved: false, right: e.button === 2 }; return; }
       if (e.button !== 0) return; down = { p, touch: e.pointerType === 'touch' };
       if (A.tool === 'select') startSelect(p, A.toWorld(p[0], p[1]), e.shiftKey); else setCursor(p);
@@ -178,7 +180,7 @@
   window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftKey = false; if (e.key === ' ') spaceKey = false; });
   window.addEventListener('keydown', e => {
     if (/^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName)) return;
-    if (A.mode !== '2d') { const k3 = e.key.toLowerCase(); if (e.key === '2' || e.key === 'Escape') A.setMode('2d'); else if (e.key === '3') A.setMode('3d'); else if (e.key === '4') A.setMode('fer'); else if (A.mode === '3d' && k3 === 'h') A.v3.preset('iso'); else if (A.mode === '3d' && k3 === 't') A.v3.preset('top'); return; }
+    if (A.mode !== '2d') { if (A.mode === 'axes' && (e.ctrlKey || e.metaKey)) { const kz = e.key.toLowerCase(); if (kz === 'z') { e.preventDefault(); e.shiftKey ? A.redo() : A.undo(); } else if (kz === 'y') { e.preventDefault(); A.redo(); } return; } const k3 = e.key.toLowerCase(); if (e.key === '1') A.setMode('axes'); else if (e.key === '2' || e.key === 'Escape') A.setMode('2d'); else if (e.key === '3') A.setMode('3d'); else if (e.key === '4') A.setMode('fer'); else if (A.mode === '3d' && k3 === 'h') A.v3.preset('iso'); else if (A.mode === '3d' && k3 === 't') A.v3.preset('top'); return; }
     if (e.key === 'Shift') shiftKey = true; if (e.key === ' ') { spaceKey = true; e.preventDefault(); return; }
     const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
     if (mod) { if (k === 'z') { e.preventDefault(); e.shiftKey ? A.redo() : A.undo(); } else if (k === 'y') { e.preventDefault(); A.redo(); }
@@ -188,6 +190,7 @@
       if (e.key === 'Backspace' && A.typed) { A.typed = A.typed.slice(0, -1); A.updatePreview(); A.redraw(); A.status && A.status(); e.preventDefault(); return; }
       if (e.key === 'Enter') { if (A.typed) A.commitTyped(); else A.finishChain(); e.preventDefault(); return; }
     }
+    if (e.key === '1') { A.setMode('axes'); return; }
     if (e.key === '3') { A.setMode('3d'); return; }
     if (e.key === '4') { A.setMode('fer'); return; }
     if (e.key === 'Escape') { if (A.typed) { A.typed = ''; A.updatePreview(); A.redraw(); A.status && A.status(); } else if (A.pts.length) A.finishChain(); else if (A.sel.length) { A.sel = []; A.emit(); } else A.setTool('select'); return; }

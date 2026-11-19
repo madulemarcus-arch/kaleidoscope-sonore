@@ -38,12 +38,12 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   check('équilibre conservé avec la descente par niveau (somme des Nu ≥ charges appliquées)', eq.Nu > eq.slab, JSON.stringify(eq));
   // ---- bar schedule per level
   await run({ nlev: 3, Q: 5 });
-  const mdl = await page.evaluate(() => { const m = App.rebar.model(App.doc); const r = App.doc.struct.result; return { cols: m.cols.map((c, i) => ({ lv: c.levels, bars: c.bars, conc: c.conc, a: c.a, H: m.H, lap: c.lap, fh: r.columns[i].footing.h, label: c.label })) }; });
+  const mdl = await page.evaluate(() => { const m = App.rebar.model(App.doc); const r = App.doc.struct.result; return { cols: m.cols.map((c, i) => ({ lv: c.levels, bars: c.bars, conc: c.conc, a: c.a, H: m.H, lap: c.lap, fh: r.columns[i].footing.h, shaft: c.shaft, label: c.label })) }; });
   const cc = mdl.cols[0], H3 = cc.H;
   check('ferraillage : 3 tronçons, 6 lignes (barres et cadres par niveau), RDC en premier (repères 1 et 2)', cc.lv.length === 3 && cc.bars.length === 6 && cc.bars[0].mark === '1' && cc.bars[1].mark === '2' && /RDC/.test(cc.bars[0].desc) && /R\+1/.test(cc.bars[2].desc) && /R\+2/.test(cc.bars[4].desc), cc.bars.map(b => b.desc.slice(0, 22)).join(' | '));
   check('béton du poteau = Σ a² · H des trois niveaux', near(cc.conc, cc.lv.reduce((s, l) => s + l.a * l.a * H3, 0), 1e-9));
   const lsOf = d => d / 1000 * 500 / (4 * 0.6 * 2.25 * (0.6 + 0.06 * 25));
-  check('barres du dernier niveau : H − 3 cm ; niveau intermédiaire : H + ls ; RDC : H + ls + pied dans la semelle', near(cc.bars[4].len, H3 - 0.03, 1e-9) && near(cc.bars[2].len, H3 + lsOf(cc.bars[2].d), 1e-9) && near(cc.bars[0].len, H3 + lsOf(cc.bars[0].d) + (cc.fh - 0.05) + 12 * cc.bars[0].d / 1000, 1e-9), JSON.stringify(cc.bars.map(b => b.len)));
+  check('barres du dernier niveau : H − 3 cm ; niveau intermédiaire : H + ls ; RDC : H + ls + pied dans la semelle', near(cc.bars[4].len, H3 - 0.03, 1e-9) && near(cc.bars[2].len, H3 + lsOf(cc.bars[2].d), 1e-9) && near(cc.bars[0].len, H3 + lsOf(cc.bars[0].d) + (cc.fh - 0.05) + cc.shaft + 12 * cc.bars[0].d / 1000, 1e-9), JSON.stringify(cc.bars.map(b => b.len)));
   check('cadres : au moins 2 de plus au RDC (dans la semelle)', cc.bars[1].n === Math.floor(H3 / (cc.lv[0].st / 100)) + 2 && cc.bars[3].n === Math.floor(H3 / (cc.lv[1].st / 100)));
   // ---- report, table view, UI
   const rep = await page.evaluate(() => App.struct.report(App.doc)); check('note de calcul : descente de charges avec la loi de dégression', /4\. Descente de charges, poteaux et semelles/.test(rep) && /NF P06-001/.test(rep) && /R\+2/.test(rep) && /Poteaux \(niveau RDC\)/.test(rep));

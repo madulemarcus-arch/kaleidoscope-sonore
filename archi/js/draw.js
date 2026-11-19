@@ -34,6 +34,7 @@
   A.render = (ctx, W, H, v, theme, opts = {}) => {
     const th = A.THEMES[theme], doc = A.doc; ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, H);
     if (opts.grid && th.grid) grid(ctx, W, H, v, th);
+    if (A.axes) A.axes.draw(ctx, W, H, v, th, opts.mode);
     const col = it => th.ink || (A.layer(it.layer) || {}).color || '#fff', items = doc.items.filter(A.shown);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     // walls: filled, with a same-colour stroke so joined corners merge
@@ -79,7 +80,8 @@
       ctx.setLineDash([]); ctx.globalAlpha = 1;
       if (pv.label) { const q = A.toScreen(pv.label.p, v); ctx.font = '13px Inter, system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; const tw = ctx.measureText(pv.label.text).width;
         ctx.fillStyle = 'rgba(14,20,32,.85)'; ctx.fillRect(q[0] + 10, q[1] - 30, tw + 10, 20); ctx.fillStyle = th.pv; ctx.fillText(pv.label.text, q[0] + 15, q[1] - 14); } }
-    if (opts.snap) { const q = A.toScreen(opts.snap.p, v); ctx.strokeStyle = opts.snap.kind === 'end' ? '#7cffb0' : opts.snap.kind === 'mid' ? '#7cc4ff' : '#ffd27a'; ctx.lineWidth = 1.5;
-      if (opts.snap.kind === 'end' || opts.snap.kind === 'mid') ctx.strokeRect(q[0] - 6, q[1] - 6, 12, 12); else { ctx.beginPath(); ctx.moveTo(q[0] - 6, q[1]); ctx.lineTo(q[0] + 6, q[1]); ctx.moveTo(q[0], q[1] - 6); ctx.lineTo(q[0], q[1] + 6); ctx.stroke(); } }
+    if (opts.snap) { const q = A.toScreen(opts.snap.p, v); ctx.strokeStyle = opts.snap.kind === 'end' ? '#7cffb0' : opts.snap.kind === 'mid' ? '#7cc4ff' : opts.snap.kind === 'axe' || opts.snap.kind === 'axeL' ? '#5aa9ff' : '#ffd27a'; ctx.lineWidth = 1.5;
+      if (opts.snap.kind === 'axe') { ctx.beginPath(); ctx.arc(q[0], q[1], 7, 0, 2 * Math.PI); ctx.stroke(); ctx.beginPath(); ctx.moveTo(q[0] - 10, q[1]); ctx.lineTo(q[0] + 10, q[1]); ctx.moveTo(q[0], q[1] - 10); ctx.lineTo(q[0], q[1] + 10); ctx.stroke(); }
+      else if (opts.snap.kind === 'end' || opts.snap.kind === 'mid') ctx.strokeRect(q[0] - 6, q[1] - 6, 12, 12); else { ctx.beginPath(); ctx.moveTo(q[0] - 6, q[1]); ctx.lineTo(q[0] + 6, q[1]); ctx.moveTo(q[0], q[1] - 6); ctx.lineTo(q[0], q[1] + 6); ctx.stroke(); } }
   };
 })();

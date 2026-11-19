@@ -13,7 +13,7 @@
 <body>
 <header id="top">
   <div class="brand"><img src="icons/logo.svg" alt="" width="26" height="26"><b>Archi 2D</b><input id="docName" aria-label="Nom du plan" value="Sans titre"></div>
-  <div class="grp" id="modes" role="group" aria-label="Mode"><button id="mode2" aria-pressed="true" title="Dessin 2D (2)">2D</button><button id="mode3" aria-pressed="false" title="Vue 3D (3)">3D</button><button id="mode4" aria-pressed="false" title="Plans de ferraillage (4)">Ferraillage</button></div>
+  <div class="grp" id="modes" role="group" aria-label="Mode"><button id="mode1" aria-pressed="false" title="Axes, niveaux et ancrage (1)">Axes</button><button id="mode2" aria-pressed="true" title="Dessin 2D (2)">2D</button><button id="mode3" aria-pressed="false" title="Vue 3D (3)">3D</button><button id="mode4" aria-pressed="false" title="Plans de ferraillage (4)">Ferraillage</button></div>
   <div class="grp" id="tools2d">
     <button id="undo" title="Annuler (Ctrl+Z)" aria-label="Annuler">↶</button>
     <button id="redo" title="Rétablir (Ctrl+Y)" aria-label="Rétablir">↷</button>
@@ -47,10 +47,12 @@
     <section><h2 id="propsTitle">Propriétés</h2><div id="props"></div></section>
   </aside>
   <aside id="panel3" aria-label="Réglages du rendu"></aside>
+  <aside id="panelAx" aria-label="Axes, niveaux et ancrage"></aside>
 </main>
 <footer id="status"><span id="hint"></span><span id="coords"></span></footer>
 <script src="js/core.js"></script>
 <script src="js/draw.js"></script>
+<script src="js/axes.js"></script>
 <script src="js/struct.js"></script>
 <script src="js/rebar.js"></script>
 <script src="js/tools.js"></script>

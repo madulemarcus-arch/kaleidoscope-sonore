@@ -13,8 +13,8 @@
   A.toDXF = () => {
     const out = [], g = (c, v) => out.push(String(c), String(v)), mm = v => Math.round(v * 1000 * 100) / 100, doc = A.doc;
     g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(0, 'ENDSEC');
-    g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, doc.layers.length);
-    doc.layers.forEach(l => { g(0, 'LAYER'); g(2, lname(l)); g(70, 0); g(62, 7); g(6, 'CONTINUOUS'); }); g(0, 'ENDTAB'); g(0, 'ENDSEC');
+    g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, doc.layers.length + 1);
+    doc.layers.forEach(l => { g(0, 'LAYER'); g(2, lname(l)); g(70, 0); g(62, 7); g(6, 'CONTINUOUS'); }); g(0, 'LAYER'); g(2, 'AXES'); g(70, 0); g(62, 5); g(6, 'CONTINUOUS'); g(0, 'ENDTAB'); g(0, 'ENDSEC');
     g(0, 'SECTION'); g(2, 'ENTITIES');
     const line = (a, b, ly) => { if (A.dist(a, b) < 1e-6) return; g(0, 'LINE'); g(8, ly); g(10, mm(a[0])); g(20, mm(a[1])); g(30, 0); g(11, mm(b[0])); g(21, mm(b[1])); g(31, 0); };
     const text = (s, p, h, ly, ang) => { g(0, 'TEXT'); g(8, ly); g(10, mm(p[0])); g(20, mm(p[1])); g(30, 0); g(40, mm(h)); g(1, ascii(s)); if (ang) g(50, Math.round(ang * 100) / 100); };
@@ -30,6 +30,12 @@
       else if (it.t === 'furn') { const P = A.furnPoly(it); P.forEach((p, i) => line(p, P[(i + 1) % 4], ly)); text((A.FURN[it.kind] || [it.kind])[0], it.p, 0.15, ly); }
       else if (it.t === 'text') text(it.s, it.p, it.size, ly);
     });
+    // building axes on their own layer (lines, names at both ends; rings as circles)
+    if (A.axes && A.axes.has()) { const gr = doc.grid, e = A.axes.ext(), th = 0.2;
+      if (gr.sys === 'cyl') { const c = gr.cyl.c; gr.cyl.r.forEach(r => { g(0, 'CIRCLE'); g(8, 'AXES'); g(10, mm(c[0])); g(20, mm(c[1])); g(30, 0); g(40, mm(r.v)); text(r.n, [c[0], c[1] - r.v - 0.3], th, 'AXES'); });
+        gr.cyl.a.forEach(a => { const u = [Math.cos(a.v * Math.PI / 180), Math.sin(a.v * Math.PI / 180)], end = [c[0] + u[0] * e.R, c[1] + u[1] * e.R]; line(c, end, 'AXES'); text(a.n, [end[0] + u[0] * 0.3, end[1] + u[1] * 0.3], th, 'AXES'); }); }
+      else { gr.x.forEach(x => { line([x.p, e.y0], [x.p, e.y1], 'AXES'); text(x.n, [x.p - 0.1, e.y1 + 0.3], th, 'AXES'); text(x.n, [x.p - 0.1, e.y0 - 0.5], th, 'AXES'); });
+        gr.y.forEach(y => { line([e.x0, y.p], [e.x1, y.p], 'AXES'); text(y.n, [e.x0 - 0.6, y.p - 0.1], th, 'AXES'); text(y.n, [e.x1 + 0.3, y.p - 0.1], th, 'AXES'); }); } }
     g(0, 'ENDSEC'); g(0, 'EOF'); return out.join('\n') + '\n';
   };
   A.exportDXF = () => download(base() + '.dxf', new Blob([A.toDXF()], { type: 'application/dxf' }));

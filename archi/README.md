@@ -21,7 +21,7 @@ Ouvrir `archi/index.html` dans un navigateur récent, ou `python3 -m http.server
 | T | Texte |
 | O / G / S | Orthogonal / Grille / Accrochage aux points (Maj : orthogonal temporaire) |
 | H | Tout voir (en 3D : vue isométrique) |
-| 2 / 3 / 4 | Passer en dessin 2D / vue 3D / plans de ferraillage (en 3D : H = isométrique, T = dessus ; Échap = retour au 2D) |
+| 1 / 2 / 3 / 4 | Passer à l'onglet Axes / au dessin 2D / à la vue 3D / aux plans de ferraillage (en 3D : H = isométrique, T = dessus ; Échap = retour au 2D) |
 | Suppr, Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+S | Supprimer, annuler, rétablir, tout sélectionner, enregistrer |
 
 Molette = zoom ; clic droit, clic milieu ou Espace + glisser = déplacer la vue ; deux doigts = zoom et déplacement sur tablette.
@@ -66,6 +66,18 @@ Pour une structure poteaux-poutres-dalles en béton armé avec remplissage en ma
 
 **Nœuds poutre-poteau (approche simplifiée, si l'analyse de portique est désactivée)** : une poutre qui s'arrête sur un poteau sans poutre alignée de l'autre côté (poteau de rive ou d'angle) lui transmet son moment d'appui de rive (0,15 M0 en forfaitaire ou en Caquot) ; réparti par moitié entre le poteau au-dessus et le poteau au-dessous de chaque plancher, en totalité vers le premier poteau sous la toiture ; deux poutres perpendiculaires (angle) donnent une flexion déviée, traitée par l'excentricité équivalente e0 = e_grand + 0,7·e_petit. Ces poteaux sont calculés en **flexion composée** par l'équilibre de la section (béton parabole-rectangle, acier bilinéaire, pivots B et C, deux lits d'acier, minimum de section par dichotomie), avec l'excentricité additionnelle ea = max(2 cm ; l0/250) et le second ordre e2 = 3·lf²·(2 + α·φ)/(10⁴·h), φ = 2 (BAEL A.4.3,5) ; la section retenue est la plus petite qui passe aussi en compression centrée (B.8.4). Les poteaux continus (poutres alignées des deux côtés) ne reçoivent pas de moment de rive, mais le **déséquilibre sous chargement alterné** : une travée chargée à 1,35 G + 1,5 Q et la voisine à 1,35 G ont des moments d'encastrement p·L²/12 différents ; le plus défavorable des deux cas, ΔM, est réparti entre les poutres et les poteaux (au-dessus et au-dessous du plancher) au prorata des rigidités I/L (une seule distribution, extrémités éloignées encastrées ; poutres : b·h³/12 / portée, poteaux : a⁴/12 / hauteur d'étage ; pas de poteau au-dessus sous la toiture). Pour un tronçon, le moment retenu est la plus forte des parts des deux planchers qui l'encadrent. Il s'ajoute au moment de rive éventuel de l'autre sens et passe dans la même flexion composée (excentricités additionnelle et du second ordre). **Ancrage** : les barres de poutre (inférieures, de montage, chapeaux) sont ancrées par crochet à 180° dans le poteau ; la longueur droite 0,4·ls (ls = Ø·fe/(4τs), τs = 0,6·ψs²·ft28) plus l'enrobage de 3 cm donne la largeur de poteau requise, arrondie à 5 cm ; l'insuffisance et le cas d'une poutre plus large que le poteau sont signalés par un avertissement, un tableau (note de calcul, section 4 bis) et un dessin du nœud. Pas d'agrandissement automatique : c'est à vous de réduire le diamètre, d'élargir le poteau ou de prévoir des barres en U.
 
+## Axes, niveaux et ancrage (onglet « Axes », touche 1)
+
+Avant de dessiner, on définit le repère du bâtiment, comme dans un logiciel de calcul. Les données sont dans `doc.grid` (conservées dans le JSON) ; le module est `js/axes.js`.
+
+- **Système cartésien** : axes X numérotés (1, 2, 3…) et axes Y lettrés (A, B, C…). On saisit l'entraxe de chaque axe (modifier un entraxe décale les axes suivants ; la première ligne règle la position de l'origine) ou on génère une grille régulière (nombre d'axes et entraxe). Les noms sont modifiables.
+- **Système cylindrique** : centre, anneaux (rayons R1, R2…) et axes radiaux (angle polaire θ en degrés, 0° vers l'est, sens trigonométrique), avec génération rapide. Le système sphérique n'est pas proposé : il n'a pas de sens pour un plan de bâtiment.
+- **Niveaux (Z)** : nombre d'étages (RDC seul à R+9, c'est le paramètre « Niveaux » de la structure), hauteur d'étage (nouvelle hauteur par défaut des murs ; les murs qui avaient l'ancienne hauteur par défaut sont mis à jour, ceux dont la hauteur a été personnalisée sont conservés) et **profondeur d'ancrage D** de la fondation sous le terrain naturel (0,3 à 6 m). Une coupe schématique montre les niveaux (RDC +0,00, R+1…, toiture), la hauteur totale et la cote D.
+- **Affichage** : les axes sont dessinés en pointillés mixtes avec des bulles de repérage et les entraxes ; **dès qu'un mur est tracé, ils passent en gris discret** en dessin 2D (option « Griser les axes »), mais restent en couleur dans l'onglet Axes.
+- **Accrochage** : en dessin 2D, le pointeur s'accroche aux intersections des axes (cercle bleu), puis aux axes eux-mêmes (le long d'un axe, la position suit le pas de la grille magnétique). Option « Accrochage aux axes ».
+- **Structure sur les axes** : « Poteaux à chaque intersection » pose un poteau de 20 cm à chaque intersection libre ; « Poteaux et poutres sur les axes » ajoute en plus une poutre entre poteaux voisins le long de chaque axe (anneaux : cordes entre axes radiaux). Rien n'est ajouté en double et l'opération s'annule d'un coup (Ctrl+Z).
+- **Ancrage dans le calcul** : la fondation est posée à −D ; entre le dessus de la semelle et le terrain naturel, le poteau se prolonge par un fût de longueur D − h (h : épaisseur de la semelle ou du radier), compté dans la longueur des barres du poteau et dessiné avec le terrain naturel et la cote D. La note de calcul rappelle les niveaux, la hauteur totale et l'ancrage ; une alerte signale D < 0,50 m (gel, retrait-gonflement) ou D inférieure à l'épaisseur de fondation. L'export DXF ajoute un calque AXES (lignes d'axes, noms aux extrémités, anneaux en cercles).
+
 ## Plans de ferraillage
 
 Après le calcul, le bouton « Ferraillage » (ou la touche 4) affiche, pour chaque élément, le plan d'armatures et son tableau de nomenclature :
@@ -85,4 +97,4 @@ Conventions : enrobage 3 cm (5 cm pour les semelles, sur béton de propreté de 
 
 ## Étapes suivantes
 
-1. Flèche des poutres, séisme dans l'analyse de portique, vent sur les poutres, poinçonnement et radier plat (dalle champignon), charges différentes par niveau.
+1. Matériaux de murs plus variés et réglables, flèche des poutres, séisme dans l'analyse de portique, vent sur les poutres, poinçonnement et radier plat (dalle champignon), charges différentes par niveau.

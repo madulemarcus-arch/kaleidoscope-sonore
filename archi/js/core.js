@@ -1,7 +1,7 @@
 // Core: document model, geometry helpers, hit testing, undo/redo, autosave.
 // All coordinates are in metres, x to the right, y UP (screen conversion happens in draw.js).
 (function () {
-  const A = window.App = { BUILD: 'archi-v13', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
+  const A = window.App = { BUILD: 'archi-v14', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
   const L = (id, name, color) => ({ id, name, color, on: true, lock: false });
   A.uid = () => Math.random().toString(36).slice(2, 9);
   A.newDoc = () => A.ensureDoc({ v: 1, name: 'Sans titre', active: 'mur', defaults: { th: 0.2, h: 2.8 },
@@ -17,6 +17,7 @@
     d.render = Object.assign({ wallMat: 'crepi', floorMat: 'carrelage', roof: 'none', slope: 25, over: 0.4, roofMat: 'tuile', hour: 14, shadows: true }, d.render || {});
     if (!d.layers.some(l => l.id === 'meu')) d.layers.push({ id: 'meu', name: 'Mobilier', color: '#c9a26b', on: true, lock: false });
     if (!d.layers.some(l => l.id === 'str')) d.layers.push({ id: 'str', name: 'Structure', color: '#ff9f6b', on: true, lock: false });
+    d.grid = Object.assign({ sys: 'cart', x: [], y: [], anchor: 1.0, fade: true, bubbles: true, snap: true }, d.grid || {}); d.grid.cyl = Object.assign({ c: [0, 0], r: [], a: [] }, d.grid.cyl || {});
     d.struct = d.struct || {}; d.struct.p = Object.assign({}, A.STRUCT_DEFAULTS, d.struct.p || {}); d.render.structure = d.render.structure !== false;
     if (!d.layers.some(l => l.id === d.active)) d.active = d.layers[0].id; return d; };
   let hist = [], fut = [];
@@ -95,6 +96,7 @@
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; const add = p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); };
     A.doc.items.filter(A.shown).forEach(it => { if (it.t === 'wall') A.wallGeom(it).poly.forEach(add); else if (it.t === 'text') { const b = A.textBox(it); add([b[0], b[1]]); add([b[2], b[3]]); } else if (it.t === 'furn') A.furnPoly(it).forEach(add); else if (it.t === 'col') A.colPoly(it).forEach(add);
       else if (it.t === 'dim') { const g = A.dimGeom(it); [it.a, it.b, g.a2, g.b2].forEach(add); } else A.endpoints(it).forEach(add); });
+    if (A.axes && A.axes.has()) { const e = A.axes.ext(); add([e.x0, e.y0]); add([e.x1, e.y1]); }
     return x1 < x0 ? null : { x0, y0, x1, y1 };
   };
   A.fmt = (v, n = 2) => (Math.round(v * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');

@@ -21,7 +21,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   check('poutre : cadres HA6, nombre = ⌊portée libre / espacement⌋, 0,78 m chacun', last.n === Math.floor(2.8 / (b0.st / 100)) && near(last.len, 0.78, 1e-6) && last.d === 6, JSON.stringify(last));
   check('poutre : 2HA10 de montage', b0.bars[1].n === 2 && b0.bars[1].d === 10 && near(b0.bars[1].len, 3.54, 1e-6));
   const p1 = mdl.p1;
-  check('poteau : barres de 3,11 m (hauteur − enrobage + semelle − 5 cm + équerre 12 Ø)', near(p1.bars[0].len, 2.8 - 0.03 + (0.25 - 0.05) + 0.144, 1e-6) && p1.bars[0].n === 4 && p1.bars[0].d === 12, JSON.stringify(p1.bars[0]));
+  check('poteau : barres de 3,86 m (hauteur − enrobage + fût enterré D − h + semelle − 5 cm + équerre 12 Ø, ancrage D = 1 m, semelle 25 cm)', near(p1.shaft, 0.75, 1e-9) && near(p1.bars[0].len, 2.8 - 0.03 + 0.75 + (0.25 - 0.05) + 0.144, 1e-6) && p1.bars[0].n === 4 && p1.bars[0].d === 12, JSON.stringify(p1.bars[0]));
   check('poteau : cadres HA6 e=15 cm, 20 cadres', p1.st === 15 && p1.nCad === Math.floor(2.8 / 0.15) + 2 && near(p1.bars[1].len, 4 * (0.2 - 0.06) + 0.12, 1e-6));
   const s1 = mdl.s1;
   check('semelle : 2 × n barres avec équerres de 12 Ø', s1.bars[0].n === 2 * s1.n && near(s1.bars[0].len, s1.side - 0.10 + 2 * 12 * s1.d / 1000, 1e-6), JSON.stringify(s1.bars[0]));
