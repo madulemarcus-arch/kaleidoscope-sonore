@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v15', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v16', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -49,12 +49,12 @@
       modules: Object.fromEntries(App.MODULES.map(m => [m[0], App.PRESETS.general.modules.includes(m[0])])),
       vocab: { ...App.PRESETS.general.vocab },
       fields: { clients: [], products: [], invoices: [] }, // custom fields: {id,label,type,options}
-      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {}, job: {}, rental: {}, delivery: {}, contract: {}, op: {}, tr: {} },
+      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {}, job: {}, rental: {}, delivery: {}, contract: {}, op: {}, tr: {}, bil: {} },
       goal: 0, subDays: 30, subGrace: 15, expenseCats: ['Achats', 'Loyer', 'Salaires', 'Transport', 'Électricité / Eau', 'Communication', 'Autres'],
       modes: ['Espèces', 'Mobile money', 'Banque', 'Autre'],
       msgs: { remind: 'Bonjour {nom},\nSauf erreur de notre part, la facture {numero} de {montant} (reste {reste}) est impayée depuis {jours} jour(s).\nMerci de régler dès que possible.\n{entreprise}', sub: 'Bonjour {nom},\nVotre {abonnement} « {formule} » arrive à échéance le {date} ({delai}).\nMontant : {montant}. Merci de le renouveler.\n{entreprise}', receipt: 'Bonjour {nom},\nNous avons bien reçu votre paiement de {montant}{facture} le {date}. Merci !\n{entreprise}' }, // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: [], trTickets: []
   });
 
   // ---------- store ----------
