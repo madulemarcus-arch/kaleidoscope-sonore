@@ -138,6 +138,7 @@ dialog form > .end { display:flex; justify-content:flex-end; gap:8px; margin-top
 /* ---------- lock screen ---------- */
 #lock { position:fixed; inset:0; z-index:100; background:linear-gradient(160deg,#0c2542,#12365d 60%,#1e3f60); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center; overflow-y:auto; }
 #lock img { width:150px; background:#fff; border-radius:20px; padding:8px; }
+@media (max-height:780px) { #lock { gap:10px; justify-content:safe center; } #lock img { width:104px; } .pad { gap:10px; } .pad button { height:64px; } }
 #lock h1 { font-size:22px; margin-top:4px; } #lock p { margin:0; opacity:.85; }
 .dots { display:flex; gap:14px; margin:8px 0; }
 .dots i { width:16px; height:16px; border-radius:50%; border:2px solid #fff; display:block; }

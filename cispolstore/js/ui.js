@@ -155,10 +155,11 @@
     const dots = [0, 1, 2, 3].map(i => `<i class="${i < buf.length ? 'f' : ''}"></i>`).join('');
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => k ? `<button data-k="${k}">${k}</button>` : '<i></i>').join('');
     const cancel = flow !== 'unlock' ? '<button class="lnk" data-lk="cancel">Annuler</button>' : '';
-    lockEl.innerHTML = `<img src="logo.png" alt=""><h1>CISPOLstore Manager</h1><p>Gérez votre activité en toute simplicité</p><p><b>${TITLES[mode]}</b></p><div class="dots" id="dots">${dots}</div><p class="warn" id="lmsg">${msg}</p><div class="pad">${keys}</div>${mode === 'enter' && flow === 'unlock' ? '<button class="lnk" data-lk="forgot">Code PIN oublié ?</button>' : ''}${mode === 'new1' && flow === 'setup' ? '<button class="lnk" data-lk="skip">Plus tard</button>' : ''}${cancel}`;
+    lockEl.innerHTML = `<img src="logo.png" alt=""><h1>CISPOLstore Manager</h1><p>Gérez votre activité en toute simplicité</p><p><b>${TITLES[mode]}</b></p><div class="dots" id="dots">${dots}</div><p class="warn" id="lmsg">${msg}</p><div class="pad">${keys}</div>${mode === 'enter' && flow === 'unlock' && App.bio && App.bio.on() ? '<button class="btn sm sec" data-lk="bio">👆 Utiliser l\'empreinte</button>' : ''}${mode === 'enter' && flow === 'unlock' ? '<button class="lnk" data-lk="forgot">Code PIN oublié ?</button>' : ''}${mode === 'new1' && flow === 'setup' ? '<button class="lnk" data-lk="skip">Plus tard</button>' : ''}${cancel}`;
   };
   const unlock = () => { lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); fails = 0; };
-  App.showLock = (m = 'enter', f = 'unlock') => { buf = ''; first = ''; mode = m; flow = f; App.locked = f === 'unlock'; drawLock(); };
+  App.unlockNow = unlock;
+  App.showLock = (m = 'enter', f = 'unlock') => { buf = ''; first = ''; mode = m; flow = f; App.locked = f === 'unlock'; drawLock(); if (f === 'unlock' && m === 'enter' && App.bio && App.bio.on()) setTimeout(() => App.bio.prompt(), 300); };
   App.hasPin = () => !!(App.multi && App.multi()) || !!dbs().pin;
   const newPin = async pin => {
     const multi = App.multi && App.multi(), target = recTarget || (multi ? App.user : null);
@@ -185,6 +186,7 @@
       if ((!(App.multi && App.multi()) || flow !== 'unlock') && p && await hash(p.salt + buf) === p.hash) {
         if (flow === 'remove') { dbs().pin = null; App.save(); unlock(); App.toast('PIN désactivé'); if (App.state.view === 'settings') App.refresh(); return; }
         if (flow === 'change') { buf = ''; mode = 'new1'; return drawLock(); }
+        if (flow === 'bio') { unlock(); App.bio.enroll(); return; }
         return unlock();
       }
       buf = ''; if (++fails >= 5) { blockedUntil = Date.now() + 30000; fails = 0; }
@@ -206,7 +208,8 @@
     }
     if (!l) return;
     const a = l.dataset.lk;
-    if (a === 'forgot') { mode = 'recover'; drawLock(); }
+    if (a === 'bio') App.bio.prompt(true);
+    else if (a === 'forgot') { mode = 'recover'; drawLock(); }
     else if (a === 'back') { App.showLock('enter', 'unlock'); }
     else if (a === 'skip' || a === 'cancel') unlock();
     else if (a === 'recdone') { unlock(); App.toast('PIN enregistré'); if (App.multi && App.multi() && App.user) { App.me_login(App.user); } else if (App.state.view === 'settings') App.refresh(); }
