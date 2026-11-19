@@ -11,7 +11,7 @@ const { check, launch, setup } = require('./helper');
   await go('trips'); check('écran vide : carte avec bouton d\'action', (await p.locator('#view .empty [data-cta]').count()) === 1);
 
   // vehicle
-  await go('veh'); await p.click('#tv2'); await p.waitForSelector('.sheet [name=plate]'); await p.fill('.sheet [name=plate]', '1234AB01'); await p.fill('.sheet [name=name]', 'Camion 1'); await p.fill('.sheet [name=driver]', 'Chauffeur Test'); await save();
+  await go('veh'); await p.click('#tv2'); await p.waitForSelector('.sheet [name=plate]'); await p.fill('.sheet [name=plate]', '1234AB01'); await p.fill('.sheet [name=name]', 'Camion 1'); await p.fill('.sheet [name=driver]', 'Chauffeur Test'); await save(); await p.waitForFunction(() => App.db.trVehicles.length === 1); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
   check('chariot enregistré', await p.evaluate(() => App.db.trVehicles.length === 1 && App.db.trVehicles[0].plate === '1234AB01'));
 
   // trip with two cargo lines
@@ -22,7 +22,7 @@ const { check, launch, setup } = require('./helper');
   const rows = p.locator('.sheet .tl');
   await rows.nth(0).locator('[data-k=client]').fill('Client Test'); await rows.nth(0).locator('[data-k=cat]').selectOption('carton'); await rows.nth(0).locator('[data-k=qty]').fill('20'); await rows.nth(0).locator('[data-k=freight]').fill('50');
   await rows.nth(1).locator('[data-k=client]').fill('Autre Client'); await rows.nth(1).locator('[data-k=cat]').selectOption('cash'); await rows.nth(1).locator('[data-k=qty]').fill('1000'); await rows.nth(1).locator('[data-k=freight]').fill('10');
-  await save();
+  await save(); await p.waitForFunction(() => App.db.trTrips.length === 1);
   check('mouvement enregistré avec numéro TR-AAAA-0001', await p.evaluate(() => /^TR-\d{4}-0001$/.test(App.db.trTrips[0].number)));
   check('chargement : 2 lignes, catégories carton et espèces', await p.evaluate(() => { const l = App.db.trTrips[0].lines; return l.length === 2 && l[0].cat === 'carton' && l[1].cat === 'cash' && l[0].qty === 20; }));
   check('temps de route = durée − scale (8 h 00)', await p.evaluate(() => { const x = App.db.trTrips[0]; return App.transport.minutes(x) === 510 && App.transport.driving(x) === 480 && App.transport.status(x) === 'Arrivé'; }));
