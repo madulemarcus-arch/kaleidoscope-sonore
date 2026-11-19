@@ -26,6 +26,7 @@
     const out = [];
     db().payments.filter(p => F.inR(p.date, r)).forEach(p => { const i = A.get(p.invoiceId); out.push({ k: 'in', t: 'payment', id: p.id, date: p.date, at: F.at(p), amount: p.amount, cur: p.currency, rate: p.rate, mode: p.mode, label: 'Paiement ' + (i ? i.number + ' · ' + A.cname(i) : '') }); });
     if (App.mm && App.mod('mm')) App.mm.entries(r).forEach(e => out.push(e));
+    if (App.transport && App.mod('transport')) App.transport.tkEntries(r).forEach(e => out.push(e));
     db().expenses.filter(e => F.inR(e.date, r)).forEach(e => out.push({ k: 'out', t: 'expense', id: e.id, date: e.date, at: F.at(e), amount: e.amount, cur: e.currency, rate: e.rate, mode: e.mode, label: e.category + (e.note ? ' · ' + e.note : '') }));
     return out.sort((a, b) => b.at - a.at);
   };
