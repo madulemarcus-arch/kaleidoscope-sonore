@@ -42,12 +42,22 @@
     // openings cut the wall, then draw their symbol
     items.filter(A.isOpening).forEach(o => { const r = A.openRect(o); if (!r) return; ctx.fillStyle = th.bg; poly(ctx, r.pts, v); ctx.fill();
       const c = col(r.w); ctx.strokeStyle = c; ctx.lineWidth = 1.2; const { u, n, h } = r.g, q = o.w / 2, P = (s, k) => [r.w.a[0] + u[0] * (r.c + s * q) + n[0] * k, r.w.a[1] + n[1] * k + u[1] * (r.c + s * q)];
+      if (o.t === 'claustra') { for (let k = -1; k <= 1; k += 0.5) seg(ctx, P(-1, k * h), P(1, k * h), v); for (let s = -1; s <= 1; s += 0.25) seg(ctx, P(s, h), P(s, -h), v); return; }
       if (o.t === 'window') { [-1, 0, 1].forEach(k => seg(ctx, P(-1, k * h * 0.66), P(1, k * h * 0.66), v)); seg(ctx, P(-1, h), P(-1, -h), v); seg(ctx, P(1, h), P(1, -h), v); return; }
       const side = o.flip ? -1 : 1, sg = o.mirror ? 1 : -1, hinge = P(sg, 0), closed = P(-sg, 0), tip = [hinge[0] + n[0] * side * o.w, hinge[1] + n[1] * side * o.w];
       seg(ctx, P(-1, h), P(-1, -h), v); seg(ctx, P(1, h), P(1, -h), v); seg(ctx, hinge, tip, v);
       const H0 = A.toScreen(hinge, v), C0 = A.toScreen(closed, v), T0 = A.toScreen(tip, v), a1 = Math.atan2(C0[1] - H0[1], C0[0] - H0[0]), a2 = Math.atan2(T0[1] - H0[1], T0[0] - H0[0]);
       let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
       ctx.beginPath(); ctx.arc(H0[0], H0[1], o.w * v.s, a1, a2, d < 0); ctx.stroke(); });
+    // shear walls: darker fill with diagonal hatching
+    items.filter(i => i.t === 'voile').forEach(w => { const g = A.wallGeom({ a: w.a, b: w.b, th: w.th, id: '_v' + w.id }); ctx.fillStyle = th.ink ? '#555' : '#8d9ab3'; ctx.strokeStyle = col(w); ctx.lineWidth = 1.2; poly(ctx, g.poly, v); ctx.fill(); ctx.stroke();
+      ctx.save(); poly(ctx, g.poly, v); ctx.clip(); ctx.strokeStyle = th.ink ? '#fff' : '#0e1420'; ctx.lineWidth = 1; const step = Math.max(5, w.th * v.s * 0.8); const A0 = A.toScreen(w.a, v), B0 = A.toScreen(w.b, v), len = Math.hypot(B0[0] - A0[0], B0[1] - A0[1]), ux = (B0[0] - A0[0]) / (len || 1), uy = (B0[1] - A0[1]) / (len || 1), nx = -uy, ny = ux, hh = w.th * v.s / 2 + 2;
+      ctx.beginPath(); for (let s = -hh; s < len + hh; s += step) { ctx.moveTo(A0[0] + ux * s + nx * hh, A0[1] + uy * s + ny * hh); ctx.lineTo(A0[0] + ux * (s + hh * 1.6) - nx * hh, A0[1] + uy * (s + hh * 1.6) - ny * hh); } ctx.stroke(); ctx.restore(); });
+    // lintels of block walls (dashed, above the openings)
+    items.filter(i => i.t === 'wall' && i.wt && (A.lib.sec(i.wt) || {}).lint !== false).forEach(w => { const g = A.wallGeom(w), ls = A.lib.active('lintel'), ap = ls ? ls.app : 0.25; ctx.strokeStyle = th.ink || '#c9a26b'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+      A.openings(w).forEach(o => { const c = A.openPos(o, w), q = o.w / 2 + ap, P = (s, k) => [w.a[0] + g.u[0] * (c + s * q) + g.n[0] * k * g.h, w.a[1] + g.u[1] * (c + s * q) + g.n[1] * k * g.h]; poly(ctx, [P(-1, 1), P(1, 1), P(1, -1), P(-1, -1)], v); ctx.stroke(); }); ctx.setLineDash([]); });
+    items.filter(i => i.t === 'rail').forEach(r => { const c = th.ink || col(r), s = A.lib.sec(r.rt), esp = s && s.esp ? s.esp : 0.11, len = A.dist(r.a, r.b), u = A.unit(r.a, r.b), n = A.normal(u); ctx.strokeStyle = c; ctx.lineWidth = 2.5; seg(ctx, r.a, r.b, v); ctx.lineWidth = 1;
+      if (esp * v.s >= 4) for (let t = 0; t <= len + 1e-6; t += esp * 2) { const p = [r.a[0] + u[0] * t, r.a[1] + u[1] * t]; seg(ctx, [p[0] + n[0] * 0.04, p[1] + n[1] * 0.04], [p[0] - n[0] * 0.04, p[1] - n[1] * 0.04], v); } });
     items.filter(i => i.t === 'line').forEach(l => { ctx.strokeStyle = col(l); ctx.lineWidth = 1.4; seg(ctx, l.a, l.b, v); });
     items.filter(i => i.t === 'dim').forEach(d => { const g = A.dimGeom(d), c = th.ink || col(d); ctx.strokeStyle = c; ctx.lineWidth = 1;
       seg(ctx, d.a, g.a2, v); seg(ctx, d.b, g.b2, v); seg(ctx, g.a2, g.b2, v);
@@ -56,6 +66,8 @@
     items.filter(i => i.t === 'col').forEach(c => { const k = col(c); ctx.fillStyle = k; ctx.strokeStyle = k; ctx.globalAlpha = 0.85; poly(ctx, A.colPoly(c), v); ctx.fill(); ctx.globalAlpha = 1; ctx.lineWidth = 1; ctx.stroke(); });
     items.filter(i => i.t === 'beam').forEach(b => { ctx.strokeStyle = col(b); ctx.lineWidth = 3; ctx.setLineDash([9, 5]); seg(ctx, b.a, b.b, v); ctx.setLineDash([]); });
     if (opts.struct && A.struct) A.struct.overlay(ctx, v, th);
+    items.filter(i => i.t === 'stair').forEach(s => A.stairs.draw(ctx, v, th, s, false));
+    doc.items.filter(i => i.t === 'stair' && !A.shown(i) && A.layer(i.layer) && A.layer(i.layer).on && A.lvView > 0 && A.atLevel(i, A.lvView - 1)).forEach(s => A.stairs.draw(ctx, v, th, s, true));
     items.filter(i => i.t === 'furn').forEach(f => { const c = col(f), P = A.furnPoly(f), q = A.toScreen(f.p, v); ctx.fillStyle = c; ctx.strokeStyle = c; ctx.globalAlpha = 0.14; poly(ctx, P, v); ctx.fill(); ctx.globalAlpha = 1; ctx.lineWidth = 1.2; poly(ctx, P, v); ctx.stroke();
       const px = Math.min(13, Math.min(f.w, f.d) * v.s * 0.4); if (px >= 7) { ctx.font = `${px}px Inter, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText((A.FURN[f.kind] || [f.kind])[0], q[0], q[1]); } });
     items.filter(i => i.t === 'text').forEach(t => { const q = A.toScreen(t.p, v); ctx.fillStyle = th.ink || col(t); ctx.font = `${Math.max(6, t.size * v.s)}px Inter, system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillText(t.s, q[0], q[1]); });
@@ -66,6 +78,7 @@
       if (it.t === 'wall') poly(ctx, A.wallGeom(it).poly, v); else if (A.isOpening(it)) { const r = A.openRect(it); if (!r) return; poly(ctx, r.pts, v); }
       else if (it.t === 'furn') poly(ctx, A.furnPoly(it), v);
       else if (it.t === 'col') poly(ctx, A.colPoly(it), v);
+      else if (it.t === 'stair') { const W = A.stairs.world(it, A.stairs.calcItem(it)); W.steps.forEach(s => { poly(ctx, s.poly, v); ctx.stroke(); }); return; }
       else if (it.t === 'text') { const b = A.textBox(it); poly(ctx, [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]], v); }
       else if (it.t === 'dim') { const g = A.dimGeom(it); seg(ctx, g.a2, g.b2, v); return; } else { seg(ctx, it.a, it.b, v); return; }
       ctx.stroke(); });
@@ -76,6 +89,7 @@
       (pv.walls || []).forEach(w => { const g = A.wallGeom({ a: w.a, b: w.b, th: w.th, id: '_pv' }); ctx.globalAlpha = 0.3; poly(ctx, g.poly, v); ctx.fill(); ctx.globalAlpha = 0.85; ctx.stroke(); });
       (pv.lines || []).forEach(l => seg(ctx, l[0], l[1], v));
       if (pv.rect) { poly(ctx, pv.rect, v); ctx.stroke(); }
+      (pv.stair || []).forEach(pl => { poly(ctx, pl, v); ctx.stroke(); });
       if (pv.open) { ctx.setLineDash([]); poly(ctx, pv.open, v); ctx.globalAlpha = 0.4; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke(); }
       ctx.setLineDash([]); ctx.globalAlpha = 1;
       if (pv.label) { const q = A.toScreen(pv.label.p, v); ctx.font = '13px Inter, system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; const tw = ctx.measureText(pv.label.text).width;

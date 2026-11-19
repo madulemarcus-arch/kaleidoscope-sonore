@@ -13,7 +13,7 @@
 <body>
 <header id="top">
   <div class="brand"><img src="icons/logo.svg" alt="" width="26" height="26"><b>Archi 2D</b><input id="docName" aria-label="Nom du plan" value="Sans titre"></div>
-  <div class="grp" id="modes" role="group" aria-label="Mode"><button id="mode1" aria-pressed="false" title="Axes, niveaux et ancrage (1)">Axes</button><button id="mode2" aria-pressed="true" title="Dessin 2D (2)">2D</button><button id="mode3" aria-pressed="false" title="Vue 3D (3)">3D</button><button id="mode4" aria-pressed="false" title="Plans de ferraillage (4)">Ferraillage</button></div>
+  <div class="grp" id="modes" role="group" aria-label="Mode"><button id="mode1" aria-pressed="false" title="Axes, niveaux et ancrage (1)">Axes</button><button id="mode5" aria-pressed="false" title="Éléments : poutres, poteaux, dalles, murs, linteaux… (5)">Éléments</button><button id="mode6" aria-pressed="false" title="Escalier (6)">Escalier</button><button id="mode2" aria-pressed="true" title="Dessin 2D (2)">2D</button><button id="mode3" aria-pressed="false" title="Vue 3D (3)">3D</button><button id="mode4" aria-pressed="false" title="Plans de ferraillage (4)">Ferraillage</button></div>
   <div class="grp" id="tools2d">
     <button id="undo" title="Annuler (Ctrl+Z)" aria-label="Annuler">↶</button>
     <button id="redo" title="Rétablir (Ctrl+Y)" aria-label="Rétablir">↷</button>
@@ -36,10 +36,12 @@
   <input id="file" type="file" accept=".json,application/json" hidden>
 </header>
 <main>
-  <nav id="tools" aria-label="Outils"></nav>
+  <nav id="tools" aria-label="Outils"><select id="lvSel" aria-label="Niveau affiché" title="Niveau affiché"></select><button id="lvOnly" class="tog" aria-pressed="false" title="Les nouveaux éléments ne sont posés que sur le niveau affiché">Ce niveau seul</button></nav>
   <div id="stage"><canvas id="cv" aria-label="Zone de dessin"></canvas><canvas id="cv3" aria-label="Vue 3D" hidden></canvas>
     <div id="bar3" hidden><button data-v="iso">Isométrique</button><button data-v="top">Dessus</button><button data-v="front">Face</button><button data-v="png">Image HD</button><button data-v="panel" class="only-small">Rendu</button></div>
     <p id="msg3" hidden></p>
+    <div id="lib" hidden><nav id="libNav" aria-label="Familles d'éléments"></nav><div id="libMain"></div></div>
+    <div id="stairs" hidden></div>
     <div id="fer" hidden><nav id="ferList" aria-label="Éléments"></nav><div id="ferMain"></div></div></div>
   <aside id="panel">
     <section><h2>Calques</h2><div id="layers"></div><button id="addLayer" class="wide">+ Nouveau calque</button></section>
@@ -53,6 +55,8 @@
 <script src="js/core.js"></script>
 <script src="js/draw.js"></script>
 <script src="js/axes.js"></script>
+<script src="js/lib.js"></script>
+<script src="js/stairs.js"></script>
 <script src="js/struct.js"></script>
 <script src="js/rebar.js"></script>
 <script src="js/tools.js"></script>

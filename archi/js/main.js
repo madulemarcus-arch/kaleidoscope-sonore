@@ -6,7 +6,7 @@
   // ---------- canvas ----------
   const resize = () => { const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2); const nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
     if (W) { A.view.ox += (nw - W) / 2; A.view.oy += (nh - H) / 2; } W = nw; H = nh; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); A.redraw(); };
-  const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true, struct: A.doc.struct.show !== false, mode: A.mode }); };
+  const paint = () => { raf = 0; if (!A.doc) return; A.render(ctx, W, H, A.view, 'screen', { sel: A.sel, pv: A.pv, snap: A.snapInfo, grid: A.opts.grid || true, struct: A.doc.struct.show !== false && A.lvView === 0, mode: A.mode }); };
   A.redraw = () => { if (!raf) raf = requestAnimationFrame(paint); };
   A.fitView = () => { A.fit(W, H); A.redraw(); };
   new ResizeObserver(() => { if (A.mode === '3d') A.v3.resize(); else resize(); }).observe($('stage'));
@@ -20,16 +20,23 @@
   $('lenBtn').onclick = () => { const s = prompt(A.tool === 'rect' ? 'Dimensions en mètres (ex. 4x3) :' : 'Longueur en mètres :'); if (s) A.commitTyped(s); };
   $('docName').onchange = e => A.edit(d => { d.name = e.target.value.trim() || 'Sans titre'; });
 
+  // ---------- level selector ----------
+  const lvSel = $('lvSel');
+  lvSel.onchange = () => { A.lvView = +lvSel.value; A.sel = []; A.emit(); };
+  $('lvOnly').onclick = () => A.edit(d => { d.lvOnly = !d.lvOnly; });
+  const drawLevels = () => { const n = A.nLevels(); if (A.lvView >= n) A.lvView = n - 1; if (document.activeElement !== lvSel) lvSel.innerHTML = Array.from({ length: n }, (_, i) => `<option value="${i}"${i === A.lvView ? ' selected' : ''}>${A.levelName(i)}</option>`).join('');
+    lvSel.hidden = n < 2; $('lvOnly').hidden = n < 2; $('lvOnly').setAttribute('aria-pressed', String(!!A.doc.lvOnly)); };
+
   // ---------- 2D / 3D mode ----------
   const cv3 = $('cv3'); let first3 = true;
   A.mode = '2d';
   A.setMode = m => {
     if (m === A.mode) return;
     if (m === '3d') { A.cancel(); if (!A.v3.init(cv3)) { alert('La vue 3D demande WebGL, absent de ce navigateur.'); return; } if (first3) { A.v3.initInput(cv3); first3 = false; } }
-    if (m === 'fer' || m === 'axes') { A.cancel(); A.tool = 'select'; }
+    if (m === 'fer' || m === 'axes' || m === 'elem' || m === 'stairs') { A.cancel(); A.tool = 'select'; }
     A.mode = m; const d3 = m === '3d';
-    document.body.dataset.mode = m; cv.hidden = m !== '2d' && m !== 'axes'; cv3.hidden = !d3; $('bar3').hidden = !d3; $('fer').hidden = m !== 'fer';
-    [['mode1', 'axes'], ['mode2', '2d'], ['mode3', '3d'], ['mode4', 'fer']].forEach(([id, k]) => $(id).setAttribute('aria-pressed', String(m === k)));
+    document.body.dataset.mode = m; cv.hidden = m !== '2d' && m !== 'axes'; cv3.hidden = !d3; $('bar3').hidden = !d3; $('fer').hidden = m !== 'fer'; $('lib').hidden = m !== 'elem'; $('stairs').hidden = m !== 'stairs';
+    [['mode1', 'axes'], ['mode5', 'elem'], ['mode6', 'stairs'], ['mode2', '2d'], ['mode3', '3d'], ['mode4', 'fer']].forEach(([id, k]) => $(id).setAttribute('aria-pressed', String(m === k)));
     if (d3) { A.v3.rebuild(); A.v3.resize(); A.v3.preset('iso'); const none = !A.v3.mesh.stats.walls; $('msg3').hidden = !none; $('msg3').textContent = 'Aucun mur à afficher : dessinez d\'abord en 2D.'; }
     else $('msg3').hidden = true;
     if (m === '2d' || m === 'axes') resize();
@@ -48,7 +55,7 @@
   $('ferList').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; A.ferView = v; drawFer(); $('ferMain').scrollTop = 0; };
   $('ferMain').onclick = e => { if (e.target.id === 'ferCalc') A.struct.run(); else if (e.target.id === 'ferExport') { const html = A.rebar.document(A.doc); if (html) A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-plans-de-ferraillage.html', new Blob([html], { type: 'text/html' })); } };
   $('mode4').onclick = () => A.setMode('fer');
-  $('mode1').onclick = () => A.setMode('axes'); $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
+  $('mode5').onclick = () => A.setMode('elem'); $('mode6').onclick = () => A.setMode('stairs'); $('mode1').onclick = () => A.setMode('axes'); $('mode2').onclick = () => A.setMode('2d'); $('mode3').onclick = () => A.setMode('3d');
   $('bar3').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; if (v === 'png') A.v3.snapshot(2, b => A.download((A.doc.name || 'plan').replace(/[^\w\-]+/g, '-') + '-3d.png', b)); else if (v === 'panel') $('panel3').classList.toggle('open'); else A.v3.preset(v); };
 
   // ---------- furniture picker (header, visible with the Meuble tool) ----------
@@ -68,7 +75,7 @@
       <label class="row"><span>Débord (m)</span><input type="number" data-k="over" min="0" max="2" step="0.1" value="${r.over}"></label></section>
       <section><h2>Soleil</h2><label class="row"><span>Heure</span><b id="hourTxt">${hh} h ${String(mm).padStart(2, '0')}</b></label><input type="range" data-k="hour" min="6" max="18" step="0.25" value="${r.hour}" aria-label="Heure du soleil">
       <label class="chk"><input type="checkbox" data-k="shadows"${r.shadows ? ' checked' : ''}> Ombres portées</label></section>
-      <section><h2>Structure</h2><label class="chk"><input type="checkbox" data-k="structure"${r.structure ? ' checked' : ''}> Poteaux et poutres</label></section>`;
+      <section><h2>Structure</h2><label class="chk"><input type="checkbox" data-k="structure"${r.structure ? ' checked' : ''}> Poteaux et poutres</label><label class="chk"><input type="checkbox" data-k="walls"${r.walls !== false ? ' checked' : ''}> Afficher les murs (décocher pour voir l\'intérieur)</label></section>`;
   }
   p3.onchange = e => { const k = e.target.dataset.k; if (!k) return; let v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' || e.target.type === 'range' ? parseFloat(e.target.value) : e.target.value;
     if (typeof v === 'number' && !isFinite(v)) return; if (k === 'slope') v = Math.max(5, Math.min(60, v)); if (k === 'over') v = Math.max(0, Math.min(2, v)); A.edit(d => { d.render[k] = v; }); };
@@ -134,9 +141,9 @@
     i.onchange = () => { const v = parseFloat(i.value); if (isFinite(v) && v >= i.min) A.edit(set.bind(null, v)); else A.emit(); }; r.appendChild(i); return r; }
   function drawProps() {
     const box = $('props'); box.innerHTML = ''; const sel = A.sel.map(A.item).filter(Boolean);
-    if (!sel.length) { $('propsTitle').textContent = 'Réglages des murs'; box.appendChild(field('Épaisseur (m)', A.doc.defaults.th, 0.01, (v, d) => { d.defaults.th = v; }));
+    if (!sel.length) { $('propsTitle').textContent = 'Réglages des murs'; if (A.lib) A.lib.activeProps(box); box.appendChild(field('Épaisseur (m)', A.doc.defaults.th, 0.01, (v, d) => { d.defaults.th = v; }));
       box.appendChild(field('Hauteur (m)', A.doc.defaults.h, 0.05, (v, d) => { d.defaults.h = v; })); const m = document.createElement('p'); m.className = 'muted'; m.textContent = 'Valables pour les prochains murs. Sélectionnez un élément pour modifier ses propriétés.'; box.appendChild(m); return; }
-    const names = { wall: 'Mur', line: 'Ligne', door: 'Porte', window: 'Fenêtre', dim: 'Cote', text: 'Texte', furn: 'Meuble', col: 'Poteau', beam: 'Poutre' };
+    const names = { wall: 'Mur', line: 'Ligne', door: 'Porte', window: 'Fenêtre', dim: 'Cote', text: 'Texte', furn: 'Meuble', col: 'Poteau', beam: 'Poutre', voile: 'Voile', rail: 'Garde-corps', claustra: 'Claustra', stair: 'Escalier' };
     $('propsTitle').textContent = sel.length > 1 ? sel.length + ' éléments' : names[sel[0].t];
     const each = (fn) => d => sel.forEach(s => fn(d.items.find(i => i.id === s.id)));
     if (sel.length === 1) { const it = sel[0];
@@ -155,6 +162,7 @@
         const r = document.createElement('div'); r.className = 'row btns'; [['flip', 'Inverser le côté'], ['mirror', it.t === 'door' ? 'Charnière' : null]].forEach(([k, t]) => { if (!t) return; const b = document.createElement('button'); b.textContent = t; b.onclick = () => A.edit(d => { const x = d.items.find(i => i.id === it.id); x[k] = !x[k]; }); r.appendChild(b); }); box.appendChild(r); }
       if (it.t === 'text') { const r = document.createElement('label'); r.className = 'row'; r.innerHTML = '<span>Texte</span>'; const i = document.createElement('input'); i.value = it.s; i.onchange = () => i.value.trim() ? A.edit(d => { d.items.find(x => x.id === it.id).s = i.value.trim(); }) : A.emit(); r.appendChild(i); box.appendChild(r);
         box.appendChild(field('Taille (m)', it.size, 0.05, (v, d) => { d.items.find(i => i.id === it.id).size = v; })); } }
+    if (A.lib) A.lib.props(box, sel, field);
     if (!sel.some(A.isOpening)) { const r = document.createElement('label'); r.className = 'row'; r.innerHTML = '<span>Calque</span>'; const s = document.createElement('select');
       A.doc.layers.forEach(l => { const o = document.createElement('option'); o.value = l.id; o.textContent = l.name; if (sel.every(x => x.layer === l.id)) o.selected = true; s.appendChild(o); });
       if (!sel.every(x => x.layer === sel[0].layer)) s.insertAdjacentHTML('afterbegin', '<option selected disabled>—</option>');
@@ -163,7 +171,7 @@
   }
 
   // ---------- status + global refresh ----------
-  A.status = () => { if (A.mode === '3d') { $('coords').textContent = ''; $('hint').textContent = 'Glissez pour tourner · Maj ou clic droit + glisser : déplacer · molette ou deux doigts : zoom'; return; } if (A.mode === 'axes') { const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m`; $('hint').textContent = 'Axes : définissez la grille, les niveaux et l\'ancrage à droite · glisser : déplacer la vue · molette : zoom · 2 : dessiner sur les axes'; return; } const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m · ${A.fmt(A.view.s, 0)} px/m`;
+  A.status = () => { if (A.mode === '3d') { $('coords').textContent = ''; $('hint').textContent = 'Glissez pour tourner · Maj ou clic droit + glisser : déplacer · molette ou deux doigts : zoom'; return; } if (A.mode === 'elem' || A.mode === 'stairs') { $('coords').textContent = ''; $('hint').textContent = A.mode === 'elem' ? 'Éléments : définissez les types (sections, matériaux, blocs…), puis posez-les en 2D · types actifs dans les réglages' : 'Escalier : paramétrez puis placez-le dans le plan et sur les niveaux'; return; } if (A.mode === 'axes') { const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m`; $('hint').textContent = 'Axes : définissez la grille, les niveaux et l\'ancrage à droite · glisser : déplacer la vue · molette : zoom · 2 : dessiner sur les axes'; return; } const p = A.raw || [0, 0]; $('coords').textContent = `x ${A.fmt(p[0])} · y ${A.fmt(p[1])} m · ${A.fmt(A.view.s, 0)} px/m`;
     $('hint').textContent = A.typed ? `Saisie : ${A.typed} (Entrée pour valider)` : A.hint(); };
   A.on(() => {
     tools.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === A.tool)));
@@ -172,7 +180,7 @@
     if (document.activeElement !== $('docName')) $('docName').value = A.doc.name;
     if (!A.doc.layers.some(l => l.id === A.doc.active)) A.doc.active = A.doc.layers[0].id;
     $('furnSel').hidden = A.tool !== 'furn'; if (document.activeElement !== fs) fs.value = A.furnKind;
-    drawLayers(); drawProps(); drawStruct(); drawRender(); drawFer(); A.status(); A.redraw();
+    drawLevels(); drawLayers(); drawProps(); drawStruct(); drawRender(); drawFer(); A.status(); A.redraw();
   });
 
   // ---------- start ----------

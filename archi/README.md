@@ -14,14 +14,16 @@ Ouvrir `archi/index.html` dans un navigateur récent, ou `python3 -m http.server
 | M | Mur (chaîné ; tapez une longueur puis Entrée) |
 | L | Ligne |
 | R | Pièce rectangulaire (4 murs ; tapez `4x3` puis Entrée) |
-| D / F | Porte / Fenêtre (X : inverser le côté) |
+| D / F / K | Porte / Fenêtre / Claustra (X : inverser le côté) |
 | C | Cote (3 clics : deux points, puis la ligne de cote) |
 | U | Meuble (choisir le type en haut, cliquer pour poser, X : tourner de 90°) |
 | P / B | Poteau / Poutre dessinée à la main (les poutres sous les murs se déduisent des poteaux) |
+| I / J | Voile en béton armé / Garde-corps (types actifs dans les réglages à droite) |
+| E | Escalier (paramètres de l'onglet Escalier ; X : tourner de 90°) |
 | T | Texte |
 | O / G / S | Orthogonal / Grille / Accrochage aux points (Maj : orthogonal temporaire) |
 | H | Tout voir (en 3D : vue isométrique) |
-| 1 / 2 / 3 / 4 | Passer à l'onglet Axes / au dessin 2D / à la vue 3D / aux plans de ferraillage (en 3D : H = isométrique, T = dessus ; Échap = retour au 2D) |
+| 1 / 5 / 6 / 2 / 3 / 4 | Passer à l'onglet Axes / Éléments / Escalier / au dessin 2D / à la vue 3D / aux plans de ferraillage (en 3D : H = isométrique, T = dessus ; Échap = retour au 2D) |
 | Suppr, Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+S | Supprimer, annuler, rétablir, tout sélectionner, enregistrer |
 
 Molette = zoom ; clic droit, clic milieu ou Espace + glisser = déplacer la vue ; deux doigts = zoom et déplacement sur tablette.
@@ -66,6 +68,25 @@ Pour une structure poteaux-poutres-dalles en béton armé avec remplissage en ma
 
 **Nœuds poutre-poteau (approche simplifiée, si l'analyse de portique est désactivée)** : une poutre qui s'arrête sur un poteau sans poutre alignée de l'autre côté (poteau de rive ou d'angle) lui transmet son moment d'appui de rive (0,15 M0 en forfaitaire ou en Caquot) ; réparti par moitié entre le poteau au-dessus et le poteau au-dessous de chaque plancher, en totalité vers le premier poteau sous la toiture ; deux poutres perpendiculaires (angle) donnent une flexion déviée, traitée par l'excentricité équivalente e0 = e_grand + 0,7·e_petit. Ces poteaux sont calculés en **flexion composée** par l'équilibre de la section (béton parabole-rectangle, acier bilinéaire, pivots B et C, deux lits d'acier, minimum de section par dichotomie), avec l'excentricité additionnelle ea = max(2 cm ; l0/250) et le second ordre e2 = 3·lf²·(2 + α·φ)/(10⁴·h), φ = 2 (BAEL A.4.3,5) ; la section retenue est la plus petite qui passe aussi en compression centrée (B.8.4). Les poteaux continus (poutres alignées des deux côtés) ne reçoivent pas de moment de rive, mais le **déséquilibre sous chargement alterné** : une travée chargée à 1,35 G + 1,5 Q et la voisine à 1,35 G ont des moments d'encastrement p·L²/12 différents ; le plus défavorable des deux cas, ΔM, est réparti entre les poutres et les poteaux (au-dessus et au-dessous du plancher) au prorata des rigidités I/L (une seule distribution, extrémités éloignées encastrées ; poutres : b·h³/12 / portée, poteaux : a⁴/12 / hauteur d'étage ; pas de poteau au-dessus sous la toiture). Pour un tronçon, le moment retenu est la plus forte des parts des deux planchers qui l'encadrent. Il s'ajoute au moment de rive éventuel de l'autre sens et passe dans la même flexion composée (excentricités additionnelle et du second ordre). **Ancrage** : les barres de poutre (inférieures, de montage, chapeaux) sont ancrées par crochet à 180° dans le poteau ; la longueur droite 0,4·ls (ls = Ø·fe/(4τs), τs = 0,6·ψs²·ft28) plus l'enrobage de 3 cm donne la largeur de poteau requise, arrondie à 5 cm ; l'insuffisance et le cas d'une poutre plus large que le poteau sont signalés par un avertissement, un tableau (note de calcul, section 4 bis) et un dessin du nœud. Pas d'agrandissement automatique : c'est à vous de réduire le diamètre, d'élargir le poteau ou de prévoir des barres en U.
 
+## Éléments (onglet « Éléments », touche 5)
+
+Bibliothèque des composants du bâtiment, stockée dans le plan (`doc.lib`, JSON) et gérée par `js/lib.js`. Chaque famille a un tableau de types modifiables (nom, dimensions en cm, matériau), un **type actif** (utilisé par les nouveaux éléments, réglable aussi dans le panneau 2D quand rien n'est sélectionné) et un aperçu dessiné aux cotes.
+
+- **Matériaux** : béton C20/25, C25/30, C30/37, acier HA et de charpente, bois résineux et dur, verre, maçonnerie ; famille, résistance, poids volumique et couleur 3D modifiables ; ajout possible.
+- **Poutres** (base b, hauteur h), **poteaux** (rectangulaires a × b ou circulaires Ø), **dalles et planchers** (pleine, corps creux, nervurée ; épaisseur éventuellement « imposée au calcul »), **fondations** (semelle isolée, filante, radier ; largeur imposée facultative), **voiles** (épaisseur).
+- **Murs en blocs et briques** : catalogue de 17 unités (blocs béton creux ou pleins de 10, 15, 20 cm en 40 × 20 ou 50 × 20, béton cellulaire, brique cuite pleine, briques creuses, brique alvéolaire monomur, bloc de terre comprimée, latérite, pierre) avec longueur L, hauteur H, épaisseur e et poids du mur ; blocs personnalisés. Un type de mur combine un bloc, l'enduit de chaque face et le joint : **l'épaisseur du mur est celle du bloc plus l'enduit**, et modifier un type met à jour tous les murs qui l'utilisent. Exemple : bloc de 15 = 40 × 20 × 15 cm (longueur, hauteur, épaisseur), 11,6 blocs au m² avec un joint de 1 cm. En 3D, l'appareillage à joints décalés est dessiné sur les deux faces.
+- **Linteaux** (hauteur, appui de chaque côté) : posés au-dessus de toutes les ouvertures des murs en blocs (pointillés en plan, béton en 3D, comptés au métré). **Claustras** (outil K, comme une fenêtre) : module, épaisseur et motif (damier, barreaux, croisillons), maillage dessiné en 3D. **Garde-corps** (outil J) : barreaudage, balustres béton, lisses, verre ou plein, hauteur, vide entre barres, section des barres, entraxe des poteaux ; alertes si la hauteur est inférieure à 1,00 m ou le vide supérieur à 11 cm.
+- **Métré de maçonnerie** : surface nette de chaque mur (ouvertures déduites), nombre de blocs (+5 % de chutes), mortier, enduit, poids, linteaux, garde-corps, claustras, voiles, tous niveaux cumulés.
+- **Dans le calcul** : le type d'une poutre ou d'un poteau en est la **section minimale** (un poteau rectangulaire ou rond est traité en section carrée de même aire) ; une dalle « imposée » donne l'épaisseur minimale ; le type de fondation actif choisit le mode du calcul ; le poids d'un mur en blocs remplace la charge par défaut ; un élément en acier ou en bois est modélisé mais signalé comme non dimensionné (BAEL béton armé) ; voiles et escaliers sont modélisés mais pas encore pris en compte dans le calcul.
+
+## Niveaux
+
+Le nombre d'étages et la hauteur d'étage se règlent dans l'onglet Axes. Un élément sans liste `lv` existe à **tous les niveaux** (étages courants identiques) ; sinon seulement aux niveaux listés. Le sélecteur de niveau (à gauche, à partir de deux niveaux) choisit le plan affiché ; « Ce niveau seul » pose les nouveaux éléments sur ce niveau uniquement ; dans les propriétés d'un élément, les cases RDC, R+1… le posent ou le **copient par translation** sur d'autres niveaux. La vue 3D empile tous les niveaux avec leurs planchers (trémies au droit des escaliers) et propose de masquer les murs pour voir l'intérieur. Le calcul de structure utilise le plan du RDC (éléments « tous niveaux » et ceux du RDC).
+
+## Escalier (onglet « Escalier », touche 6)
+
+Escalier paramétrique en **béton armé, métal ou bois** (`js/stairs.js`). Types : droit, droit avec palier intermédiaire, quart tournant avec palier d'angle, demi-tournant avec palier (jour réglable), **quart tournant à marches balancées** (2 à 5 marches balancées, rayons à angles égaux). On définit la hauteur à franchir (hauteur d'étage), la hauteur de marche visée (ajustée pour obtenir un nombre entier de contremarches), le giron, l'emmarchement, l'épaisseur de paillasse ou de marche, le nombre de marches de la première volée, la longueur du palier et le sens du virage. Le calcul affiche en direct : nombre de contremarches et hauteur réelle, marches par volée, longueur de volée (projection) et de paillasse (inclinée), pente, emprise, volume de béton et poids ≈, avec un plan numéroté et une coupe, et les alertes (formule de Blondel 2h + g entre 60 et 64 cm, plages courantes de h et de g, emmarchement, giron des marches balancées à la ligne de foulée, paillasse de moins de 12 cm). « Valider et placer » pose l'escalier à la position saisie (ou à la souris avec l'outil E, X pour tourner) aux niveaux cochés : il apparaît dans les plans de ces niveaux, la trémie est dessinée en pointillés au niveau supérieur, et la 3D l'empile avec une ouverture dans les planchers. Copier sur d'autres niveaux : cocher les niveaux (dans l'onglet ou dans les propriétés). Sélectionner un escalier puis « Modifier dans l'onglet Escalier » rouvre ses paramètres. Non encore traités : escalier hélicoïdal, demi-tournant balancé, contribution au calcul des dalles.
+
 ## Axes, niveaux et ancrage (onglet « Axes », touche 1)
 
 Avant de dessiner, on définit le repère du bâtiment, comme dans un logiciel de calcul. Les données sont dans `doc.grid` (conservées dans le JSON) ; le module est `js/axes.js`.
@@ -97,4 +118,4 @@ Conventions : enrobage 3 cm (5 cm pour les semelles, sur béton de propreté de 
 
 ## Étapes suivantes
 
-1. Matériaux de murs plus variés et réglables, flèche des poutres, séisme dans l'analyse de portique, vent sur les poutres, poinçonnement et radier plat (dalle champignon), charges différentes par niveau.
+1. Escalier hélicoïdal et demi-tournant balancé, voiles et escaliers dans le calcul, flèche des poutres, séisme dans l'analyse de portique, vent sur les poutres, poinçonnement et radier plat (dalle champignon), charges différentes par niveau.

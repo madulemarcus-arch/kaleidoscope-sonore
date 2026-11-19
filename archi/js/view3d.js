@@ -24,8 +24,8 @@
   };
   V3.rebuild = () => { V3.mesh = A.buildMesh(A.doc); V3.dirty = false; const gl = V3.gl; if (!gl) return;
     ['base', 'solid', 'glass'].forEach(k => { gl.bindBuffer(gl.ARRAY_BUFFER, bufs[k]); gl.bufferData(gl.ARRAY_BUFFER, V3.mesh[k], gl.STATIC_DRAW); }); };
-  V3.preset = name => { const b = V3.mesh && V3.mesh.bounds; if (b) { const w = b.x1 - b.x0, h = b.y1 - b.y0, hh = Math.max(...A.doc.items.filter(i => i.t === 'wall').map(i => i.h), 2.8);
-      V3.target = [(b.x0 + b.x1) / 2, hh / 3, -(b.y0 + b.y1) / 2]; V3.dist = Math.max(Math.hypot(w, h) * 1.3, 5); } else { V3.target = [0, 1, 0]; V3.dist = 10; }
+  V3.preset = name => { const b = V3.mesh && V3.mesh.bounds; if (b) { const w = b.x1 - b.x0, h = b.y1 - b.y0, hh = Math.max((V3.mesh && V3.mesh.stats && V3.mesh.stats.height) || 0, ...A.doc.items.filter(i => i.t === 'wall').map(i => i.h), 2.8);
+      V3.target = [(b.x0 + b.x1) / 2, hh / 3, -(b.y0 + b.y1) / 2]; V3.dist = Math.max(Math.hypot(w, h, hh) * 1.3, 5); } else { V3.target = [0, 1, 0]; V3.dist = 10; }
     if (name === 'top') { V3.yaw = 0; V3.pitch = Math.PI / 2 - 0.001; V3.dist *= 0.9; } else if (name === 'front') { V3.yaw = 0; V3.pitch = 0.12; } else { V3.yaw = -0.6; V3.pitch = 0.5; } V3.draw(); };
   V3.matrix = () => { const cv = V3.cv, asp = cv.width / Math.max(1, cv.height), cp = Math.cos(V3.pitch), t = V3.target,
       eye = [t[0] + V3.dist * cp * Math.sin(V3.yaw), t[1] + V3.dist * Math.sin(V3.pitch), t[2] + V3.dist * cp * Math.cos(V3.yaw)];

@@ -1,7 +1,7 @@
 // Core: document model, geometry helpers, hit testing, undo/redo, autosave.
 // All coordinates are in metres, x to the right, y UP (screen conversion happens in draw.js).
 (function () {
-  const A = window.App = { BUILD: 'archi-v14', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
+  const A = window.App = { BUILD: 'archi-v15', KEY: 'archi.doc.v1', sel: [], doc: null, listeners: [] };
   const L = (id, name, color) => ({ id, name, color, on: true, lock: false });
   A.uid = () => Math.random().toString(36).slice(2, 9);
   A.newDoc = () => A.ensureDoc({ v: 1, name: 'Sans titre', active: 'mur', defaults: { th: 0.2, h: 2.8 },
@@ -14,9 +14,10 @@
   A.STRUCT_DEFAULTS = { fc28: 25, fe: 500, sigSol: 0.2, nlev: 1, top: 'dalle', G2: 2.0, Q: 1.5, G2top: 1.5, Qtop: 1.0, Groof: 1.0, Qroof: 0.5, wallLoad: 2.8, maxSpan: 4.5, found: 'auto', degr: true, frame: true, base: 'pin', crack: true, crackB: 0.35, crackC: 0.7, vent: 0 };
   // Fills in everything a document needs (older plans lack the rendering settings and the furniture layer).
   A.ensureDoc = d => { d.defaults = d.defaults || { th: 0.2, h: 2.8 };
-    d.render = Object.assign({ wallMat: 'crepi', floorMat: 'carrelage', roof: 'none', slope: 25, over: 0.4, roofMat: 'tuile', hour: 14, shadows: true }, d.render || {});
+    d.render = Object.assign({ wallMat: 'crepi', floorMat: 'carrelage', roof: 'none', slope: 25, over: 0.4, roofMat: 'tuile', hour: 14, shadows: true, walls: true }, d.render || {});
     if (!d.layers.some(l => l.id === 'meu')) d.layers.push({ id: 'meu', name: 'Mobilier', color: '#c9a26b', on: true, lock: false });
     if (!d.layers.some(l => l.id === 'str')) d.layers.push({ id: 'str', name: 'Structure', color: '#ff9f6b', on: true, lock: false });
+    if (A.libFix) A.libFix(d);
     d.grid = Object.assign({ sys: 'cart', x: [], y: [], anchor: 1.0, fade: true, bubbles: true, snap: true }, d.grid || {}); d.grid.cyl = Object.assign({ c: [0, 0], r: [], a: [] }, d.grid.cyl || {});
     d.struct = d.struct || {}; d.struct.p = Object.assign({}, A.STRUCT_DEFAULTS, d.struct.p || {}); d.render.structure = d.render.structure !== false;
     if (!d.layers.some(l => l.id === d.active)) d.active = d.layers[0].id; return d; };
@@ -34,9 +35,13 @@
   A.undo = () => swap(hist, fut); A.redo = () => swap(fut, hist);
   A.item = id => A.doc.items.find(i => i.id === id);
   A.layer = id => A.doc.layers.find(l => l.id === id);
-  A.shown = it => { const l = A.layer(it.layer); return !l || l.on; };
+  // Levels: an element with no `lv` list exists on every level (typical floors); otherwise only on the listed levels (0 = ground floor).
+  A.lvView = 0; A.nLevels = () => Math.max(1, Math.round(A.doc.struct.p.nlev)); A.levelName = i => i === 0 ? 'RDC' : 'R+' + i;
+  A.atLevel = (it, lv) => !it.lv || it.lv.includes(lv);
+  A.withLevel = (lv, fn) => { const k = A.lvView; A.lvView = lv; try { return fn(); } finally { A.lvView = k; } };
+  A.shown = it => { const l = A.layer(it.layer); return (!l || l.on) && A.atLevel(it, A.lvView); };
   A.free = it => { const l = A.layer(it.layer); return A.shown(it) && !(l && l.lock); };
-  A.isOpening = it => it.t === 'door' || it.t === 'window';
+  A.isOpening = it => it.t === 'door' || it.t === 'window' || it.t === 'claustra';
 
   // ---------- geometry ----------
   A.dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -49,7 +54,7 @@
     const u = A.unit(a, b), t = Math.max(0, Math.min(l, (p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]));
     return { d: A.dist(p, [a[0] + u[0] * t, a[1] + u[1] * t]), t };
   };
-  A.endpoints = it => it.t === 'wall' || it.t === 'line' || it.t === 'dim' || it.t === 'beam' ? [it.a, it.b] : it.t === 'text' || it.t === 'col' ? [it.p] : [];
+  A.endpoints = it => it.t === 'wall' || it.t === 'line' || it.t === 'dim' || it.t === 'beam' || it.t === 'voile' || it.t === 'rail' ? [it.a, it.b] : it.t === 'text' || it.t === 'col' || it.t === 'stair' ? [it.p] : [];
   // A wall end that touches another wall's end is extended by half a thickness so corners close cleanly.
   A.wallGeom = w => {
     const u = A.unit(w.a, w.b), n = A.normal(u), h = w.th / 2;
@@ -73,7 +78,11 @@
   // Four world corners of a furniture piece (centre p, size w x d, rotation in degrees).
   A.furnPoly = f => { const r = (f.rot || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r), hw = f.w / 2, hd = f.d / 2;
     return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([x, y]) => [f.p[0] + x * c - y * s, f.p[1] + x * s + y * c]); };
-  A.colPoly = c => { const h = c.a / 2; return [[c.p[0] - h, c.p[1] - h], [c.p[0] + h, c.p[1] - h], [c.p[0] + h, c.p[1] + h], [c.p[0] - h, c.p[1] + h]]; };
+  // Column footprint: square of side a by default, or the rectangle / circle of its section type (doc.lib).
+  A.colDims = c => { const s = A.lib && c.sec ? A.lib.sec(c.sec) : null; if (!s) return { shape: 'rect', b: c.a, h: c.a }; return s.shape === 'circ' ? { shape: 'circ', b: s.b, h: s.b } : { shape: 'rect', b: s.b, h: s.h }; };
+  A.colPoly = c => { const d = A.colDims(c);
+    if (d.shape === 'circ') return Array.from({ length: 24 }, (_, i) => [c.p[0] + d.b / 2 * Math.cos(i * Math.PI / 12), c.p[1] + d.b / 2 * Math.sin(i * Math.PI / 12)]);
+    const w = d.b / 2, h = d.h / 2; return [[c.p[0] - w, c.p[1] - h], [c.p[0] + w, c.p[1] - h], [c.p[0] + w, c.p[1] + h], [c.p[0] - w, c.p[1] + h]]; };
   A.textBox = t => [t.p[0], t.p[1], t.p[0] + t.s.length * t.size * 0.6, t.p[1] + t.size];
 
   // Topmost item under world point p (openings win over their wall); tol in metres.
@@ -86,6 +95,9 @@
       if (o.t === 'wall' && A.segDist(p, o.a, o.b).d <= o.th / 2 + tol) return o.id;
       if ((o.t === 'line' || o.t === 'beam') && A.segDist(p, o.a, o.b).d <= tol) return o.id;
       if (o.t === 'col' && Math.abs(p[0] - o.p[0]) <= o.a / 2 + tol && Math.abs(p[1] - o.p[1]) <= o.a / 2 + tol) return o.id;
+      if (o.t === 'stair' && A.stairs && A.stairs.hit(o, p)) return o.id;
+      if (o.t === 'voile' && A.segDist(p, o.a, o.b).d <= o.th / 2 + tol) return o.id;
+      if (o.t === 'rail' && A.segDist(p, o.a, o.b).d <= tol) return o.id;
       if (o.t === 'dim') { const g = A.dimGeom(o); if (A.segDist(p, g.a2, g.b2).d <= tol) return o.id; }
       if (o.t === 'furn') { const r = -(o.rot || 0) * Math.PI / 180, dx = p[0] - o.p[0], dy = p[1] - o.p[1], lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
         if (Math.abs(lx) <= o.w / 2 + tol && Math.abs(ly) <= o.d / 2 + tol) return o.id; }

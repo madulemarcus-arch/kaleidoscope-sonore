@@ -27,6 +27,9 @@
         if (s1 > cur) faces(cur, s1); if (!w.ea) line(at(s0, w.h), at(s0, -w.h), ly); if (!w.eb) line(at(s1, w.h), at(s1, -w.h), ly); }
       else if (it.t === 'dim') { const d = A.dimGeom(it); line(it.a, d.a2, ly); line(it.b, d.b2, ly); line(d.a2, d.b2, ly);
         let ang = Math.atan2(d.u[1], d.u[0]) * 180 / Math.PI; text(A.fmt(d.len) + ' m', [(d.a2[0] + d.b2[0]) / 2 + d.n[0] * 0.05, (d.a2[1] + d.b2[1]) / 2 + d.n[1] * 0.05], 0.15, ly, ang); }
+      else if (it.t === 'voile') { const w = A.wallGeom({ a: it.a, b: it.b, th: it.th, id: '_v' }), P = w.poly; P.forEach((p, i) => line(p, P[(i + 1) % 4], ly)); }
+      else if (it.t === 'rail') line(it.a, it.b, ly);
+      else if (it.t === 'stair') { const W = A.stairs.world(it, A.stairs.calcItem(it)); W.steps.forEach(s => s.poly.forEach((p, i) => line(p, s.poly[(i + 1) % s.poly.length], ly))); for (let k = 0; k + 1 < W.path.length; k++) line(W.path[k], W.path[k + 1], ly); }
       else if (it.t === 'furn') { const P = A.furnPoly(it); P.forEach((p, i) => line(p, P[(i + 1) % 4], ly)); text((A.FURN[it.kind] || [it.kind])[0], it.p, 0.15, ly); }
       else if (it.t === 'text') text(it.s, it.p, it.size, ly);
     });

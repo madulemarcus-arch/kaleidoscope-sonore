@@ -71,3 +71,23 @@ input[type=range] { width: 100%; padding: 0; min-height: 28px; }
   main { position: relative; }
   .brand input { width: 110px; }
 }
+
+/* Éléments and Escalier tabs */
+#lib, #stairs { position: absolute; inset: 0; display: flex; background: var(--bg); overflow: hidden; } #lib[hidden], #stairs[hidden] { display: none; }
+#libNav { width: 210px; padding: 8px; display: flex; flex-direction: column; gap: 5px; overflow: auto; background: var(--panel); border-right: 1px solid var(--line); } #libNav button { text-align: left; } #libNav button.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+#libMain { flex: 1; min-width: 0; overflow: auto; padding: 14px 18px; } #libMain h2 { margin: 4px 0 10px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.libgrid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: start; } .libprev { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; position: sticky; top: 0; }
+.libt { border-collapse: collapse; width: 100%; margin-bottom: 8px; } .libt th { font-size: 11px; color: var(--mute); text-align: left; font-weight: 500; padding: 2px 4px 4px; } .libt td { padding: 2px 3px; vertical-align: middle; } .libt input:not([type=checkbox]):not([type=radio]), .libt select { width: 100%; min-width: 74px; min-height: 30px; padding: 3px 6px; } .libt input[type=checkbox], .libt input[type=radio] { width: 18px; height: 18px; min-height: 0; } .libt tr.sel td { background: rgba(213,82,47,.12); } .libt input[type=color] { width: 42px; padding: 1px; } .libt button { min-height: 30px; padding: 2px 8px; }
+.libform { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } .libform input { width: 110px; } .libform input:first-child { width: 220px; }
+.lvbox { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0; align-items: center; } .lvbox span { color: var(--mute); font-size: 12px; width: 100%; } .lvbox label { display: flex; gap: 4px; align-items: center; } .lvbox input { min-height: 0; width: 16px; height: 16px; }
+#lvSel { min-height: 36px; width: 92px; } #lvOnly { width: 92px; font-size: 12px; padding: 5px 6px; min-height: 32px; } #lvSel[hidden], #lvOnly[hidden] { display: none; }
+@media (max-width: 760px) { #lib, #stairs { flex-direction: column; } #libNav { width: auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); flex: 0 0 auto; } #libNav button { flex: 0 0 auto; } .libgrid { grid-template-columns: 1fr; } .libprev { position: static; } #libMain { padding: 10px; } }
+
+/* compact header so that it keeps a single row at 1200 px even with every button visible */
+#top { gap: 8px 10px; } #modes { gap: 4px; flex-wrap: nowrap; } #modes button { padding: 7px 8px; } .brand input { width: 112px; } #tools2d { gap: 4px; } #tools2d button { padding: 7px 8px; }
+.libgrid > div:first-child { min-width: 0; overflow-x: auto; } .libt td:nth-child(2) input { min-width: 150px; }
+
+.stl { flex: 0 0 380px; padding: 14px 18px; overflow: auto; border-right: 1px solid var(--line); } .stl h2, .stm h2 { margin: 4px 0 10px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); } .stl .row input, .stl .row select { width: 150px; }
+.stm { flex: 1; min-width: 0; padding: 14px 18px; overflow: auto; } .stm svg { display: block; margin: 0 auto 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+@media (max-width: 760px) { .stl { flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--line); max-height: 55vh; } }
+[data-mode="elem"] #tools, [data-mode="elem"] #panel, [data-mode="elem"] #panel3, [data-mode="stairs"] #tools, [data-mode="stairs"] #panel, [data-mode="stairs"] #panel3 { display: none; }
