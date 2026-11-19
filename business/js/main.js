@@ -3,8 +3,8 @@
   const App = window.App, ui = App.ui, esc = App.esc, M = App.money;
   // id → [label, emoji, module needed (null = always), step of the roadmap that delivers the screen]; the navigation icon has the same name as the id
   const SCREENS = {
-    home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases'], 3], money: ['Finances', '💰', null, 5],
-    services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7], mm: ['Mobile money', '📲', 'mm', 7],
+    home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases', 'transport'], 3], money: ['Finances', '💰', null, 5],
+    services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7], mm: ['Mobile money', '📲', 'mm', 7], transport: ['Transport', '🚛', 'transport', 8],
     interventions: ['Interventions', '🧰', 'interventions', 7], contracts: ['Contrats', '📄', 'contracts', 7], purchases: ['Achats', '🛒', 'purchases', 7],
     cash: ['Caisse', '🏧', 'cash', 5], team: ['Équipe', '🧑‍💼', 'team', 6], data: ['Données et sécurité', '💾', null, 6], settings: ['Réglages', '⚙️', null, 1]
   };
@@ -21,7 +21,7 @@
   const tiles = () => { // four tiles on the home screen: invoice, collect, client, then the next available action
     const list = App.quick.filter(q => !q.mod || App.mod(q.mod)), inv = list.find(q => q.to === 'sales'), cli = list.find(q => q.to === 'clients'), rest = list.filter(q => q !== inv && q !== cli);
     const collect = App.mod('sales') && App.canView('sales') ? { label: () => 'Encaisser', short: () => 'Encaisser', qc: '#1f9d55', ic: '💰', run: () => App.go('sales', { tab: 'unpaid' }) } : null;
-    const mmq = list.find(q => q.to === 'mm'); return [mmq, inv, collect, cli, ...rest.filter(q => q !== mmq)].filter(Boolean).slice(0, 4);
+    const mmq = list.find(q => q.to === 'mm' || q.to === 'transport'); return [mmq, inv, collect, cli, ...rest.filter(q => q !== mmq)].filter(Boolean).slice(0, 4);
   };
 
   // ---------- routing ----------
@@ -30,7 +30,7 @@
   const fromHash = () => { const m = location.hash.match(/^#\/(\w+)/); return m ? m[1] : 'home'; };
   window.addEventListener('hashchange', () => { cur = fromHash(); App.render(App.params); App.params = null; });
 
-  const tabsFor = () => { const mid = ['mm', 'sales', 'stock', 'money'].filter(enabled).slice(0, 2); return ['home', 'clients', ...mid, 'more']; };
+  const tabsFor = () => { const mid = ['mm', 'transport', 'sales', 'stock', 'money'].filter(enabled).slice(0, 2); return ['home', 'clients', ...mid, 'more']; };
   const navBtn = (id, on) => '<button data-go="' + id + '" class="' + (on ? 'on' : '') + '"' + (on ? ' aria-current="page"' : '') + '><i aria-hidden="true">' + App.icon(id) + '</i><span>' + esc(id === 'more' ? 'Plus' : label(id)) + '</span></button>';
   const logoSrc = () => App.set().logo || 'icons/logo.svg';
   const rateChip = cls => '<button class="' + cls + '" id="ratechip" aria-label="Modifier le taux de change">1 ' + esc(M.info(App.set().currency)[0]) + ' = ' + esc(String(App.set().rate).replace(/\B(?=(\d{3})+$)/g, ' ')) + ' ' + esc(M.info(App.set().cur2)[0]) + '</button>';
@@ -81,7 +81,7 @@
   // ---------- home ----------
   const hs = { p: 'month', counted: '' };
   const PERIODS = [['today', 'Aujourd\'hui'], ['week', 'Cette semaine'], ['month', 'Ce mois'], ['year', 'Cette année']];
-  const revenue = r => App.db.invoices.filter(i => !i.cancelled && App.fin.inR(i.date || '', r)).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : +i.total || 0), 0) + (App.mm && App.mod('mm') ? App.mm.gains(r) : 0); // fees and commissions are the turnover of a money agent
+  const revenue = r => App.db.invoices.filter(i => !i.cancelled && App.fin.inR(i.date || '', r)).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : +i.total || 0), 0) + (App.mm && App.mod('mm') ? App.mm.gains(r) : 0) + (App.transport && App.mod('transport') ? App.transport.revenue(r) : 0); // fees and commissions are the turnover of a money agent
   const spark = () => { // last 30 days of invoicing as a soft area
     const days = Array.from({ length: 30 }, (_, k) => App.addDays(App.today(), k - 29)), raw = days.map(d => App.db.invoices.filter(i => !i.cancelled && i.date === d).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : 0), 0)), v = raw.map((x, k) => (raw[Math.max(0, k - 2)] + raw[Math.max(0, k - 1)] + x + raw[Math.min(29, k + 1)] + raw[Math.min(29, k + 2)]) / 5), mx = Math.max(...v, 1e-9);
     if (!v.some(x => x > 0)) return ''; const pts = v.map((x, k) => [k * 10, 40 - x / mx * 34]); const line = pts.map((p, k) => (k ? 'L' : 'M') + p[0] + ' ' + p[1].toFixed(1)).join(' ');
@@ -129,8 +129,8 @@
     render(el) {
       // Screens already in the bottom bar are not repeated; the rest is grouped by what the user is doing.
       const inBar = tabsFor(), ids = Object.keys(SCREENS).filter(enabled).filter(id => id !== 'home' && !inBar.includes(id));
-      const GROUPS = [['Vendre', ['sales', 'services', 'interventions', 'subs', 'rental', 'delivery', 'contracts']], ['Gérer', ['mm', 'stock', 'suppliers', 'purchases', 'money', 'cash', 'team']], ['Réglages', ['data', 'settings']]];
-      const HINT = { mm: 'Dépôts, retraits, fonds', services: 'Prestations', interventions: 'Visites', money: 'Dépenses, rapports', cash: 'Comptage du jour', data: 'Sauvegarde, PIN' };
+      const GROUPS = [['Vendre', ['sales', 'services', 'interventions', 'subs', 'rental', 'delivery', 'contracts']], ['Gérer', ['mm', 'transport', 'stock', 'suppliers', 'purchases', 'money', 'cash', 'team']], ['Réglages', ['data', 'settings']]];
+      const HINT = { mm: 'Dépôts, retraits, fonds', transport: 'Chariots, carburant, entretien', services: 'Prestations', interventions: 'Visites', money: 'Dépenses, rapports', cash: 'Comptage du jour', data: 'Sauvegarde, PIN' };
       const tile = id => '<button class="tile big" data-go="' + id + '"><i>' + App.icon(id) + '</i><span>' + esc(label(id)) + '</span>' + (HINT[id] ? '<small class="muted">' + esc(HINT[id]) + '</small>' : '') + '</button>';
       const used = new Set(), html = GROUPS.map(([t, list]) => { const l = list.filter(id => ids.includes(id)); l.forEach(id => used.add(id)); return l.length ? '<h3 class="grp">' + t + '</h3><div class="grid">' + l.map(tile).join('') + '</div>' : ''; }).join('');
       const rest = ids.filter(id => !used.has(id)); // any screen added later still shows up

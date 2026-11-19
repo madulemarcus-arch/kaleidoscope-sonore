@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v13', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v14', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -24,7 +24,7 @@
     ['rental', 'Location', 'Biens loués, caution, retours'], ['delivery', 'Livraisons', 'Planification et encaissement'],
     ['interventions', 'Interventions', 'Visites, employé, statut'], ['contracts', 'Contrats', 'Modèles imprimables'],
     ['purchases', 'Achats', 'Bons de commande, fournisseurs'], ['cash', 'Caisse', 'Comptage, écart, clôture'],
-    ['mm', 'Mobile money & banque', 'Dépôts, retraits, transferts, fonds, commissions'], ['team', 'Équipe', 'Profils, PIN, journal d\'audit']
+    ['mm', 'Mobile money & banque', 'Dépôts, retraits, transferts, fonds, commissions'], ['transport', 'Transport', 'Chariots, chargement, carburant, entretien'], ['team', 'Équipe', 'Profils, PIN, journal d\'audit']
   ];
   // Starting presets by activity: modules switched on + vocabulary.
   App.PRESETS = {
@@ -37,6 +37,7 @@
     atelier: { label: 'Atelier', modules: ['sales', 'stock', 'interventions', 'purchases', 'cash'], vocab: { client: 'client', product: 'pièce', sub: 'contrat' } },
     ecole: { label: 'École', modules: ['sales', 'subs', 'cash', 'team', 'contracts'], vocab: { client: 'élève', product: 'prestation', sub: 'inscription' } },
     finance: { label: 'Mobile money & banque', modules: ['mm', 'sales', 'cash', 'team'], vocab: { client: 'client', product: 'service', sub: 'abonnement' } },
+    transport: { label: 'Transport', modules: ['transport', 'sales', 'cash', 'team'], vocab: { client: 'client', product: 'service', sub: 'abonnement' } },
     cabinet: { label: 'Cabinet', modules: ['sales', 'services', 'contracts', 'cash'], vocab: { client: 'patient', product: 'prestation', sub: 'contrat' } }
   };
   App.defaults = () => ({
@@ -48,12 +49,12 @@
       modules: Object.fromEntries(App.MODULES.map(m => [m[0], App.PRESETS.general.modules.includes(m[0])])),
       vocab: { ...App.PRESETS.general.vocab },
       fields: { clients: [], products: [], invoices: [] }, // custom fields: {id,label,type,options}
-      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {}, job: {}, rental: {}, delivery: {}, contract: {}, op: {} },
+      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {}, job: {}, rental: {}, delivery: {}, contract: {}, op: {}, tr: {} },
       goal: 0, subDays: 30, subGrace: 15, expenseCats: ['Achats', 'Loyer', 'Salaires', 'Transport', 'Électricité / Eau', 'Communication', 'Autres'],
       modes: ['Espèces', 'Mobile money', 'Banque', 'Autre'],
       msgs: { remind: 'Bonjour {nom},\nSauf erreur de notre part, la facture {numero} de {montant} (reste {reste}) est impayée depuis {jours} jour(s).\nMerci de régler dès que possible.\n{entreprise}', sub: 'Bonjour {nom},\nVotre {abonnement} « {formule} » arrive à échéance le {date} ({delai}).\nMontant : {montant}. Merci de le renouveler.\n{entreprise}', receipt: 'Bonjour {nom},\nNous avons bien reçu votre paiement de {montant}{facture} le {date}. Merci !\n{entreprise}' }, // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: []
   });
 
   // ---------- store ----------
