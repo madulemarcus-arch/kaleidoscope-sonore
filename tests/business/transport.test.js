@@ -62,6 +62,28 @@ const { check, launch, setup } = require('./helper');
   check('dépenses de carburant dans les finances', await p.evaluate(() => App.fin.entries(App.fin.range('month')).some(e => e.k === 'out' && /Carburant|carburant/i.test(JSON.stringify(e)))));
   check('rapport en texte (WhatsApp)', await p.evaluate(() => App.transport.reportText(App.fin.range('month')).includes('Cartons')));
 
+  // billing: freight → one invoice per client → payments
+  await p.evaluate(() => App.transport.profile(App.db.trTrips[0].id)); await p.waitForSelector('.sheet-wrap.on >> text=Facturer le fret'); await p.click('.sheet-wrap.on >> text=Facturer le fret'); await p.waitForSelector('.sheet-wrap.on >> text=Créer les factures');
+  check('facturation : une facture proposée par client', (await p.locator('.sheet-wrap.on .list .item').count()) === 2);
+  await p.click('.sheet-wrap.on >> text=Créer les factures'); await p.waitForTimeout(400);
+  check('2 factures (50 $ et 10 $) liées aux lignes du mouvement', await p.evaluate(() => { const t = App.db.trTrips[0], inv = App.db.invoices; return inv.length === 2 && inv.map(i => i.total).sort((a, b) => a - b).join() === '10,50' && t.lines.every(l => inv.some(i => i.id === l.invoiceId)) && inv.every(i => i.source === 'Transport' && App.sales.status(i)[0] === 'Impayée'); }));
+  check('factures au nom des clients saisis', await p.evaluate(() => App.db.invoices.map(i => App.sales.cname(i)).sort().join() === 'Autre Client,Client Test'));
+  check('pas de double compte : fret facturé = ventes, rien en plus', await p.evaluate(() => { const c = App.reports.compute(App.fin.range('month')); return c.sales === 60 && c.tr === 0 && c.revenue === 60 && App.transport.revenue(App.fin.range('month')) === 0; }));
+  await p.evaluate(() => { const i = App.db.invoices.find(x => x.total === 50); App.sales.addPayment(i, { amount: 50, mode: 'Espèces' }); App.save(); });
+  check('encaissement : facturé 60, encaissé 50, reste 10', await p.evaluate(() => { const b = App.transport.billing(App.fin.range('month')); return b.billed === 60 && b.paid === 50 && b.due === 10 && b.unbilled === 0; }));
+  await p.evaluate(() => App.transport.profile(App.db.trTrips[0].id)); await p.waitForSelector('.sheet-wrap.on >> text=Factures et encaissements');
+  check('mouvement : factures, statut Payée et reste visibles', (await p.textContent('.sheet-wrap.on')).includes('Payée') && (await p.textContent('.sheet-wrap.on')).includes('reste'));
+  check('plus de bouton « Facturer le fret » une fois tout facturé', (await p.locator('.sheet-wrap.on >> text=Facturer le fret').count()) === 0);
+  await p.keyboard.press('Escape'); await p.waitForTimeout(250);
+  await p.evaluate(() => { const t = App.db.trTrips.find(x => x.id === 'tr2'); t.lines = [{ client: 'Client Test', cat: 'drink', qty: 5, freight: 20 }]; t.currency = 'USD'; App.transport.bill(t, 'Espèces'); });
+  check('facturation avec encaissement immédiat : facture Payée', await p.evaluate(() => { const t = App.db.trTrips.find(x => x.id === 'tr2'), i = App.sales.get(t.lines[0].invoiceId); return App.sales.status(i)[0] === 'Payée' && App.sales.due(i) === 0; }));
+  check('rapport : bloc facturation du fret', await p.evaluate(() => { App.go('transport', { tab: 'rep' }); return true; }) && await p.waitForSelector('#ttab .card >> text=Fret · facturation').then(() => true));
+  await p.evaluate(() => App.transport.form(App.db.trTrips[0].id)); await p.waitForSelector('.sheet [name=from]'); check('ligne facturée verrouillée dans le formulaire', (await p.locator('.sheet .tl [data-k=freight][readonly]').count()) === 2); await save();
+  check('modifier le mouvement garde le lien avec les factures', await p.evaluate(() => App.db.trTrips[0].lines.every(l => l.invoiceId && App.sales.get(l.invoiceId))));
+  await p.evaluate(() => { App.db.trTrips.push({ id: 'tr3', number: 'TR-Y', at: Date.now(), date: App.today(), vehicleId: App.db.trVehicles[0].id, lines: [{ client: 'Client Test', cat: 'bag', qty: 3, freight: 15 }], currency: 'USD', rate: 2800 }); const i = App.sales.get(App.db.trTrips[0].lines[0].invoiceId); i.cancelled = true; });
+  check('facture annulée : fret de nouveau à facturer (non perdu)', await p.evaluate(() => App.transport.billable(App.db.trTrips[0]).length === 1 && App.transport.billable(App.db.trTrips.find(x => x.id === 'tr3')).length === 1));
+  await p.evaluate(() => { App.db.trTrips = App.db.trTrips.filter(x => x.id !== 'tr3'); App.save(); });
+
   // cancel, export, links
   await p.evaluate(() => App.transport.profile(App.db.trTrips[0].id)); await p.waitForSelector('.sheet-wrap.on >> text=Annuler le mouvement'); await p.click('.sheet-wrap.on >> text=Annuler le mouvement'); await p.waitForSelector('.sheet-wrap.on >> text=Confirmation'); await p.locator('.sheet-wrap.on').last().locator('footer >> text=Annuler le mouvement').click(); await p.waitForTimeout(300);
   check('annulation : le fret n\'est plus compté', await p.evaluate(() => App.transport.revenue(App.fin.range('month')) === 0 && App.transport.status(App.db.trTrips[0]) === 'Annulé'));
