@@ -10,6 +10,7 @@
     db().payments.filter(p => p.mode === cm && F.at(p) > since).forEach(p => { o[p.currency] = (o[p.currency] || 0) + p.amount; });
     db().expenses.filter(e => e.mode === cm && F.at(e) > since).forEach(e => { o[e.currency] = (o[e.currency] || 0) - e.amount; });
     if (App.mm && App.mod('mm')) { const d = App.mm.cashSince(since); curs().forEach(c => o[c] = (o[c] || 0) + (d[c] || 0)); }
+    if (App.coop && App.mod('coop')) { const d = App.coop.cashSince(since); curs().forEach(c => o[c] = (o[c] || 0) + (d[c] || 0)); }
     if (App.transport && App.mod('transport')) { const d = App.transport.cashSince(since); curs().forEach(c => o[c] = (o[c] || 0) + (d[c] || 0)); }
     curs().forEach(c => o[c] = M.round(o[c], c)); return o;
   };
