@@ -168,6 +168,21 @@
     const hd = App.can('finance') && App.depHeldBy ? App.depHeldBy(c.id) : 0; if (hd > 0.004) st.push([App.fmt(hd), 'dépôt en attente']);
     return st.map(([v, l, k]) => `<div class="${k || ''}"><b>${v}</b><small>${l}</small></div>`).join('');
   };
+  // "Factures" tab: summary (invoiced / paid / still due, in dollars), a status filter, this client's invoices, and for a payer the invoices of the people whose kits he pays
+  const FAC_F = [['all', 'Toutes'], ['due', 'À payer'], ['paid', 'Payées']];
+  const invRow = (i, who) => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${who ? esc(App.cname(App.client(i.clientId))) + ' · ' : ''}${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; };
+  const facTab = (c, f) => {
+    f = FAC_F.some(x => x[0] === f) ? f : 'all';
+    const mine = App.db.invoices.filter(i => i.clientId === c.id), kids = App.isPayer(c) ? App.kitsOf(c.id).map(k => k.id) : [], theirs = App.db.invoices.filter(i => kids.includes(i.clientId));
+    const keep = i => f === 'all' || (f === 'due' ? App.invDue(i) > 0.004 : App.live(i) && App.invDue(i) <= 0.004), by = (a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number);
+    const live = mine.filter(App.live), usd = (n, i) => App.conv(n, i.currency, 'USD', App.rateOf(i)), tot = live.reduce((a, i) => a + usd(App.invAgreed(i), i), 0), due = live.reduce((a, i) => a + usd(App.invDue(i), i), 0);
+    const sum = `<div class="card"><div class="spread"><b>${mine.length} facture(s)</b><span class="mut">Facturé ${App.fmt(tot)} · Payé ${App.fmt(Math.max(0, tot - due))}</span></div><div class="spread" style="margin-top:6px"><span>Reste à payer</span><b class="${due > 0.004 ? 'bad' : ''}">${App.fmt(due)}</b></div></div>`;
+    const chips = `<div class="chips">${FAC_F.map(([k, t]) => `<button class="chip ${k === f ? 'on' : ''}" data-act="clfac" data-id="${c.id}" data-f="${k}">${t}</button>`).join('')}</div>`;
+    let out = `<div class="bar"><button class="btn sm" data-act="newinv" data-cid="${c.id}">+ Nouvelle facture</button></div>` + sum + chips + listOrEmpty(mine.filter(keep).sort(by).map(i => invRow(i)), f === 'all' ? 'Aucune facture.' : 'Aucune facture dans ce filtre.');
+    if (kids.length) { const rows = theirs.filter(keep).sort(by); out += `<h2 class="sec">Factures des bénéficiaires (${rows.length})</h2>` + listOrEmpty(rows.map(i => invRow(i, true)), 'Aucune facture pour les bénéficiaires.'); }
+    return out + (App.contractsBlock ? App.contractsBlock(c) : '') + (App.lettersBlock ? App.lettersBlock(c) : '');
+  };
+  App.actions.clfac = d => App.go('client', { id: d.id, tab: 'fac', f: d.f }, true);
   App.views.client = p => {
     const c = App.client(p.id); if (!c) return { title: 'Client', back: 'clients', html: '<div class="empty">Client introuvable.</div>' };
     const tabs = TABS[c.type].filter(t => t !== 'dep' || App.can('finance')); if (App.isPayer(c)) tabs.splice(1, 0, 'kits'); const tab = tabs.includes(p.tab) ? p.tab : 'infos', db = App.db;
@@ -176,7 +191,7 @@
       <div class="bar" style="margin-top:12px"><button class="btn sec" data-act="editclient" data-id="${c.id}">Modifier</button>${App.payerOf(c) ? `<button class="btn sec" data-act="kit_unlink" data-id="${c.id}">Détacher du payeur</button>` : ''}<button class="btn del" data-act="delclient" data-id="${c.id}">Supprimer</button></div></div>`;
     if (tab === 'abo') body = aboTab(c) + App.penaltyBlock(c);
     if (tab === 'pay') body = `<div class="bar"><button class="btn sm" data-act="newpay" data-cid="${c.id}">+ Paiement</button></div>` + listOrEmpty(db.payments.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => { const i = App.invoice(x.invoiceId); return `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.mode)}</b><small>${i ? esc(i.number) : 'Sans facture'}${x.ref ? ' · ' + esc(x.ref) : ''}</small></div><b class="ok">${App.fmt(x.amount, x.currency)}</b></div>`; }), 'Aucun paiement enregistré.');
-    if (tab === 'fac') body = `<div class="bar"><button class="btn sm" data-act="newinv" data-cid="${c.id}">+ Nouvelle facture</button></div>` + listOrEmpty(db.invoices.filter(i => i.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)).map(i => { const [t, k] = App.INV[App.invStatus(i)]; return `<button class="item" data-act="go" data-v="invoice" data-id="${i.id}"><div class="grow"><b>${esc(i.number)}</b><small>${App.fdate(i.date)} · ${App.invTypes[i.type]}</small></div><div class="end"><b>${App.fmt(App.invTotal(i), i.currency)}</b><span class="pill ${k}">${t}</span></div></button>`; }), 'Aucune facture.') + (App.contractsBlock ? App.contractsBlock(c) : '') + (App.lettersBlock ? App.lettersBlock(c) : '');
+    if (tab === 'fac') body = facTab(c, p.f);
     if (tab === 'inst') body = `<div class="bar"><button class="btn sm" data-act="newinst" data-cid="${c.id}">+ Installation</button></div>` + listOrEmpty(db.installs.filter(x => x.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).map(x => `<div class="item"><div class="grow"><b>${App.fdate(x.date)} · ${esc(x.kind)}</b><small>${esc(x.tech || 'Technicien non précisé')}${x.obs ? ' · ' + esc(x.obs) : ''}</small></div><b>${App.fmt(x.price || 0)}</b></div>`), "Aucune intervention enregistrée.");
     if (tab === 'mat') {
       const rows = []; db.invoices.filter(i => i.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date)).forEach(i => i.lines.forEach(l => { if (l.pid && App.tracked(App.prod(l.pid))) rows.push(`<div class="item"><div class="grow"><b>${esc(l.desc)}</b><small>${App.fdate(i.date)} · ${esc(i.number)}</small></div><div class="end"><b>${l.qty} ${esc(l.unit || '')}</b><span class="mut">${App.fmt(l.qty * l.price, i.currency)}</span></div></div>`); }));

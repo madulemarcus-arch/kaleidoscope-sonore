@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v18', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v23', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -24,7 +24,7 @@
     ['rental', 'Location', 'Biens loués, caution, retours'], ['delivery', 'Livraisons', 'Planification et encaissement'],
     ['interventions', 'Interventions', 'Visites, employé, statut'], ['contracts', 'Contrats', 'Modèles imprimables'],
     ['purchases', 'Achats', 'Bons de commande, fournisseurs'], ['cash', 'Caisse', 'Comptage, écart, clôture'],
-    ['mm', 'Mobile money & banque', 'Dépôts, retraits, transferts, fonds, commissions'], ['transport', 'Transport', 'Chariots, chargement, carburant, entretien'], ['coop', 'Tontine & micro-crédit', 'Cotisations, épargne, crédits, remboursements'], ['realty', 'Immobilier & loyers', 'Biens, baux, loyers, cautions, propriétaires'], ['team', 'Équipe', 'Profils, PIN, journal d\'audit']
+    ['mm', 'Mobile money & banque', 'Dépôts, retraits, transferts, fonds, commissions'], ['transport', 'Transport', 'Chariots, chargement, carburant, entretien'], ['coop', 'Tontine & micro-crédit', 'Cotisations, épargne, crédits, remboursements'], ['realty', 'Immobilier & loyers', 'Biens, baux, loyers, cautions, propriétaires'], ['pharmacy', 'Pharmacie', 'Lots et péremption, ordonnances, assurances, patients'], ['agri', 'Agriculture & élevage', 'Parcelles, cultures, élevage, intrants, récoltes, rentabilité'], ['furniture', 'Meubles & literie', 'Commandes sur mesure, mousse, livraison, échéances, SAV'], ['hotel', 'Hôtel & hébergement', 'Chambres, réservations, séjours, extras, ménage, occupation'], ['team', 'Équipe', 'Profils, PIN, journal d\'audit']
   ];
   // Starting presets by activity: modules switched on + vocabulary.
   App.PRESETS = {
@@ -38,8 +38,12 @@
     ecole: { label: 'École', modules: ['sales', 'subs', 'cash', 'team', 'contracts'], vocab: { client: 'élève', product: 'prestation', sub: 'inscription' } },
     finance: { label: 'Mobile money & banque', modules: ['mm', 'sales', 'cash', 'team'], vocab: { client: 'client', product: 'service', sub: 'abonnement' } },
     transport: { label: 'Transport', modules: ['transport', 'sales', 'cash', 'team'], vocab: { client: 'client', product: 'service', sub: 'abonnement' } },
+    agri: { label: 'Agriculture & élevage', modules: ['agri', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'produit', sub: 'abonnement' } },
+    pharmacie: { label: 'Pharmacie', modules: ['pharmacy', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'patient', product: 'médicament', sub: 'abonnement' } },
     immo: { label: 'Immobilier & loyers', modules: ['realty', 'cash', 'team'], vocab: { client: 'locataire', product: 'bien', sub: 'location' } },
     tontine: { label: 'Tontine & micro-crédit', modules: ['coop', 'cash', 'team'], vocab: { client: 'membre', product: 'service', sub: 'abonnement' } },
+    meuble: { label: 'Meubles & literie', modules: ['furniture', 'sales', 'stock', 'purchases', 'delivery', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
+    hotel: { label: 'Hôtel & hébergement', modules: ['hotel', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
     cabinet: { label: 'Cabinet', modules: ['sales', 'services', 'contracts', 'cash'], vocab: { client: 'patient', product: 'prestation', sub: 'contrat' } }
   };
   App.defaults = () => ({
@@ -51,12 +55,12 @@
       modules: Object.fromEntries(App.MODULES.map(m => [m[0], App.PRESETS.general.modules.includes(m[0])])),
       vocab: { ...App.PRESETS.general.vocab },
       fields: { clients: [], products: [], invoices: [] }, // custom fields: {id,label,type,options}
-      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {}, job: {}, rental: {}, delivery: {}, contract: {}, op: {}, tr: {}, bil: {}, cr: {}, co: {}, ba: {}, ly: {} },
+      theme: 'auto', dial: '243', words: 'be', clientTypes: ['Particulier', 'Entreprise'], categories: ['Général'], units: ['pièce', 'kg', 'm', 'litre'], seq: { client: 0, product: 0, supplier: 0, order: {}, invoice: {}, quote: {}, receipt: {}, job: {}, rental: {}, delivery: {}, contract: {}, op: {}, tr: {}, bil: {}, cr: {}, co: {}, ba: {}, ly: {}, or: {}, ph: {}, ac: {}, ag: {}, cm: {}, at: {}, sav: {}, sj: {} },
       goal: 0, subDays: 30, subGrace: 15, expenseCats: ['Achats', 'Loyer', 'Salaires', 'Transport', 'Électricité / Eau', 'Communication', 'Autres'],
       modes: ['Espèces', 'Mobile money', 'Banque', 'Autre'],
       msgs: { remind: 'Bonjour {nom},\nSauf erreur de notre part, la facture {numero} de {montant} (reste {reste}) est impayée depuis {jours} jour(s).\nMerci de régler dès que possible.\n{entreprise}', sub: 'Bonjour {nom},\nVotre {abonnement} « {formule} » arrive à échéance le {date} ({delai}).\nMontant : {montant}. Merci de le renouveler.\n{entreprise}', receipt: 'Bonjour {nom},\nNous avons bien reçu votre paiement de {montant}{facture} le {date}. Merci !\n{entreprise}' }, // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: [], trTickets: [], coTontines: [], coLoans: [], coOps: [], reProps: [], reUnits: [], reLeases: [], reOps: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: [], trTickets: [], coTontines: [], coLoans: [], coOps: [], reProps: [], reUnits: [], reLeases: [], reOps: [], phInfo: [], phBatches: [], phOps: [], phRx: [], phInsurers: [], phPatients: [], agPlots: [], agActs: [], agOps: [], agTasks: [], fuOrders: [], fuOps: [], fuClaims: [], fuVisits: [], fuPacks: [], fuInfo: [], htRooms: [], htStays: []
   });
 
   // ---------- store ----------
