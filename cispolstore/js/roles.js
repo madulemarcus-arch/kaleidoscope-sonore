@@ -112,7 +112,7 @@
   const mkPin = async pin => { const salt = App.uid(); return { salt, hash: await App.hash(salt + pin), len: App.PINLEN }; };
   App.actions.users_on = () => {
     const hasPin = !!S().pin;
-    App.modal('Activer les profils', `<p>Vous devenez l'<b>administrateur</b>. ${hasPin ? 'Votre code PIN actuel est conservé.' : 'Choisissez votre code PIN d\'administrateur.'}</p>${F.text('f_name', 'Votre nom', 'Administrateur')}${hasPin ? '' : F.text('f_pin', 'Code PIN (6 chiffres)', '', 'type="tel" inputmode="numeric" maxlength="4" autocomplete="off"')}<p id="f_msg" class="warn"></p>`, () => {
+    App.modal('Activer les profils', `<p>Vous devenez l'<b>administrateur</b>. ${hasPin ? 'Votre code PIN actuel est conservé.' : 'Choisissez votre code PIN d\'administrateur.'}</p>${F.text('f_name', 'Votre nom', 'Administrateur')}${hasPin ? '' : F.text('f_pin', 'Code PIN (6 chiffres)', '', 'type="tel" inputmode="numeric" maxlength="6" autocomplete="off"')}<p id="f_msg" class="warn"></p>`, () => {
       const name = App.v('f_name') || 'Administrateur', pin = App.v('f_pin');
       if (!hasPin && !pinOk(pin)) { $('f_msg').textContent = 'Le code doit avoir 6 chiffres'; return false; }
       (async () => {
@@ -126,7 +126,7 @@
   App.actions.users_edit = d => userForm(App.users().find(u => u.id === d.id));
   const userForm = (u, role) => {
     const isNew = !u; u = u || { name: '', role: ROLES[role] ? role : 'vendeur', active: true };
-    App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.sel('f_tech', 'Fiche technicien liée (profil Technicien)', [['', '— Aucune —'], ...App.db.technicians.map(t => [t.id, t.name])], u.techId || '')}${F.text('f_pin', isNew ? 'Code PIN (6 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="4" autocomplete="off"')}
+    App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.sel('f_tech', 'Fiche technicien liée (profil Technicien)', [['', '— Aucune —'], ...App.db.technicians.map(t => [t.id, t.name])], u.techId || '')}${F.text('f_pin', isNew ? 'Code PIN (6 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="6" autocomplete="off"')}
       ${isNew ? '' : F.sel('f_act', 'Statut', [['1', 'Actif'], ['0', 'Désactivé']], u.active === false ? '0' : '1')}<p id="f_msg" class="warn"></p>${isNew ? '' : `<div class="bar"><button type="button" class="btn sm del" data-act="users_del" data-id="${u.id}">Supprimer ce profil</button></div>`}`, () => {
       const name = App.v('f_name'), pin = App.v('f_pin'), rl = App.v('f_role'), active = isNew || App.v('f_act') !== '0';
       const bad = m => { $('f_msg').textContent = m; return false; };
