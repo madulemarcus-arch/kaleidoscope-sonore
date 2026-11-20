@@ -3,7 +3,7 @@
 // snapshot (three-way merge): offline edits made on several phones are combined, not overwritten. Adapted from CISPOLstore Manager.
 (function () {
   const App = window.App, ui = App.ui, esc = App.esc, CKEY = 'business-sync', js = JSON.stringify;
-  const COLL = ['clients', 'products', 'suppliers', 'invoices', 'payments', 'expenses', 'movements', 'quotes', 'orders', 'inventories', 'cashCounts', 'closings', 'subs', 'ledger', 'staff', 'jobs', 'rentals', 'deliveries', 'contracts', 'mmAccounts', 'mmOps', 'trVehicles', 'trTrips', 'trFuel', 'trMaint', 'trTickets', 'users', 'log'];
+  const COLL = ['clients', 'products', 'suppliers', 'invoices', 'payments', 'expenses', 'movements', 'quotes', 'orders', 'inventories', 'cashCounts', 'closings', 'subs', 'ledger', 'staff', 'jobs', 'rentals', 'deliveries', 'contracts', 'mmAccounts', 'mmOps', 'trVehicles', 'trTrips', 'trFuel', 'trMaint', 'trTickets', 'coTontines', 'coLoans', 'coOps', 'users', 'log'];
   const NOT_SHARED = ['theme', 'lastBackup', 'seq']; // theme and backup date stay per device; counters are merged by max
   let cfg = null; try { cfg = JSON.parse(localStorage.getItem(CKEY)); } catch (e) { }
   const saveCfg = () => { try { localStorage.setItem(CKEY, js(cfg)); } catch (e) { } };
@@ -54,7 +54,7 @@
     const d = App.db; let n = 0, A = App.sales;
     const fix = (name, list, field, next) => { const seen = new Map(); order(name, list).forEach(x => { const v = x[field]; if (seen.has(v) && seen.get(v) !== x.id) { x[field] = next(x); n++; } else seen.set(v, x.id); }); };
     fix('invoices', d.invoices, 'number', () => A.nextNo('FAC', 'invoice', () => d.invoices)); fix('quotes', d.quotes, 'number', () => A.nextNo('DEV', 'quote', () => d.quotes)); fix('payments', d.payments, 'no', () => A.nextNo('REC', 'receipt', () => d.payments.map(p => ({ number: p.no }))));
-    fix('mmOps', d.mmOps, 'number', () => A.nextNo('OP', 'op', () => d.mmOps)); fix('trTrips', d.trTrips, 'number', () => A.nextNo('TR', 'tr', () => d.trTrips)); fix('trTickets', d.trTickets, 'number', () => A.nextNo('BIL', 'bil', () => d.trTickets)); fix('clients', d.clients, 'code', () => App.clients.nextCode()); fix('products', d.products, 'code', () => App.stock.nextCode()); fix('suppliers', d.suppliers, 'code', () => App.suppliers.nextCode());
+    fix('mmOps', d.mmOps, 'number', () => A.nextNo('OP', 'op', () => d.mmOps)); fix('trTrips', d.trTrips, 'number', () => A.nextNo('TR', 'tr', () => d.trTrips)); fix('trTickets', d.trTickets, 'number', () => A.nextNo('BIL', 'bil', () => d.trTickets)); fix('coOps', d.coOps, 'number', () => A.nextNo('CO', 'co', () => d.coOps)); fix('coLoans', d.coLoans, 'number', () => A.nextNo('CR', 'cr', () => d.coLoans)); fix('clients', d.clients, 'code', () => App.clients.nextCode()); fix('products', d.products, 'code', () => App.stock.nextCode()); fix('suppliers', d.suppliers, 'code', () => App.suppliers.nextCode());
     return n;
   };
 
