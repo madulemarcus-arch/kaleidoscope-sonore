@@ -1,6 +1,7 @@
 // Core: utilities, data model, storage, migration, business rules shared by every module.
 (() => {
   'use strict';
+  if (window.__gateLocked) return;   // encrypted data not unlocked yet (gate.js): never start with an empty data set
   const App = window.App = { views: {}, actions: {} };
   const $ = App.$ = id => document.getElementById(id);
   App.esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,7 +24,7 @@
   App.EXP_CATS = ['Achat marchandise', 'Transport', 'Loyer', 'Salaire', 'Commission technicien', 'Internet / Abonnement', 'Marketing', 'Autre'];
   App.PLANS = ['Résidentiel', 'Résidentiel Lite', 'Local Prioritaire 50 Go', 'Local Prioritaire 1 To', 'Itinérance', 'Mobile Prioritaire'];
   App.KITS = ['Starlink Mini', 'Starlink Standard'];
-  App.BUILD = 'v201'; // keep equal to CACHE in sw.js
+  App.BUILD = 'v202'; // keep equal to CACHE in sw.js
   App.typeName = c => c.type === 'gere' && c.aboOnly ? 'Abonnement seulement' : App.TYPES[c.type];
   App.TYPES = { gere: 'Client géré', mat: 'Matériel uniquement', install: 'Installation uniquement' };
 
@@ -70,7 +71,8 @@
 
   let db = blank();
   try {
-    const raw = localStorage.getItem(KEY), old = localStorage.getItem(OLD_KEY);
+    const E = window.__enc && window.__enc.on ? window.__enc : null;   // encrypted data: decrypted in memory by gate.js
+    const raw = E ? E.db : localStorage.getItem(KEY), old = E ? null : localStorage.getItem(OLD_KEY);
     if (raw) db = normalize(JSON.parse(raw));
     else if (old) { db = normalize(App.migrate(JSON.parse(old))); }
   } catch (e) { db = blank(); }
@@ -86,8 +88,11 @@
   App.save = () => {
     App.stampRates();
     const txt = JSON.stringify(db);
-    try { localStorage.setItem(KEY, txt); } catch (e) { App.toast('Stockage local plein ou bloqué : faites une sauvegarde'); }
-    try { idb('readwrite', st => st.put(txt, 'db2')).catch(() => {}); } catch (e) {}
+    if (window.__enc && window.__enc.on) window.__enc.write(txt);   // encrypted: no readable copy anywhere (no IndexedDB mirror either)
+    else {
+      try { localStorage.setItem(KEY, txt); } catch (e) { App.toast('Stockage local plein ou bloqué : faites une sauvegarde'); }
+      try { idb('readwrite', st => st.put(txt, 'db2')).catch(() => {}); } catch (e) {}
+    }
     if (App.afterSave) App.afterSave();
   };
   // Backup content: everything except this device's PIN

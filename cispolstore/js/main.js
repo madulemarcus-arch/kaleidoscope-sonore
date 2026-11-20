@@ -9,7 +9,7 @@
   // App shortcuts (long-press menu on Android): ?go=<view> opens that screen when the active profile may see it
   { const g = new URLSearchParams(location.search).get('go'); if (g && App.views[g] && App.canView(g)) App.go(g, {}, true); }
 
-  if (App.hasPin()) App.showLock('enter', 'unlock');
+  if (App.hasPin() && !(window.__enc && window.__enc.fresh && !App.multi())) App.showLock('enter', 'unlock');   // the passphrase was just typed: no second code (with profiles, the PIN still chooses the profile)
   else if (!App.db.settings.pinAsked) { App.db.settings.pinAsked = true; App.save(); App.showLock('new1', 'setup'); }
 
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => { App.persisted = p; if (App.state.view === 'settings') App.refresh(); }).catch(() => {});

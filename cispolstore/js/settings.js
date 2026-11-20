@@ -45,8 +45,9 @@
           ${!App.multi() && S.pin && App.bio && (App.bio.ok() || App.bio.mine()) ? (App.bio.mine() ? row('Empreinte', 'Activée : l\'application s\'ouvre avec votre empreinte, le code PIN reste le secours', '<button class="btn sm del" data-act="bioremove">Désactiver</button>') : row('Empreinte', 'Ouvrir l\'application avec votre empreinte (ou votre visage) au lieu du code', '<button class="btn sm" data-act="bioset">Activer</button>')) : ''}
           ${!App.multi() && S.pin ? row('Désactiver le PIN', 'Retire le verrouillage', '<button class="btn sm del" data-act="pinremove">Désactiver</button>') : ''}
           <div class="item"><div class="grow"><b>Verrouillage auto</b><small>Après inactivité</small></div><select id="s_lock" style="width:auto">${App.opts(LOCKS, S.lockMin)}</select></div>
+          ${App.encRow ? App.encRow() : ''}
           ${App.usersRow()}</div>
-        <p class="mut" style="font-size:13px">Le PIN verrouille l'écran de l'application ; il ne chiffre pas les données stockées dans le téléphone.</p>
+        <p class="mut" style="font-size:13px">${window.__enc && window.__enc.on ? "Les données de ce téléphone sont chiffrées par votre mot de passe. Le code PIN et l'empreinte ne verrouillent que l'écran, pendant la journée." : "Le PIN verrouille l'écran de l'application ; il ne chiffre pas les données stockées dans le téléphone (activez « Chiffrer les données » pour cela)."}</p>
         ${App.plansCard()}
         ${App.remindCard()}
         ${App.fold('sync', 'Synchronisation entre appareils', App.syncCard().replace(/^<h2 class="sec">.*?<\/h2>/, ''))}

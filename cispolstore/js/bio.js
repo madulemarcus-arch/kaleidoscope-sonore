@@ -50,5 +50,6 @@
   };
   App.actions.bioset = () => App.showLock('enter', 'bio');   // the PIN is asked first, then the finger
   App.actions.bioremove = () => { if (App.confirm("Désactiver l'empreinte ? Le code PIN reste en place.")) App.bio.off(); };
-  check().then(() => { if (document.readyState === 'complete') refresh(); else window.addEventListener('load', refresh, { once: true }); });   // not while the scripts are still loading
+  const ready = () => document.readyState === 'complete' && !(window.__enc && window.__enc.fresh && !window.__gateDone);   // encrypted start: the scripts load one by one
+  check().then(() => { if (ready()) refresh(); else { let n = 0; const t = setInterval(() => { if (ready()) { clearInterval(t); refresh(); } else if (++n > 200) clearInterval(t); }, 100); } });   // not while the scripts are still loading
 })();
