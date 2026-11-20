@@ -11,6 +11,7 @@
     services: '<path class="f s" d="M14.7 6.3a4.2 4.2 0 0 0-5.4 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4.2 4.2 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>',
     mm: '<rect class="f s" x="6.5" y="2.8" width="10" height="18.4" rx="2.4"/><path class="s" d="M10.2 18.2h2.6"/><path class="s" d="M3 9.2h6M6.2 6.6 9 9.2 6.2 11.8M21 14.8h-6M17.8 12.2 15 14.8l2.8 2.6"/>',
     transport: '<path class="f s" d="M2.5 6h11v10.2h-11z"/><path class="f s" d="M13.5 9.4h4.2l3.8 3.8v3h-8z"/><circle class="f s" cx="6.5" cy="17.8" r="2.1"/><circle class="f s" cx="17" cy="17.8" r="2.1"/><path class="s" d="M5.5 9.2h5.5M5.5 12h3.5"/>',
+    realty: '<path class="f s" d="M4 20V9l6-4 6 4v11"/><path class="s" d="M16 20h4V12l-4-3M8 20v-5h4v5M7.5 11h1M11.5 11h1"/>',
     coop: '<circle class="f s" cx="12" cy="7" r="3"/><circle class="f s" cx="5.5" cy="16.5" r="2.7"/><circle class="f s" cx="18.5" cy="16.5" r="2.7"/><path class="s" d="M9.8 9.6 7 13.9M14.2 9.6 17 13.9M8.4 17.6h7.2"/>',
     delivery: '<path class="f s" d="M2.8 6.8h11.4v9.6H2.8z"/><path class="f s" d="M14.2 9.6h3.7l3.3 3.3v3.5h-7z"/><circle class="f s" cx="7" cy="17.6" r="2"/><circle class="f s" cx="17.4" cy="17.6" r="2"/>',
     subs: '<path class="f s" d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7V4"/><path class="f s" d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3V20"/><path class="s" d="M20 8.7h-4.7M4 15.3h4.7"/>',
