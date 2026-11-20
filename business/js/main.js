@@ -4,7 +4,7 @@
   // id → [label, emoji, module needed (null = always), step of the roadmap that delivers the screen]; the navigation icon has the same name as the id
   const SCREENS = {
     home: ['Accueil', '🏠', null, 1], clients: [null, '👥', null, 2], sales: ['Ventes', '🧾', 'sales', 4], stock: ['Stock', '📦', 'stock', 3], suppliers: ['Fournisseurs', '🏭', ['stock', 'purchases', 'transport'], 3], money: ['Finances', '💰', null, 5],
-    services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7], mm: ['Mobile money', '📲', 'mm', 7], transport: ['Transport', '🚛', 'transport', 8], coop: ['Tontine', '🤝', 'coop', 9],
+    services: ['Services', '🛠️', 'services', 7], subs: [null, '🔁', 'subs', 7], rental: ['Location', '🔑', 'rental', 7], delivery: ['Livraisons', '🚚', 'delivery', 7], mm: ['Mobile money', '📲', 'mm', 7], transport: ['Transport', '🚛', 'transport', 8], coop: ['Tontine', '🤝', 'coop', 9], realty: ['Immobilier', '🏢', 'realty', 9],
     interventions: ['Interventions', '🧰', 'interventions', 7], contracts: ['Contrats', '📄', 'contracts', 7], purchases: ['Achats', '🛒', 'purchases', 7],
     cash: ['Caisse', '🏧', 'cash', 5], team: ['Équipe', '🧑‍💼', 'team', 6], data: ['Données et sécurité', '💾', null, 6], settings: ['Réglages', '⚙️', null, 1]
   };
@@ -21,7 +21,7 @@
   const tiles = () => { // four tiles on the home screen: invoice, collect, client, then the next available action
     const list = App.quick.filter(q => !q.mod || App.mod(q.mod)), inv = list.find(q => q.to === 'sales'), cli = list.find(q => q.to === 'clients'), rest = list.filter(q => q !== inv && q !== cli);
     const collect = App.mod('sales') && App.canView('sales') ? { label: () => 'Encaisser', short: () => 'Encaisser', qc: '#1f9d55', ic: '💰', run: () => App.go('sales', { tab: 'unpaid' }) } : null;
-    const mmq = list.find(q => q.to === 'mm' || q.to === 'transport' || q.to === 'coop'); return [mmq, inv, collect, cli, ...rest.filter(q => q !== mmq)].filter(Boolean).slice(0, 4);
+    const mmq = list.find(q => q.to === 'mm' || q.to === 'transport' || q.to === 'coop' || q.to === 'realty'); return [mmq, inv, collect, cli, ...rest.filter(q => q !== mmq)].filter(Boolean).slice(0, 4);
   };
 
   // ---------- routing ----------
@@ -30,7 +30,7 @@
   const fromHash = () => { const m = location.hash.match(/^#\/(\w+)/); return m ? m[1] : 'home'; };
   window.addEventListener('hashchange', () => { cur = fromHash(); App.render(App.params); App.params = null; });
 
-  const tabsFor = () => { const mid = ['mm', 'transport', 'coop', 'sales', 'stock', 'money'].filter(enabled).slice(0, 2); return ['home', 'clients', ...mid, 'more']; };
+  const tabsFor = () => { const mid = ['mm', 'transport', 'coop', 'realty', 'sales', 'stock', 'money'].filter(enabled).slice(0, 2); return ['home', 'clients', ...mid, 'more']; };
   const navBtn = (id, on) => '<button data-go="' + id + '" class="' + (on ? 'on' : '') + '"' + (on ? ' aria-current="page"' : '') + '><i aria-hidden="true">' + App.icon(id) + '</i><span>' + esc(id === 'more' ? 'Plus' : label(id)) + '</span></button>';
   const logoSrc = () => App.set().logo || 'icons/logo.svg';
   const rateChip = cls => '<button class="' + cls + '" id="ratechip" aria-label="Modifier le taux de change">1 ' + esc(M.info(App.set().currency)[0]) + ' = ' + esc(String(App.set().rate).replace(/\B(?=(\d{3})+$)/g, ' ')) + ' ' + esc(M.info(App.set().cur2)[0]) + '</button>';
@@ -81,7 +81,7 @@
   // ---------- home ----------
   const hs = { p: 'month', counted: '' };
   const PERIODS = [['today', 'Aujourd\'hui'], ['week', 'Cette semaine'], ['month', 'Ce mois'], ['year', 'Cette année']];
-  const revenue = r => App.db.invoices.filter(i => !i.cancelled && App.fin.inR(i.date || '', r)).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : +i.total || 0), 0) + (App.mm && App.mod('mm') ? App.mm.gains(r) : 0) + (App.transport && App.mod('transport') ? App.transport.revenue(r) : 0) + (App.coop && App.mod('coop') ? App.coop.gains(r) : 0); // fees and commissions are the turnover of a money agent
+  const revenue = r => App.db.invoices.filter(i => !i.cancelled && App.fin.inR(i.date || '', r)).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : +i.total || 0), 0) + (App.mm && App.mod('mm') ? App.mm.gains(r) : 0) + (App.transport && App.mod('transport') ? App.transport.revenue(r) : 0) + (App.coop && App.mod('coop') ? App.coop.gains(r) : 0) + (App.realty && App.mod('realty') ? App.realty.gains(r) : 0); // fees and commissions are the turnover of a money agent
   const spark = () => { // last 30 days of invoicing as a soft area
     const days = Array.from({ length: 30 }, (_, k) => App.addDays(App.today(), k - 29)), raw = days.map(d => App.db.invoices.filter(i => !i.cancelled && i.date === d).reduce((a, i) => a + (App.sales ? App.sales.main(i, i.total) : 0), 0)), v = raw.map((x, k) => (raw[Math.max(0, k - 2)] + raw[Math.max(0, k - 1)] + x + raw[Math.min(29, k + 1)] + raw[Math.min(29, k + 2)]) / 5), mx = Math.max(...v, 1e-9);
     if (!v.some(x => x > 0)) return ''; const pts = v.map((x, k) => [k * 10, 40 - x / mx * 34]); const line = pts.map((p, k) => (k ? 'L' : 'M') + p[0] + ' ' + p[1].toFixed(1)).join(' ');
@@ -98,6 +98,7 @@
     if (App.mod('sales') && App.sales && App.sales.unpaidList().length) t.push([App.sales.unpaidList().length + ' facture(s) impayée(s) : ' + App.money.main(App.sales.unpaidTotal()), 'sales', { tab: 'unpaid' }]);
     if (!s.lastBackup || Date.now() - s.lastBackup > 7 * 864e5) t.push([s.lastBackup ? 'Sauvegarde ancienne (plus de 7 jours)' : 'Faire une première sauvegarde', 'data']);
     if (App.coop) App.coop.todo().forEach(x => t.push(x));
+    if (App.realty) App.realty.todo().forEach(x => t.push(x));
     if (!App.db.users.length && App.can('settings')) t.push(['Protéger l\'application avec un PIN', 'data']);
     return t;
   };
@@ -109,7 +110,7 @@
       const ring = hs.p !== 'month' ? '' : gp != null ? '<button class="ring" id="goal" aria-label="Modifier l\'objectif"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="30" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="7"/><circle cx="38" cy="38" r="30" fill="none" stroke="' + (gp >= 100 ? '#9be7b3' : '#ffc61a') + '" stroke-width="7" stroke-linecap="round" stroke-dasharray="' + (circ * Math.min(gp, 100) / 100).toFixed(1) + ' ' + circ.toFixed(1) + '"/></svg><b>' + gp + ' %</b></button>' : '<button class="ring none" id="goal"><span>🎯</span><small>Objectif</small></button>';
       const q = tiles(), start = [[App.cap(App.vocab('client')) + ' ajouté', App.db.clients.length > 0, 'clients', '👥'], ['Logo importé', !!s.logo, 'settings', '🖼️'], ['Infos légales remplies', s.legal.some(l => l.v), 'settings', '📋']];
       if (App.mod('stock')) start.push([App.cap(App.vocab('product')) + ' ajouté', App.db.products.length > 0, 'stock', '📦']);
-      const done = start.filter(x => x[1]).length, td = todo(), cnt = [['clients', '👥', App.db.clients.length + ' ' + App.vocab('client', App.db.clients.length !== 1)]]; if (App.mod('sales')) cnt.push(['sales', '🧾', App.db.invoices.length + ' facture' + (App.db.invoices.length !== 1 ? 's' : '')]); if (App.mod('mm') && App.mm) { const td0 = App.today(), n0 = App.mm.inRange({ from: td0, to: td0 }).filter(o => o.status === 'Terminé').length; cnt.push(['mm', '📲', n0 + ' opération' + (n0 !== 1 ? 's' : '') + ' aujourd\'hui']); } if (App.mod('coop') && App.coop) { const P0 = App.coop.portfolio(); cnt.push(['coop', '🤝', P0.n + ' crédit' + (P0.n !== 1 ? 's' : '') + ' en cours' + (P0.late.length ? ' · ' + P0.late.length + ' en retard' : '')]); } if (App.mod('stock')) cnt.push(['stock', '📦', App.db.products.length + ' ' + App.vocab('product', App.db.products.length !== 1)]);
+      const done = start.filter(x => x[1]).length, td = todo(), cnt = [['clients', '👥', App.db.clients.length + ' ' + App.vocab('client', App.db.clients.length !== 1)]]; if (App.mod('sales')) cnt.push(['sales', '🧾', App.db.invoices.length + ' facture' + (App.db.invoices.length !== 1 ? 's' : '')]); if (App.mod('mm') && App.mm) { const td0 = App.today(), n0 = App.mm.inRange({ from: td0, to: td0 }).filter(o => o.status === 'Terminé').length; cnt.push(['mm', '📲', n0 + ' opération' + (n0 !== 1 ? 's' : '') + ' aujourd\'hui']); } if (App.mod('coop') && App.coop) { const P0 = App.coop.portfolio(); cnt.push(['coop', '🤝', P0.n + ' crédit' + (P0.n !== 1 ? 's' : '') + ' en cours' + (P0.late.length ? ' · ' + P0.late.length + ' en retard' : '')]); } if (App.mod('realty') && App.realty) { const S0 = App.realty.stats(), L0 = App.realty.late(); cnt.push(['realty', '🏢', S0.occupied + '/' + S0.units + ' lot' + (S0.units !== 1 ? 's' : '') + ' loué' + (S0.occupied !== 1 ? 's' : '') + (L0.length ? ' · ' + L0.length + ' en retard' : '')]); } if (App.mod('stock')) cnt.push(['stock', '📦', App.db.products.length + ' ' + App.vocab('product', App.db.products.length !== 1)]);
       el.innerHTML = '<div class="page home"><section class="hero"><div class="hero-top"><div><div class="hello">' + esc(greet) + '</div><div class="hero-date">' + esc(dateTxt) + '</div></div>' + rateChip('rate') + '</div>' +
         '<div class="hero-main"><div><small>Chiffre d\'affaires · ' + esc(r.label) + '</small><div class="amt" id="amt">' + M.main(cur0) + '</div><div class="sub">≈ ' + M.second(cur0) + (diff == null ? '' : ' <span class="delta ' + (diff >= 0 ? 'up' : 'down') + '">' + (diff >= 0 ? '▲ +' : '▼ ') + diff + ' %</span>') + '</div></div>' + ring + '</div>' + spark() +
         '<div class="chips" id="per">' + PERIODS.map(p => '<button data-p="' + p[0] + '" class="' + (hs.p === p[0] ? 'on' : '') + '">' + p[1] + '</button>').join('') + '</div></section>' +
@@ -130,8 +131,8 @@
     render(el) {
       // Screens already in the bottom bar are not repeated; the rest is grouped by what the user is doing.
       const inBar = tabsFor(), ids = Object.keys(SCREENS).filter(enabled).filter(id => id !== 'home' && !inBar.includes(id));
-      const GROUPS = [['Vendre', ['sales', 'services', 'interventions', 'subs', 'rental', 'delivery', 'contracts']], ['Gérer', ['mm', 'transport', 'coop', 'stock', 'suppliers', 'purchases', 'money', 'cash', 'team']], ['Réglages', ['data', 'settings']]];
-      const HINT = { mm: 'Dépôts, retraits, fonds', transport: 'Chariots, carburant, entretien', coop: 'Tontines, épargne, crédits', services: 'Prestations', interventions: 'Visites', money: 'Dépenses, rapports', cash: 'Comptage du jour', data: 'Sauvegarde, PIN' };
+      const GROUPS = [['Vendre', ['sales', 'services', 'interventions', 'subs', 'rental', 'delivery', 'contracts']], ['Gérer', ['mm', 'transport', 'coop', 'realty', 'stock', 'suppliers', 'purchases', 'money', 'cash', 'team']], ['Réglages', ['data', 'settings']]];
+      const HINT = { mm: 'Dépôts, retraits, fonds', transport: 'Chariots, carburant, entretien', coop: 'Tontines, épargne, crédits', realty: 'Biens, baux, loyers', services: 'Prestations', interventions: 'Visites', money: 'Dépenses, rapports', cash: 'Comptage du jour', data: 'Sauvegarde, PIN' };
       const tile = id => '<button class="tile big" data-go="' + id + '"><i>' + App.icon(id) + '</i><span>' + esc(label(id)) + '</span>' + (HINT[id] ? '<small class="muted">' + esc(HINT[id]) + '</small>' : '') + '</button>';
       const used = new Set(), html = GROUPS.map(([t, list]) => { const l = list.filter(id => ids.includes(id)); l.forEach(id => used.add(id)); return l.length ? '<h3 class="grp">' + t + '</h3><div class="grid">' + l.map(tile).join('') + '</div>' : ''; }).join('');
       const rest = ids.filter(id => !used.has(id)); // any screen added later still shows up
