@@ -69,7 +69,7 @@
     if (u.role === 'admin') { App.realAdmin = null; }
     App.close(); App.me_login(u); App.toast(u.role === 'admin' ? 'Retour au profil gérant' : `Vous voyez l'application comme ${u.name}`); };
   $('whoBtn').onclick = () => App.actions.me_switch();
-  { const sl = App.showLock; App.showLock = (...a) => { if (a[1] !== 'change' && a[1] !== 'setup') App.realAdmin = null; return sl(...a); }; } // a lock ends the « viewed as » session
+  { const sl = App.showLock; App.showLock = (...a) => { if (a[1] !== 'change' && a[1] !== 'setup' && a[1] !== 'bio') App.realAdmin = null; return sl(...a); }; } // a lock ends the « viewed as » session
   App.me_login = u => { const same = App.user && App.user.id === u.id; App.user = u; App.applyRole(); if (!same || !App.canView(App.state.view)) App.go(role().home, {}, true); else App.refresh(); };
   // sign out when the profile disappears (removed/deactivated, or sync switched the app to multi-user)
   setInterval(() => {
@@ -84,12 +84,16 @@
   App.views.profile = () => {
     const m = App.me(), r = role();
     return { title: 'Mon profil', back: 'more', nav: 'more', html: `<div class="card"><div class="row" style="align-items:center"><span class="avatar big" style="flex:none">${r.icon}</span><div><h2 style="font-size:18px">${esc(m.name)}</h2><span class="pill blue">${r.label}</span></div></div><p class="mut">${r.desc}</p></div>
-      <div class="list"><button class="item" data-act="me_pin"><span class="ico avatar" style="background:var(--navy)">🔑</span><div class="grow"><b>Changer mon code PIN</b><small>Votre code personnel à 4 chiffres</small></div><span class="mut">›</span></button>
+      <div class="list">${App.bioItem()}<button class="item" data-act="me_pin"><span class="ico avatar" style="background:var(--navy)">🔑</span><div class="grow"><b>Changer mon code PIN</b><small>Votre code personnel à 4 chiffres</small></div><span class="mut">›</span></button>
       <button class="item" data-act="me_switch"><span class="ico avatar" style="background:var(--navy)">👥</span><div class="grow"><b>Changer de profil</b><small>${isAdmin() ? 'Gérant : passez sur n\'importe quel profil, sans code' : 'Voir tous les profils'}</small></div><span class="mut">›</span></button>
       <button class="item" data-act="lockNow"><span class="ico avatar" style="background:var(--navy)">🔒</span><div class="grow"><b>Verrouiller</b><small>Un autre profil se connecte avec son propre code</small></div><span class="mut">›</span></button></div>` };
   };
   // footer of the single-window profiles: own PIN and sign out
-  App.soloFoot = () => `<div class="bar" style="margin-top:24px;justify-content:center"><button class="btn sm sec" data-act="me_pin">🔑 Mon code PIN</button><button class="btn sm sec" data-act="lockNow">🔒 Quitter</button></div><p class="mut" style="text-align:center;font-size:13px">${esc((App.user || {}).name || '')}</p>`;
+  // the profile's own « Empreinte » line (only when this device can do it)
+  App.bioItem = () => !(App.bio && (App.bio.ok() || App.bio.mine())) ? '' : App.bio.mine()
+    ? `<button class="item" data-act="bioremove"><span class="ico avatar" style="background:var(--navy)">👆</span><div class="grow"><b>Empreinte activée</b><small>Sur cet appareil. Toucher pour la désactiver ; le code PIN reste le secours</small></div><span class="mut">›</span></button>`
+    : `<button class="item" data-act="bioset"><span class="ico avatar" style="background:var(--navy)">👆</span><div class="grow"><b>Ouvrir avec mon empreinte</b><small>Sur cet appareil, au lieu du code à 4 chiffres</small></div><span class="mut">›</span></button>`;
+  App.soloFoot = () => `<div class="bar" style="margin-top:24px;justify-content:center">${App.bio && (App.bio.ok() || App.bio.mine()) ? (App.bio.mine() ? '<button class="btn sm sec" data-act="bioremove">👆 Empreinte : désactiver</button>' : '<button class="btn sm sec" data-act="bioset">👆 Empreinte</button>') : ''}<button class="btn sm sec" data-act="me_pin">🔑 Mon code PIN</button><button class="btn sm sec" data-act="lockNow">🔒 Quitter</button></div><p class="mut" style="text-align:center;font-size:13px">${esc((App.user || {}).name || '')}</p>`;
   App.actions.me_pin = () => { if (!App.user) return; App.showLock('enter', 'change'); };
 
   // ---------- Administration of profiles ----------
