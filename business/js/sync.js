@@ -3,7 +3,7 @@
 // snapshot (three-way merge): offline edits made on several phones are combined, not overwritten. Adapted from CISPOLstore Manager.
 (function () {
   const App = window.App, ui = App.ui, esc = App.esc, CKEY = 'business-sync', js = JSON.stringify;
-  const COLL = ['clients', 'products', 'suppliers', 'invoices', 'payments', 'expenses', 'movements', 'quotes', 'orders', 'inventories', 'cashCounts', 'closings', 'subs', 'ledger', 'staff', 'jobs', 'rentals', 'deliveries', 'contracts', 'mmAccounts', 'mmOps', 'trVehicles', 'trTrips', 'trFuel', 'trMaint', 'trTickets', 'coTontines', 'coLoans', 'coOps', 'reProps', 'reUnits', 'reLeases', 'reOps', 'phInfo', 'phBatches', 'phOps', 'phRx', 'phInsurers', 'phPatients', 'agPlots', 'agActs', 'agOps', 'agTasks', 'fuOrders', 'fuOps', 'fuClaims', 'fuVisits', 'fuPacks', 'htRooms', 'htStays', 'users', 'log'];
+  const COLL = ['clients', 'products', 'suppliers', 'invoices', 'payments', 'expenses', 'movements', 'quotes', 'orders', 'inventories', 'cashCounts', 'closings', 'subs', 'ledger', 'staff', 'jobs', 'rentals', 'deliveries', 'contracts', 'mmAccounts', 'mmOps', 'trVehicles', 'trTrips', 'trFuel', 'trMaint', 'trTickets', 'coTontines', 'coLoans', 'coOps', 'reProps', 'reUnits', 'reLeases', 'reOps', 'phInfo', 'phBatches', 'phOps', 'phRx', 'phInsurers', 'phPatients', 'agPlots', 'agActs', 'agOps', 'agTasks', 'fuOrders', 'fuOps', 'fuClaims', 'fuVisits', 'fuPacks', 'fuInfo', 'htRooms', 'htStays', 'users', 'log'];
   const NOT_SHARED = ['theme', 'lastBackup', 'seq']; // theme and backup date stay per device; counters are merged by max
   let cfg = null; try { cfg = JSON.parse(localStorage.getItem(CKEY)); } catch (e) { }
   const saveCfg = () => { try { localStorage.setItem(CKEY, js(cfg)); } catch (e) { } };

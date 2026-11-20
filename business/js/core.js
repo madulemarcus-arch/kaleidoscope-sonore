@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v22', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v23', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -60,7 +60,7 @@
       modes: ['Espèces', 'Mobile money', 'Banque', 'Autre'],
       msgs: { remind: 'Bonjour {nom},\nSauf erreur de notre part, la facture {numero} de {montant} (reste {reste}) est impayée depuis {jours} jour(s).\nMerci de régler dès que possible.\n{entreprise}', sub: 'Bonjour {nom},\nVotre {abonnement} « {formule} » arrive à échéance le {date} ({delai}).\nMontant : {montant}. Merci de le renouveler.\n{entreprise}', receipt: 'Bonjour {nom},\nNous avons bien reçu votre paiement de {montant}{facture} le {date}. Merci !\n{entreprise}' }, // dial = country code for WhatsApp links
     },
-    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: [], trTickets: [], coTontines: [], coLoans: [], coOps: [], reProps: [], reUnits: [], reLeases: [], reOps: [], phInfo: [], phBatches: [], phOps: [], phRx: [], phInsurers: [], phPatients: [], agPlots: [], agActs: [], agOps: [], agTasks: [], fuOrders: [], fuOps: [], fuClaims: [], fuVisits: [], fuPacks: [], htRooms: [], htStays: []
+    clients: [], products: [], suppliers: [], invoices: [], payments: [], expenses: [], movements: [], log: [], lastImport: null, orders: [], inventories: [], quotes: [], cashCounts: [], closings: [], users: [], subs: [], ledger: [], staff: [], jobs: [], rentals: [], deliveries: [], contracts: [], mmAccounts: [], mmOps: [], trVehicles: [], trTrips: [], trFuel: [], trMaint: [], trTickets: [], coTontines: [], coLoans: [], coOps: [], reProps: [], reUnits: [], reLeases: [], reOps: [], phInfo: [], phBatches: [], phOps: [], phRx: [], phInsurers: [], phPatients: [], agPlots: [], agActs: [], agOps: [], agTasks: [], fuOrders: [], fuOps: [], fuClaims: [], fuVisits: [], fuPacks: [], fuInfo: [], htRooms: [], htStays: []
   });
 
   // ---------- store ----------
