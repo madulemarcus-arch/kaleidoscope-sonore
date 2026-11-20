@@ -135,7 +135,7 @@
 
   // ---------- PIN lock ----------
   const lockEl = $('lock');
-  let buf = '', first = '', mode = 'enter', flow = 'unlock', fails = 0, blockedUntil = 0, lastActive = Date.now(), hiddenAt = 0;
+  let buf = '', first = '', mode = 'enter', flow = 'unlock', lastActive = Date.now(), hiddenAt = 0;
   App.locked = false;
   const hash = async s => {
     try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
@@ -143,21 +143,38 @@
   };
   App.hash = hash;
   let recTarget = null;
-  const TITLES = { enter: 'Entrez votre code PIN', new1: 'Choisissez un code PIN à 4 chiffres', new2: 'Confirmez le code PIN' };
+  const TITLES = { enter: 'Entrez votre code PIN', new1: 'Choisissez un code PIN à 6 chiffres', new2: 'Confirmez le code PIN' };
+  // PIN length: new codes have 6 digits (`len` stored with the code); older codes without `len` keep their 4 digits until they are changed
+  const NEWLEN = 6, pinLen = p => (p && p.len) || 4;
+  App.pinLen = pinLen; App.PINLEN = NEWLEN;
+  const lens = () => {   // lengths a code typed at the unlock screen can have
+    const multi = App.multi && App.multi(), L = (multi && flow === 'unlock' ? App.users().filter(x => x.active !== false && x.pin).map(x => pinLen(x.pin)) : [pinLen(multi ? App.user && App.user.pin : dbs().pin)]);
+    return [...new Set(L.length ? L : [4])].sort();
+  };
+  const curLen = () => mode === 'enter' ? Math.max(...lens()) : NEWLEN, mixed = () => mode === 'enter' && lens().length > 1;
+  // wrong codes are counted in localStorage (a reload does not reset them): free for 2 tries, then 30 s, 1 min, 2 min... up to 1 h
+  const FAILK = 'cispol.pinfail';
+  const failGet = () => { try { return JSON.parse(localStorage.getItem(FAILK)) || { n: 0, until: 0 }; } catch (e) { return { n: 0, until: 0 }; } };
+  const failSet = o => { try { if (o) localStorage.setItem(FAILK, JSON.stringify(o)); else localStorage.removeItem(FAILK); } catch (e) {} };
+  const blockLeft = () => Math.max(0, Math.ceil((failGet().until - Date.now()) / 1000));
+  const waitTxt = s => s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : `${s} s`;
+  const failAdd = () => { const f = failGet(), n = f.n + 1, until = n >= 3 ? Date.now() + Math.min(3600, 30 * 2 ** (n - 3)) * 1000 : 0; failSet({ n, until }); return n; };
+  let blockTimer = null;
+  const blockTick = () => { clearInterval(blockTimer); blockTimer = null; const m = $('lmsg'); if (!m || blockLeft() <= 0) { if (m && /^Trop/.test(m.textContent)) m.textContent = ''; return; } m.textContent = `Trop d'essais : patientez ${waitTxt(blockLeft())}`; blockTimer = setInterval(() => { const l = blockLeft(), e = $('lmsg'); if (!e || l <= 0) { clearInterval(blockTimer); blockTimer = null; if (e && /^Trop/.test(e.textContent)) e.textContent = ''; } else e.textContent = `Trop d'essais : patientez ${waitTxt(l)}`; }, 1000); };
   const drawLock = (msg = '') => {
     lockEl.hidden = false; document.body.style.overflow = 'hidden';
     if (mode === 'recover') {
-      lockEl.innerHTML = `<img src="logo.png" alt=""><h1>Code PIN oublié</h1><p>Saisissez le code de récupération remis à la création du PIN.</p><input id="rec" placeholder="XXXX-XXXX" autocapitalize="characters" autocomplete="off"><p class="warn">${msg}</p><button class="btn" data-lk="recok">Valider</button><button class="lnk" data-lk="back">Retour</button>`; return;
+      lockEl.innerHTML = `<img src="logo.png" alt=""><h1>Code PIN oublié</h1><p>Saisissez le code de récupération remis à la création du PIN.</p><input id="rec" placeholder="XXXX-XXXX" autocapitalize="characters" autocomplete="off"><p class="warn" id="lmsg">${msg}</p><button class="btn" data-lk="recok">Valider</button><button class="lnk" data-lk="back">Retour</button>`; return;
     }
     if (mode === 'showrec') {
       lockEl.innerHTML = `<img src="logo.png" alt=""><h1>Code de récupération</h1><p>Notez-le dans un endroit sûr. Il permet de changer le PIN si vous l'oubliez et ne sera plus affiché.</p><h1 style="letter-spacing:4px;color:var(--acc2)">${esc(msg)}</h1><button class="btn" data-lk="recdone">J'ai noté le code</button>`; return;
     }
-    const dots = [0, 1, 2, 3].map(i => `<i class="${i < buf.length ? 'f' : ''}"></i>`).join('');
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => k ? `<button data-k="${k}">${k}</button>` : '<i></i>').join('');
+    const dots = Array.from({ length: curLen() }, (_, i) => i).map(i => `<i class="${i < buf.length ? 'f' : ''}"></i>`).join('');
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', mixed() ? '✓' : '', '0', '⌫'].map(k => k ? `<button data-k="${k}">${k}</button>` : '<i></i>').join('');
     const cancel = flow !== 'unlock' ? '<button class="lnk" data-lk="cancel">Annuler</button>' : '';
     lockEl.innerHTML = `<img src="logo.png" alt=""><h1>CISPOLstore Manager</h1><p>Gérez votre activité en toute simplicité</p><p><b>${TITLES[mode]}</b></p><div class="dots" id="dots">${dots}</div><p class="warn" id="lmsg">${msg}</p><div class="pad">${keys}</div>${mode === 'enter' && flow === 'unlock' && App.bio && App.bio.on() ? '<button class="btn sm sec" data-lk="bio">👆 Utiliser l\'empreinte</button>' : ''}${mode === 'enter' && flow === 'unlock' ? '<button class="lnk" data-lk="forgot">Code PIN oublié ?</button>' : ''}${mode === 'new1' && flow === 'setup' ? '<button class="lnk" data-lk="skip">Plus tard</button>' : ''}${cancel}`;
   };
-  const unlock = () => { lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); fails = 0; };
+  const unlock = () => { lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); failSet(null); };
   App.unlockNow = unlock;
   App.showLock = (m = 'enter', f = 'unlock') => { buf = ''; first = ''; mode = m; flow = f; App.locked = f === 'unlock'; drawLock(); if (f === 'unlock' && m === 'enter' && App.bio && App.bio.on()) setTimeout(() => App.bio.prompt(), 300); };
   App.hasPin = () => !!(App.multi && App.multi()) || !!dbs().pin;
@@ -165,7 +182,7 @@
     const multi = App.multi && App.multi(), target = recTarget || (multi ? App.user : null);
     if (multi && target) for (const o of App.users()) if (o.id !== target.id && o.pin && await hash(o.pin.salt + pin) === o.pin.hash) { buf = ''; first = ''; mode = 'new1'; return drawLock('Ce code est déjà utilisé par un autre profil'); }
     const salt = App.uid(), rec = Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
-    const np = { salt, hash: await hash(salt + pin) };
+    const np = { salt, hash: await hash(salt + pin), len: NEWLEN };
     if (!multi || (target && target.role === 'admin')) np.rec = await hash(salt + rec);
     if (target) {
       target.pin = np; dbs().users = App.users().map(x => x.id === target.id ? target : x); App.user = target; recTarget = null; App.save();
@@ -178,19 +195,18 @@
   const submitPin = async () => {
     const p = App.multi && App.multi() ? (App.user && App.user.pin) : dbs().pin;
     if (mode === 'enter') {
-      if (Date.now() < blockedUntil) { buf = ''; return drawLock('Trop d\'essais. Patientez quelques secondes.'); }
+      if (blockLeft() > 0) { buf = ''; drawLock(); return blockTick(); }
       if (App.multi && App.multi() && flow === 'unlock') {
         let found = null; for (const x of App.users()) if (x.active !== false && x.pin && await hash(x.pin.salt + buf) === x.pin.hash) { found = x; break; }
         if (found) { unlock(); App.me_login(found); return; }
       }
       if ((!(App.multi && App.multi()) || flow !== 'unlock') && p && await hash(p.salt + buf) === p.hash) {
         if (flow === 'remove') { dbs().pin = null; App.save(); unlock(); App.toast('PIN désactivé'); if (App.state.view === 'settings') App.refresh(); return; }
-        if (flow === 'change') { buf = ''; mode = 'new1'; return drawLock(); }
+        failSet(null); if (flow === 'change') { buf = ''; mode = 'new1'; return drawLock(); }
         if (flow === 'bio') { unlock(); App.bio.enroll(); return; }
         return unlock();
       }
-      buf = ''; if (++fails >= 5) { blockedUntil = Date.now() + 30000; fails = 0; }
-      drawLock('Code incorrect'); const d = $('dots'); if (d) d.classList.add('shake'); return;
+      buf = ''; const n = failAdd(); drawLock(n < 3 ? `Code incorrect (${3 - n} essai(s) avant blocage)` : 'Code incorrect'); const d = $('dots'); if (d) d.classList.add('shake'); blockTick(); return;
     }
     if (mode === 'new1') { first = buf; buf = ''; mode = 'new2'; return drawLock(); }
     if (mode === 'new2') {
@@ -201,24 +217,26 @@
   lockEl.addEventListener('click', async e => {
     const k = e.target.closest('[data-k]'), l = e.target.closest('[data-lk]');
     if (k) {
-      if (k.dataset.k === '⌫') buf = buf.slice(0, -1); else if (buf.length < 4) buf += k.dataset.k;
+      if (mode === 'enter' && blockLeft() > 0) return blockTick();
+      if (k.dataset.k === '✓') { if (buf.length >= Math.min(...lens())) submitPin(); return; }
+      if (k.dataset.k === '⌫') buf = buf.slice(0, -1); else if (buf.length < curLen()) buf += k.dataset.k;
       const msg = ($('lmsg') || {}).textContent || ''; drawLock(buf.length ? '' : msg);
-      if (buf.length === 4) submitPin();
+      if (buf.length === curLen()) submitPin();
       return;
     }
     if (!l) return;
     const a = l.dataset.lk;
     if (a === 'bio') App.bio.prompt(true);
-    else if (a === 'forgot') { mode = 'recover'; drawLock(); }
+    else if (a === 'forgot') { mode = 'recover'; drawLock(); blockTick(); }
     else if (a === 'back') { App.showLock('enter', 'unlock'); }
     else if (a === 'skip' || a === 'cancel') unlock();
     else if (a === 'recdone') { unlock(); App.toast('PIN enregistré'); if (App.multi && App.multi() && App.user) { App.me_login(App.user); } else if (App.state.view === 'settings') App.refresh(); }
     else if (a === 'recok') {
-      const code = ($('rec').value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(), multi = App.multi && App.multi();
+      if (blockLeft() > 0) return blockTick(); const code = ($('rec').value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(), multi = App.multi && App.multi();
       let who = null; if (multi) { for (const x of App.users()) if (x.role === 'admin' && x.pin && x.pin.rec && await hash(x.pin.salt + code) === x.pin.rec) { who = x; break; } }
       const p = dbs().pin;
       if (multi ? who : (p && await hash(p.salt + code) === p.rec)) { recTarget = who; buf = ''; first = ''; mode = 'new1'; flow = 'unlock'; drawLock('Choisissez un nouveau PIN'); }
-      else drawLock('Code de récupération incorrect');
+      else { failAdd(); drawLock('Code de récupération incorrect'); blockTick(); }
     }
   });
   $('lockBtn').onclick = () => { if (App.hasPin()) App.showLock('enter', 'unlock'); else App.showLock('new1', 'setup'); };
