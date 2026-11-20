@@ -35,7 +35,7 @@
     });
     requestAnimationFrame(() => wrap.classList.add('on'));
     opts.onMount && opts.onMount(sheet);
-    const first = wrap.querySelector('input,select,textarea'); if (first && !opts.noFocus) setTimeout(() => first.focus(), 60);
+    const first = wrap.querySelector('input,select,textarea'); if (first && !opts.noFocus) setTimeout(() => { const a = document.activeElement; if (!(a && wrap.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))) first.focus(); }, 60); // never pull the cursor back once the user has already moved to another field
     return sheet;
   };
   ui.confirm = (msg, ok, danger) => new Promise(res => {
