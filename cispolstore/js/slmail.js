@@ -183,13 +183,13 @@
       }
     } finally { a.seen = [...seen].slice(-500); }
     if (denied) a.tidyErr = "Google n'a pas autorisé la modification : ajoutez la portée gmail.modify dans la console Google (« E-mails Starlink : Google »), puis touchez « Reconnecter »"; else delete a.tidyErr;
-    a.last = Date.now(); delete a.err; return added;
+    a.last = Date.now(); delete a.err; delete a.closed; return added;
   };
   const NEED_LOGIN = ['interaction_required', 'access_denied', 'auth', 'popup_closed', 'popup_failed_to_open', 'immediate_failed', 'user_logged_out', 'consent_required', 'login_required', 'popup', 'unknown'];
   L.check = async (interactive, only) => {
     adopt(); if (busy || !cfg.accounts.length) return 0; busy = true; L.status = 'busy'; redraw();
     let added = 0; const errs = []; tidied = 0;
-    for (const a of (only ? [only] : cfg.accounts.filter(x => !x.skip))) { try { added += await syncAccount(a, interactive); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
+    for (const a of (only ? [only] : cfg.accounts.filter(x => !x.skip))) { try { added += await syncAccount(a, interactive); } catch (e) { a.closed = e.code === 'popup_closed' ? 1 : 0; a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.code === 'quota' ? 'Gmail limite le débit : lecture partielle, touchez « Vérifier maintenant » dans une minute (elle reprend où elle s\'est arrêtée)' : e.message; errs.push(a.err === 'reconnect' ? 'reconnexion nécessaire pour ' + a.email : a.err); } }
     let auto = 0; try { auto = await L.autoLink(interactive); } catch (e) {}
     reclass(); const re = rematch();
     cfg.lastCheck = Date.now(); saveCfg(); App.save();
@@ -208,8 +208,8 @@
     if (!clientId()) body = row('État', "Non configuré. L'application lit les e-mails de Starlink (échec de paiement, suspension, réactivation) et met à jour le client grâce à son numéro ACC. Lecture seule par défaut : rien n'est envoyé, rien n'est supprimé.", '<button class="btn sm" data-act="slm_setup">Configurer</button>');
     else {
       const st = { busy: 'Lecture des e-mails…', error: 'Erreur : ' + esc(L.error) }[L.status] || (L.needsAttention() ? 'Reconnexion à Google nécessaire' : 'Prêt'), cls = { error: 'bad' }[L.status] || (L.needsAttention() ? 'warn' : 'ok');
-      body = row('État', `<b class="${cls}">${st}</b><br>Dernière vérification : <b>${when(cfg.lastCheck)}</b>`, cfg.accounts.length ? '<button class="btn sm" data-act="slm_check">Vérifier maintenant</button>' : '')
-        + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.skip ? "Lue par vos autres appareils : les alertes arrivent ici par la synchronisation (cet appareil ne lit pas cette boîte)." : a.err === 'reconnect' ? '<span class="warn">La connexion à Google est à refaire sur cet appareil : touchez « Reconnecter » (Google demande le mot de passe de cette adresse).</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last) + (a.tidyErr ? '<br><span class="warn">' + esc(a.tidyErr) + '</span>' : ''), `<div style="display:grid;gap:6px">${a.err === 'reconnect' && !a.skip ? `<button class="btn sm" data-act="slm_reconnect" data-v="${i}">Reconnecter</button>` : ''}${a.skip ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Lire ici</button>` : a.err === 'reconnect' ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Ne pas lire ici</button>` : ''}<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button></div>`)).join('')
+      body = row('État', `<span class="${cls}" style="font-weight:700">${st}</span><br>Dernière vérification : <b>${when(cfg.lastCheck)}</b>`, cfg.accounts.length ? '<button class="btn sm" data-act="slm_check">Vérifier maintenant</button>' : '')
+        + cfg.accounts.map((a, i) => row('📧 ' + esc(a.email), a.skip ? "Lue par vos autres appareils : les alertes arrivent ici par la synchronisation (cet appareil ne lit pas cette boîte)." : a.err === 'reconnect' ? '<span class="warn">La connexion à Google est à refaire sur cet appareil : touchez « Reconnecter » (Google demande le mot de passe de cette adresse).' + (a.closed ? '<br>La fenêtre Google s\'est fermée toute seule : ouvrez d\'abord Chrome, connectez-vous à cette adresse sur gmail.com, puis revenez ici et touchez « Reconnecter ». Sinon, si une autre de vos machines lit déjà cette boîte, touchez « Ne pas lire ici ».' : '') + '</span>' : a.err ? '<span class="bad">' + esc(a.err) + '</span>' : 'Dernière lecture : ' + when(a.last) + (a.tidyErr ? '<br><span class="warn">' + esc(a.tidyErr) + '</span>' : ''), `<div style="display:grid;gap:6px">${a.err === 'reconnect' && !a.skip ? `<button class="btn sm" data-act="slm_reconnect" data-v="${i}">Reconnecter</button>` : ''}${a.skip ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Lire ici</button>` : a.err === 'reconnect' ? `<button class="btn sm sec" data-act="slm_skip" data-v="${i}">Ne pas lire ici</button>` : ''}<button class="btn sm del" data-act="slm_remove" data-v="${i}">Retirer</button></div>`)).join('')
         + row('Ajouter une boîte Gmail', 'Vous pouvez en lier plusieurs (par exemple la boîte qui reçoit les e-mails de paiement et celle qui reçoit les suspensions).', '<button class="btn sm" data-act="slm_add">+ Gmail</button>')
         + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Lecture automatique</b><small style="white-space:normal">À l'ouverture de l'écran Clients, si la dernière lecture est assez ancienne. Le bouton « Vérifier maintenant » lit toujours tout de suite.</small></div><select id="slm_every" style="width:100%">${App.opts(EVERY, everyH())}</select></div>`
         + `<div class="item" style="flex-wrap:wrap"><div class="grow" style="flex:1 1 100%"><b>Après la lecture d'un e-mail Starlink</b><small style="white-space:normal">L'e-mail compris par l'application peut être marqué comme lu et archivé dans Gmail (jamais supprimé : il reste dans « Tous les messages »). Cela demande une autorisation de plus : voir « Modifier » dans Identifiant Google.</small></div><select id="slm_tidy" style="width:100%">${App.opts(TIDY, cfg.tidy ? 1 : 0)}</select></div>`
@@ -275,8 +275,8 @@
   // so this is the first thing done, and only this mailbox is read afterwards
   App.actions.slm_reconnect = async d => {
     const a = cfg.accounts[+d.v]; if (!a || busy) return;
-    try { await getToken(a.email, true); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.message; saveCfg(); return failAdd(e); }
-    delete a.err; saveCfg(); L.check(true, a);
+    try { await getToken(a.email, true); } catch (e) { a.err = NEED_LOGIN.includes(e.code) ? 'reconnect' : e.message; a.closed = e.code === 'popup_closed' ? 1 : 0; saveCfg(); return failAdd(e); }
+    delete a.err; delete a.closed; saveCfg(); L.check(true, a);
   };
   // this device does not read that mailbox (kept on this device only): another device reads it and its alerts arrive through the data sync
   App.actions.slm_skip = d => {
