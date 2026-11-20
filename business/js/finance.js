@@ -29,6 +29,7 @@
     if (App.transport && App.mod('transport')) App.transport.tkEntries(r).forEach(e => out.push(e));
     if (App.coop && App.mod('coop')) App.coop.entries(r).forEach(e => out.push(e));
     if (App.realty && App.mod('realty')) App.realty.entries(r).forEach(e => out.push(e));
+    if (App.ngo && App.mod('ngo')) App.ngo.entries(r).forEach(e => out.push(e));
     db().expenses.filter(e => F.inR(e.date, r)).forEach(e => out.push({ k: 'out', t: 'expense', id: e.id, date: e.date, at: F.at(e), amount: e.amount, cur: e.currency, rate: e.rate, mode: e.mode, label: e.category + (e.note ? ' · ' + e.note : '') }));
     return out.sort((a, b) => b.at - a.at);
   };
