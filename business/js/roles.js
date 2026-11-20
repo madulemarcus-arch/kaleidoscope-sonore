@@ -5,7 +5,7 @@
   const R = App.roles = {};
   R.ROLES = { admin: 'Administrateur', accountant: 'Comptable', seller: 'Vendeur', tech: 'Technicien / employé', driver: 'Livreur' };
   const PERMS = { admin: ['*'], accountant: ['sell', 'pay', 'clientedit', 'stockedit', 'costs', 'expense', 'cash', 'reports', 'export'], seller: ['sell', 'pay', 'clientedit'], tech: [], driver: ['pay'] };
-  const VIEWS = { admin: '*', accountant: ['clients', 'sales', 'stock', 'suppliers', 'money', 'cash', 'mm', 'transport', 'coop', 'realty', 'pharmacy', 'agri', 'furniture', 'hotel', 'btp', 'purchases', 'contracts', 'data', 'subs', 'rental', 'delivery', 'services', 'interventions'], seller: ['clients', 'sales', 'stock', 'mm', 'transport', 'coop', 'realty', 'pharmacy', 'agri', 'furniture', 'hotel', 'btp', 'subs', 'rental', 'delivery', 'contracts'], tech: ['clients', 'services', 'interventions', 'contracts'], driver: ['clients', 'delivery', 'transport'] };
+  const VIEWS = { admin: '*', accountant: ['clients', 'sales', 'stock', 'suppliers', 'money', 'cash', 'mm', 'transport', 'coop', 'realty', 'pharmacy', 'agri', 'furniture', 'hotel', 'btp', 'station', 'purchases', 'contracts', 'data', 'subs', 'rental', 'delivery', 'services', 'interventions'], seller: ['clients', 'sales', 'stock', 'mm', 'transport', 'coop', 'realty', 'pharmacy', 'agri', 'furniture', 'hotel', 'btp', 'station', 'subs', 'rental', 'delivery', 'contracts'], tech: ['clients', 'services', 'interventions', 'contracts'], driver: ['clients', 'delivery', 'transport'] };
   R.perms = role => PERMS[role] || [];
   const state = { locked: false };
   App.user = null;
