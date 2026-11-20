@@ -11,6 +11,7 @@
     services: '<path class="f s" d="M14.7 6.3a4.2 4.2 0 0 0-5.4 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4.2 4.2 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>',
     mm: '<rect class="f s" x="6.5" y="2.8" width="10" height="18.4" rx="2.4"/><path class="s" d="M10.2 18.2h2.6"/><path class="s" d="M3 9.2h6M6.2 6.6 9 9.2 6.2 11.8M21 14.8h-6M17.8 12.2 15 14.8l2.8 2.6"/>',
     transport: '<path class="f s" d="M2.5 6h11v10.2h-11z"/><path class="f s" d="M13.5 9.4h4.2l3.8 3.8v3h-8z"/><circle class="f s" cx="6.5" cy="17.8" r="2.1"/><circle class="f s" cx="17" cy="17.8" r="2.1"/><path class="s" d="M5.5 9.2h5.5M5.5 12h3.5"/>',
+    cleaning: '<rect class="f s" x="3" y="6" width="18" height="12" rx="2"/><path class="s" d="M3 10h18M7 6v-2M12 6v-2M17 6v-2"/>',
     resto: '<path class="f s" d="M7 3v8a2 2 0 0 0 2 2v8M5 3v5M9 3v5M17 3c-2 2-2.500 5-2 8h2v10"/>',
     production: '<path class="f s" d="M3 20V10l6 4V10l6 4V6h6v14z"/><path class="s" d="M3 20h18"/>',
     ngo: '<circle class="f s" cx="12" cy="12" r="8"/><path class="s" d="M4 12h16M12 4c2.500 2.500 2.500 13.500 0 16M12 4c-2.500 2.500-2.500 13.500 0 16"/>',
