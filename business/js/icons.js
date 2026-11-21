@@ -21,6 +21,7 @@
     funeral: '<path class="f s" d="M12 3v18M7 8h10M9 21h6"/>',
     studio: '<path class="f s" d="M4 8h4l2-3h4l2 3h4v11H4zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>',
     firm: '<path class="f s" d="M12 3v18M5 7h14M5 7l-2 6a3 3 0 0 0 4 0zM19 7l-2 6a3 3 0 0 0 4 0zM8 21h8"/>',
+    carrental: '<path class="f s" d="M4 16v-4l2-5h12l2 5v4zM4 12h16M7 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>',
     printing: '<path class="f s" d="M7 9V4h10v5M6 17H4v-6h16v6h-2M7 14h10v6H7z"/>',
     driving: '<path class="f s" d="M5 16v-3l2-5h10l2 5v3zM7 12h10M7.5 16v2M16.5 16v2"/>',
     garden: '<path class="f s" d="M12 20v-8M12 13c0-4 3-6 7-6 0 4-3 6-7 6zM12 16c0-3-2-5-6-5 0 3 2 5 6 5z"/>',

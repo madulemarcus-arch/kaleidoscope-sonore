@@ -3,7 +3,7 @@
 const fs = require('fs'), path = require('path'), { check, launch, setup } = require('./helper'), root = path.resolve(__dirname, '..', '..', 'business');
 (async () => {
   const t = await launch(), p = t.page; await setup(p, { activity: 'commerce' });
-  const SECTOR = ['mm', 'transport', 'coop', 'realty', 'pharmacy', 'agri', 'furniture', 'hotel', 'btp', 'station', 'ngo', 'production', 'resto', 'cleaning', 'butcher', 'hardware', 'shop', 'school', 'garage', 'salon', 'tailor', 'taxi', 'exchange', 'wholesale', 'clinic', 'events', 'cyber', 'utility', 'bakery', 'garden', 'driving', 'printing', 'gym', 'laundry', 'daycare', 'carwash', 'equipment', 'kiosk', 'travel', 'funeral', 'studio', 'firm'];
+  const SECTOR = ['mm', 'transport', 'coop', 'realty', 'pharmacy', 'agri', 'furniture', 'hotel', 'btp', 'station', 'ngo', 'production', 'resto', 'cleaning', 'butcher', 'hardware', 'shop', 'school', 'garage', 'salon', 'tailor', 'taxi', 'exchange', 'wholesale', 'clinic', 'events', 'cyber', 'utility', 'bakery', 'garden', 'driving', 'printing', 'gym', 'laundry', 'daycare', 'carwash', 'equipment', 'kiosk', 'travel', 'funeral', 'studio', 'firm', 'carrental'];
   const src = f => fs.readFileSync(path.join(root, f), 'utf8');
 
   // static wiring
@@ -14,7 +14,7 @@ const fs = require('fs'), path = require('path'), { check, launch, setup } = req
     if (!idx.includes('js/' + f + '.js')) add('absent de index.html', id); if (!sw.includes('./js/' + f + '.js')) add('absent du service worker', id); if (!new RegExp("\\['" + id + "', '").test(core)) add('absent de MODULES', id);
     if (!new RegExp('\\b' + id + ": \\['").test(main)) add('absent des écrans (main.js)', id); if (!new RegExp("'" + id + "'").test(roles)) add('absent des rôles', id); if (!new RegExp('\\b' + id + ": '").test(icons)) add('icône absente', id);
   });
-  Object.keys(missing).forEach(k => check('câblage : ' + k + ' — aucun module concerné', false, missing[k].join(', '))); if (!Object.keys(missing).length) check('câblage : les 42 modules sont dans index.html, le service worker, MODULES, les écrans, les rôles et les icônes', true);
+  Object.keys(missing).forEach(k => check('câblage : ' + k + ' — aucun module concerné', false, missing[k].join(', '))); if (!Object.keys(missing).length) check('câblage : les 43 modules sont dans index.html, le service worker, MODULES, les écrans, les rôles et les icônes', true);
   const swVer = (sw.match(/business-v(\d+)/) || [])[1], coreVer = (core.match(/business-v(\d+)/) || [])[1]; check('version du cache = version de l\'application (v' + swVer + ')', swVer && swVer === coreVer);
 
   // synchro covers every collection of the database
@@ -35,7 +35,7 @@ const fs = require('fs'), path = require('path'), { check, launch, setup } = req
     const tabs = await p.evaluate(() => [...document.querySelectorAll('#gtabs button[data-t]')].map(b => b.dataset.t));
     for (const tb of tabs) { await p.evaluate(([i, x]) => App.go(i, { tab: x }), [id, tb]); await p.waitForTimeout(30); const l2 = await p.evaluate(() => (document.querySelector('#gtab') || document.querySelector('#view')).innerHTML.length); if (l2 < 60) empty.push(id + '/' + tb); }
   }
-  check('écrans : les 42 modules et tous leurs onglets s\'affichent (rien de vide)', !empty.length, empty.join(', '));
+  check('écrans : les 43 modules et tous leurs onglets s\'affichent (rien de vide)', !empty.length, empty.join(', '));
   await p.evaluate(() => App.go('home')); await p.waitForTimeout(100); check('accueil : s\'affiche avec tous les modules activés', (await p.locator('#view').innerHTML()).length > 500);
   check('aucune erreur JS en parcourant tous les écrans', t.errors.length === err0, t.errors.slice(err0).join(' | '));
   await p.evaluate(() => App.go('more')); await p.waitForTimeout(100); check('menu « Plus » : s\'affiche avec tous les modules activés', (await p.locator('#view').innerHTML()).length > 500);

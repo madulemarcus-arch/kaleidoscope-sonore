@@ -22,12 +22,12 @@
     let u = id ? EQ.unit(id) : null; if (u) Object.assign(u, rec); else { u = { id: App.uid(), hours: num(f.hours), services: [], ...rec }; units().push(u); } App.log('equipment.unit', name); App.save(); return u;
   };
   EQ.deleteUnit = u => { if (rents().some(r => r.unitId === u.id)) return false; db().eqUnits = units().filter(x => x.id !== u.id); App.save(); return true; };
-  EQ.hours = u => Math.max(u.hours || 0, ...rents().filter(r => r.unitId === u.id && r.status === 'Retourné').map(r => r.meterIn || 0));
+  EQ.hours = u => Math.max(u.hours || 0, ...rents().filter(r => r.unitId === u.id && r.status === 'Retourné').map(r => r.meterIn || 0), ...(u.services || []).filter(s => s.status !== 'Annulé').map(s => s.hours));
   EQ.lastService = u => (u.services || []).filter(s => s.status !== 'Annulé').reduce((m, s) => Math.max(m, s.hours), u.hours || 0);
   EQ.sinceService = u => Math.max(0, EQ.hours(u) - EQ.lastService(u)); EQ.serviceDue = u => u.active && u.interval > 0 && EQ.sinceService(u) >= u.interval;
   EQ.service = (u, f) => {
     const h = num(f.hours), cost = num(f.cost); if (!(h >= EQ.lastService(u))) return { err: 'Compteur inférieur au dernier entretien (' + EQ.lastService(u) + ' h)' }; if (h > EQ.hours(u) + 1000) return { err: 'Compteur incohérent' }; if (cost < 0) return { err: 'Coût invalide' };
-    const s = { id: App.uid(), date: f.date || App.today(), hours: h, cost, note: f.note || '', status: 'Valide' }; if (cost > 0) s.expenseId = expense('Entretien engins', cost, f.mode || db().settings.modes[0], s.date, u.name + ' · ' + (s.note || 'entretien')); u.services.push(s); if (h > (u.hours || 0)) u.hours = Math.max(u.hours || 0, h); App.log('equipment.service', u.name + ' ' + h); App.save(); return s;
+    const s = { id: App.uid(), date: f.date || App.today(), hours: h, cost, note: f.note || '', status: 'Valide' }; if (cost > 0) s.expenseId = expense('Entretien engins', cost, f.mode || db().settings.modes[0], s.date, u.name + ' · ' + (s.note || 'entretien')); u.services.push(s); App.log('equipment.service', u.name + ' ' + h); App.save(); return s;
   };
   EQ.cancelService = (u, s) => { if (s.status === 'Annulé') return false; dropExp(s.expenseId); s.status = 'Annulé'; App.save(); return true; };
 
