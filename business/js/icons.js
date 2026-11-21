@@ -11,6 +11,7 @@
     services: '<path class="f s" d="M14.7 6.3a4.2 4.2 0 0 0-5.4 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4.2 4.2 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>',
     mm: '<rect class="f s" x="6.5" y="2.8" width="10" height="18.4" rx="2.4"/><path class="s" d="M10.2 18.2h2.6"/><path class="s" d="M3 9.2h6M6.2 6.6 9 9.2 6.2 11.8M21 14.8h-6M17.8 12.2 15 14.8l2.8 2.6"/>',
     transport: '<path class="f s" d="M2.5 6h11v10.2h-11z"/><path class="f s" d="M13.5 9.4h4.2l3.8 3.8v3h-8z"/><circle class="f s" cx="6.5" cy="17.8" r="2.1"/><circle class="f s" cx="17" cy="17.8" r="2.1"/><path class="s" d="M5.5 9.2h5.5M5.5 12h3.5"/>',
+    taxi: '<path class="f s" d="M5 15V11l2-5h10l2 5v4M4 15h16v3H4zM7 18v2M17 18v2"/>',
     tailor: '<path class="f s" d="M8 4l-4 4 3 3 1-1v10h8V10l1 1 3-3-4-4a4 4 0 01-8 0z"/>',
     salon: '<circle class="f s" cx="8" cy="7" r="3"/><circle class="f s" cx="8" cy="17" r="3"/><path class="s" d="M10.5 9l9 9M10.5 15l9-9"/>',
     garage: '<path class="f s" d="M4 14l2-5h12l2 5v4H4v-4z"/><circle class="s" cx="8" cy="18" r="1.6"/><circle class="s" cx="16" cy="18" r="1.6"/>',
