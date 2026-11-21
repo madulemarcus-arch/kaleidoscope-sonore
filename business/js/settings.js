@@ -16,8 +16,40 @@
   };
   const legalHtml = list => list.map((l, i) => '<div class="row2"><input data-legal-k="' + i + '" value="' + esc(l.k) + '" aria-label="Libellé"><input data-legal-v="' + i + '" value="' + esc(l.v) + '" aria-label="Valeur"></div>').join('');
   const readLegal = (root, list) => list.forEach((l, i) => { l.k = root.querySelector('[data-legal-k="' + i + '"]').value.trim() || l.k; l.v = root.querySelector('[data-legal-v="' + i + '"]').value.trim(); });
-  const modulesHtml = mods => '<div class="mods">' + App.MODULES.map(m => '<label class="mod"><input type="checkbox" data-mod="' + m[0] + '"' + (mods[m[0]] ? ' checked' : '') + '><span><b>' + esc(m[1]) + '</b><small>' + esc(m[2]) + '</small></span></label>').join('') + '</div>';
+  const modulesHtml = mods => modFinder() + '<div class="mods">' + App.MODULES.map(m => '<label class="mod"><input type="checkbox" data-mod="' + m[0] + '"' + (mods[m[0]] ? ' checked' : '') + '><span><b>' + esc(m[1]) + '</b><small>' + esc(m[2]) + '</small></span></label>').join('') + '</div>';
   const vocabHtml = v => [['client', 'Un client, c\'est un…'], ['product', 'Un produit, c\'est un…'], ['sub', 'Un abonnement, c\'est un…']].map(([k, l]) => ui.field(l, '<input data-vocab="' + k + '" value="' + esc(v[k]) + '" maxlength="24">')).join('');
+
+  // ---------- search bars (activity + modules) ----------
+  // Accent- and case-insensitive text used to match what the user types.
+  const norm = t => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const modName = id => { const m = App.MODULES.find(x => x[0] === id); return m ? m[1] : ''; };
+  // An activity is found by its label, its key or the names of the modules it switches on.
+  const actText = k => { const p = App.PRESETS[k]; return norm(p.label + ' ' + k + ' ' + p.modules.map(modName).join(' ')); };
+  const actFinder = () => '<input type="search" class="finder" data-find="act" placeholder="Rechercher un domaine ou un secteur…" aria-label="Rechercher un domaine ou un secteur" autocomplete="off">';
+  const modFinder = () => '<input type="search" class="finder" data-find="mod" placeholder="Rechercher un module…" aria-label="Rechercher un module" autocomplete="off">';
+  const bindFinders = root => {
+    root.querySelectorAll('[data-find="act"]').forEach(f => {
+      const sel = f.parentNode.querySelector('select[name="activity"],select[data-p="activity"]'); if (!sel) return;
+      const all = Array.from(sel.options).map(o => [o.value, o.textContent]), hint = document.createElement('small'); hint.className = 'finder-hint'; f.after(hint);
+      const run = () => {
+        const q = norm(f.value.trim()), cur = sel.value, hits = q ? all.filter(([v, l]) => norm(l).includes(q) || actText(v).includes(q)) : all;
+        hint.textContent = q ? (hits.length ? hits.length + (hits.length > 1 ? ' résultats' : ' résultat') + ' — touchez l\'activité voulue' : 'Aucun résultat') : '';
+        const list = hits.length ? hits : all; if (!hits.length) sel.removeAttribute('size');
+        sel.innerHTML = list.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
+        if (q && hits.length) { sel.size = Math.min(hits.length, 6) + (hits.length === 1 ? 1 : 0); if (!hits.some(h => h[0] === cur)) sel.selectedIndex = -1; } else sel.removeAttribute('size');
+        if (!q) sel.value = cur;
+      };
+      f.oninput = run;
+      // Enter picks the first result.
+      f.onkeydown = e => { if (e.key !== 'Enter') return; e.preventDefault(); const o = sel.options[0]; if (o && f.value.trim()) { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); f.value = ''; run(); } };
+      sel.addEventListener('change', () => { if (f.value) { f.value = ''; run(); } });
+    });
+    root.querySelectorAll('[data-find="mod"]').forEach(f => {
+      const box = f.nextElementSibling; if (!box || !box.classList.contains('mods')) return;
+      const none = document.createElement('p'); none.className = 'muted finder-none'; none.textContent = 'Aucun module trouvé.'; none.hidden = true; box.after(none);
+      f.oninput = () => { const q = norm(f.value.trim()); let n = 0; box.querySelectorAll('.mod').forEach(l => { const ok = !q || norm(l.textContent).includes(q); l.style.display = ok ? '' : 'none'; if (ok) n++; }); none.hidden = n > 0; };
+    });
+  };
 
   // ---------- wizard ----------
   App.wizard = () => {
@@ -26,7 +58,7 @@
     const apply = p => { const pr = App.PRESETS[p]; d.activity = p; d.vocab = { ...pr.vocab }; App.MODULES.forEach(m => d.modules[m[0]] = pr.modules.includes(m[0])); };
     const body = () => {
       if (step === 0) return ui.field('Nom de l\'entreprise *', ui.input('name', d.name, { ph: 'Ex. Ets Mavuela' })) +
-        ui.field('Activité', ui.select('activity', Object.entries(App.PRESETS).map(([k, v]) => [k, v.label]), d.activity), 'Choisit les modules et le vocabulaire de départ. Tout reste modifiable.') +
+        actFinder() + ui.field('Activité', ui.select('activity', Object.entries(App.PRESETS).map(([k, v]) => [k, v.label]), d.activity), 'Choisit les modules et le vocabulaire de départ. Tout reste modifiable.') +
         ui.field('Ville', ui.input('city', d.city)) + ui.field('Slogan (facultatif)', ui.input('slogan', d.slogan)) + imgField('logo', 'Logo', d.logo);
       if (step === 1) return '<div class="row2">' + ui.field('Devise principale', ui.select('currency', curOpts(), d.currency)) + ui.field('Devise secondaire', ui.select('cur2', curOpts(), d.cur2)) + '</div>' +
         ui.field('Taux : 1 ' + d.currency + ' = ? ' + d.cur2, ui.input('rate', d.rate, { num: 1 })) + ui.field('Adresse', ui.input('address', d.address)) +
@@ -41,7 +73,7 @@
     };
     const draw = () => {
       el.innerHTML = '<div class="wbox"><div class="whead"><img class="logo" alt="" src="' + esc(d.logo || 'icons/logo.svg') + '"><h1>' + (step === 0 ? 'Bienvenue dans CISPOLstore Business' : esc(steps[step])) + '</h1><p>Étape ' + (step + 1) + ' sur 3 — ' + steps[step] + '</p></div><div class="wb"><div class="dots">' + steps.map((s, i) => '<i class="' + (i <= step ? 'on' : '') + '"></i>').join('') + '</div><div class="body">' + body() + '</div><div class="wfoot">' + (step ? '<button class="btn ghost" data-back>Retour</button>' : '<span></span>') + '<button class="btn primary" data-next>' + (step === 2 ? 'Terminer' : 'Suivant') + '</button></div></div></div>';
-      bindImgs(el, d);
+      bindImgs(el, d); bindFinders(el);
       el.querySelector('[data-back]') && (el.querySelector('[data-back]').onclick = () => { read(); step--; draw(); });
       el.querySelector('[data-next]').onclick = () => {
         read();
@@ -63,7 +95,7 @@
     render(el) {
       const s = S();
       el.innerHTML = '<div class="page set">' +
-        '<section class="card"><h3>Entreprise</h3>' + ui.field('Nom', '<input data-p="name" value="' + esc(s.name) + '">') + ui.field('Activité', '<select data-p="activity">' + Object.entries(App.PRESETS).map(([k, v]) => '<option value="' + k + '"' + (s.activity === k ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select>', 'Changer l\'activité ne modifie pas vos modules.') +
+        '<section class="card"><h3>Entreprise</h3>' + ui.field('Nom', '<input data-p="name" value="' + esc(s.name) + '">') + actFinder() + ui.field('Activité', '<select data-p="activity">' + Object.entries(App.PRESETS).map(([k, v]) => '<option value="' + k + '"' + (s.activity === k ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select>', 'Changer l\'activité ne modifie pas vos modules.') +
         '<div class="row2">' + ui.field('Ville', '<input data-p="city" value="' + esc(s.city) + '">') + ui.field('Slogan', '<input data-p="slogan" value="' + esc(s.slogan) + '">') + '</div>' +
         ui.field('Adresse', '<input data-p="address" value="' + esc(s.address) + '">') + '<div class="row2">' + ui.field('Téléphone', '<input data-p="phone" inputmode="tel" value="' + esc(s.phone) + '">') + ui.field('Courriel', '<input data-p="email" type="email" value="' + esc(s.email) + '">') + '</div>' +
         ui.field('Conditions de paiement', '<textarea data-p="terms" rows="2">' + esc(s.terms) + '</textarea>') + '<div class="fld"><span>Mentions légales</span><div id="legal">' + legalHtml(s.legal) + '</div><button class="btn ghost sm" id="addlegal">+ Ajouter une mention</button></div>' + imgField('logo', 'Logo', s.logo) + imgField('stamp', 'Sceau / cachet', s.stamp) + '</section>' +
@@ -80,7 +112,7 @@
         if (k === 'currency' || k === 'cur2') { if (s.currency === s.cur2) { App.toast('Les deux devises doivent différer', 'err'); s[k] = k === 'currency' ? (s.currency === 'USD' ? 'EUR' : 'USD') : (s.cur2 === 'CDF' ? 'USD' : 'CDF'); return redo(); } redo(); }
         App.save(); App.emit('settings');
       });
-      bindImgs(el, s);
+      bindImgs(el, s); bindFinders(el);
       const lg = el.querySelector('#legal'), saveLegal = () => { readLegal(lg, s.legal); App.save(); };
       lg.oninput = saveLegal; el.querySelector('#addlegal').onclick = () => { s.legal.push({ k: 'Mention', v: '' }); App.save(); redo(); };
       el.querySelector('#rate').onclick = () => { ui.rateSheet(); };
