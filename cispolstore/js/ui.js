@@ -142,7 +142,16 @@
     catch (e) { let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) | 0; return 'x' + h; }
   };
   App.hash = hash;
-  let recTarget = null;
+  let recTarget = null, recCode = '', recWho = '';
+  // printable / PDF sheet of the recovery code: the code is only shown once, so the sheet is made from the screen that shows it and nothing is kept
+  App.recoveryDoc = (code, who, logo) => { const K = App.docKit, e = esc, co = App.db.settings.company, NAVY = '#12365d', ORG = '#d5522f';
+    return `<div class="paper" data-fit="1" style="position:relative">${K.head(co, logo)}
+      <div style="text-align:center;margin:18px 0 4px;font:700 22px/1.2 Georgia,serif;color:${NAVY}">Code de récupération du PIN</div>
+      <div style="text-align:center;color:#555;margin-bottom:14px">${e(co.name || 'CISPOLstore Manager')}${who ? ' · ' + e(who) : ''} · ${App.fdate(App.today())}</div>
+      <div style="text-align:center;margin:18px auto;padding:20px 10px;border:2px solid ${NAVY};border-radius:10px;max-width:420px"><div style="font:700 40px/1.1 'Courier New',monospace;letter-spacing:6px;color:${NAVY}">${e(code)}</div></div>
+      <p>Ce code permet de choisir un nouveau code PIN si vous l'oubliez. Il n'est montré qu'une seule fois : l'application n'en garde pas le texte et ne peut pas le réafficher.</p>
+      <div style="margin:16px 0;padding:12px 14px;border-left:5px solid ${ORG};background:#fdf2ee"><b style="color:${ORG}">Document secret.</b> Quiconque possède cette fiche peut changer le code PIN. Rangez-la sous clé, ne la photographiez pas, ne l'envoyez à personne (ni WhatsApp, ni e-mail) et détruisez-la si vous changez de code.</div>
+      <p style="margin-top:22px">Mot de passe de l'application (si le chiffrement est activé), à écrire à la main : <span style="display:inline-block;border-bottom:1px solid #333;width:260px">&nbsp;</span></p></div>`; };
   const TITLES = { enter: 'Entrez votre code PIN', new1: 'Choisissez un code PIN à 6 chiffres', new2: 'Confirmez le code PIN' };
   // PIN length: new codes have 6 digits (`len` stored with the code); older codes without `len` keep their 4 digits until they are changed
   const NEWLEN = 6, pinLen = p => (p && p.len) || 4;
@@ -167,7 +176,7 @@
       lockEl.innerHTML = `<img src="logo.png" alt=""><h1>Code PIN oublié</h1><p>Saisissez le code de récupération remis à la création du PIN.</p><input id="rec" placeholder="XXXX-XXXX" autocapitalize="characters" autocomplete="off"><p class="warn" id="lmsg">${msg}</p><button class="btn" data-lk="recok">Valider</button><button class="lnk" data-lk="back">Retour</button>`; return;
     }
     if (mode === 'showrec') {
-      lockEl.innerHTML = `<img src="logo.png" alt=""><h1>Code de récupération</h1><p>Notez-le dans un endroit sûr. Il permet de changer le PIN si vous l'oubliez et ne sera plus affiché.</p><h1 style="letter-spacing:4px;color:var(--acc2)">${esc(msg)}</h1><button class="btn" data-lk="recdone">J'ai noté le code</button>`; return;
+      lockEl.innerHTML = `<img src="logo.png" alt=""><h1>Code de récupération</h1><p>Notez-le dans un endroit sûr. Il permet de changer le PIN si vous l'oubliez et ne sera plus affiché.</p><h1 style="letter-spacing:4px;color:var(--acc2)">${esc(msg)}</h1><div class="bar" style="justify-content:center"><button class="btn sec" data-lk="recpdf">📄 Télécharger en PDF</button><button class="btn sec" data-lk="recprint">🖨 Imprimer</button></div><p class="warn" style="font-size:13px">Document secret : gardez-le sous clé, ne l'envoyez à personne.</p><button class="btn" data-lk="recdone">J'ai noté le code</button>`; return;
     }
     const dots = Array.from({ length: curLen() }, (_, i) => i).map(i => `<i class="${i < buf.length ? 'f' : ''}"></i>`).join('');
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', mixed() ? '✓' : '', '0', '⌫'].map(k => k ? `<button data-k="${k}">${k}</button>` : '<i></i>').join('');
@@ -186,11 +195,11 @@
     if (!multi || (target && target.role === 'admin')) np.rec = await hash(salt + rec);
     if (target) {
       target.pin = np; dbs().users = App.users().map(x => x.id === target.id ? target : x); App.user = target; recTarget = null; App.save();
-      if (np.rec) { mode = 'showrec'; return drawLock(rec.slice(0, 4) + '-' + rec.slice(4)); }
+      if (np.rec) { recCode = rec.slice(0, 4) + '-' + rec.slice(4); recWho = target.name || ''; mode = 'showrec'; return drawLock(rec.slice(0, 4) + '-' + rec.slice(4)); }
       unlock(); App.toast('Code PIN modifié'); if (App.applyRole) App.applyRole(); return;
     }
     dbs().pin = np; App.save();
-    mode = 'showrec'; drawLock(rec.slice(0, 4) + '-' + rec.slice(4));
+    recCode = rec.slice(0, 4) + '-' + rec.slice(4); recWho = ''; mode = 'showrec'; drawLock(rec.slice(0, 4) + '-' + rec.slice(4));
   };
   const submitPin = async () => {
     const p = App.multi && App.multi() ? (App.user && App.user.pin) : dbs().pin;
@@ -230,7 +239,11 @@
     else if (a === 'forgot') { mode = 'recover'; drawLock(); blockTick(); }
     else if (a === 'back') { App.showLock('enter', 'unlock'); }
     else if (a === 'skip' || a === 'cancel') unlock();
-    else if (a === 'recdone') { unlock(); App.toast('PIN enregistré'); if (App.multi && App.multi() && App.user) { App.me_login(App.user); } else if (App.state.view === 'settings') App.refresh(); }
+    else if (a === 'recpdf' || a === 'recprint') {
+      const K = App.docKit; if (!K || !recCode) return; const html = App.recoveryDoc(recCode, recWho, await K.logoData());
+      if (a === 'recpdf') await App.sharePdf('Code-de-recuperation-PIN.pdf', html); else K.print('Code de récupération du PIN', html);
+    }
+    else if (a === 'recdone') { recCode = ''; recWho = ''; unlock(); App.toast('PIN enregistré'); if (App.multi && App.multi() && App.user) { App.me_login(App.user); } else if (App.state.view === 'settings') App.refresh(); }
     else if (a === 'recok') {
       if (blockLeft() > 0) return blockTick(); const code = ($('rec').value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(), multi = App.multi && App.multi();
       let who = null; if (multi) { for (const x of App.users()) if (x.role === 'admin' && x.pin && x.pin.rec && await hash(x.pin.salt + code) === x.pin.rec) { who = x; break; } }
