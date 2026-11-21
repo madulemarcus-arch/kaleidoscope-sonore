@@ -14,6 +14,7 @@
     gym: '<path class="f s" d="M3 10v4M6 8v8M18 8v8M21 10v4M6 12h12"/>',
     laundry: '<path class="f s" d="M8 4l-5 4 3 3 2-1v10h8V10l2 1 3-3-5-4a4 4 0 0 1-8 0z"/>',
     daycare: '<circle class="s" cx="12" cy="7" r="3"/><path class="f s" d="M6 21v-6a6 6 0 0 1 12 0v6z"/>',
+    carwash: '<path class="f s" d="M5 17v-4l2-5h10l2 5v4zM7 17v2M17 17v2M3 4l2 2M12 3v2M21 4l-2 2"/>',
     printing: '<path class="f s" d="M7 9V4h10v5M6 17H4v-6h16v6h-2M7 14h10v6H7z"/>',
     driving: '<path class="f s" d="M5 16v-3l2-5h10l2 5v3zM7 12h10M7.5 16v2M16.5 16v2"/>',
     garden: '<path class="f s" d="M12 20v-8M12 13c0-4 3-6 7-6 0 4-3 6-7 6zM12 16c0-3-2-5-6-5 0 3 2 5 6 5z"/>',
