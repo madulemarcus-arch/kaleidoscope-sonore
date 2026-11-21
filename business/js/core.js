@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v48', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v49', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -66,7 +66,18 @@
     jardinage: { label: 'Jardinage & paysagisme', modules: ['garden', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
     autoecole: { label: 'Auto-école & permis', modules: ['driving', 'sales', 'cash', 'team'], vocab: { client: 'élève', product: 'prestation', sub: 'abonnement' } },
     imprimerie: { label: 'Imprimerie & papeterie', modules: ['printing', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
-    cabinet: { label: 'Cabinet', modules: ['sales', 'services', 'contracts', 'cash'], vocab: { client: 'patient', product: 'prestation', sub: 'contrat' } }
+    cabinet: { label: 'Cabinet', modules: ['sales', 'services', 'contracts', 'cash'], vocab: { client: 'patient', product: 'prestation', sub: 'contrat' } },
+    pressing: { label: 'Pressing & blanchisserie', modules: ['sales', 'services', 'delivery', 'cash', 'team'], vocab: { client: 'client', product: 'prestation', sub: 'forfait' } },
+    sport: { label: 'Salle de sport & fitness', modules: ['subs', 'sales', 'contracts', 'cash', 'team'], vocab: { client: 'adhérent', product: 'formule', sub: 'abonnement' } },
+    creche: { label: 'Crèche & garderie', modules: ['subs', 'sales', 'contracts', 'cash', 'team'], vocab: { client: 'parent', product: 'formule', sub: 'inscription' } },
+    laveauto: { label: 'Lave-auto', modules: ['sales', 'services', 'subs', 'cash', 'team'], vocab: { client: 'client', product: 'prestation', sub: 'forfait' } },
+    engins: { label: 'Location d\'engins & matériel', modules: ['rental', 'sales', 'contracts', 'delivery', 'cash', 'team'], vocab: { client: 'client', product: 'matériel', sub: 'contrat' } },
+    kiosque: { label: 'Kiosque & dépôt de boissons', modules: ['sales', 'stock', 'purchases', 'delivery', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
+    photo: { label: 'Photographe & studio', modules: ['sales', 'services', 'contracts', 'cash', 'team'], vocab: { client: 'client', product: 'prestation', sub: 'contrat' } },
+    voyage: { label: 'Agence de voyage & billetterie', modules: ['sales', 'services', 'contracts', 'cash', 'team'], vocab: { client: 'client', product: 'prestation', sub: 'contrat' } },
+    funerailles: { label: 'Pompes funèbres', modules: ['sales', 'services', 'stock', 'contracts', 'cash', 'team'], vocab: { client: 'famille', product: 'prestation', sub: 'contrat' } },
+    veto: { label: 'Pharmacie vétérinaire', modules: ['pharmacy', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'éleveur', product: 'médicament', sub: 'abonnement' } },
+    opticien: { label: 'Opticien & lunetterie', modules: ['shop', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'monture', sub: 'abonnement' } }
   };
   App.defaults = () => ({
     v: VERSION,
