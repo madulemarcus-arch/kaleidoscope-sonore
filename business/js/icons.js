@@ -11,6 +11,7 @@
     services: '<path class="f s" d="M14.7 6.3a4.2 4.2 0 0 0-5.4 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4.2 4.2 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>',
     mm: '<rect class="f s" x="6.5" y="2.8" width="10" height="18.4" rx="2.4"/><path class="s" d="M10.2 18.2h2.6"/><path class="s" d="M3 9.2h6M6.2 6.6 9 9.2 6.2 11.8M21 14.8h-6M17.8 12.2 15 14.8l2.8 2.6"/>',
     transport: '<path class="f s" d="M2.5 6h11v10.2h-11z"/><path class="f s" d="M13.5 9.4h4.2l3.8 3.8v3h-8z"/><circle class="f s" cx="6.5" cy="17.8" r="2.1"/><circle class="f s" cx="17" cy="17.8" r="2.1"/><path class="s" d="M5.5 9.2h5.5M5.5 12h3.5"/>',
+    bakery: '<path class="f s" d="M4 14c0-4 3.5-7 8-7s8 3 8 7v3H4zM8 11l1 2M12 10v3M16 11l-1 2"/>',
     utility: '<path class="f s" d="M12 3s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/>',
     cyber: '<path class="f s" d="M4 5h16v10H4zM2 19h20M9 15v4M15 15v4"/>',
     events: '<path class="f s" d="M4 20V9l8-5 8 5v11zM9 20v-6h6v6"/>',
