@@ -8,7 +8,7 @@ const { check, launch, setup } = require('./helper');
   await p.selectOption('select[name=cur2]', 'USD'); await p.click('[data-next]'); check('devises identiques refusées', await p.isVisible('.toast.err'));
   await p.selectOption('select[name=cur2]', 'CDF'); await p.click('[data-next]');
   check('préréglage cabinet : vocabulaire patient', (await p.inputValue('[data-vocab=client]')) === 'patient');
-  check('préréglage cabinet : module services coché', await p.isChecked('[data-mod=services]') && !(await p.isChecked('[data-mod=stock]')));
+  check('préréglage cabinet médical : module Clinique coché, pas de stock', await p.isChecked('[data-mod=clinic]') && !(await p.isChecked('[data-mod=stock]')));
   await p.click('[data-next]'); await p.waitForSelector('.wizard', { state: 'detached' });
   check('accueil après assistant', (await p.textContent('#ttl')) === 'Cabinet Test');
   check('onglet Clients renommé Patients', (await p.textContent('#tabs')).includes('Patients'));
