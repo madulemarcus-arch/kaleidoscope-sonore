@@ -62,7 +62,7 @@
   };
 
   // ---------- operations (never edited, cancelled) ----------
-  const mkOp = (type, date, extra) => Object.assign({ id: App.uid(), number: A.nextNo('BC', 'bc', () => ops()), date: date || App.today(), at: Date.now(), type, status: 'Valide', by: App.user ? App.user.name : '' }, extra);
+  const mkOp = (type, date, extra) => Object.assign({ id: App.uid(), number: A.nextNo('BO', 'bc', () => ops()), date: date || App.today(), at: Date.now(), type, status: 'Valide', by: App.user ? App.user.name : '' }, extra);
   BC.addCut = f => {
     const src = BC.lot(f.lotId); if (!src || !live(src)) return { err: 'Choisissez le lot à découper' }; const kgIn = r3(f.kgIn); if (!(kgIn > 0)) return { err: 'Indiquez le poids découpé' }; if (kgIn > BC.rem(src) + 1e-6) return { err: 'Il ne reste que ' + nf(BC.rem(src)) + ' kg dans ce lot' };
     const outs = {}; for (const o of f.outputs || []) { if (!(o.kg > 0)) continue; let p = o.pid && S.get(o.pid); if (!p) { if (!o.name) continue; p = db().products.find(x => norm(x.name) === norm(o.name) && S.tracked(x)) || newProduct(o.name, o.price); } else if (o.price > 0 && !(+p.price)) p.price = o.price; if (!S.tracked(p)) return { err: p.name + ' n\'est pas suivi en stock' }; if (p.id === src.productId) return { err: 'Un morceau ne peut pas être le produit de départ' }; outs[p.id] = r3((outs[p.id] || 0) + o.kg); }

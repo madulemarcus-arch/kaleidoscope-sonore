@@ -88,7 +88,7 @@ const { check, launch, setup } = require('./helper');
   await go('ops'); check('Opérations : liste du mois', (await p.locator('#rtab [data-o]').count()) >= 7);
   await go('rep'); await p.waitForSelector('#rtab .hero'); check('rapport : recouvrement, parc immobilier, propriétaires', (await p.textContent('#rtab')).includes('Recouvrement') && (await p.textContent('#rtab')).includes('Parc immobilier') && (await p.textContent('#rtab')).includes('M. Propriétaire'));
   check('rapport en texte (WhatsApp)', await p.evaluate(() => App.realty.reportText(App.fin.range('month')).includes('Impayés')));
-  check('Excel : feuilles Biens, Lots, Baux, Opérations loyers', await p.evaluate(() => { const n = App.data.tables().map(x => x.name); return ['Biens', 'Lots', 'Baux', 'Opérations loyers'].every(x => n.includes(x)); }));
+  check('Excel : feuilles Biens, Lots, Baux, Opérations loyers', await p.evaluate(() => { const n = App.data.tables().map(x => x.name); return ['Biens', 'Lots immobilier', 'Baux', 'Opérations loyers'].every(x => n.includes(x)); }));
   check('Synchro : les collections sont partagées', await p.evaluate(() => ['reProps', 'reUnits', 'reLeases', 'reOps'].every(k => Array.isArray(App.db[k]))));
 
   // an operation is cancelled, never edited

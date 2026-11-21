@@ -49,7 +49,7 @@
     ong: { label: 'ONG & projets', modules: ['ngo', 'cash', 'purchases', 'team'], vocab: { client: 'donateur', product: 'article', sub: 'abonnement' } },
     production: { label: 'Production & fabrication', modules: ['production', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'produit', sub: 'abonnement' } },
     lavage: { label: 'Nettoyage tapis & mobilier', modules: ['cleaning', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'produit', sub: 'abonnement' } },
-    boucherie: { label: 'Boucherie & chambre froide', modules: ['butcher', 'sales', 'stock', 'purchases', 'suppliers', 'cash', 'team'], vocab: { client: 'client', product: 'produit', sub: 'abonnement' } },
+    boucherie: { label: 'Boucherie & chambre froide', modules: ['butcher', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'produit', sub: 'abonnement' } },
     quincaillerie: { label: 'Quincaillerie & matériaux', modules: ['hardware', 'sales', 'stock', 'purchases', 'delivery', 'rental', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
     boutique: { label: 'Boutique & magasin', modules: ['shop', 'sales', 'stock', 'purchases', 'delivery', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
     garage: { label: 'Garage & mécanique', modules: ['garage', 'sales', 'stock', 'interventions', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'pièce', sub: 'contrat' } },
