@@ -1,0 +1,83 @@
+// Salle de sport & fitness: plans, subscriptions as real invoices (copied duration and price, discount, credit, chaining), derived end and state, freezes, door check-in (with the reason of each refusal),
+// entries per card, single entries, cancellation rules, members to renew / lapsed / inactive, report, texts, forms and screens. Fictitious data only.
+const { check, launch, setup } = require('./helper');
+(async () => {
+  const near = (a, b) => Math.abs(a - b) < 0.005, t = await launch(), p = t.page; await setup(p, { activity: 'sport' });
+  const go = async tab => { await p.evaluate(tb => App.go('gym', { tab: tb }), tab); await p.waitForSelector('#gtabs'); };
+  const settle = () => p.waitForFunction(() => document.activeElement && document.activeElement.closest && document.activeElement.closest('.sheet')), ok = () => p.click('.sheet-wrap.on footer .primary');
+  const ALL = '{ from: "0000-01-01", to: "9999-12-31", label: "" }';
+
+  check('secteur « Salle de sport & fitness » : module activé, vocabulaire « adhérent »', await p.evaluate(() => App.mod('gym') && App.mod('sales') && App.db.settings.activity === 'sport' && App.db.settings.vocab.client === 'adhérent'));
+  check('barre du bas : Salle de sport', (await p.textContent('#tabs')).includes('Salle de sport'));
+  await go('members'); check('écran vide : carte avec bouton d\'action', (await p.locator('#gtab .empty [data-cta]').count()) === 1);
+  await p.evaluate(() => { [['c1', 'Adhérent Un'], ['c2', 'Adhérent Deux'], ['c3', 'Adhérent Trois'], ['c4', 'Adhérent Quatre'], ['c5', 'Adhérent Cinq'], ['c6', 'Adhérent Six'], ['c7', 'Adhérent Sept']].forEach(x => App.db.clients.push({ id: x[0], code: 'CL-' + x[0], name: x[1], phone: '09900000' + x[0].slice(1), type: 'Particulier', created: App.today(), fields: {} })); App.save(); });
+
+  // plans
+  const pl = await p.evaluate(() => { const G = App.gym, n = G.prepare(), n2 = G.prepare(), by = nm => App.db.gmPlans.find(x => x.name === nm).id, b = { name: 'Test', days: 30, price: 10 }; const ref = [G.savePlan({ ...b, name: '' }), G.savePlan({ ...b, name: 'mensuel' }), G.savePlan({ ...b, days: 0 }), G.savePlan({ ...b, price: 0 }), G.savePlan({ ...b, visits: -1 })].every(r => !!r.err); return { n, n2, ref, m: by('Mensuel'), t: by('Trimestriel'), a: by('Annuel'), c: by('Carnet de 10 entrées'), e: by('Entrée à la séance'), count: App.db.gmPlans.length }; });
+  check('formules préparées : 5 sans doublon ; refus : sans nom, nom en double (casse ignorée), durée nulle, prix nul, entrées négatives', pl.n === 5 && pl.n2 === 0 && pl.ref && pl.count === 5);
+
+  // sales
+  check('abonnement refusé : sans adhérent, formule inconnue, formule inactive, encaissé au-dessus du total, début trop ancien', await p.evaluate(pl => { const G = App.gym, f = { clientId: 'c1', planId: pl.m }; App.db.gmPlans.find(x => x.id === pl.a).active = false; const r = [G.sell({ ...f, clientId: '' }), G.sell({ ...f, planId: 'zz' }), G.sell({ ...f, planId: pl.a }), G.sell({ ...f, paid: 999 }), G.sell({ ...f, start: App.addDays(App.today(), -31) })].every(x => !!x.err); App.db.gmPlans.find(x => x.id === pl.a).active = true; return r && App.db.gmSubs.length === 0; }, pl));
+  const s1 = await p.evaluate(pl => { const G = App.gym, t = App.today(), s = G.sell({ clientId: 'c1', planId: pl.m }), i = App.sales.get(s.invoiceId); return { id: s.id, n: s.number, total: i.total, paid: App.sales.paid(i), src: i.source, end: G.end(s) === App.addDays(t, 29), state: G.state(s), left: G.daysLeft(s), start: s.start === t }; }, pl);
+  check('abonnement AD-AAAA-0001 : mensuel 25 payé, facture « Salle de sport », début aujourd\'hui, fin dans 29 jours, état « Actif », 30 jours restants', /^AD-\d{4}-0001$/.test(s1.n) && near(s1.total, 25) && near(s1.paid, 25) && s1.src === 'Salle de sport' && s1.end && s1.start && s1.state === 'Actif' && s1.left === 30);
+  const s2 = await p.evaluate(pl => { const G = App.gym, s = G.sell({ clientId: 'c2', planId: pl.t, disc: 20, paid: 0 }), i = App.sales.get(s.invoiceId), st = G.stat(s); return { id: s.id, total: i.total, due: App.sales.due(i), lines: i.lines.length, end: G.end(s) === App.addDays(App.today(), 89) }; }, pl);
+  check('trimestriel avec remise de 20 % à crédit : 65 → 52 (2 lignes dont la remise), reste 52, fin dans 89 jours', near(s2.total, 52) && near(s2.due, 52) && s2.lines === 2 && s2.end);
+  const ch = await p.evaluate(pl => { const G = App.gym, t = App.today(), over = G.sell({ clientId: 'c1', planId: pl.m, start: App.addDays(t, 10) }).err, s3 = G.sell({ clientId: 'c1', planId: pl.m }); return { over, id: s3.id, start: s3.start === App.addDays(t, 30), end: G.end(s3) === App.addDays(t, 59), state: G.state(s3), cur: G.current('c1').id }; }, pl);
+  check('chevauchement refusé (début dans 10 jours) ; renouvellement sans date : commence à la suite (dans 30 jours), état « À venir » ; l\'abonnement courant reste le premier', ch.over && ch.over.includes('déjà un abonnement') && ch.start && ch.end && ch.state === 'À venir' && ch.cur === s1.id);
+  const cd = await p.evaluate(pl => { const G = App.gym, s = G.sell({ clientId: 'c3', planId: pl.c }); return { id: s.id, left: G.left(s), visits: s.visits, days: s.days }; }, pl);
+  check('carnet de 10 entrées : 10 entrées restantes, valable 120 jours', cd.left === 10 && cd.visits === 10 && cd.days === 120);
+  check('la formule est copiée dans l\'abonnement : changer le prix ensuite ne réécrit pas la vente', await p.evaluate(pl => { const G = App.gym, s = App.db.gmSubs[0], p = G.plan(pl.m), a = G.stat(s).total; p.price = 99; p.days = 5; const b = G.stat(s).total, e = G.end(s) === App.addDays(App.today(), 29); p.price = 25; p.days = 30; return a === b && e; }, pl));
+
+  // door
+  const dr = await p.evaluate(() => { const G = App.gym, a = G.checkIn('c1'), dup = G.checkIn('c1'), forced = G.checkIn('c1', true), none = G.checkIn('c3x'), c3 = G.checkIn('c3'), c4 = G.checkIn('c4'), c2 = G.checkIn('c2'); return { a: !a.err, dup: dup.err, dupFlag: dup.dup, forced: !forced.err, none: none.err, c3: !c3.err, c4: c4.err, c4b: c4.blocked, c2: !c2.err, today: G.visitsOn(App.today()).length }; });
+  check('entrée à l\'accueil : acceptée ; une 2e le même jour refusée (« déjà enregistré »), acceptée avec confirmation ; adhérent inconnu et adhérent sans abonnement refusés avec la raison', dr.a && dr.dup && dr.dup.includes('Déjà enregistré') && dr.dupFlag && dr.forced && dr.none && dr.c4 === 'Aucun abonnement' && dr.c4b && dr.c3 && dr.c2 && dr.today === 4);
+  const ex = await p.evaluate(cd => { const G = App.gym, s = G.sub(cd.id), left1 = G.left(s), used1 = G.used(s); for (let k = 1; k <= 9; k++) App.db.gmVisits.push({ id: 'v' + k, clientId: 'c3', subId: s.id, date: App.addDays(App.today(), -k), time: '18:00' }); const st = G.state(s), r = G.checkIn('c3', true); return { left1, used1, st, err: r.err, left: G.left(s) }; }, cd);
+  check('carnet : 9 entrées restantes après la 1re ; après 10 entrées l\'état est « Épuisé » et l\'entrée est refusée (« entrées épuisées »)', ex.left1 === 9 && ex.used1 === 1 && ex.st === 'Épuisé' && ex.err === 'Entrées épuisées' && ex.left === 0);
+
+  // freeze
+  const fz = await p.evaluate(s2 => { const G = App.gym, s = G.sub(s2.id), t = App.today(), bad = [G.freeze(s, t, 0), G.freeze(s, t, 40), G.freeze(s, App.addDays(t, -5), 3)].every(x => !!x.err), r = G.freeze(s, t, 10), end = G.end(s) === App.addDays(t, 99), st = G.state(s), blocked = G.checkIn('c2', true), over = G.freeze(s, App.addDays(t, 3), 2).err, more = G.freeze(s, App.addDays(t, 20), 25).err, un = G.unfreeze(s), after = { st: G.state(s), end: G.end(s) === App.addDays(t, 89), n: s.freezes.length }; G.freeze(s, App.addDays(t, 5), 10); return { bad, end, st, blocked: blocked.err, over, more, un, after, end2: G.end(s) === App.addDays(t, 99), st2: G.state(s) }; }, s2);
+  check('gel : 0 jour, plus de 30 jours et avant le début refusés ; 10 jours gelés : fin repoussée de 10 jours, état « Gelé », entrée refusée ; gel chevauchant et cumul au-delà de 30 jours refusés ; reprise : fin et état rétablis', fz.bad && fz.end && fz.st === 'Gelé' && fz.blocked === 'Abonnement gelé' && fz.over && fz.over.includes('déjà') && fz.more && fz.more.includes('limité') && fz.un && fz.after.st === 'Actif' && fz.after.end && fz.after.n === 0);
+  check('un gel dans le futur repousse la fin sans geler aujourd\'hui ; une formule de moins de 30 jours ne se gèle pas', fz.end2 && fz.st2 === 'Actif' && await p.evaluate(pl => { const G = App.gym, s = G.sell({ clientId: 'c4', planId: pl.e, paid: 0 }), r = G.freeze(s, App.today(), 1); G.cancel(s); return !!r.err && r.err.includes('moins de 30'); }, pl));
+
+  // single entries
+  const dp = await p.evaluate(() => { const G = App.gym, a = G.dropIn({}), i = App.sales.get(a.invoiceId), bad = G.dropIn({ paid: 2 }).err, c = G.dropIn({ clientId: 'c3', paid: 0 }), ci = App.sales.get(c.invoiceId); return { total: i.total, paid: App.sales.paid(i), src: i.source, drop: a.dropIn, bad, cdue: App.sales.due(ci), cid: c.id, today: G.visitsOn(App.today()).length }; });
+  check('entrée à la séance : 4 payés sans adhérent (facture « Salle de sport ») ; montant insuffisant sans adhérent refusé ; avec adhérent à crédit : reste 4', near(dp.total, 4) && near(dp.paid, 4) && dp.src === 'Salle de sport' && dp.drop && dp.bad && dp.bad.includes('insuffisant') && near(dp.cdue, 4) && dp.today === 6);
+  check('entrée annulée : retirée du compteur du jour, facture annulée', await p.evaluate(id => { const G = App.gym, v = App.db.gmVisits.find(x => x.id === id), i = App.sales.get(v.invoiceId); const r = G.cancelVisit(v); return r === true && !App.sales.live(i) && G.visitsOn(App.today()).length === 5; }, dp.cid));
+
+  // cancellation
+  const cx = await p.evaluate(pl => { const G = App.gym, s2 = App.db.gmSubs[1], s3 = App.db.gmSubs[2], a = G.cancel(s3), b = G.cancel(s2), c = G.sell({ clientId: 'c4', planId: pl.m, paid: 0 }), ci = App.sales.get(c.invoiceId), r = G.cancel(c), again = G.cancel(c); return { a, b, r, again, live: App.sales.live(ci), st: G.state(c) }; }, pl);
+  check('annulation refusée avec un paiement (« paid ») ou des entrées utilisées (« used ») ; un abonnement à crédit sans entrée s\'annule (facture annulée, 2e annulation sans effet)', cx.a === 'paid' && cx.b === 'used' && cx.r === true && cx.again === false && !cx.live && cx.st === 'Annulé');
+
+  // members to renew, lapsed, inactive
+  const ml = await p.evaluate(pl => { const G = App.gym, t = App.today(), a = G.sell({ clientId: 'c5', planId: pl.m, start: App.addDays(t, -27) }), b = G.sell({ clientId: 'c6', planId: pl.m, start: App.addDays(t, -30) }), x = G.checkIn('c6'); return { aEnd: G.end(a) === App.addDays(t, 2), aLeft: G.daysLeft(a), aSt: G.state(a), bSt: G.state(b), blocked: x.err, exp: G.expiring(7).map(s => s.clientId), lapsed: G.lapsed(14).map(s => s.clientId), inactive: G.inactive().map(m => m.id) }; }, pl);
+  check('adhérent dont l\'abonnement se termine dans 3 jours : à renouveler ; abonnement terminé hier : « Expiré », à relancer, entrée refusée avec la date ; adhérent actif sans visite depuis 2 semaines : inactif', ml.aEnd && ml.aLeft === 3 && ml.aSt === 'Actif' && ml.bSt === 'Expiré' && ml.blocked && ml.blocked.includes('expiré le') && JSON.stringify(ml.exp) === JSON.stringify(['c5']) && JSON.stringify(ml.lapsed) === JSON.stringify(['c6']) && JSON.stringify(ml.inactive) === JSON.stringify(['c5']));
+
+  // report, to-do
+  const rep = await p.evaluate(R => { const G = App.gym, c = G.report(eval('(' + R + ')')); return { n: c.n, sales: c.sales, drop: c.dropIn, by: c.by.map(x => [x.name, x.n]), visits: c.visits, active: c.active, expiring: c.expiring, lapsed: c.lapsed, inactive: c.inactive, due: c.due, today: c.today, dow: c.dow.reduce((a, b) => a + b, 0), todo: G.todo().map(x => x[0]) }; }, ALL);
+  check('rapport : 6 abonnements vendus (25 + 52 + 25 + 30 + 25 + 25 = 182) + 4 d\'entrée à la séance = 186 ; 14 entrées ; 3 adhérents actifs ; 1 à renouveler, 1 expiré, 1 inactif ; 52 à encaisser', rep.n === 6 && near(rep.sales, 186) && near(rep.drop, 4) && rep.visits === 14 && rep.active === 3 && rep.expiring === 1 && rep.lapsed === 1 && rep.inactive === 1 && near(rep.due, 52) && rep.today === 5 && rep.dow === 14);
+  check('« À faire » : à renouveler, expirés à relancer, à encaisser, absents depuis 2 semaines', rep.todo.some(x => x.includes('à renouveler')) && rep.todo.some(x => x.includes('à relancer')) && rep.todo.some(x => x.includes('à encaisser')) && rep.todo.some(x => x.includes('absent')));
+
+  // texts
+  check('textes : rappel, relance, bienvenue, paiement, rapport, carte d\'adhérent', await p.evaluate(() => { const G = App.gym, s = App.db.gmSubs[0], b = App.db.gmSubs.find(x => G.state(x) === 'Expiré'); return G.msg(s, 'remind').includes('Adhérent Un') && G.msg(b, 'lapsed').includes('terminé') && G.msg(s, 'welcome').includes('Bienvenue') && G.msg(App.db.gmSubs[1], 'pay').includes('52') && G.reportText({ from: '0000-01-01', to: '9999-12-31', label: 'tout' }).includes('Rapport salle de sport') && typeof G.printCard === 'function'; }));
+
+  // forms and screens
+  const n0 = await p.evaluate(() => App.db.gmSubs.length);
+  await p.evaluate(() => App.gym.sellForm()); await p.waitForSelector('.sheet [name=clientId]'); await settle(); await p.selectOption('.sheet [name=clientId]', 'c4');
+  check('formulaire d\'abonnement : total 25 et fin dans 29 jours annoncés', await p.evaluate(() => { const x = document.querySelector('.sheet #st').textContent.replace(/\s/g, ''); return x.includes('25,00'); }));
+  await p.fill('.sheet [name=disc]', '10'); check('remise de 10 % : total 22,50', await p.evaluate(() => document.querySelector('.sheet #st').textContent.replace(/\s/g, '').includes('22,50')));
+  await ok(); await p.waitForFunction(n => App.db.gmSubs.length === n + 1, n0); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
+  check('abonnement par le formulaire : Adhérent Quatre, mensuel à 22,50, payé', await p.evaluate(() => { const s = App.db.gmSubs[App.db.gmSubs.length - 1], st = App.gym.stat(s); return s.clientId === 'c4' && Math.abs(st.total - 22.5) < 0.005 && Math.abs(st.due) < 0.005; }));
+  const np = await p.evaluate(() => App.db.gmPlans.length);
+  await p.evaluate(() => App.gym.planForm()); await p.waitForSelector('.sheet [name=name]'); await settle(); await p.fill('.sheet [name=name]', 'Étudiant'); await p.fill('.sheet [name=days]', '30'); await p.fill('.sheet [name=price]', '18'); await ok(); await p.waitForFunction(n => App.db.gmPlans.length === n + 1, np); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
+  check('formule par le formulaire : Étudiant à 18, 30 jours, illimitée', await p.evaluate(() => { const q = App.db.gmPlans[App.db.gmPlans.length - 1]; return q.name === 'Étudiant' && q.price === 18 && q.days === 30 && q.visits === 0; }));
+  await p.evaluate(() => App.gym.sellForm({ clientId: 'c7' })); await p.waitForSelector('.sheet [name=planId]'); await settle(); await ok(); await p.waitForFunction(n => App.db.gmSubs.length === n + 2, n0); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
+  await go('door'); const v0 = await p.evaluate(() => App.db.gmVisits.length); await p.fill('#dq', 'Sept'); await p.click('[data-in]'); await p.waitForFunction(n => App.db.gmVisits.length === n + 1, v0);
+  check('accueil : recherche « Sept », bouton « Entrée » : entrée enregistrée et confirmée à l\'écran', (await p.locator('#gtab').textContent()).includes('entrée enregistrée'));
+  await go('door'); await p.fill('#dq', 'Six'); await p.click('[data-in]'); check('accueil : adhérent expiré — l\'écran affiche le refus avec la raison', (await p.locator('#gtab').textContent()).includes('expiré le'));
+  await p.evaluate(() => App.gym.memberSheet('c1')); await p.waitForSelector('.sheet-wrap.on .hero'); check('fiche d\'adhérent : jours restants affichés', (await p.locator('.sheet-wrap.on .hero').textContent()).includes(' j')); await p.keyboard.press('Escape'); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
+  for (const tab of ['door', 'members', 'plans', 'rep']) { await go(tab); check('onglet ' + tab + ' s\'affiche sans erreur', (await p.locator('#gtab').innerHTML()).length > 80); }
+  await go('members'); await p.fill('#mq', 'zzzqq'); check('recherche d\'adhérent : aucun résultat', (await p.locator('#gtab .empty').count()) === 1);
+  check('Synchro : les collections sont partagées', await p.evaluate(() => ['gmPlans', 'gmSubs', 'gmVisits'].every(k => Array.isArray(App.db[k]))));
+  check('aucune erreur JS', t.errors.length === 0, t.errors.join(' | '));
+  await t.browser.close();
+})().catch(e => { console.log('FAIL exception → ' + e.message); process.exit(1); });
