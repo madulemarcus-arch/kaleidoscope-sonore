@@ -126,7 +126,7 @@
   App.actions.users_edit = d => userForm(App.users().find(u => u.id === d.id));
   const userForm = (u, role) => {
     const isNew = !u; u = u || { name: '', role: ROLES[role] ? role : 'vendeur', active: true };
-    App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.sel('f_tech', 'Fiche technicien liée (profil Technicien)', [['', '— Aucune —'], ...App.db.technicians.map(t => [t.id, t.name])], u.techId || '')}${F.text('f_pin', isNew ? 'Code PIN (6 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="6" autocomplete="off"')}
+    App.modal(isNew ? 'Nouveau profil' : 'Modifier le profil', `${F.text('f_name', 'Nom', u.name)}${F.sel('f_role', 'Profil', roleOpts, u.role)}${F.sel('f_tech', 'Fiche technicien liée (profil Technicien)', [['', '— Aucune —'], ...App.db.technicians.map(t => [t.id, t.name])], u.techId || '')}${F.sel('f_hp', 'Numéros de téléphone des clients (profils autres que gérant)', [['0', 'Visibles'], ['1', 'Masqués : points, sans Appeler ni WhatsApp']], u.hidePhone ? '1' : '0')}${F.num('f_cap', 'Plafond par facture ou encaissement, en $ (vide = aucun). Au-delà : accord du gérant par son code PIN', u.cap || '')}${F.text('f_pin', isNew ? 'Code PIN (6 chiffres)' : 'Nouveau code PIN (laisser vide = inchangé)', '', 'type="tel" inputmode="numeric" maxlength="6" autocomplete="off"')}
       ${isNew ? '' : F.sel('f_act', 'Statut', [['1', 'Actif'], ['0', 'Désactivé']], u.active === false ? '0' : '1')}<p id="f_msg" class="warn"></p>${isNew ? '' : `<div class="bar"><button type="button" class="btn sm del" data-act="users_del" data-id="${u.id}">Supprimer ce profil</button></div>`}`, () => {
       const name = App.v('f_name'), pin = App.v('f_pin'), rl = App.v('f_role'), active = isNew || App.v('f_act') !== '0';
       const bad = m => { $('f_msg').textContent = m; return false; };
@@ -135,7 +135,7 @@
       if (!isNew && u.role === 'admin' && (rl !== 'admin' || !active) && !admins) return bad('Il faut garder au moins un administrateur actif');
       (async () => {
         if (pin && await clash(pin, u.id)) { $('f_msg').textContent = 'Ce code est déjà utilisé par un autre profil'; return; }
-        Object.assign(u, { name, role: rl, active, techId: App.v('f_tech') }); if (pin) u.pin = { ...(await mkPin(pin)), ...(u.pin && u.pin.rec ? { rec: u.pin.rec } : {}) };
+        Object.assign(u, { name, role: rl, active, techId: App.v('f_tech'), hidePhone: rl !== 'admin' && App.v('f_hp') === '1', cap: rl !== 'admin' ? Math.max(0, Math.round(App.n('f_cap') * 100) / 100) : 0 }); if (pin) u.pin = { ...(await mkPin(pin)), ...(u.pin && u.pin.rec ? { rec: u.pin.rec } : {}) };
         if (isNew) { u.id = App.uid(); S().users = [...App.users(), u]; }
         else S().users = App.users().map(x => x.id === u.id ? u : x);
         App.save(); App.close(); App.toast('Profil enregistré'); App.refresh();

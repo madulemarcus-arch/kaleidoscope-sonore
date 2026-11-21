@@ -39,7 +39,7 @@
   const short = v => { const s = typeof v === 'string' ? v : JSON.stringify(v); return v === '' || v == null || v === undefined ? '—' : s.length > 28 ? s.slice(0, 27) + '…' : s; };
   let snap = null; // { coll: Map(key -> json) }, users: json, rate
   const keyOf = it => it && (it.id || it.ts || it.date);
-  const take = () => { const db = App.db, s = { users: JSON.stringify((db.settings.users || []).map(u => ({ id: u.id, name: u.name, role: u.role, active: u.active }))), rate: db.settings.rate }; COLLS.forEach(c => { const m = new Map(); (db[c] || []).forEach(it => { const k = keyOf(it); if (k != null) m.set(k, JSON.stringify(it)); }); s[c] = m; }); return s; };
+  const take = () => { const db = App.db, s = { users: JSON.stringify((db.settings.users || []).map(u => ({ id: u.id, name: u.name, role: u.role, active: u.active, hp: !!u.hidePhone, cap: +u.cap || 0 }))), rate: db.settings.rate }; COLLS.forEach(c => { const m = new Map(); (db[c] || []).forEach(it => { const k = keyOf(it); if (k != null) m.set(k, JSON.stringify(it)); }); s[c] = m; }); return s; };
   App.auditReset = () => { snap = take(); };
   const list = () => (App.db.audit = App.db.audit || []);
   const push = (e) => { const me = App.me() || {}, now = new Date(); list().push({ ts: Date.now(), date: App.today(), t: now.toTimeString().slice(0, 5), by: me.name || 'Administrateur', role: me.role || 'admin', uid: me.id || '', ...e }); if (list().length > MAX) list().splice(0, list().length - MAX); };
@@ -66,7 +66,7 @@
       prev.forEach((json, k) => { if (now.has(k)) return; try { const o = JSON.parse(json); push({ kind: 'del', coll: c, text: 'a supprimé ' + d(o) }); } catch (e) {} }); });
     if (cur.rate !== snap.rate && snap.rate != null) push({ kind: 'edit', coll: 'settings', text: `a changé le taux du jour : ${snap.rate} → ${cur.rate} CDF` });
     if (cur.users !== snap.users) { const a = JSON.parse(snap.users), b = JSON.parse(cur.users);
-      b.forEach(u => { const p = a.find(x => x.id === u.id); if (!p) push({ kind: 'add', coll: 'users', text: `a créé le profil ${u.name} (${u.role})` }); else if (p.role !== u.role || p.active !== u.active) push({ kind: 'edit', coll: 'users', text: `a modifié le profil ${u.name} (${u.role}${u.active === false ? ', désactivé' : ''})` }); });
+      b.forEach(u => { const p = a.find(x => x.id === u.id); if (!p) push({ kind: 'add', coll: 'users', text: `a créé le profil ${u.name} (${u.role})` }); else if (p.role !== u.role || p.active !== u.active || p.hp !== u.hp || p.cap !== u.cap) push({ kind: 'edit', coll: 'users', text: `a modifié le profil ${u.name} (${u.role}${u.active === false ? ', désactivé' : ''}${u.hp ? ', numéros masqués' : ''}${u.cap ? ', plafond ' + u.cap + ' $' : ''})` }); });
       a.forEach(u => { if (!b.find(x => x.id === u.id)) push({ kind: 'del', coll: 'users', text: `a supprimé le profil ${u.name}` }); }); }
     snap = take(); // includes the entries just added? no: entries live in db.audit, not tracked
   };
