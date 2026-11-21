@@ -1,7 +1,7 @@
 // Core: global App object, data store (localStorage + IndexedDB mirror), migration, helpers.
 (function () {
   const LS = 'biz.db', IDB = 'biz-manager', STORE = 'kv', VERSION = 1;
-  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v55', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
+  const App = window.App = { NAME: 'CISPOLstore Business', BUILD: 'business-v56', DB_VERSION: VERSION, views: {}, mods: {}, hooks: {}, ready: null };
 
   // ---------- helpers ----------
   App.$ = (s, r) => (r || document).querySelector(s);
@@ -66,7 +66,7 @@
     jardinage: { label: 'Jardinage & paysagisme', modules: ['garden', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
     autoecole: { label: 'Auto-école & permis', modules: ['driving', 'sales', 'cash', 'team'], vocab: { client: 'élève', product: 'prestation', sub: 'abonnement' } },
     imprimerie: { label: 'Imprimerie & papeterie', modules: ['printing', 'sales', 'stock', 'purchases', 'cash', 'team'], vocab: { client: 'client', product: 'article', sub: 'abonnement' } },
-    cabinet: { label: 'Cabinet', modules: ['sales', 'services', 'contracts', 'cash'], vocab: { client: 'patient', product: 'prestation', sub: 'contrat' } },
+    cabinet: { label: 'Cabinet médical', modules: ['clinic', 'sales', 'cash', 'team'], vocab: { client: 'patient', product: 'acte', sub: 'abonnement' } },
     conseil: { label: 'Cabinet de conseil, juridique & comptable', modules: ['firm', 'sales', 'cash', 'team'], vocab: { client: 'client', product: 'prestation', sub: 'mission' } },
     pressing: { label: 'Pressing & blanchisserie', modules: ['laundry', 'sales', 'delivery', 'cash', 'team'], vocab: { client: 'client', product: 'prestation', sub: 'forfait' } },
     sport: { label: 'Salle de sport & fitness', modules: ['gym', 'sales', 'cash', 'team'], vocab: { client: 'adhérent', product: 'formule', sub: 'abonnement' } },
