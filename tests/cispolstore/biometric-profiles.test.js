@@ -7,7 +7,8 @@ let f = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + 
   const cdp = await ctx.newCDPSession(p); await cdp.send('WebAuthn.enable');
   const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: false, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   const pin = async d => { for (const c of d) await p.click(`#lock [data-k="${c}"]`); };
-  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.addInitScript(() => { try { localStorage.setItem('cispol.lockkb', '0'); } catch (e) {} });
+await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   await p.evaluate(async () => { const mk = async (id, name, role, code) => { const salt = 's' + id; return { id, name, role, active: true, pin: { salt, hash: await App.hash(salt + code) } }; };
     App.db.settings.users = [await mk('u1', 'Chef', 'admin', '1111'), await mk('u2', 'Awa', 'comptable', '2222')]; App.user = App.users()[0]; App.applyRole(); App.save(); App.go('profile'); }); await p.waitForTimeout(500);
   const txt = () => p.evaluate(() => document.getElementById('view').innerText);

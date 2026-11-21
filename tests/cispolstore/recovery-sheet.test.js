@@ -6,7 +6,8 @@ let f = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + 
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }), p = await (await b.newContext({ ...devices['Pixel 5'] })).newPage(), errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   const pin = async d => { for (const c of d) await p.click(`#lock [data-k="${c}"]`); await p.waitForTimeout(250); };
-  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.addInitScript(() => { try { localStorage.setItem('cispol.lockkb', '0'); } catch (e) {} });
+await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   await p.evaluate(() => { App.db.settings.company.name = 'Ma Boutique'; App.save(); App.showLock('new1', 'setup'); }); await p.waitForTimeout(200);
   await pin('135790'); await pin('135790'); await p.waitForTimeout(300);
   let t = await p.innerText('#lock');
