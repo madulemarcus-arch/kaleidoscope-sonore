@@ -11,6 +11,7 @@
     services: '<path class="f s" d="M14.7 6.3a4.2 4.2 0 0 0-5.4 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4.2 4.2 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>',
     mm: '<rect class="f s" x="6.5" y="2.8" width="10" height="18.4" rx="2.4"/><path class="s" d="M10.2 18.2h2.6"/><path class="s" d="M3 9.2h6M6.2 6.6 9 9.2 6.2 11.8M21 14.8h-6M17.8 12.2 15 14.8l2.8 2.6"/>',
     transport: '<path class="f s" d="M2.5 6h11v10.2h-11z"/><path class="f s" d="M13.5 9.4h4.2l3.8 3.8v3h-8z"/><circle class="f s" cx="6.5" cy="17.8" r="2.1"/><circle class="f s" cx="17" cy="17.8" r="2.1"/><path class="s" d="M5.5 9.2h5.5M5.5 12h3.5"/>',
+    printing: '<path class="f s" d="M7 9V4h10v5M6 17H4v-6h16v6h-2M7 14h10v6H7z"/>',
     driving: '<path class="f s" d="M5 16v-3l2-5h10l2 5v3zM7 12h10M7.5 16v2M16.5 16v2"/>',
     garden: '<path class="f s" d="M12 20v-8M12 13c0-4 3-6 7-6 0 4-3 6-7 6zM12 16c0-3-2-5-6-5 0 3 2 5 6 5z"/>',
     bakery: '<path class="f s" d="M4 14c0-4 3.5-7 8-7s8 3 8 7v3H4zM8 11l1 2M12 10v3M16 11l-1 2"/>',
