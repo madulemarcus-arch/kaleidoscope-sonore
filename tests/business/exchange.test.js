@@ -53,9 +53,9 @@ const { check, launch, setup } = require('./helper');
   // screens
   await p.evaluate(() => App.exchange.tradeForm()); await p.waitForSelector('.sheet [name=give]'); await settle(); await p.selectOption('.sheet [name=give]', 'USD'); await p.selectOption('.sheet [name=get]', 'CDF'); await p.fill('.sheet [name=amount]', '10');
   check('formulaire : la cotation s\'affiche (10 USD → 27 900 CDF)', await p.evaluate(() => { const t = document.querySelector('.sheet #qt').textContent.replace(/\s/g, ''); return t.includes('Cotation') && t.includes('27900'); }));
-  await ok(); await p.waitForFunction(() => App.db.xcOps.filter(o => o.kind === 'trade').length === 6); await p.waitForSelector('.sheet-wrap', { state: 'detached' }).catch(() => {});
+  await ok(); await p.waitForFunction(() => App.db.xcOps.filter(o => o.kind === 'trade').length === 6); await p.waitForSelector('.sheet-wrap', { state: 'detached' });
   check('opération par le formulaire : 10 USD → 27 900 CDF', await p.evaluate(() => { const o = App.db.xcOps.filter(x => x.kind === 'trade').pop(); return o.g.amt === 10 && o.r.amt === 27900; }));
-  await p.evaluate(() => App.exchange.rateForm('EUR')); await p.waitForSelector('.sheet [name=buy]'); await settle(); await p.fill('.sheet [name=buy]', '3010'); await p.fill('.sheet [name=sell]', '3110'); await ok(); await p.waitForFunction(() => App.exchange.rate('EUR').buy === 3010);
+  await p.evaluate(() => App.exchange.rateForm('EUR')); await p.waitForSelector('.sheet-wrap.on [name=buy]'); await settle(); await p.fill('.sheet [name=buy]', '3010'); await p.fill('.sheet [name=sell]', '3110'); await ok(); await p.waitForFunction(() => App.exchange.rate('EUR').buy === 3010);
   check('cotation par le formulaire : EUR 3 010 / 3 110', await p.evaluate(() => App.exchange.rate('EUR').sell === 3110));
   for (const tab of ['till', 'rates', 'ops', 'rep']) { await go(tab); check('onglet ' + tab + ' s\'affiche sans erreur', (await p.locator('#gtab').innerHTML()).length > 80); }
   check('Synchro : les collections sont partagées', await p.evaluate(() => ['xcRates', 'xcOps'].every(k => Array.isArray(App.db[k]))));
