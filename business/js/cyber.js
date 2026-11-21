@@ -21,7 +21,8 @@
   // ---------- sessions ----------
   CY.running = sid => ops().filter(o => o.kind === 'session' && o.status === 'En cours' && (!sid || o.stationId === sid));
   CY.elapsed = (s, now) => Math.max(0, ((now || Date.now()) - s.start) / 60000);
-  CY.billed = (s, minutes) => { const c = CY.cfg(), m = Math.ceil(Math.max(0, minutes) / c.step - 1e-9) * c.step; return Math.max(c.minMin, m); };
+  CY.GRACE = 10 / 60; // seconds of tolerance (in minutes) before the next step is billed
+  CY.billed = (s, minutes) => { const c = CY.cfg(), m = Math.ceil(Math.max(0, minutes - CY.GRACE) / c.step - 1e-9) * c.step; return Math.max(c.minMin, m); };
   CY.price = (st, minutes) => st.unit === 'minute' ? rd(st.rate * minutes) : rd(st.rate * minutes / 60);
   const nextNo = () => A.nextNo('CC', 'cc', () => ops());
   const mkInv = (cid, lines, paid, mode, note) => A.createInvoice({ clientId: cid || '', lines, paid: Math.max(0, paid || 0), mode: mode || db().settings.modes[0], date: App.today(), source: 'Cyber', note });
