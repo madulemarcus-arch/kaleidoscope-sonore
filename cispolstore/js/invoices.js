@@ -192,6 +192,7 @@
           st.f = 'pro'; App.go('invoices'); setTimeout(() => App.actions.pro_open({ id: pf.id }), 80); return;
         }
         const total = lines.reduce((a, l) => a + l.qty * l.price, 0);
+        if (App.capGate && !App.capGate(App.conv(total, curr, 'USD', frate()), 'une facture', () => $('dok').click())) return false;   // profile ceiling: the manager's PIN is asked above it
         const rate = frate(); if (rate !== App.rate()) App.setRate(rate);
         const pc = App.v('f_pcur') || curr, given = App.n('f_paid'), gInv = App.conv(given, pc, curr, rate), payAmount = given > 0 ? (gInv > total ? round(App.conv(total, curr, pc, rate), pc) : given) : 0;
         const prevSub = c ? { start: c.start || '', period: c.period, price: c.price } : null;
@@ -463,6 +464,7 @@
         let amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
         const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
         if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > bal(i) + 0.004 && bal(i) > 0.004) amt = Math.round(App.conv(bal(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
+        if (App.capGate && !App.capGate(App.conv(amt, App.v('f_cur'), 'USD', rate), 'un encaissement', () => $('dok').click())) return false;
         if (rate !== App.rate()) App.setRate(rate);
         db.payments.push({ rcpt: 'todo', id: App.uid(), date: App.v('f_date') || App.today(), clientId: cid, invoiceId: i ? i.id : '', amount: amt, currency: App.v('f_cur'), rate, mode: App.v('f_mode'), ref: App.v('f_ref'), comment: App.v('f_com') });
         App.log(cid, `Paiement ${App.fmt(amt, App.v('f_cur'))} (${App.v('f_mode')})${i ? ' · ' + i.number : ''}`);
@@ -494,6 +496,7 @@
         if (!(amt > 0)) { App.toast('Montant invalide'); return false; }
         if (amt > tot + 0.004) { App.toast(`Le montant ne peut pas dépasser le total (${App.fmt(tot, cur)})`); return false; }
         if (amt < got - 0.004) { App.toast(`Le client a déjà donné ${App.fmt(got, cur)} d'acompte : le montant ne peut pas être plus bas`); return false; }
+        if (App.capGate && !App.capGate(App.conv(amt, cur, 'USD', App.rateOf(i)), 'une vente', () => $('dok').click())) return false;
         App.validateInvoice(i.id); const now = Math.round((amt - got) * 100) / 100; let np = null;
         if (now > 0.004) { np = { rcpt: 'todo', id: App.uid(), date: App.v('hg_date') || App.today(), clientId: i.clientId, invoiceId: i.id, amount: now, currency: cur, rate: App.rateOf(i), mode: App.v('hg_mode'), ref: '', comment: 'Prix négocié' }; App.db.payments.push(np); App.log(i.clientId, `Paiement ${App.fmt(now, cur)} (${np.mode}) · ${i.number}`); }
         if (amt < tot - 0.004) { i.agreed = amt; App.log(i.clientId, `Prix négocié sur ${i.number} : ${App.fmt(amt, cur)} au lieu de ${App.fmt(tot, cur)}`); }
