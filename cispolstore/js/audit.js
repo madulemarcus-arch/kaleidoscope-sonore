@@ -44,6 +44,8 @@
   const list = () => (App.db.audit = App.db.audit || []);
   const push = (e) => { const me = App.me() || {}, now = new Date(); list().push({ ts: Date.now(), date: App.today(), t: now.toTimeString().slice(0, 5), by: me.name || 'Administrateur', role: me.role || 'admin', uid: me.id || '', ...e }); if (list().length > MAX) list().splice(0, list().length - MAX); };
   App.audit = (kind, text, extra) => push({ kind, text, ...(extra || {}) });
+  // security events (wrong codes, PIN / fingerprint / encryption changes, data leaving the phone): saved at once, shown with a red lock in the journal
+  App.secLog = (text, extra) => { try { push({ kind: 'sec', coll: 'security', text, ...(extra || {}) }); App.save(); } catch (e) {} };
   const changes = (a, b, coll) => { const out = []; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => { if (IGNORE.has(k) || (coll === 'products' && k === 'qty')) return; const x = JSON.stringify(a[k]), y = JSON.stringify(b[k]); if (x === y) return;
     if (typeof a[k] === 'object' && a[k] !== null || typeof b[k] === 'object' && b[k] !== null) out.push([LABEL[k] || k, 'modifié', '']); else out.push([LABEL[k] || k, short(a[k]), short(b[k])]); }); return out; };
   const diff = () => {
@@ -73,28 +75,39 @@
   // who opened the app
   const login0 = App.me_login;
   if (login0) App.me_login = u => { const same = App.user && App.user.id === u.id; const r = login0(u); if (!same) push({ kind: 'login', coll: 'session', text: 'a ouvert sa session', by: u.name, role: u.role, uid: u.id }); return r; };
+  // fingerprint and encryption changes
+  if (App.bio) { const en = App.bio.enroll, off = App.bio.off;
+    App.bio.enroll = async (...a) => { const had = App.bio.mine(); const r = await en(...a); if (!had && App.bio.mine()) App.secLog('a activé l\'empreinte sur ce téléphone'); return r; };
+    App.bio.off = (...a) => { const had = App.bio.mine(), r = off(...a); if (had) App.secLog('a désactivé l\'empreinte sur ce téléphone'); return r; }; }
+  if (window.__enc && window.__enc.enable) { const E = window.__enc, w = (k, t) => { const f = E[k]; E[k] = async (...a) => { const r = await f(...a); App.secLog(t); return r; }; };
+    w('enable', 'a activé le chiffrement des données de ce téléphone'); w('change', 'a changé le mot de passe de chiffrement'); w('disable', 'a désactivé le chiffrement des données de ce téléphone');
+    // wrong passphrases typed on the unlock screen before the app was opened
+    if (E.prevFails) setTimeout(() => { const n = E.prevFails; E.prevFails = 0; App.secLog(`Ouverture réussie après ${n} mauvais essai(s) du mot de passe de chiffrement`, { by: 'Écran de verrouillage', role: 'lock', fail: 1 }); }, 800); }
   document.addEventListener('DOMContentLoaded', () => {});
   setTimeout(() => { if (!snap && App.db) snap = take(); }, 0);
 
   // ---------- journal view (administrator) ----------
   const st = { who: 'all', kind: 'all', per: '7', q: '' };
-  const KIND = { add: ['➕', 'ok', 'Créations'], edit: ['✏️', 'warn', 'Modifications'], del: ['🗑', 'bad', 'Suppressions'], pay: ['💰', 'ok', 'Encaissements'], login: ['🔑', '', 'Connexions'] };
-  const ROLE = { admin: 'Administrateur', comptable: 'Comptable', vendeur: 'Vendeur', technicien: 'Technicien', livreur: 'Livreur' };
+  const KIND = { add: ['➕', 'ok', 'Créations'], edit: ['✏️', 'warn', 'Modifications'], del: ['🗑', 'bad', 'Suppressions'], pay: ['💰', 'ok', 'Encaissements'], login: ['🔑', '', 'Connexions'], sec: ['🔐', 'bad', 'Sécurité'] };
+  const ROLE = { admin: 'Administrateur', comptable: 'Comptable', vendeur: 'Vendeur', technicien: 'Technicien', livreur: 'Livreur', lock: 'Écran de verrouillage' };
   const visible = () => { const q = st.q.toLowerCase(), from = st.per === 'all' ? '' : App.addDays(App.today(), -(+st.per - 1));
     return list().filter(e => (st.who === 'all' || e.by === st.who) && (st.kind === 'all' || e.kind === st.kind) && (!from || e.date >= from) && (!q || (e.by + ' ' + e.text).toLowerCase().includes(q))).slice().reverse(); };
   const drawRows = () => { const l = visible().slice(0, 300), days = [];
     l.forEach(e => { let g = days[days.length - 1]; if (!g || g.d !== e.date) { g = { d: e.date, l: [] }; days.push(g); } g.l.push(e); });
     $('jlist').innerHTML = l.length ? days.map(g => `<h2 class="sec">${esc(App.dayLabel(g.d))}</h2><div class="list">${g.l.map(e => { const k = KIND[e.kind] || KIND.edit;
       return `<button class="item" data-act="jr_open" data-i="${list().indexOf(e)}"><span class="avatar ${k[1]}">${k[0]}</span><div class="grow"><span style="font-weight:800">${esc(e.by)}</span> ${esc(e.text)}<small>${esc(e.t || '')} · ${esc(ROLE[e.role] || e.role)}</small></div><span class="mut">›</span></button>`; }).join('')}</div>`).join('') + (visible().length > 300 ? '<p class="mut" style="text-align:center">Affichage des 300 plus récentes : affinez avec les filtres.</p>' : '') : '<div class="empty big"><div class="ei">🕵️</div><b>Aucune activité</b><p class="mut">Les créations, modifications, suppressions et encaissements apparaîtront ici.</p></div>'; };
+  // red alert at the top when wrong codes were typed this week
+  const alertCard = week => { const f = week.filter(e => e.kind === 'sec' && e.fail), n = f.reduce((a, e) => a + 1, 0); if (!n) return ''; const l = f[f.length - 1];
+    return `<div class="card" style="border-left:5px solid var(--bad,#c0392b)"><b>⚠️ ${n} mauvais essai(s) de code cette semaine</b><div class="mut" style="margin-top:4px">Dernier : ${App.fdate(l.date)} à ${esc(l.t || '')}. Si ce n'était pas vous, changez le code PIN et gardez le téléphone sous clé.</div><button class="btn sm sec" style="margin-top:8px" data-act="jr_f" data-k="kind" data-v="sec">Voir la sécurité</button></div>`; };
   App.views.journal = () => {
     const all = list(), today = all.filter(e => e.date === App.today()), week = all.filter(e => e.date >= App.addDays(App.today(), -6)), dels = week.filter(e => e.kind === 'del').length;
     const by = {}; today.forEach(e => { by[e.by] = (by[e.by] || 0) + 1; }); const top = Object.entries(by).sort((a, b) => b[1] - a[1])[0], people = [...new Set(all.map(e => e.by))];
     return {
       title: 'Journal d\'activité', sub: `${today.length} action(s) aujourd'hui`, back: 'more', nav: 'more',
-      html: `<section class="hero dhero"><div class="hero-top"><div><small>🕵️ Actions aujourd'hui</small><div class="hero-num" data-count="${today.length}" data-int="1">${today.length}</div></div></div>
+      html: `${alertCard(week)}<section class="hero dhero"><div class="hero-top"><div><small>🕵️ Actions aujourd'hui</small><div class="hero-num" data-count="${today.length}" data-int="1">${today.length}</div></div></div>
           <div class="cstats"><div><b style="font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${top ? esc(top[0]) : '—'}</b><small>le plus actif</small></div><div class="${dels ? 'bad' : ''}"><b>${dels}</b><small>suppression(s) / 7 j</small></div><div><b>${all.length}</b><small>au total</small></div></div></section>
         <div class="search"><input id="jq" placeholder="Rechercher (facture, client, personne…)" value="${esc(st.q)}" autocomplete="off"></div>
-        <div class="chips">${[['all', 'Tout'], ['add', '➕ Créations'], ['edit', '✏️ Modifs'], ['del', '🗑 Suppressions'], ['pay', '💰 Encaissements'], ['login', '🔑 Connexions']].map(([k, t]) => `<button class="chip ${st.kind === k ? 'on' : ''}" data-act="jr_f" data-k="kind" data-v="${k}">${t}</button>`).join('')}</div>
+        <div class="chips">${[['all', 'Tout'], ['add', '➕ Créations'], ['edit', '✏️ Modifs'], ['del', '🗑 Suppressions'], ['pay', '💰 Encaissements'], ['login', '🔑 Connexions'], ['sec', '🔐 Sécurité']].map(([k, t]) => `<button class="chip ${st.kind === k ? 'on' : ''}" data-act="jr_f" data-k="kind" data-v="${k}">${t}</button>`).join('')}</div>
         <div class="chips">${[['1', "Aujourd'hui"], ['7', '7 jours'], ['30', '30 jours'], ['all', 'Tout']].map(([k, t]) => `<button class="chip ${st.per === k ? 'on' : ''}" data-act="jr_f" data-k="per" data-v="${k}">${t}</button>`).join('')}</div>
         ${people.length > 1 ? `<div class="chips"><button class="chip ${st.who === 'all' ? 'on' : ''}" data-act="jr_f" data-k="who" data-v="all">Tout le monde</button>${people.map(p => `<button class="chip ${st.who === p ? 'on' : ''}" data-act="jr_f" data-k="who" data-v="${esc(p)}">👤 ${esc(p)}</button>`).join('')}</div>` : ''}
         <div id="jlist"></div>`,

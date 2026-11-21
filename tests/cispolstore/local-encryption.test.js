@@ -24,6 +24,7 @@ const SECRET = 'Zéphyrine-Confidentielle', SYNC = JSON.stringify({ key: 'CLE-SY
   await p.fill('#enc_p2', 'phrase-secrete-1'); await p.click('#dok'); await p.waitForTimeout(1500);
   await p.evaluate(() => window.__enc.flush());
   ok('encryption is on', await p.evaluate(() => window.__enc.on));
+  ok('enabling the encryption is written in the security journal', await p.evaluate(() => (App.db.audit || []).some(e => e.kind === 'sec' && /activé le chiffrement/.test(e.text))));
   d = await dump();
   ok('NOTHING readable is left: no client name, no sync key, no plain data key, no IndexedDB mirror', !d.ls.includes(SECRET) && !d.ls.includes('CLE-SYNC') && !d.keys.includes('cispolstore-v2') && !d.keys.includes('cispolstore-sync') && !d.idb.includes(SECRET) && d.keys.includes('cispolstore-enc'), JSON.stringify(d.keys));
   ok('the application still reads its secret settings (served from memory)', await p.evaluate(s => localStorage.getItem('cispolstore-sync') === s, SYNC));
@@ -36,6 +37,7 @@ const SECRET = 'Zéphyrine-Confidentielle', SYNC = JSON.stringify({ key: 'CLE-SY
   ok('a wrong passphrase is refused, the app stays closed', await p.evaluate(() => !window.App && !!document.getElementById('gp')));
   await unlock('phrase-secrete-1'); await booted();
   ok('the right passphrase starts the application with ALL the data (both clients)', await p.evaluate(() => App.db.clients.length === 2 && !!App.client('c2')));
+  await p.waitForTimeout(1500); ok('the wrong passphrase typed before the opening is reported in the journal', await p.evaluate(() => (App.db.audit || []).some(e => e.kind === 'sec' && e.fail && /mauvais essai\(s\) du mot de passe/.test(e.text))));
   ok('no PIN screen on top of the passphrase', await p.evaluate(() => document.getElementById('lock').hidden));
   ok('secret settings are back for the application (sync, gmail)', await p.evaluate(s => localStorage.getItem('cispolstore-sync') === s && /a@example.test/.test(localStorage.getItem('cispolstore-gmail')), SYNC));
   d = await dump(); ok('still nothing readable at rest after the restart', !d.ls.includes(SECRET) && !d.ls.includes('CLE-SYNC') && !d.keys.includes('cispolstore-v2'));

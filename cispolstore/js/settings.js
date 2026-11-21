@@ -119,7 +119,7 @@
       if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Sauvegarde CISPOLstore' });
       else App.download(name, txt, 'application/json');
     } catch (e) { if (e.name === 'AbortError') return; App.download(name, txt, 'application/json'); }
-    App.db.settings.lastBackup = App.today(); delete App.db.settings.bkSnooze; App.save(); const v = App.verifyBackup ? App.verifyBackup(plain) : null;
+    if (App.secLog) App.secLog('a exporté une sauvegarde des données'); App.db.settings.lastBackup = App.today(); delete App.db.settings.bkSnooze; App.save(); const v = App.verifyBackup ? App.verifyBackup(plain) : null;
     App.toast(!v ? 'Sauvegarde créée' : v.ok ? `Sauvegarde créée et vérifiée ✔ (${v.clients} clients, ${v.invoices} factures)` : '⚠ Sauvegarde incomplète : ' + v.bad.join(', ')); App.refresh();
   };
   // Restore from backup text (file or Google Drive)
@@ -136,6 +136,7 @@
       if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return false;
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
       d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, decor: keep.decor, bgs: keep.bgs, fx: keep.fx, lockMin: keep.lockMin };
+      d.audit = App.db.audit || d.audit;   // the journal of this phone is never replaced by an older one
       App.db = d; if (App.auditReset) { App.auditReset(); App.audit('edit', 'a restauré une sauvegarde (toutes les données remplacées)'); } App.save(); App.applyTheme(); App.toast('Données restaurées'); App.refresh(); return true;
     } catch (e) { App.toast('Fichier de sauvegarde invalide'); return false; }
   };
@@ -155,7 +156,7 @@
   };
   App.actions.csvdo = d => {
     const S = App.tables();
-    App.download(`cispolstore-${d.k}-${App.today()}.csv`, App.csv(S[d.k].rows), 'text/csv'); App.close();
+    if (App.secLog) App.secLog(`a exporté les ${d.k} en CSV`); App.download(`cispolstore-${d.k}-${App.today()}.csv`, App.csv(S[d.k].rows), 'text/csv'); App.close();
   };
-  App.actions.xlsx = () => { App.download(`cispolstore-${App.today()}.xlsx`, App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); App.toast('Fichier Excel créé'); };
+  App.actions.xlsx = () => { if (App.secLog) App.secLog('a exporté les données en Excel'); App.download(`cispolstore-${App.today()}.xlsx`, App.makeXlsx(App.reportSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); App.toast('Fichier Excel créé'); };
 })();

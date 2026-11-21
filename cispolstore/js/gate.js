@@ -92,7 +92,7 @@
       if (n >= 10 && E.wipeOpt()) { await E.wipe(); msg('Trop d\'essais : les données de ce téléphone ont été effacées.'); setTimeout(() => location.reload(), 1500); return; }
       $('gp').value = ''; $('gb').disabled = false; msg('Mot de passe incorrect' + (E.wipeOpt() && n >= 5 ? ` (${10 - n} essai(s) avant l'effacement des données de ce téléphone)` : '')); tick(); return;
     }
-    r.call(localStorage, FAIL);
+    E.prevFails = f.n; r.call(localStorage, FAIL);
     Object.assign(E, { on: true, fresh: true, key: o.key, salt: o.salt, iter: o.iter, db: o.payload.db || '', ls: o.payload.ls || {} });
     msg('Ouverture…');
     let html = ''; for (const u of [location.href.split('#')[0], 'index.html']) { try { const rs = await fetch(u); if (rs.ok && /<script/i.test(html = await rs.text())) break; html = ''; } catch (e) { html = ''; } }

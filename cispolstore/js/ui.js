@@ -183,7 +183,8 @@
     const cancel = flow !== 'unlock' ? '<button class="lnk" data-lk="cancel">Annuler</button>' : '';
     lockEl.innerHTML = `<img src="logo.png" alt=""><h1>CISPOLstore Manager</h1><p>Gérez votre activité en toute simplicité</p><p><b>${TITLES[mode]}</b></p><div class="dots" id="dots">${dots}</div><p class="warn" id="lmsg">${msg}</p><div class="pad">${keys}</div>${mode === 'enter' && flow === 'unlock' && App.bio && App.bio.on() ? '<button class="btn sm sec" data-lk="bio">👆 Utiliser l\'empreinte</button>' : ''}${mode === 'enter' && flow === 'unlock' ? '<button class="lnk" data-lk="forgot">Code PIN oublié ?</button>' : ''}${mode === 'new1' && flow === 'setup' ? '<button class="lnk" data-lk="skip">Plus tard</button>' : ''}${cancel}`;
   };
-  const unlock = () => { lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); failSet(null); };
+  const unlock = () => { if (App.locked) { const nf = failGet().n; failSet(null); if (nf > 0 && App.secLog) App.secLog(`Ouverture réussie après ${nf} mauvais essai(s) de code`, { by: 'Écran de verrouillage', role: 'lock' }); }   // only a real opening clears the counter (never a cancel)
+    lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); };
   App.unlockNow = unlock;
   App.showLock = (m = 'enter', f = 'unlock') => { buf = ''; first = ''; mode = m; flow = f; App.locked = f === 'unlock'; drawLock(); if (f === 'unlock' && m === 'enter' && App.bio && App.bio.on()) setTimeout(() => App.bio.prompt(), 300); };
   App.hasPin = () => !!(App.multi && App.multi()) || !!dbs().pin;
@@ -194,11 +195,12 @@
     const np = { salt, hash: await hash(salt + pin), len: NEWLEN };
     if (!multi || (target && target.role === 'admin')) np.rec = await hash(salt + rec);
     if (target) {
+      if (App.secLog) App.secLog(recTarget ? `a changé le code PIN de ${target.name} avec le code de récupération` : `a changé le code PIN de ${target.name}`);
       target.pin = np; dbs().users = App.users().map(x => x.id === target.id ? target : x); App.user = target; recTarget = null; App.save();
       if (np.rec) { recCode = rec.slice(0, 4) + '-' + rec.slice(4); recWho = target.name || ''; mode = 'showrec'; return drawLock(rec.slice(0, 4) + '-' + rec.slice(4)); }
       unlock(); App.toast('Code PIN modifié'); if (App.applyRole) App.applyRole(); return;
     }
-    dbs().pin = np; App.save();
+    dbs().pin = np; if (App.secLog) App.secLog(flow === 'change' ? 'a changé le code PIN' : 'a défini le code PIN'); App.save();
     recCode = rec.slice(0, 4) + '-' + rec.slice(4); recWho = ''; mode = 'showrec'; drawLock(rec.slice(0, 4) + '-' + rec.slice(4));
   };
   const submitPin = async () => {
@@ -210,12 +212,13 @@
         if (found) { unlock(); App.me_login(found); return; }
       }
       if ((!(App.multi && App.multi()) || flow !== 'unlock') && p && await hash(p.salt + buf) === p.hash) {
-        if (flow === 'remove') { dbs().pin = null; App.save(); unlock(); App.toast('PIN désactivé'); if (App.state.view === 'settings') App.refresh(); return; }
-        failSet(null); if (flow === 'change') { buf = ''; mode = 'new1'; return drawLock(); }
+        if (flow !== 'unlock') failSet(null);   // an opening (flow unlock) clears it in unlock(), after logging it
+        if (flow === 'remove') { dbs().pin = null; if (App.secLog) App.secLog('a désactivé le code PIN'); App.save(); unlock(); App.toast('PIN désactivé'); if (App.state.view === 'settings') App.refresh(); return; }
+        if (flow === 'change') { buf = ''; mode = 'new1'; return drawLock(); }
         if (flow === 'bio') { unlock(); App.bio.enroll(); return; }
         return unlock();
       }
-      buf = ''; const n = failAdd(); drawLock(n < 3 ? `Code incorrect (${3 - n} essai(s) avant blocage)` : 'Code incorrect'); const d = $('dots'); if (d) d.classList.add('shake'); blockTick(); return;
+      buf = ''; const n = failAdd(); if (App.secLog) App.secLog(`Code PIN incorrect (essai ${n}${n >= 3 ? ', blocage ' + waitTxt(Math.min(3600, 30 * 2 ** (n - 3))) : ''})`, { by: 'Écran de verrouillage', role: 'lock', fail: 1 }); drawLock(n < 3 ? `Code incorrect (${3 - n} essai(s) avant blocage)` : 'Code incorrect'); const d = $('dots'); if (d) d.classList.add('shake'); blockTick(); return;
     }
     if (mode === 'new1') { first = buf; buf = ''; mode = 'new2'; return drawLock(); }
     if (mode === 'new2') {
@@ -249,7 +252,7 @@
       let who = null; if (multi) { for (const x of App.users()) if (x.role === 'admin' && x.pin && x.pin.rec && await hash(x.pin.salt + code) === x.pin.rec) { who = x; break; } }
       const p = dbs().pin;
       if (multi ? who : (p && await hash(p.salt + code) === p.rec)) { recTarget = who; buf = ''; first = ''; mode = 'new1'; flow = 'unlock'; drawLock('Choisissez un nouveau PIN'); }
-      else { failAdd(); drawLock('Code de récupération incorrect'); blockTick(); }
+      else { const n = failAdd(); if (App.secLog) App.secLog(`Code de récupération incorrect (essai ${n})`, { by: 'Écran de verrouillage', role: 'lock', fail: 1 }); drawLock('Code de récupération incorrect'); blockTick(); }
     }
   });
   $('lockBtn').onclick = () => { if (App.hasPin()) App.showLock('enter', 'unlock'); else App.showLock('new1', 'setup'); };
