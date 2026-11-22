@@ -1,0 +1,38 @@
+// Pêche & aquaculture: ponds, fingerlings (real expense), feed out of the stock (internal cost), mortality, harvest into the stock, sale as a real invoice (stock out), cancellations,
+// derived figures (alive, mortality %, feed conversion, margin), report, forms and screens. Fictitious data only.
+const { check, launch, setup } = require('./helper');
+(async () => {
+  const t = await launch(), p = t.page; await setup(p, { activity: 'peche' });
+  const go = async tab => { await p.evaluate(a => App.go('fishery', a), { tab }); await p.waitForSelector('#ftabs'); };
+
+  check('secteur « Pêche & aquaculture » : module activé, stock disponible', await p.evaluate(() => App.mod('fishery') && App.mod('sales') && App.mod('stock') && App.db.settings.activity === 'peche'));
+  await go('ponds'); check('écran vide : carte avec bouton d\'action', (await p.locator('#ftab .empty').count()) >= 1);
+  await p.evaluate(() => { App.db.clients.push({ id: 'c1', code: 'CL-c1', name: 'Client Un', phone: '0990000001', type: 'Particulier', created: App.today(), fields: {} }); App.db.products.push({ id: 'f1', code: 'PR-f1', name: 'Granulés', cat: 'Aliment', unit: 'kg', qty: 50, min: 5, cost: 1, price: 0, track: true, fields: {} }, { id: 'f2', code: 'PR-f2', name: 'Tilapia frais', cat: 'Poisson', unit: 'kg', qty: 0, min: 0, cost: 0, price: 4, track: true, fields: {} }); App.save(); });
+
+  const a = await p.evaluate(() => { const F = App.fishery, bad = [F.savePond({ name: '' }), F.savePond({ name: 'A', kind: 'Étang' }).err, F.savePond({ name: 'a' }).err].map(x => !!x), p = App.db.fsPonds[0]; return { bad, id: p.id, name: p.name }; });
+  check('bassin : nom obligatoire, doublon refusé (casse ignorée)', a.bad[0] && !a.bad[1] && a.bad[2]);
+
+  const s = await p.evaluate(id => { const F = App.fishery, e0 = App.db.expenses.length, r = F.add({ pondId: id, type: 'stock', n: 1000, cost: 50 }), p = F.pond(id), bad = [F.add({ pondId: id, type: 'stock', n: 0 }), F.add({ pondId: id, type: 'dead', n: 5000 }), F.add({ pondId: '', type: 'stock', n: 1 })].map(x => !!x.err); return { n: r.number, alive: F.alive(p), exp: App.db.expenses.length - e0, cat: App.db.expenses[App.db.expenses.length - 1].category, bad }; }, a.id);
+  check('alevinage : PQ-…, 1000 vivants, dépense « Alevins » de 50 ; nombre nul, mortalité au-delà des vivants, bassin manquant refusés', /^PQ-\d{4}-0001$/.test(s.n) && s.alive === 1000 && s.exp === 1 && s.cat === 'Alevins' && s.bad.every(Boolean), JSON.stringify(s));
+  const d = await p.evaluate(id => { const F = App.fishery, p = F.pond(id), fut = F.add({ pondId: id, type: 'stock', n: 1, date: '2999-01-01' }).err; F.add({ pondId: id, type: 'dead', n: 30 }); const f = F.add({ pondId: id, type: 'feed', pid: 'f1', kg: 20 }), q = App.stock.get('f1').qty, over = F.add({ pondId: id, type: 'feed', pid: 'f1', kg: 999 }).err; return { fut: !!fut, alive: F.alive(p), cost: f.cost, q, over: /insuffisant/.test(over) }; }, a.id);
+  check('mortalité 30 → 970 vivants ; aliment 20 kg : stock 50 → 30, coût interne 20 (sans dépense) ; excès refusé ; date future refusée', d.fut && d.alive === 970 && d.cost === 20 && d.q === 30 && d.over, JSON.stringify(d));
+  const h = await p.evaluate(id => { const F = App.fishery, p = F.pond(id), r = F.add({ pondId: id, type: 'harvest', kg: 100, n: 200, pid: 'f2' }); return { q: App.stock.get('f2').qty, alive: F.alive(p), kg: r.kg }; }, a.id);
+  check('récolte 100 kg / 200 poissons : le stock du produit lié passe à 100, 770 vivants', h.q === 100 && h.alive === 770, JSON.stringify(h));
+  const v = await p.evaluate(id => { const F = App.fishery, S = App.sales, i0 = App.db.invoices.length, low = F.add({ pondId: id, type: 'sale', pid: 'f2', kg: 10, price: 4, paid: 5 }).err, over = F.add({ pondId: id, type: 'sale', pid: 'f2', kg: 500, price: 4 }).err, r = F.add({ pondId: id, type: 'sale', pid: 'f2', kg: 40, price: 4 }), i = S.get(r.invoiceId); return { low: /insuffisant/i.test(low), over: /Stock/.test(over), total: i.total, src: i.source, paid: S.paid(i), q: App.stock.get('f2').qty, n: App.db.invoices.length - i0 }; }, a.id);
+  check('vente 40 kg × 4 : facture « Pêche » payée de 160, stock 100 → 60 ; montant insuffisant sans client et stock insuffisant refusés', v.low && v.over && v.total === 160 && v.src === 'Pêche' && v.paid === 160 && v.q === 60 && v.n === 1, JSON.stringify(v));
+  const stt = await p.evaluate(id => { const F = App.fishery, x = F.stat(F.pond(id)); return { stocked: x.stocked, dead: x.dead, alive: x.alive, mort: x.mort, kg: x.harvestKg, feed: x.feed, fcr: x.fcr, sold: x.sold, cost: x.cost, margin: x.margin, perKg: x.perKg }; }, a.id);
+  check('chiffres dérivés : mortalité 3 %, indice de conversion 0,2, coût 70 (alevins 50 + aliment 20), vendu 160, marge 90, 0,7 par kilo', stt.mort === 3 && stt.fcr === 0.2 && stt.cost === 70 && stt.sold === 160 && stt.margin === 90 && stt.perKg === 0.7 && stt.alive === 770, JSON.stringify(stt));
+  const c = await p.evaluate(id => { const F = App.fishery, ops = App.db.fsOps, harvest = ops.find(o => o.type === 'harvest'), sale = ops.find(o => o.type === 'sale'), h = F.cancel(harvest), s1 = F.cancel(sale), cr = F.add({ pondId: id, type: 'sale', pid: 'f2', kg: 10, price: 4, clientId: 'c1', paid: 0 }), q0 = App.stock.get('f2').qty, ok = F.cancel(cr), q1 = App.stock.get('f2').qty; return { h, s1, q0, ok, q1, live: App.sales.live(App.sales.get(cr.invoiceId)) }; }, a.id);
+  check('annuler : récolte déjà vendue refusée, vente payée refusée ; vente à crédit annulée = stock remis et facture annulée', c.h === 'sold' && c.s1 === 'paid' && c.q0 === 50 && c.ok === true && c.q1 === 60 && c.live === false, JSON.stringify(c));
+  const x = await p.evaluate(() => { const F = App.fishery, ops = App.db.fsOps, fe = ops.find(o => o.type === 'feed'), q0 = App.stock.get('f1').qty; F.cancel(fe); const st = ops.find(o => o.type === 'stock'), e0 = App.db.expenses.length; F.cancel(st); return { q: App.stock.get('f1').qty - q0, exp: e0 - App.db.expenses.length, again: F.cancel(st) }; });
+  check('annuler l\'aliment remet 20 kg ; annuler l\'alevinage supprime la dépense ; déjà annulé = refusé', x.q === 20 && x.exp === 1 && x.again === false, JSON.stringify(x));
+  const r = await p.evaluate(() => { const c = App.fishery.report({ from: '0000-01-01', to: '9999-12-31', label: '' }); return { harvest: c.harvest, soldKg: c.soldKg, sales: c.sales, txt: App.fishery.reportText({ from: '0000-01-01', to: '9999-12-31', label: 'Tout' }).includes('Rapport pêche') }; });
+  check('rapport : 100 kg récoltés, 40 kg vendus pour 160, texte copiable', r.harvest === 100 && r.soldKg === 40 && r.sales === 160 && r.txt, JSON.stringify(r));
+  check('Synchro : collections partagées et numéros uniques', await p.evaluate(() => ['fsPonds', 'fsOps'].every(k => Array.isArray(App.db[k])) && new Set(App.db.fsOps.map(x => x.number)).size === App.db.fsOps.length));
+  await go('ops'); await p.evaluate(() => App.fishery.add({ pondId: App.db.fsPonds[0].id, type: 'stock', n: 1000, cost: 0 })); await p.evaluate(() => App.fishery.opForm('dead')); await p.waitForSelector('.sheet [name=n]'); await p.fill('.sheet [name=n]', '5'); await p.click('.sheet-wrap.on footer .primary'); await p.waitForTimeout(400);
+  check('mortalité par le formulaire : 5 poissons', await p.evaluate(() => App.db.fsOps.some(o => o.type === 'dead' && o.n === 5)));
+  for (const tab of ['ponds', 'ops', 'rep']) { await go(tab); await p.waitForTimeout(100); }
+  check('les trois onglets s\'affichent', true);
+  check('aucune erreur JS', t.errors.length === 0, t.errors.join(' | '));
+  await t.browser.close();
+})().catch(e => { console.log('FAIL exception → ' + e.message); process.exit(1); });
