@@ -32,10 +32,9 @@ const { check, launch, setup } = require('./helper');
   await p.evaluate(() => App.go('data')); await p.waitForSelector('#bioon');
   await p.click('#bioon'); await p.waitForSelector('#bioff');
   check('empreinte activée pour ce profil (stockée sur l\'appareil, pas dans les données)', await p.evaluate(() => App.bio.mine() && JSON.parse(localStorage.getItem('biz.bio')).length === 1 && !JSON.stringify(App.db).includes(JSON.parse(localStorage.getItem('biz.bio'))[0].id)));
-  await p.evaluate(() => App.roles.lock()); await p.waitForSelector('#lock [data-u]');
-  await p.waitForSelector('#lock', { state: 'hidden', timeout: 8000 }).catch(() => { });
-  const opened = await p.evaluate(() => !!App.user && !App.roles.isLocked());
-  if (!opened) { await p.waitForSelector('#lbio'); await p.click('#lbio'); await p.waitForSelector('#lock', { state: 'hidden', timeout: 8000 }); }
+  await p.evaluate(() => App.roles.lock());
+  await p.waitForFunction(() => !!App.user && !App.roles.isLocked() || !!document.querySelector('#lbio'), null, { timeout: 8000 });   // the finger is asked at once; the button is the manual way
+  if (await p.evaluate(() => !!App.roles.isLocked())) { await p.click('#lbio'); await p.waitForSelector('#lock', { state: 'hidden', timeout: 8000 }); }
   check('l\'empreinte rouvre la session du profil sans taper le PIN', await p.evaluate(() => !!App.user && App.user.name === 'Marie Gérante' && !App.roles.isLocked()));
   await p.evaluate(() => App.go('data')); await p.waitForSelector('#bioff'); await p.click('#bioff'); await p.click('.sheet-wrap.on footer .primary'); await p.waitForSelector('#bioon');
   check('empreinte désactivée : le bouton disparaît de l\'écran de verrouillage', await p.evaluate(() => !App.bio.mine() && JSON.parse(localStorage.getItem('biz.bio')).length === 0));
