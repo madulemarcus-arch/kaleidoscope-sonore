@@ -1,11 +1,11 @@
-// The 58 activities: every preset (the 39 first ones and the 11 sectors built on the shared modules) switches on existing modules with its own vocabulary, opens every screen it offers without an error,
+// The 62 activities: every preset (the 39 first ones and the 11 sectors built on the shared modules) switches on existing modules with its own vocabulary, opens every screen it offers without an error,
 // and is found by the search bar of the wizard.
 const { check, launch, setup } = require('./helper');
 (async () => {
   const t = await launch(), p = t.page; await setup(p, { activity: 'veto' });
   const NEW = ['pressing', 'sport', 'creche', 'laveauto', 'engins', 'kiosque', 'photo', 'voyage', 'funerailles', 'veto', 'opticien'];
   const info = await p.evaluate(n => { const P = App.PRESETS, labels = Object.values(P).map(x => x.label); return { total: Object.keys(P).length, uniq: new Set(labels).size, missing: n.filter(k => !P[k]), vocab: n.every(k => P[k].vocab && P[k].vocab.client && P[k].vocab.product && P[k].vocab.sub), mods: n.every(k => P[k].modules.length >= 4) }; }, NEW);
-  check('58 activités au total, noms uniques, les 11 nouvelles présentes avec vocabulaire et au moins 4 modules', info.total === 58 && info.uniq === 58 && !info.missing.length && info.vocab && info.mods, JSON.stringify(info));
+  check('62 activités au total, noms uniques, les 11 nouvelles présentes avec vocabulaire et au moins 4 modules', info.total === 62 && info.uniq === 62 && !info.missing.length && info.vocab && info.mods, JSON.stringify(info));
   check('activité choisie à l\'assistant (Pharmacie vétérinaire) : vocabulaire « éleveur », module Pharmacie actif', await p.evaluate(() => App.db.settings.activity === 'veto' && App.db.settings.vocab.client === 'éleveur' && App.mod('pharmacy')));
   const err0 = t.errors.length;
   for (const k of NEW) {
