@@ -16,6 +16,8 @@
   };
   const legalHtml = list => list.map((l, i) => '<div class="row2"><input data-legal-k="' + i + '" value="' + esc(l.k) + '" aria-label="Libellé"><input data-legal-v="' + i + '" value="' + esc(l.v) + '" aria-label="Valeur"></div>').join('');
   const readLegal = (root, list) => list.forEach((l, i) => { l.k = root.querySelector('[data-legal-k="' + i + '"]').value.trim() || l.k; l.v = root.querySelector('[data-legal-v="' + i + '"]').value.trim(); });
+  let modsOpen = false; // the « Modules » ribbon of the settings is folded until the user opens it
+  const modCount = mods => App.MODULES.filter(m => mods[m[0]]).length + ' actif' + (App.MODULES.filter(m => mods[m[0]]).length !== 1 ? 's' : '') + ' sur ' + App.MODULES.length;
   const modulesHtml = mods => modFinder() + '<div class="mods">' + App.MODULES.map(m => '<label class="mod"><input type="checkbox" data-mod="' + m[0] + '"' + (mods[m[0]] ? ' checked' : '') + '><span><b>' + esc(m[1]) + '</b><small>' + esc(m[2]) + '</small></span></label>').join('') + '</div>';
   const vocabHtml = v => [['client', 'Un client, c\'est un…'], ['product', 'Un produit, c\'est un…'], ['sub', 'Un abonnement, c\'est un…']].map(([k, l]) => ui.field(l, '<input data-vocab="' + k + '" value="' + esc(v[k]) + '" maxlength="24">')).join('');
 
@@ -80,7 +82,7 @@
         if (step === 0) { if (!d.name) return App.toast('Indiquez le nom de l\'entreprise', 'err'); if (d.activity !== el._act) { apply(d.activity); el._act = d.activity; } }
         if (step === 1) { if (d.currency === d.cur2) return App.toast('Choisissez deux devises différentes', 'err'); if (!(d.rate > 0)) return App.toast('Taux invalide', 'err'); }
         if (step < 2) { step++; return draw(); }
-        d.setup = true; Object.assign(App.db.settings, d); App.log('setup', d.name); App.flush(); el.remove(); ui.applyTheme(); App.emit('settings'); App.go('home'); App.toast('Entreprise enregistrée');
+        d.setup = true; Object.assign(App.db.settings, d); App.log('setup', d.name); App.flush(); el.remove(); ui.applyTheme(); App.emit('settings'); App.go('home'); App.toast('Entreprise enregistrée'); App.roles && App.roles.boot && App.roles.boot();
       };
     };
     el._act = d.activity; draw(); setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
@@ -101,7 +103,7 @@
         ui.field('Conditions de paiement', '<textarea data-p="terms" rows="2">' + esc(s.terms) + '</textarea>') + '<div class="fld"><span>Mentions légales</span><div id="legal">' + legalHtml(s.legal) + '</div><button class="btn ghost sm" id="addlegal">+ Ajouter une mention</button></div>' + imgField('logo', 'Logo', s.logo) + imgField('stamp', 'Sceau / cachet', s.stamp) + '</section>' +
         '<section class="card"><h3>Devises</h3><div class="row2">' + ui.field('Principale', '<select data-p="currency">' + curOpts().map(o => '<option value="' + o[0] + '"' + (s.currency === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>') + ui.field('Secondaire', '<select data-p="cur2">' + curOpts().map(o => '<option value="' + o[0] + '"' + (s.cur2 === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>') + '</div>' +
         '<button class="btn ghost" id="rate">Taux : 1 ' + esc(s.currency) + ' = ' + esc(s.rate) + ' ' + esc(s.cur2) + ' — modifier</button></section>' +
-        '<section class="card"><h3>Modules</h3><p class="muted">Un module désactivé disparaît des menus, de l\'accueil et des rapports.</p>' + modulesHtml(s.modules) + '</section>' +
+        '<section class="card"><button type="button" class="rib" id="modrib" aria-expanded="' + modsOpen + '" aria-controls="modbody"><span class="rib-t">🧩 Modules</span><small id="modcount">' + modCount(s.modules) + '</small><span class="rib-c" aria-hidden="true">▾</span></button><div id="modbody"' + (modsOpen ? '' : ' hidden') + '><p class="muted">Un module désactivé disparaît des menus, de l\'accueil et des rapports.</p>' + modulesHtml(s.modules) + '</div></section>' +
         '<section class="card"><h3>Vocabulaire</h3>' + vocabHtml(s.vocab) + '</section>' +
         '<section class="card"><h3>Champs personnalisés</h3><div id="cfs">' + customFields() + '</div></section>' +
         '<section class="card"><h3>Paiements et messages</h3>' + ui.field('Modes de paiement (séparés par des virgules)', '<input id="modes" value="' + esc(s.modes.join(', ')) + '">') + ui.field('Message de relance', '<textarea data-msg="remind" rows="4">' + esc(s.msgs.remind) + '</textarea>', 'Variables : {nom} {numero} {montant} {reste} {jours} {entreprise}') + ui.field('Message de rappel d\'échéance (abonnements)', '<textarea data-msg="sub" rows="3">' + esc(s.msgs.sub) + '</textarea>', 'Variables : {nom} {abonnement} {formule} {date} {delai} {montant} {entreprise}') + ui.field('Message après paiement', '<textarea data-msg="receipt" rows="3">' + esc(s.msgs.receipt) + '</textarea>', 'Variables : {nom} {montant} {facture} {date} {entreprise}') + '</section>' +
@@ -116,7 +118,8 @@
       const lg = el.querySelector('#legal'), saveLegal = () => { readLegal(lg, s.legal); App.save(); };
       lg.oninput = saveLegal; el.querySelector('#addlegal').onclick = () => { s.legal.push({ k: 'Mention', v: '' }); App.save(); redo(); };
       el.querySelector('#rate').onclick = () => { ui.rateSheet(); };
-      el.querySelectorAll('[data-mod]').forEach(c => c.onchange = () => { s.modules[c.dataset.mod] = c.checked; App.save(); App.emit('settings'); });
+      const rib = el.querySelector('#modrib'); if (rib) rib.onclick = () => { modsOpen = !modsOpen; rib.setAttribute('aria-expanded', modsOpen); el.querySelector('#modbody').hidden = !modsOpen; if (modsOpen) { const f = el.querySelector('#modbody [data-find="mod"]'); f && f.focus({ preventScroll: true }); } };
+      el.querySelectorAll('[data-mod]').forEach(c => c.onchange = () => { s.modules[c.dataset.mod] = c.checked; const n = el.querySelector('#modcount'); if (n) n.textContent = modCount(s.modules); App.save(); App.emit('settings'); });
       el.querySelectorAll('[data-vocab]').forEach(i => i.onchange = () => { s.vocab[i.dataset.vocab] = i.value.trim() || s.vocab[i.dataset.vocab]; App.save(); App.emit('settings'); });
       el.querySelectorAll('[data-msg]').forEach(t => t.onchange = () => { s.msgs[t.dataset.msg] = t.value; App.save(); });
       el.querySelector('#modes').onchange = e => { const m = e.target.value.split(',').map(x => x.trim()).filter(Boolean); if (m.length) { s.modes = m; App.save(); } };

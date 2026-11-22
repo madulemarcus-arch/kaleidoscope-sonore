@@ -32,6 +32,14 @@
     q('#ulock') && (q('#ulock').onclick = () => R.lock()); q('#urec') && (q('#urec').onclick = async () => { if (App.can('team') && await ui.confirm('Générer un nouveau code ? L\'ancien ne fonctionnera plus.', 'Générer')) showCode(await R.newRecovery()); });
     q('[name=lockMin]') && (q('[name=lockMin]').onchange = e => { R.setLockMin(+e.target.value); App.toast('Enregistré'); });
   };
+  // fingerprint (this device only): enrol / remove it for the open profile
+  const bioCard = () => db().users.length && App.user ? '<section class="card" id="biocard"></section>' : '';
+  const bioFill = (el, redo) => {
+    const box = el.querySelector('#biocard'); if (!box) return; const on = App.bio.mine();
+    box.innerHTML = '<h3>Empreinte digitale</h3>' + (on ? '<p class="muted">✅ Activée pour ' + esc(App.user.name) + ' sur cet appareil. Le PIN reste le secours.</p><button class="btn ghost" id="bioff">Désactiver l\'empreinte</button>' : App.bio.ok() ? '<p class="muted">Ouvrez l\'application d\'un geste, sans taper le PIN (sur cet appareil seulement).</p><button class="btn primary" id="bioon">👆 Activer l\'empreinte</button>' : '<p class="muted">Empreinte indisponible sur cet appareil (il faut un verrouillage d\'écran avec empreinte ou visage).</p>');
+    const a = box.querySelector('#bioon'), b = box.querySelector('#bioff'); if (a) a.onclick = async () => { if (await App.bio.enroll()) bioFill(el, redo); }; if (b) b.onclick = async () => { if (await ui.confirm('Désactiver l\'empreinte ? Le PIN reste en place.', 'Désactiver')) { App.bio.off(); bioFill(el, redo); } };
+  };
+  const sec0 = T.securityHtml, bind0 = T.bindSecurity; T.securityHtml = () => sec0() + bioCard(); T.bindSecurity = (el, redo) => { bind0(el, redo); bioFill(el, redo); App.bio.check().then(() => bioFill(el, redo)); };
   App.views.team = { title: 'Équipe', render(el) { el.innerHTML = '<div class="page">' + T.securityHtml() + '</div>'; T.bindSecurity(el, () => App.views.team.render(el)); } };
   // admin-only actions
   const A = () => { const u = App.user; return !db().users.length || (u && u.role === 'admin'); };
