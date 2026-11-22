@@ -52,12 +52,15 @@
   let fails = 0, until = 0;
   R.lock = () => {
     if (!db().users.length) return; state.locked = true; if (App.user) App.log('logout', ''); App.user = null; App.$$('.sheet-wrap').forEach(e => e.remove());
-    let el = App.$('#lock'); if (!el) { el = document.createElement('div'); el.id = 'lock'; el.className = 'lockscr'; document.body.appendChild(el); } el.hidden = false; pick(el); App.render && App.render();
+    let el = App.$('#lock'); if (!el) { el = document.createElement('div'); el.id = 'lock'; el.className = 'lockscr'; document.body.appendChild(el); } el.hidden = false; pick(el, true); App.render && App.render();
   };
+  // opens the session of a profile (after its PIN or its fingerprint)
+  R.unlockUser = (u, how) => { fails = 0; state.locked = false; App.user = u; last = Date.now(); App.log('login', how || ''); App.save(); const el = App.$('#lock'); if (el) el.hidden = true; if (!App.canView(App.current && App.current())) App.go('home'); App.render(); };
   const logo = () => '<img class="logo" alt="" src="' + esc(db().settings.logo || 'icons/logo.svg') + '">';
-  const pick = el => {
+  const pick = (el, auto) => {
     el.innerHTML = '<div class="lbox">' + logo() + '<h1>' + esc(db().settings.name || App.NAME) + '</h1><p class="muted">Qui êtes-vous ?</p><div class="ulist">' + db().users.map(u => '<button class="btn ghost" data-u="' + u.id + '"><span class="av">' + esc(App.letterOf(u.name)) + '</span><span><b>' + esc(u.name) + '</b><br><small>' + esc(R.ROLES[u.role]) + '</small></span></button>').join('') + '</div></div>';
     el.querySelectorAll('[data-u]').forEach(b => b.onclick = () => pin(el, db().users.find(u => u.id === b.dataset.u)));
+    if (App.bio && App.bio.on()) { const box = el.querySelector('.lbox'), b = document.createElement('button'); b.type = 'button'; b.className = 'btn primary'; b.id = 'lbio'; b.textContent = '👆 Entrer avec l\'empreinte'; b.onclick = () => App.bio.prompt(true); box.appendChild(b); if (auto) App.bio.prompt(false); }
   };
   // PIN keypad: round keys, dots that fill, shake on error; a hidden input keeps keyboards and tests working
   const pin = (el, u) => {
@@ -68,7 +71,7 @@
     const go = async () => {
       const msg = el.querySelector('#lmsg'); if (Date.now() < until) { msg.textContent = 'Trop d\'essais : patientez ' + Math.ceil((until - Date.now()) / 1000) + ' s'; return; }
       const v = inp.value; if (!v) return;
-      if (await R.hash(u.salt, v) === u.hash) { fails = 0; state.locked = false; App.user = u; last = Date.now(); if (!u.len) { u.len = v.length; } App.log('login', ''); App.save(); el.hidden = true; if (!App.canView(App.current && App.current())) App.go('home'); App.render(); }
+      if (await R.hash(u.salt, v) === u.hash) { if (!u.len) { u.len = v.length; } R.unlockUser(u, ''); }
       else { fails++; inp.value = ''; paint(); dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake'); try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } if (fails >= 5) { until = Date.now() + 30000; fails = 0; msg.textContent = 'Trop d\'essais : patientez 30 s'; } else msg.textContent = 'PIN incorrect'; App.log('login.fail', u.name); }
     };
     inp.oninput = () => { paint(); if (u.len && inp.value.length === u.len) go(); };
@@ -85,7 +88,30 @@
       await R.setPin(el.querySelector('#lwho').value, np); App.log('security.recovered', ''); App.toast('PIN réinitialisé'); pick(el);
     };
   };
-  R.boot = () => { if (db().users.length) { state.locked = true; App.user = null; let el = App.$('#lock'); if (!el) { el = document.createElement('div'); el.id = 'lock'; el.className = 'lockscr'; document.body.appendChild(el); } el.hidden = false; pick(el); } };
+  // The app is never left open: without any profile, the first administrator (name + PIN) must be created before the app can be used.
+  // Automated browsers (navigator.webdriver) skip it unless `biz.forceLock` is set, so the test suite can still open the app freely.
+  R.mustProtect = () => !db().users.length && !!db().settings.setup && !(navigator.webdriver && !localStorage.getItem('biz.forceLock'));
+  R.setupLock = () => {
+    let el = App.$('#lock'); if (!el) { el = document.createElement('div'); el.id = 'lock'; el.className = 'lockscr'; document.body.appendChild(el); } el.hidden = false; App.$$('.sheet-wrap').forEach(e => e.remove());
+    el.innerHTML = '<div class="lbox">' + logo() + '<h1>Protégez votre application</h1><p class="muted">Vos données de gestion sont privées. Choisissez un code (PIN) : il sera demandé à chaque ouverture.</p>' +
+      '<input id="sname" autocomplete="off" placeholder="Votre nom" aria-label="Votre nom" maxlength="40"><input id="spin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" placeholder="PIN de 4 à 8 chiffres" aria-label="PIN"><input id="spin2" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" placeholder="Confirmez le PIN" aria-label="Confirmer le PIN"><p class="muted" id="lmsg" role="alert"></p><button type="button" class="btn primary" id="sgo">Protéger l\'application</button></div>';
+    const q = s => el.querySelector(s), msg = t => { q('#lmsg').textContent = t; };
+    const done = u => { state.locked = false; App.user = u; last = Date.now(); el.hidden = true; App.render(); };
+    const code = (r) => {
+      el.innerHTML = '<div class="lbox">' + logo() + '<h1>Code de récupération</h1><p class="muted">Notez ce code en lieu sûr (papier). Il permet de recréer votre PIN si vous l\'oubliez.</p><div class="rcode" id="rc">' + esc(r.code) + '</div><button type="button" class="btn primary" id="rok">J\'ai noté le code</button></div>';
+      q('#rok').onclick = async () => {
+        if (App.bio && await App.bio.check()) { el.innerHTML = '<div class="lbox">' + logo() + '<h1>Empreinte digitale</h1><p class="muted">Ouvrez l\'application d\'un geste, sans taper le PIN. Le PIN reste le secours.</p><button type="button" class="btn primary" id="bon">👆 Activer l\'empreinte</button><button type="button" class="btn ghost" id="boff" style="color:#fff">Plus tard</button></div>'; q('#bon').onclick = async () => { await App.bio.enroll(); done(r.user); }; q('#boff').onclick = () => done(r.user); }
+        else done(r.user);
+      };
+    };
+    q('#sgo').onclick = async () => {
+      const name = q('#sname').value.trim(), p1 = q('#spin').value, p2 = q('#spin2').value;
+      if (!name) return msg('Indiquez votre nom'); if (!R.validPin(p1)) return msg('Le PIN doit avoir 4 à 8 chiffres'); if (p1 !== p2) return msg('Les deux PIN ne sont pas identiques');
+      try { const r = await R.addUser(name, 'admin', p1); App.log('security.protected', ''); code(r); } catch (e) { msg(e.message); }
+    };
+    q('#sname').focus();
+  };
+  R.boot = () => { if (R.mustProtect()) { R.setupLock(); return; } if (db().users.length) { state.locked = true; App.user = null; let el = App.$('#lock'); if (!el) { el = document.createElement('div'); el.id = 'lock'; el.className = 'lockscr'; document.body.appendChild(el); } el.hidden = false; pick(el, true); } };
   R.isLocked = () => state.locked && db().users.length > 0;
   R.wrap = wrapAll;
   window.addEventListener('DOMContentLoaded', () => { });

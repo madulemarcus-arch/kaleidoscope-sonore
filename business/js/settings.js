@@ -82,7 +82,7 @@
         if (step === 0) { if (!d.name) return App.toast('Indiquez le nom de l\'entreprise', 'err'); if (d.activity !== el._act) { apply(d.activity); el._act = d.activity; } }
         if (step === 1) { if (d.currency === d.cur2) return App.toast('Choisissez deux devises différentes', 'err'); if (!(d.rate > 0)) return App.toast('Taux invalide', 'err'); }
         if (step < 2) { step++; return draw(); }
-        d.setup = true; Object.assign(App.db.settings, d); App.log('setup', d.name); App.flush(); el.remove(); ui.applyTheme(); App.emit('settings'); App.go('home'); App.toast('Entreprise enregistrée');
+        d.setup = true; Object.assign(App.db.settings, d); App.log('setup', d.name); App.flush(); el.remove(); ui.applyTheme(); App.emit('settings'); App.go('home'); App.toast('Entreprise enregistrée'); App.roles && App.roles.boot && App.roles.boot();
       };
     };
     el._act = d.activity; draw(); setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
