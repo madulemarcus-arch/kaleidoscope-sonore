@@ -17,8 +17,9 @@
   const legalHtml = list => list.map((l, i) => '<div class="row2"><input data-legal-k="' + i + '" value="' + esc(l.k) + '" aria-label="Libellé"><input data-legal-v="' + i + '" value="' + esc(l.v) + '" aria-label="Valeur"></div>').join('');
   const readLegal = (root, list) => list.forEach((l, i) => { l.k = root.querySelector('[data-legal-k="' + i + '"]').value.trim() || l.k; l.v = root.querySelector('[data-legal-v="' + i + '"]').value.trim(); });
   let modsOpen = false; // the « Modules » ribbon of the settings is folded until the user opens it
+  const alpha = (a, b) => String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }), presetList = () => Object.entries(App.PRESETS).sort((a, b) => alpha(a[1].label, b[1].label)), modList = () => App.MODULES.slice().sort((a, b) => alpha(a[1], b[1]));
   const modCount = mods => App.MODULES.filter(m => mods[m[0]]).length + ' actif' + (App.MODULES.filter(m => mods[m[0]]).length !== 1 ? 's' : '') + ' sur ' + App.MODULES.length;
-  const modulesHtml = mods => modFinder() + '<div class="mods">' + App.MODULES.map(m => '<label class="mod"><input type="checkbox" data-mod="' + m[0] + '"' + (mods[m[0]] ? ' checked' : '') + '><span><b>' + esc(m[1]) + '</b><small>' + esc(m[2]) + '</small></span></label>').join('') + '</div>';
+  const modulesHtml = mods => modFinder() + '<div class="mods">' + modList().map(m => '<label class="mod"><input type="checkbox" data-mod="' + m[0] + '"' + (mods[m[0]] ? ' checked' : '') + '><span><b>' + esc(m[1]) + '</b><small>' + esc(m[2]) + '</small></span></label>').join('') + '</div>';
   const vocabHtml = v => [['client', 'Un client, c\'est un…'], ['product', 'Un produit, c\'est un…'], ['sub', 'Un abonnement, c\'est un…']].map(([k, l]) => ui.field(l, '<input data-vocab="' + k + '" value="' + esc(v[k]) + '" maxlength="24">')).join('');
 
   // ---------- search bars (activity + modules) ----------
@@ -60,7 +61,7 @@
     const apply = p => { const pr = App.PRESETS[p]; d.activity = p; d.vocab = { ...pr.vocab }; App.MODULES.forEach(m => d.modules[m[0]] = pr.modules.includes(m[0])); };
     const body = () => {
       if (step === 0) return ui.field('Nom de l\'entreprise *', ui.input('name', d.name, { ph: 'Ex. Ets Mavuela' })) +
-        actFinder() + ui.field('Activité', ui.select('activity', Object.entries(App.PRESETS).map(([k, v]) => [k, v.label]), d.activity), 'Choisit les modules et le vocabulaire de départ. Tout reste modifiable.') +
+        actFinder() + ui.field('Activité', ui.select('activity', presetList().map(([k, v]) => [k, v.label]), d.activity), 'Choisit les modules et le vocabulaire de départ. Tout reste modifiable.') +
         ui.field('Ville', ui.input('city', d.city)) + ui.field('Slogan (facultatif)', ui.input('slogan', d.slogan)) + imgField('logo', 'Logo', d.logo);
       if (step === 1) return '<div class="row2">' + ui.field('Devise principale', ui.select('currency', curOpts(), d.currency)) + ui.field('Devise secondaire', ui.select('cur2', curOpts(), d.cur2)) + '</div>' +
         ui.field('Taux : 1 ' + d.currency + ' = ? ' + d.cur2, ui.input('rate', d.rate, { num: 1 })) + ui.field('Adresse', ui.input('address', d.address)) +
@@ -97,7 +98,7 @@
     render(el) {
       const s = S();
       el.innerHTML = '<div class="page set">' +
-        '<section class="card"><h3>Entreprise</h3>' + ui.field('Nom', '<input data-p="name" value="' + esc(s.name) + '">') + actFinder() + ui.field('Activité', '<select data-p="activity">' + Object.entries(App.PRESETS).map(([k, v]) => '<option value="' + k + '"' + (s.activity === k ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select>', 'Changer l\'activité ne modifie pas vos modules.') +
+        '<section class="card"><h3>Entreprise</h3>' + ui.field('Nom', '<input data-p="name" value="' + esc(s.name) + '">') + actFinder() + ui.field('Activité', '<select data-p="activity">' + presetList().map(([k, v]) => '<option value="' + k + '"' + (s.activity === k ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select>', 'Changer l\'activité ne modifie pas vos modules.') +
         '<div class="row2">' + ui.field('Ville', '<input data-p="city" value="' + esc(s.city) + '">') + ui.field('Slogan', '<input data-p="slogan" value="' + esc(s.slogan) + '">') + '</div>' +
         ui.field('Adresse', '<input data-p="address" value="' + esc(s.address) + '">') + '<div class="row2">' + ui.field('Téléphone', '<input data-p="phone" inputmode="tel" value="' + esc(s.phone) + '">') + ui.field('Courriel', '<input data-p="email" type="email" value="' + esc(s.email) + '">') + '</div>' +
         ui.field('Conditions de paiement', '<textarea data-p="terms" rows="2">' + esc(s.terms) + '</textarea>') + '<div class="fld"><span>Mentions légales</span><div id="legal">' + legalHtml(s.legal) + '</div><button class="btn ghost sm" id="addlegal">+ Ajouter une mention</button></div>' + imgField('logo', 'Logo', s.logo) + imgField('stamp', 'Sceau / cachet', s.stamp) + '</section>' +
