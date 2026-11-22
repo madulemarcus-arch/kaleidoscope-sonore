@@ -1,0 +1,43 @@
+// Transport scolaire: routes (seats, stops, price), children (capacity, duplicate, stop of the route, price copied), monthly bills as real invoices (one per parent and month, sibling discount, not twice,
+// cancellation), boardings (no duplicate, suspended when a bill is unpaid beyond the grace period), report, forms and screens. Fictitious data only.
+const { check, launch, setup } = require('./helper');
+(async () => {
+  const t = await launch(), p = t.page; await setup(p, { activity: 'transportscol' });
+  const go = async tab => { await p.evaluate(a => App.go('schoolbus', a), { tab }); await p.waitForSelector('#btabs'); };
+
+  check('secteur « Transport scolaire » : module activé, vocabulaire « parent »', await p.evaluate(() => App.mod('schoolbus') && App.mod('sales') && App.db.settings.activity === 'transportscol' && App.db.settings.vocab.client === 'parent'));
+  await go('today'); check('écran vide : carte avec bouton d\'action', (await p.locator('#btab .empty').count()) >= 1);
+  await p.evaluate(() => { [['c1', 'Parent Un'], ['c2', 'Parent Deux'], ['c3', 'Parent Trois']].forEach(x => App.db.clients.push({ id: x[0], code: 'CL-' + x[0], name: x[1], phone: '09900000' + x[0].slice(1), type: 'Particulier', created: App.today(), fields: {} })); App.save(); });
+
+  const a = await p.evaluate(() => { const B = App.schoolbus, bad = [B.saveRoute({ name: '', seats: 2, price: 30 }), B.saveRoute({ name: 'X', seats: 0, price: 30 }), B.saveRoute({ name: 'X', seats: 2, price: 0 })].map(r => !!r.err), r = B.saveRoute({ name: 'Centre → École A', vehicle: 'Bus 1', seats: 2, price: 30, stops: 'Gare, Marché' }), dup = B.saveRoute({ name: 'centre → école a', seats: 2, price: 30 }).err; return { bad, id: r.id, dup }; });
+  check('circuit : nom, places et prix obligatoires, doublon refusé', a.bad.every(Boolean) && /existe/.test(a.dup));
+
+  const k = await p.evaluate(r => { const B = App.schoolbus, k1 = B.enroll({ name: 'Léa', parentId: 'c1', routeId: r, stop: 'gare' }), stop = B.enroll({ name: 'Zoé', parentId: 'c2', routeId: r, stop: 'Port' }).err, dup = B.enroll({ name: 'LÉA', parentId: 'c1', routeId: r, stop: 'Gare' }).err, k2 = B.enroll({ name: 'Max', parentId: 'c1', routeId: r, stop: 'Marché' }), full = B.enroll({ name: 'Ina', parentId: 'c2', routeId: r, stop: 'Gare' }).err, rt = B.route(r); return { stop, dup, full, stopName: k1.stop, price: k1.price, taken: B.taken(rt), free: B.free(rt) }; }, a.id);
+  check('inscription : arrêt inconnu refusé, doublon refusé, circuit complet refusé, arrêt normalisé, prix copié', /Arrêt/.test(k.stop) && /déjà/.test(k.dup) && /complet/i.test(k.full) && k.stopName === 'Gare' && k.price === 30 && k.taken === 2 && k.free === 0, JSON.stringify(k));
+  check('le prix du circuit changé ensuite ne réécrit pas l\'inscription', await p.evaluate(r => { const B = App.schoolbus; B.saveRoute({ name: 'Centre → École A', vehicle: 'Bus 1', seats: 2, price: 99, stops: 'Gare, Marché' }, r); const ok = B.kid(App.db.sbKids[0].id).price === 30; B.saveRoute({ name: 'Centre → École A', vehicle: 'Bus 1', seats: 2, price: 30, stops: 'Gare, Marché' }, r); return ok; }, a.id));
+  check('on ne réduit pas les places sous le nombre d\'enfants', await p.evaluate(r => !!App.schoolbus.saveRoute({ name: 'Centre → École A', seats: 1, price: 30, stops: 'Gare' }, r).err, a.id));
+
+  const b = await p.evaluate(() => { const B = App.schoolbus, m = App.today().slice(0, 7), fut = B.bill({ month: '2999-01', parentId: 'c1' }).err, d = B.draft('c1', m), r = B.bill({ month: m, parentId: 'c1' }), i = App.sales.get(r.invoiceId), again = B.bill({ month: m, parentId: 'c1' }).err; return { fut, lines: d.lines.length, draft: d.total, n: r.number, total: i.total, source: i.source, again, due: B.stat(r).due }; });
+  check('facture du mois : lignes + remise fratrie 10 % (30 + 30 − 3 = 57), vraie facture « Transport scolaire », mois futur et doublon refusés', b.lines === 3 && b.draft === 57 && /^TS-\d{4}-0001$/.test(b.n) && b.total === 57 && b.source === 'Transport scolaire' && /futur|commencé/.test(b.fut) && /déjà/.test(b.again) && b.due === 57, JSON.stringify(b));
+  const c = await p.evaluate(() => { const B = App.schoolbus, m = App.today().slice(0, 7), bl = B.bill0(App.db.sbBills[0].id), r = B.cancelBill(bl), i = App.sales.get(bl.invoiceId), re = B.bill({ month: m, parentId: 'c1', paid: 57 }), paid = App.sales.paid(App.sales.get(re.invoiceId)), cx = B.cancelBill(re); return { r, live: App.sales.live(i), paid, cx }; });
+  check('annuler la facture du mois libère le mois ; une facture payée ne s\'annule pas', c.r === true && c.live === false && c.paid === 57 && c.cx === 'paid', JSON.stringify(c));
+
+  const s = await p.evaluate(r => { const B = App.schoolbus, d = new Date(); d.setMonth(d.getMonth() - 3); d.setDate(1); const old = App.isoDate(d), m = old.slice(0, 7); const kid = B.enroll({ name: 'Tom', parentId: 'c3', routeId: B.saveRoute({ name: 'Circuit B', seats: 5, price: 40, stops: 'Gare' }).id, stop: 'Gare', start: old }); const bl = B.bill({ month: m, parentId: 'c3' }); const sus = B.suspended('c3'), ref = B.board(kid.id, 'Matin'), forced = B.board(kid.id, 'Matin', { force: true }); return { bl: !!bl.number, sus, soft: ref.soft === true && /suspendu/i.test(ref.err), ok: !!forced.id }; }, a.id);
+  check('facture impayée depuis plus de 15 jours : service suspendu à l\'embarquement (confirmable par le droit « cash »)', s.bl && s.sus && s.soft && s.ok, JSON.stringify(s));
+  const bo = await p.evaluate(r => { const B = App.schoolbus, k = App.db.sbKids.find(x => x.name === 'Léa'), ok = B.board(k.id, 'Matin'), dup = B.board(k.id, 'Matin').err, soir = B.board(k.id, 'Soir'), fut = B.board(k.id, 'Matin', { date: '2999-01-01' }).err, rt = B.route(r), absent = B.absent(rt, App.today(), 'Matin').map(x => x.name), on = B.on(rt, App.today(), 'Matin').length; B.unboard(ok); return { dup, soir: !!soir.id, fut, absent, on, after: B.on(rt, App.today(), 'Matin').length }; }, a.id);
+  check('embarquement : doublon refusé, matin et soir distincts, futur refusé, absents calculés, annulation du pointage', /Déjà/.test(bo.dup) && bo.soir && /futur/.test(bo.fut) && bo.absent.length === 1 && bo.absent[0] === 'Max' && bo.on === 1 && bo.after === 0, JSON.stringify(bo));
+  const l = await p.evaluate(() => { const B = App.schoolbus, k = App.db.sbKids.find(x => x.name === 'Max'), r = B.leave(k), st0 = r.status, again = B.leave(k).err, del = B.deleteKid(k), re = B.reopen(k); return { st: st0, again: !!again, del, re: re.status }; });
+  check('départ d\'un enfant : sa place est libérée, réinscription possible, une fiche avec factures ne se supprime pas', l.st === 'Parti' && l.again && l.del === false && l.re === 'Actif', JSON.stringify(l));
+  const all = await p.evaluate(() => { const B = App.schoolbus, m = App.today().slice(0, 7), n = B.billAll(m); return { n: n.n, sum: n.sum, left: B.toBill(m).length }; });
+  check('« Facturer le mois » crée les factures manquantes (c1 déjà facturé, c3 sans enfant ce mois)', all.left === 0, JSON.stringify(all));
+  const r = await p.evaluate(() => { const c = App.schoolbus.report({ from: '0000-01-01', to: '9999-12-31', label: '' }); return { kids: c.kids, routes: c.routes, sus: c.suspended, txt: App.schoolbus.reportText({ from: '0000-01-01', to: '9999-12-31', label: 'Tout' }).includes('transport scolaire'), todo: App.schoolbus.todo().length > 0 }; });
+  check('rapport : 3 enfants, 2 circuits, 1 parent suspendu, texte, « À faire »', r.kids === 3 && r.routes === 2 && r.sus === 1 && r.txt && r.todo, JSON.stringify(r));
+  check('Synchro : collections partagées et numéros uniques', await p.evaluate(() => ['sbRoutes', 'sbKids', 'sbAtt', 'sbBills'].every(k => Array.isArray(App.db[k])) && new Set(App.db.sbBills.map(x => x.number)).size === App.db.sbBills.length));
+
+  await go('kids'); await p.evaluate(() => App.schoolbus.kidForm()); await p.waitForSelector('.sheet [name=name]'); await p.fill('.sheet [name=name]', 'Éva'); await p.selectOption('.sheet [name=parentId]', 'c2'); await p.selectOption('.sheet [name=routeId]', { index: 2 }); await p.fill('.sheet [name=stop]', 'Gare'); await p.click('.sheet-wrap.on footer .primary'); await p.waitForTimeout(400);
+  check('inscription par le formulaire : Éva', await p.evaluate(() => App.db.sbKids.some(x => x.name === 'Éva' && x.parentId === 'c2')));
+  for (const tab of ['today', 'kids', 'routes', 'bills', 'rep']) { await go(tab); await p.waitForTimeout(100); }
+  check('les cinq onglets s\'affichent', true);
+  check('aucune erreur JS', t.errors.length === 0, t.errors.join(' | '));
+  await t.browser.close();
+})().catch(e => { console.log('FAIL exception → ' + e.message); process.exit(1); });
