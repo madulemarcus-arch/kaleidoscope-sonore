@@ -6,7 +6,7 @@
   'use strict';
   const App = window.App, $ = App.$, esc = App.esc;
   const CKEY = 'cispolstore-sync';
-  const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'purchases', 'deposits', 'slpays', 'slmail', 'quotes', 'proformas', 'contracts', 'letters', 'cmodels', 'counts', 'orders', 'caisse', 'closings', 'log'];
+  const COLL = ['clients', 'products', 'moves', 'suppliers', 'technicians', 'penalties', 'deliveries', 'invoices', 'payments', 'installs', 'expenses', 'purchases', 'deposits', 'slpays', 'slmail', 'quotes', 'proformas', 'contracts', 'letters', 'cmodels', 'counts', 'orders', 'caisse', 'closings', 'devices', 'log'];
   const SHARED = ['company', 'rate', 'period', 'grace', 'msgs', 'plans', 'users', 'rates', 'instFromCash', 'subFromCash', 'goal', 'gmail']; // PIN, theme and auto-lock stay per device
   const js = JSON.stringify;
 
@@ -94,6 +94,32 @@
     return n;
   };
 
+  // ---------- Devices: who is connected, and revoking a lost phone ----------
+  // Each device is a record of the shared data (id kept on the phone, never exported). The manager can revoke one: the next time that phone synchronises it
+  // sees it was revoked, tells the others it was wiped, and erases its own data. A phone that never goes online again is not reached (see the manager's screen).
+  const DEVK = 'cispol.devid';
+  const devId = () => { try { let v = localStorage.getItem(DEVK); if (!v) { v = App.uid(); localStorage.setItem(DEVK, v); } return v; } catch (e) { return 'x'; } };
+  const guessName = () => { const u = navigator.userAgent || '', m = /Android[^;]*;\s*([^)]+?)\s*(?:Build|\))/.exec(u), os = /iPhone|iPad/.test(u) ? 'iPhone' : m ? m[1] : /Android/.test(u) ? 'Android' : /Windows/.test(u) ? 'Windows' : /Mac/.test(u) ? 'Mac' : /Linux/.test(u) ? 'Linux' : 'Appareil';
+    const who = App.me && App.me() ? App.me().name : ''; return os + (who && who !== 'Administrateur' ? ' · ' + who : ''); };
+  App.devices = () => (App.db.devices = App.db.devices || []);
+  const ensureSelf = () => { const l = App.devices(), id = devId(); let d = l.find(x => x.id === id), ch = false;
+    if (!d) { d = { id, name: guessName(), first: Date.now(), seen: Date.now(), revoked: 0 }; l.push(d); ch = true; }
+    else if (Date.now() - (d.seen || 0) > 6 * 3600e3) { d.seen = Date.now(); ch = true; }
+    return ch; };
+  App.wipeDevice = () => {   // erase everything of this app on this phone, keep only the device id (so a revoked phone stays revoked)
+    cfg = null; window.__wiped = true; App.save = () => {}; App.afterSave = () => {};
+    try { if (window.__enc) { window.__enc.on = false; } } catch (e) {}
+    try { Object.keys(localStorage).filter(k => /^cispol/.test(k) && k !== DEVK).forEach(k => Storage.prototype.removeItem.call(localStorage, k)); } catch (e) {}
+    try { indexedDB.deleteDatabase('cispolstore'); } catch (e) {}
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;background:#0c2542;color:#fff;font-family:sans-serif"><div style="font-size:42px">🔒</div><h1 style="font-size:22px">Appareil révoqué</h1><p style="max-width:320px">Le gérant a révoqué cet appareil. Les données de l\'application ont été effacées de ce téléphone.</p><button style="padding:12px 22px;border:0;border-radius:12px;font-size:16px" onclick="location.reload()">Fermer</button></div>';
+  };
+  // called by the sync engine with what the server holds: if this phone was revoked, say it was wiped (best effort) and erase it
+  const revokedCheck = async (remote, version) => {
+    const mine = (remote.devices || []).find(d => d.id === devId()); if (!mine || !mine.revoked) return false;
+    try { mine.wiped = Date.now(); await rpc('cispol_push', { ...auth(), p_blob: await seal(remote), p_base: version }); } catch (e) {}
+    App.wipeDevice(); return true;
+  };
+
   // ---------- Sync engine ----------
   let busy = false, applying = false, dirty = true, timer = null;
   const ICONS = { off: ['☁️', 'Synchronisation non configurée'], idle: ['☁️', 'Synchronisé'], busy: ['🔄', 'Synchronisation…'], error: ['⚠️', 'Erreur de synchronisation'], offline: ['📴', 'Hors connexion'] };
@@ -108,12 +134,14 @@
     if (!cfg || busy) return S.summary;
     busy = true; setStatus('busy'); let changed = false;
     try {
+      if (ensureSelf()) dirty = true;
       if (!navigator.onLine) { const e = new Error('Pas de connexion internet'); e.offline = true; throw e; }
       for (let attempt = 0; attempt < 4; attempt++) {
         const head = await rpc('cispol_head', auth());
         if (head.exists && !dirty && head.version === cfg.version) { S.summary = 'Déjà à jour'; break; } // nothing new on either side
         let remote = null, version = 0;
         if (head.exists) { const r = await rpc('cispol_pull', auth()); remote = await open(r.blob); version = r.version; }
+        if (remote && await revokedCheck(remote, version)) return 'Appareil révoqué';   // nothing of this phone is sent, everything is erased
         const local = shared(App.db);
         if (remote) {
           const merged = mergeAll(cfg.base ? JSON.parse(cfg.base) : null, local, remote, !cfg.base);
@@ -164,8 +192,24 @@
     const row = (t, s, b) => `<div class="item"><div class="grow"><b>${t}</b><small style="white-space:normal">${s}</small></div>${b || ''}</div>`;
     return `<h2 class="sec">Synchronisation entre appareils</h2><div class="list">
       ${row('État', `<b class="${cls}">${st}</b>${S.error ? ' · ' + esc(S.error) : ''}${cfg ? `<br>Espace « ${esc(cfg.ws)} » · dernière synchronisation : ${when}` : '<br>Utilisez la même application sur plusieurs téléphones ou ordinateurs.'}`, cfg ? '<button class="btn sm" data-act="syncnow">Synchroniser</button>' : '<button class="btn sm" data-act="syncsetup">Configurer</button>')}
+      ${cfg ? row('Appareils connectés', `${App.devices().filter(d => !d.revoked).length} autorisé(s), ${App.devices().filter(d => d.revoked).length} révoqué(s). Pour un téléphone perdu ou volé.`, '<button class="btn sm sec" data-act="syncdev">Gérer</button>') : ''}
       ${cfg ? row('Réglages', 'Données chiffrées avant l\'envoi. Chaque appareil garde son propre PIN.', '<button class="btn sm sec" data-act="syncshow">Afficher les paramètres</button><button class="btn sm del" data-act="syncoff">Déconnecter</button>') : ''}</div>`;
   };
+  const ago = t => { if (!t) return 'jamais'; const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'à l\'instant' : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
+  App.actions.syncdev = () => {
+    const me = devId(), l = App.devices().slice().sort((a, b) => (b.seen || 0) - (a.seen || 0));
+    const row = d => { const st = d.revoked ? (d.wiped ? `<span class="pill bad">Effacé le ${new Date(d.wiped).toLocaleDateString('fr-FR')}</span>` : '<span class="pill warn">Révoqué : sera effacé au prochain passage en ligne</span>') : '<span class="pill ok">Autorisé</span>';
+      const acts = d.id === me ? '' : d.revoked ? (d.wiped ? '' : `<button class="btn sm sec" data-act="syncrestore" data-id="${d.id}">Rétablir</button>`) : `<button class="btn sm del" data-act="syncrevoke" data-id="${d.id}">Révoquer</button>`;
+      return `<div class="card" style="margin:0 0 8px"><div class="spread"><b>${esc(d.name)}${d.id === me ? ' <small class="mut">(cet appareil)</small>' : ''}</b>${st}</div><div class="mut" style="font-size:13px;margin:4px 0">Vu ${ago(d.seen)} · ajouté le ${new Date(d.first || 0).toLocaleDateString('fr-FR')}</div><div class="bar"><button class="btn sm sec" data-act="syncrename" data-id="${d.id}">Renommer</button>${acts}</div></div>`; };
+    App.modal('Appareils connectés', `${l.map(row).join('') || '<p class="mut">Aucun appareil enregistré.</p>'}
+      <p class="mut" style="font-size:13px">Téléphone perdu ou volé : touchez <b>Révoquer</b>. Dès qu'il se reconnecte à internet, il efface ses données et plus rien n'est envoyé. <b>S'il reste hors connexion, il n'est pas atteint</b> : gardez alors le chiffrement par mot de passe activé sur chaque téléphone, et changez les codes PIN des profils concernés.</p>
+      <p class="mut" style="font-size:13px">Tous les téléphones doivent être à jour pour que la révocation soit transmise.</p>`);
+  };
+  App.actions.syncrevoke = d => { const x = App.devices().find(v => v.id === d.id); if (!x || x.id === devId()) return;
+    if (!App.confirm(`Révoquer « ${x.name} » ? Ses données seront effacées dès qu'il se reconnectera à internet.`)) return;
+    x.revoked = Date.now(); x.by = (App.me() || {}).name || ''; if (App.secLog) App.secLog(`a révoqué l'appareil « ${x.name} »`); App.save(); App.actions.syncdev(); S.now(); };
+  App.actions.syncrestore = d => { const x = App.devices().find(v => v.id === d.id); if (!x || x.wiped) return; x.revoked = 0; if (App.secLog) App.secLog(`a rétabli l'appareil « ${x.name} »`); App.save(); App.actions.syncdev(); S.now(); };
+  App.actions.syncrename = d => { const x = App.devices().find(v => v.id === d.id); if (!x) return; const n = (window.prompt("Nom de l'appareil :", x.name) || '').trim(); if (!n) return; x.name = n.slice(0, 40); App.save(); App.actions.syncdev(); };
   App.actions.syncnow = async () => { App.toast('Synchronisation…'); App.toast(await S.now()); };
   // show what is needed to connect another device (the passphrase is never stored, so it cannot be shown)
   App.actions.syncshow = () => {
