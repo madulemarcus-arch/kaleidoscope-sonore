@@ -170,6 +170,13 @@
   const failAdd = () => { const f = failGet(), n = f.n + 1, until = n >= 3 ? Date.now() + Math.min(3600, 30 * 2 ** (n - 3)) * 1000 : 0; failSet({ n, until }); return n; };
   let blockTimer = null;
   const blockTick = () => { clearInterval(blockTimer); blockTimer = null; const m = $('lmsg'); if (!m || blockLeft() <= 0) { if (m && /^Trop/.test(m.textContent)) m.textContent = ''; return; } m.textContent = `Trop d'essais : patientez ${waitTxt(blockLeft())}`; blockTimer = setInterval(() => { const l = blockLeft(), e = $('lmsg'); if (!e || l <= 0) { clearInterval(blockTimer); blockTimer = null; if (e && /^Trop/.test(e.textContent)) e.textContent = ''; } else e.textContent = `Trop d'essais : patientez ${waitTxt(l)}`; }, 1000); };
+  // the code can be typed on the keyboard (default) instead of tapping the on-screen pad: less visible to someone looking over the shoulder
+  const KBK = 'cispol.lockkb', kbOn = () => { try { return localStorage.getItem(KBK) !== '0'; } catch (e) { return true; } };
+  const paintDots = () => document.querySelectorAll('#dots i').forEach((d, i) => d.classList.toggle('f', i < buf.length));
+  const wireKb = () => { const inp = $('lkin'); if (!inp) return;
+    inp.oninput = () => { inp.value = inp.value.replace(/\D/g, '').slice(0, curLen()); buf = inp.value; paintDots(); if (buf.length === curLen()) submitPin(); };
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if (buf.length >= Math.min(...(mode === 'enter' ? lens() : [NEWLEN]))) submitPin(); } };
+    setTimeout(() => { try { inp.focus(); } catch (e) {} }, 60); };
   const drawLock = (msg = '') => {
     lockEl.hidden = false; document.body.style.overflow = 'hidden';
     if (mode === 'recover') {
@@ -181,7 +188,8 @@
     const dots = Array.from({ length: curLen() }, (_, i) => i).map(i => `<i class="${i < buf.length ? 'f' : ''}"></i>`).join('');
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', mixed() ? '✓' : '', '0', '⌫'].map(k => k ? `<button data-k="${k}">${k}</button>` : '<i></i>').join('');
     const cancel = flow !== 'unlock' ? '<button class="lnk" data-lk="cancel">Annuler</button>' : '';
-    lockEl.innerHTML = `<img src="logo.png" alt=""><h1>CISPOLstore Manager</h1><p>Gérez votre activité en toute simplicité</p><p><b>${TITLES[mode]}</b></p><div class="dots" id="dots">${dots}</div><p class="warn" id="lmsg">${msg}</p><div class="pad">${keys}</div>${mode === 'enter' && flow === 'unlock' && App.bio && App.bio.on() ? '<button class="btn sm sec" data-lk="bio">👆 Utiliser l\'empreinte</button>' : ''}${mode === 'enter' && flow === 'unlock' ? '<button class="lnk" data-lk="forgot">Code PIN oublié ?</button>' : ''}${mode === 'new1' && flow === 'setup' ? '<button class="lnk" data-lk="skip">Plus tard</button>' : ''}${cancel}`;
+    lockEl.innerHTML = `<img src="logo.png" alt=""><h1>CISPOLstore Manager</h1><p>Gérez votre activité en toute simplicité</p><p><b>${TITLES[mode]}</b></p><div class="dots" id="dots">${dots}</div><p class="warn" id="lmsg">${msg}</p>${kbOn() ? `<input id="lkin" class="lkin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="${curLen()}" aria-label="Code PIN"><p class="mut" style="font-size:13px;margin:0">Tapez le code avec le clavier${mixed() ? ' puis Entrée' : ''}</p>` : `<div class="pad">${keys}</div>`}<button class="lnk" data-lk="kbtoggle">${kbOn() ? '🔢 Utiliser le pavé à l\'écran' : '⌨️ Saisir avec le clavier'}</button>${mode === 'enter' && flow === 'unlock' && App.bio && App.bio.on() ? '<button class="btn sm sec" data-lk="bio">👆 Utiliser l\'empreinte</button>' : ''}${mode === 'enter' && flow === 'unlock' ? '<button class="lnk" data-lk="forgot">Code PIN oublié ?</button>' : ''}${mode === 'new1' && flow === 'setup' ? '<button class="lnk" data-lk="skip">Plus tard</button>' : ''}${cancel}`;
+    wireKb();
   };
   const unlock = () => { if (App.locked) { const nf = failGet().n; failSet(null); if (nf > 0 && App.secLog) App.secLog(`Ouverture réussie après ${nf} mauvais essai(s) de code`, { by: 'Écran de verrouillage', role: 'lock' }); }   // only a real opening clears the counter (never a cancel)
     lockEl.hidden = true; lockEl.innerHTML = ''; document.body.style.overflow = ''; App.locked = false; lastActive = Date.now(); };
@@ -226,8 +234,18 @@
       buf = ''; first = ''; mode = 'new1'; drawLock('Les deux codes ne correspondent pas');
     }
   };
+  // typing starts at once: while the lock screen is up, a key pressed anywhere goes to the code (no need to tap the field or the pad first)
+  document.addEventListener('keydown', e => {
+    if (lockEl.hidden || e.ctrlKey || e.metaKey || e.altKey || mode === 'recover' || mode === 'showrec') return;
+    const act = document.activeElement, inp = $('lkin'); if (act === inp && inp) return;                    // the field is already focused: it takes the key itself
+    if (act && act !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)) return;
+    if (inp) { if (/^\d$/.test(e.key) || e.key === 'Backspace' || e.key === 'Enter') inp.focus(); return; }   // keyboard mode: focus, the key then lands in the field
+    const b = /^\d$/.test(e.key) ? e.key : e.key === 'Backspace' ? '⌫' : e.key === 'Enter' ? '✓' : '';     // pad mode: the same as tapping the key
+    const k = b && lockEl.querySelector(`[data-k="${b}"]`); if (k) { e.preventDefault(); k.click(); }
+  });
   lockEl.addEventListener('click', async e => {
     const k = e.target.closest('[data-k]'), l = e.target.closest('[data-lk]');
+    if (!k && !l && kbOn() && $('lkin')) { $('lkin').focus(); return; }   // a tap anywhere brings the keyboard back
     if (k) {
       if (mode === 'enter' && blockLeft() > 0) return blockTick();
       if (k.dataset.k === '✓') { if (buf.length >= Math.min(...lens())) submitPin(); return; }
@@ -239,6 +257,7 @@
     if (!l) return;
     const a = l.dataset.lk;
     if (a === 'bio') App.bio.prompt(true);
+    else if (a === 'kbtoggle') { try { localStorage.setItem(KBK, kbOn() ? '0' : '1'); } catch (e) {} buf = ''; drawLock(); }
     else if (a === 'forgot') { mode = 'recover'; drawLock(); blockTick(); }
     else if (a === 'back') { App.showLock('enter', 'unlock'); }
     else if (a === 'skip' || a === 'cancel') unlock();

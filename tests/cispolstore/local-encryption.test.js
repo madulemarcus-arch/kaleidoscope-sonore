@@ -35,6 +35,8 @@ const SECRET = 'Zéphyrine-Confidentielle', SYNC = JSON.stringify({ key: 'CLE-SY
   ok('after a restart, the passphrase screen is shown and the application is NOT started', !!(await p.$('#gp')) && await p.evaluate(() => !window.App));
   await unlock('mauvais-mot-de-passe'); await p.waitForFunction(() => /incorrect/.test(document.getElementById('gm').textContent), null, { timeout: 10000 });
   ok('a wrong passphrase is refused, the app stays closed', await p.evaluate(() => !window.App && !!document.getElementById('gp')));
+  await p.evaluate(() => { document.getElementById('gp').value = ''; document.activeElement.blur(); }); await p.keyboard.type('abc');
+  ok('typing starts at once on the passphrase screen (no tap on the field)', await p.evaluate(() => document.getElementById('gp').value === 'abc'));
   await unlock('phrase-secrete-1'); await booted();
   ok('the right passphrase starts the application with ALL the data (both clients)', await p.evaluate(() => App.db.clients.length === 2 && !!App.client('c2')));
   await p.waitForTimeout(1500); ok('the wrong passphrase typed before the opening is reported in the journal', await p.evaluate(() => (App.db.audit || []).some(e => e.kind === 'sec' && e.fail && /mauvais essai\(s\) du mot de passe/.test(e.text))));

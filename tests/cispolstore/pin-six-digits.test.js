@@ -6,7 +6,8 @@ let f = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + 
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }), p = await (await b.newContext({ ...devices['Pixel 5'] })).newPage(), errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   const pin = async d => { for (const c of d) await p.click(`#lock [data-k="${c}"]`); await p.waitForTimeout(250); };
-  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.addInitScript(() => { try { localStorage.setItem('cispol.lockkb', '0'); } catch (e) {} });
+await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   // 1. creating a PIN: 6 dots, 6 digits needed, confirmation must match
   await p.evaluate(() => App.showLock('new1', 'setup')); await p.waitForTimeout(200);
   ok('creation screen asks for 6 digits with 6 dots', /6 chiffres/.test(await p.innerText('#lock')) && await p.locator('#lock .dots i').count() === 6);
