@@ -21,12 +21,18 @@ let f = 0; const ok = (n, c, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + 
   await p.evaluate(() => localStorage.removeItem('cispol.pinfail'));
   await p.keyboard.type('246810'); await p.waitForTimeout(500);
   ok('the right code typed on the keyboard opens the application', await p.evaluate(() => !App.locked && document.getElementById('lock').hidden));
+  // typing starts at once: no tap on the field, the keys go to the code wherever the focus is
+  await p.evaluate(() => App.showLock('enter', 'unlock')); await p.waitForTimeout(200);
+  await p.evaluate(() => document.activeElement.blur()); await p.keyboard.type('2468'); await p.waitForTimeout(150);
+  ok('keyboard mode: digits typed without focus still fill the dots', await p.locator('#lock .dots i.f').count() === 4 && await p.evaluate(() => document.activeElement.id === 'lkin'));
+  await p.keyboard.type('10'); await p.waitForTimeout(500);
+  ok('...and the code opens the application', await p.evaluate(() => !App.locked));
   // switch to the pad and back
   await p.evaluate(() => App.showLock('enter', 'unlock')); await p.waitForTimeout(200);
   await p.click('[data-lk=kbtoggle]'); await p.waitForTimeout(200);
   ok('switch: the on-screen pad appears and the choice is remembered', await p.locator('#lock .pad').count() === 1 && await p.locator('#lock #lkin').count() === 0 && await p.evaluate(() => localStorage.getItem('cispol.lockkb') === '0'));
-  for (const c of '246810') await p.click(`#lock [data-k="${c}"]`); await p.waitForTimeout(400);
-  ok('the pad still opens the application', await p.evaluate(() => !App.locked));
+  await p.keyboard.type('246810'); await p.waitForTimeout(500);
+  ok('pad mode: the physical keyboard also types the code without tapping the pad', await p.evaluate(() => !App.locked));
   await p.evaluate(() => App.showLock('enter', 'unlock')); await p.waitForTimeout(200); await p.click('[data-lk=kbtoggle]'); await p.waitForTimeout(200);
   ok('switch back to the keyboard', await p.locator('#lock #lkin').count() === 1 && await p.evaluate(() => localStorage.getItem('cispol.lockkb') === '1'));
   // Enter validates a short code (older 4-digit codes among 6-digit profiles)

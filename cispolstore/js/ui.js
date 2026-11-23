@@ -234,6 +234,15 @@
       buf = ''; first = ''; mode = 'new1'; drawLock('Les deux codes ne correspondent pas');
     }
   };
+  // typing starts at once: while the lock screen is up, a key pressed anywhere goes to the code (no need to tap the field or the pad first)
+  document.addEventListener('keydown', e => {
+    if (lockEl.hidden || e.ctrlKey || e.metaKey || e.altKey || mode === 'recover' || mode === 'showrec') return;
+    const act = document.activeElement, inp = $('lkin'); if (act === inp && inp) return;                    // the field is already focused: it takes the key itself
+    if (act && act !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)) return;
+    if (inp) { if (/^\d$/.test(e.key) || e.key === 'Backspace' || e.key === 'Enter') inp.focus(); return; }   // keyboard mode: focus, the key then lands in the field
+    const b = /^\d$/.test(e.key) ? e.key : e.key === 'Backspace' ? '⌫' : e.key === 'Enter' ? '✓' : '';     // pad mode: the same as tapping the key
+    const k = b && lockEl.querySelector(`[data-k="${b}"]`); if (k) { e.preventDefault(); k.click(); }
+  });
   lockEl.addEventListener('click', async e => {
     const k = e.target.closest('[data-k]'), l = e.target.closest('[data-lk]');
     if (!k && !l && kbOn() && $('lkin')) { $('lkin').focus(); return; }   // a tap anywhere brings the keyboard back

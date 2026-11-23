@@ -107,4 +107,5 @@
   $('gb').onclick = go; $('gp').onkeydown = e => { if (e.key === 'Enter') go(); }; $('gf').onclick = () => { $('gh').style.display = 'block'; };
   $('gw').onclick = async () => { if (confirm('Effacer toutes les données de ce téléphone ? Elles ne pourront être récupérées que par une sauvegarde ou la synchronisation.')) { await E.wipe(); location.reload(); } };
   $('gp').focus(); tick();
+  document.addEventListener('keydown', e => { const p = $('gp'); if (p && document.activeElement !== p && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) p.focus(); });   // typing starts at once
 })();
