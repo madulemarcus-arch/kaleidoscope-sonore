@@ -6,7 +6,8 @@ const nav = p => p.evaluate(() => [...document.querySelectorAll('#bottom [data-v
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); const ctx = await b.newContext({ ...devices['Pixel 5'] }); const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-  await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
+  await p.addInitScript(() => { try { localStorage.setItem('cispol.lockkb', '0'); } catch (e) {} });
+await p.goto(BASE + '/index.html'); await p.waitForTimeout(500); await p.click('[data-lk=skip]').catch(() => {});
   await p.evaluate(() => { const t = App.today(); App.db.clients.push({ id: 'c1', code: 'CL-1', type: 'gere', first: 'Awa', last: 'D', name: 'Awa D', phone: '0812345678', address: 'Av. Kasa-Vubu 12', plan: 'Résidentiel', price: 70, start: t, period: 30, grace: 15, subs: [], created: t });
     App.db.products.push({ id: 'p1', name: 'Starlink Mini', cat: 'Kits Starlink', ref: '', unit: 'pièce', qty: 5, cost: 300, price: 450, min: 1 });
     App.db.invoices.push({ id: 'i1', number: 'FAC-1', type: 'materiel', clientId: 'c1', date: t, currency: 'USD', lines: [{ pid: 'p1', desc: 'Starlink Mini', qty: 1, price: 450, cost: 300 }], created: t }); App.save(); });
