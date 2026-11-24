@@ -1,0 +1,53 @@
+// Import / export: JSON project, DXF (millimetres), PNG, and file helpers.
+(function () {
+  const A = window.App;
+  const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  A.download = download;
+  const base = () => (A.doc.name || 'plan').replace(/[^\w\-À-ÿ ]+/g, '').trim().replace(/\s+/g, '-') || 'plan';
+  A.exportJSON = () => download(base() + '.archi.json', new Blob([JSON.stringify(A.doc, null, 1)], { type: 'application/json' }));
+  A.importJSON = text => { const d = JSON.parse(text); if (!A.valid(d)) throw new Error('Fichier non reconnu'); A.setDoc(A.ensureDoc(d)); };
+
+  // ---------- DXF (R12 ASCII, 1 unit = 1 mm) ----------
+  const ascii = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '?');
+  const lname = l => ascii(l.name).replace(/[^A-Za-z0-9_$-]/g, '_').toUpperCase() || 'CALQUE';
+  A.toDXF = () => {
+    const out = [], g = (c, v) => out.push(String(c), String(v)), mm = v => Math.round(v * 1000 * 100) / 100, doc = A.doc;
+    g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(0, 'ENDSEC');
+    g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, doc.layers.length + 1);
+    doc.layers.forEach(l => { g(0, 'LAYER'); g(2, lname(l)); g(70, 0); g(62, 7); g(6, 'CONTINUOUS'); }); g(0, 'LAYER'); g(2, 'AXES'); g(70, 0); g(62, 5); g(6, 'CONTINUOUS'); g(0, 'ENDTAB'); g(0, 'ENDSEC');
+    g(0, 'SECTION'); g(2, 'ENTITIES');
+    const line = (a, b, ly) => { if (A.dist(a, b) < 1e-6) return; g(0, 'LINE'); g(8, ly); g(10, mm(a[0])); g(20, mm(a[1])); g(30, 0); g(11, mm(b[0])); g(21, mm(b[1])); g(31, 0); };
+    const text = (s, p, h, ly, ang) => { g(0, 'TEXT'); g(8, ly); g(10, mm(p[0])); g(20, mm(p[1])); g(30, 0); g(40, mm(h)); g(1, ascii(s)); if (ang) g(50, Math.round(ang * 100) / 100); };
+    doc.items.filter(A.shown).forEach(it => { const l = A.layer(it.layer) || doc.layers[0], ly = lname(l);
+      if (it.t === 'line') line(it.a, it.b, ly);
+      else if (it.t === 'wall') { const w = A.wallGeom(it), ops = A.openings(it).map(o => [A.openPos(o, it) - o.w / 2, A.openPos(o, it) + o.w / 2]).sort((x, y) => x[0] - y[0]);
+        const at = (s, k) => [it.a[0] + w.u[0] * s + w.n[0] * k, it.a[1] + w.u[1] * s + w.n[1] * k], s0 = -w.ea, s1 = w.len + w.eb; let cur = s0;
+        const faces = (x, y) => { line(at(x, w.h), at(y, w.h), ly); line(at(x, -w.h), at(y, -w.h), ly); };
+        ops.forEach(o => { if (o[0] > cur) faces(cur, o[0]); line(at(o[0], w.h), at(o[0], -w.h), ly); line(at(o[1], w.h), at(o[1], -w.h), ly); cur = Math.max(cur, o[1]); });
+        if (s1 > cur) faces(cur, s1); if (!w.ea) line(at(s0, w.h), at(s0, -w.h), ly); if (!w.eb) line(at(s1, w.h), at(s1, -w.h), ly); }
+      else if (it.t === 'dim') { const d = A.dimGeom(it); line(it.a, d.a2, ly); line(it.b, d.b2, ly); line(d.a2, d.b2, ly);
+        let ang = Math.atan2(d.u[1], d.u[0]) * 180 / Math.PI; text(A.fmt(d.len) + ' m', [(d.a2[0] + d.b2[0]) / 2 + d.n[0] * 0.05, (d.a2[1] + d.b2[1]) / 2 + d.n[1] * 0.05], 0.15, ly, ang); }
+      else if (it.t === 'voile') { const w = A.wallGeom({ a: it.a, b: it.b, th: it.th, id: '_v' }), P = w.poly; P.forEach((p, i) => line(p, P[(i + 1) % 4], ly)); }
+      else if (it.t === 'rail') line(it.a, it.b, ly);
+      else if (it.t === 'stair') { const W = A.stairs.world(it, A.stairs.calcItem(it)); W.steps.forEach(s => s.poly.forEach((p, i) => line(p, s.poly[(i + 1) % s.poly.length], ly))); for (let k = 0; k + 1 < W.path.length; k++) line(W.path[k], W.path[k + 1], ly); }
+      else if (it.t === 'furn') { const P = A.furnPoly(it); P.forEach((p, i) => line(p, P[(i + 1) % 4], ly)); text((A.FURN[it.kind] || [it.kind])[0], it.p, 0.15, ly); }
+      else if (it.t === 'text') text(it.s, it.p, it.size, ly);
+    });
+    // building axes on their own layer (lines, names at both ends; rings as circles)
+    if (A.axes && A.axes.has()) { const gr = doc.grid, e = A.axes.ext(), th = 0.2;
+      if (gr.sys === 'cyl') { const c = gr.cyl.c; gr.cyl.r.forEach(r => { g(0, 'CIRCLE'); g(8, 'AXES'); g(10, mm(c[0])); g(20, mm(c[1])); g(30, 0); g(40, mm(r.v)); text(r.n, [c[0], c[1] - r.v - 0.3], th, 'AXES'); });
+        gr.cyl.a.forEach(a => { const u = [Math.cos(a.v * Math.PI / 180), Math.sin(a.v * Math.PI / 180)], end = [c[0] + u[0] * e.R, c[1] + u[1] * e.R]; line(c, end, 'AXES'); text(a.n, [end[0] + u[0] * 0.3, end[1] + u[1] * 0.3], th, 'AXES'); }); }
+      else { gr.x.forEach(x => { line([x.p, e.y0], [x.p, e.y1], 'AXES'); text(x.n, [x.p - 0.1, e.y1 + 0.3], th, 'AXES'); text(x.n, [x.p - 0.1, e.y0 - 0.5], th, 'AXES'); });
+        gr.y.forEach(y => { line([e.x0, y.p], [e.x1, y.p], 'AXES'); text(y.n, [e.x0 - 0.6, y.p - 0.1], th, 'AXES'); text(y.n, [e.x1 + 0.3, y.p - 0.1], th, 'AXES'); }); } }
+    g(0, 'ENDSEC'); g(0, 'EOF'); return out.join('\n') + '\n';
+  };
+  A.exportDXF = () => download(base() + '.dxf', new Blob([A.toDXF()], { type: 'application/dxf' }));
+
+  // ---------- PNG (white background, black ink, whole drawing) ----------
+  A.exportPNG = () => {
+    const b = A.bounds(); if (!b) return false; const m = 0.6, w = b.x1 - b.x0 + 2 * m, h = b.y1 - b.y0 + 2 * m, s = Math.min(2400 / Math.max(w, h), 400);
+    const cv = document.createElement('canvas'); cv.width = Math.ceil(w * s); cv.height = Math.ceil(h * s);
+    const v = { s, ox: (m - b.x0) * s, oy: (b.y1 + m) * s }; A.render(cv.getContext('2d'), cv.width, cv.height, v, 'print', {});
+    cv.toBlob(bl => download(base() + '.png', bl), 'image/png'); return true;
+  };
+})();
