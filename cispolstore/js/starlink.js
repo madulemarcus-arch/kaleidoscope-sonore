@@ -40,6 +40,27 @@
     };
   };
 
+  // "Part de CISPOLstore": what stays with CISPOLstore in each payment (the rest goes to Starlink and to the technicians), by month
+  App.mineStats = () => {
+    const by = {}, add = (d, k, v) => { const m = d.slice(0, 7); (by[m] = by[m] || { own: 0, pen: 0, inst: 0, sub: 0 })[k] += v; };
+    App.db.payments.forEach(p => { const q = App.payParts(p); add(p.date, 'own', U(q.own, p.currency, p)); add(p.date, 'inst', U(q.inst, p.currency, p)); add(p.date, 'sub', U(q.sub, p.currency, p)); });
+    (App.db.penalties || []).filter(p => p.paid).forEach(p => { const c = p.cost === undefined || p.cost === '' ? p.amount : p.cost; add(p.paid, 'pen', U(Math.max(0, p.amount - c), p.currency, p)); });
+    Object.values(by).forEach(o => { o.mine = o.own + o.pen; });
+    const t = App.today().slice(0, 7), pd = new Date(+t.slice(0, 4), +t.slice(5) - 2, 1), pm = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
+    return { by, total: Object.values(by).reduce((a, o) => a + o.mine, 0), cur: (by[t] || {}).mine || 0, prev: (by[pm] || {}).mine || 0, t, pm };
+  };
+  App.views.mine = () => {
+    const s = App.mineStats(), months = Object.keys(s.by).sort().reverse(), money = n => App.fmt(Math.round(n * 100) / 100);
+    return {
+      title: 'Part de CISPOLstore', sub: 'Ce qui vous revient', back: 'more', nav: 'more',
+      html: `<section class="hero dhero"><div class="hero-top"><div><small>💼 Revenu de CISPOLstore, ${esc(mlabel(s.t))}</small><div class="hero-num" data-count="${s.cur}">${money(s.cur)}</div></div></div>
+          <div class="cstats"><div><b>${money(s.prev)}</b><small>${esc(mlabel(s.pm))}</small></div><div><b>${money(s.total)}</b><small>total depuis le début</small></div></div></section>
+        <p class="mut" style="font-size:13px;margin:0 0 10px">Dans chaque paiement reçu, une partie va à Starlink (abonnement) et aux techniciens (installation) : le reste, avec la part CISPOLstore des pénalités payées, est ce qui revient à CISPOLstore.</p>
+        <h2 class="sec">Revenu de CISPOLstore, mois par mois</h2>
+        ${months.length ? `<div class="list">${months.map(m => { const o = s.by[m]; return `<div class="item"><span class="avatar">💼</span><div class="grow"><b>${esc(mlabel(m))}</b><small>Kits, matériel, autres ${money(o.own)}${o.pen ? ' · pénalités ' + money(o.pen) : ''}</small><small>Pour Starlink ${money(o.sub)} · techniciens ${money(o.inst)}</small></div><div class="end"><b>${money(o.mine)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Aucun paiement pour le moment.</div>'}`
+    };
+  };
+
   const form = r => {
     if (!App.can('finance')) return App.toast('Action réservée au gérant ou au comptable');
     const isNew = !r, t = App.today(), due = App.slDue();
