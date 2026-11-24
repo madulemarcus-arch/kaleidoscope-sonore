@@ -29,6 +29,7 @@
     deliveries: o => `une livraison pour ${cl(o.clientId)}`,
     counts: o => `l'inventaire ${o.no}`,
     orders: o => `le bon de commande ${o.no}`,
+    mcloses: o => `la clôture du mois ${o.month}`,
     closings: o => `la clôture du ${App.fdate(o.date)}`,
     caisse: o => `un comptage de caisse du ${App.fdate(o.date)}`,
   };

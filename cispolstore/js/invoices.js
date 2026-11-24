@@ -199,6 +199,7 @@
         const pend = !!($('f_pend') && $('f_pend').checked);
         const hp0 = App.n('f_hagp'), oldNeg = !pend && gInv > 0 && gInv < total - 0.004 && !(hp0 > 0);
         if ($('f_neg').checked && !oldNeg) { if (!(hp0 > 0) || hp0 >= total - 0.004) { App.toast(`Prix convenu : entrez un montant inférieur au total (${App.fmt(total, curr)})`); return false; } if (gInv > hp0 + 0.004) { App.toast(pend ? 'L\'acompte ne peut pas dépasser le prix convenu' : 'Le client a donné plus que le prix convenu'); return false; } }
+        if (App.closedGuard && payAmount > 0 && App.closedGuard(date)) return false;
         const inv = App.createInvoice({ type, clientId: cid, currency: curr, payMode: mode, date, lines, rate, pending: pend || undefined, payAmount, payCur: pc, payRef: App.v('f_ref') }, 0);
         const fx = { renewed, prevSub };
         if (['installation', 'complete'].includes(type) && cid) {
@@ -462,6 +463,7 @@
        ${F.text('f_ref', 'Référence (n° transaction)', '')}${F.text('f_com', 'Commentaire', '')}`,
       () => {
         let amt = App.n('f_amt'); if (amt <= 0) { App.toast('Montant invalide'); return false; }
+        if (App.closedGuard && App.closedGuard(App.v('f_date') || App.today())) return false;
         const i = App.invoice(App.v('f_inv')), cid = App.v('f_cl') || (i ? i.clientId : ''), rate = App.n('f_rate') > 0 ? Math.round(App.n('f_rate')) : App.rate();
         if (i && App.conv(amt, App.v('f_cur'), i.currency, rate) > bal(i) + 0.004 && bal(i) > 0.004) amt = Math.round(App.conv(bal(i), i.currency, App.v('f_cur'), rate) * 100) / 100; // never record more than the balance
         if (App.capGate && !App.capGate(App.conv(amt, App.v('f_cur'), 'USD', rate), 'un encaissement', () => $('dok').click())) return false;
@@ -519,7 +521,7 @@
     };
   };
   App.actions.paymode = d => { pq.mode = d.m; App.refresh(); };
-  App.actions.delpay = d => { if (!App.confirm('Supprimer ce paiement ?')) return; App.db.payments = App.db.payments.filter(p => p.id !== d.id); App.save(); App.refresh(); };
+  App.actions.delpay = d => { const pp = App.db.payments.find(p => p.id === d.id); if (pp && App.closedGuard && App.closedGuard(pp.date)) return; if (!App.confirm('Supprimer ce paiement ?')) return; App.db.payments = App.db.payments.filter(p => p.id !== d.id); App.save(); App.refresh(); };
 
   // ---------- Expenses ----------
   App.views.expenses = () => {
@@ -531,9 +533,10 @@
   };
   App.actions.newexp = () => App.modal('Nouvelle dépense', `${F.text('f_label', 'Libellé', '')}${F.sel('f_cat', 'Catégorie', App.EXP_CATS)}<div class="row">${F.num('f_amt', 'Montant', '')}${F.sel('f_cur', 'Devise', CUR, 'USD')}</div><div class="row">${F.date('f_date', 'Date', App.today())}${F.sel('f_mode', 'Payé par', App.PAY_MODES, 'Cash')}</div>`, () => {
     if (!App.v('f_label') || App.n('f_amt') <= 0) { App.toast('Libellé et montant requis'); return false; }
+    if (App.closedGuard && App.closedGuard(App.v('f_date') || App.today())) return false;
     App.db.expenses.push({ id: App.uid(), label: App.v('f_label'), cat: App.v('f_cat'), amount: App.n('f_amt'), currency: App.v('f_cur'), mode: App.v('f_mode'), date: App.v('f_date') || App.today() }); App.save(); App.refresh();
   });
-  App.actions.delexp = d => { if (!App.confirm('Supprimer cette dépense ?')) return; App.db.expenses = App.db.expenses.filter(e => e.id !== d.id); App.save(); App.refresh(); };
+  App.actions.delexp = d => { const ee = App.db.expenses.find(e => e.id === d.id); if (ee && App.closedGuard && App.closedGuard(ee.date)) return; if (!App.confirm('Supprimer cette dépense ?')) return; App.db.expenses = App.db.expenses.filter(e => e.id !== d.id); App.save(); App.refresh(); };
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-csv="depenses"]'); if (!b) return;
     App.download(`cispolstore-depenses-${App.today()}.csv`, App.csv([['Date', 'Libellé', 'Catégorie', 'Montant', 'Devise'], ...App.db.expenses.map(x => [x.date, x.label, x.cat, x.amount, x.currency])]), 'text/csv');

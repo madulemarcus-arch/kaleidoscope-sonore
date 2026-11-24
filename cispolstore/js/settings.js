@@ -133,6 +133,7 @@
       if (!Array.isArray(d.penalties)) d.penalties = [];
       if (!Array.isArray(d.deliveries)) d.deliveries = [];
       if (!Array.isArray(d.closings)) d.closings = [];
+      if (!Array.isArray(d.mcloses)) d.mcloses = [];
       if (!App.confirm('Remplacer toutes les données actuelles par cette sauvegarde ?' + (App.syncConfigured() ? ' Attention : la synchronisation enverra ce remplacement aux autres appareils.' : ''))) return false;
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
       d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, decor: keep.decor, bgs: keep.bgs, fx: keep.fx, lockMin: keep.lockMin };

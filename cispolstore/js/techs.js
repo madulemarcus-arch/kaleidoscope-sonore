@@ -53,9 +53,10 @@
   App.actions.paytech = d => {
     const t = App.tech(d.id); if (!t) return;
     const todo = jobs(t).filter(x => !x.techPaid), sum = todo.reduce((a, x) => a + comm(t, x), 0);
+    if (App.closedGuard && App.closedGuard(App.today())) return;
     if (!(sum > 0) || !App.confirm(`Payer ${App.fmt(sum)} de commission à ${t.name} (${todo.length} intervention(s)) ? Une dépense sera enregistrée.`)) return;
     todo.forEach(x => { x.techComm = comm(t, x); x.techPaid = App.today(); });
-    App.db.expenses.push({ id: App.uid(), label: 'Commission ' + t.name, cat: 'Commission technicien', amount: sum, currency: 'USD', date: App.today() });
+    App.db.expenses.push({ id: App.uid(), label: 'Commission ' + t.name, cat: 'Commission technicien', techId: t.id, amount: sum, currency: 'USD', date: App.today() });
     App.save(); App.toast('Commission payée et dépense enregistrée'); App.refresh();
   };
   // single window of the "Technicien" profile: own interventions + record a new installation

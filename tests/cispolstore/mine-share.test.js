@@ -17,7 +17,40 @@ ok('mine = 300 kit + 6 penalty share = 306',Math.abs(st.cur-306)<0.01&&Math.abs(
 ok('mine + starlink + technicians = all cash received (+ penalty)',await p.evaluate(()=>{const o=Object.values(App.mineStats().by)[0];return Math.abs(o.mine+o.sub+o.inst+4-(380+10))<0.01}));
 await p.evaluate(()=>App.go('mine'));await p.waitForTimeout(1300);
 let t=await p.innerText('#view');ok('hero shows 306',/306/.test(await p.innerText('.dhero')),t.replace(/\n/g,' | '));
-ok('month list shows Pour Starlink 80',/Pour Starlink 80/.test(t));
+ok('month list shows Pour Starlink 80',/Starlink 80/.test(t));
+await p.evaluate(()=>App.go('more'));
+// --- technicians, net, check, closing ---
+await p.evaluate(()=>{const t=App.today(),pm=(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,10)})();
+App.db.technicians.push({id:'t1',name:'Marc',active:true,role:'Technicien'});
+const inv=App.createInvoice({type:'installation',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Installation Starlink',qty:1,price:100,cost:0}],payAmount:100},0);
+App.db.installs.push({id:'i1',clientId:'c1',invoiceId:inv.id,tech:'Marc',techId:'t1',date:t,price:100,kind:'Pose'});
+App.db.expenses.push({id:'e1',label:'Commission Marc',cat:'Commission technicien',techId:'t1',amount:30,currency:'USD',date:t});
+App.db.expenses.push({id:'e2',label:'Loyer',cat:'Loyer',amount:50,currency:'USD',date:t});
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:pm,lines:[{pid:'',desc:'Routeur',qty:1,price:40,cost:0}],payAmount:40},0);window.__pm=pm.slice(0,7);App.save()});
+let m=await p.evaluate(()=>{const s=App.mineStats(),o=s.by[s.t];return {mine:o.mine,net:o.net,inst:o.inst,td:s.tech.t1.inst-s.tech.t1.paid,gap:o.gap}});
+ok('mine still 306 with an install invoice',Math.abs(m.mine-306)<0.01,JSON.stringify(m));
+ok('net = 306 - 50 rent (commission comes out of the installations)',Math.abs(m.net-256)<0.01);
+ok('technician balance = 100 - 30',Math.abs(m.td-70)<0.01);
+ok('check balances (no gap)',Math.abs(m.gap)<0.01);
+await p.evaluate(()=>App.go('mine'));await p.waitForTimeout(1200);t=await p.innerText('#view');
+ok('screen shows net and technician Marc 70 à payer',/net du mois/.test(t)&&/Marc/.test(t)&&/70/.test(t)&&/à payer/.test(t),t.replace(/\n/g,' | ').slice(0,500));
+await p.evaluate(()=>App.actions.mine_pay({id:'t1'}));await p.waitForTimeout(400);
+ok('pay form prefilled with 70',await p.inputValue('#f_ta')==='70');
+await p.fill('#f_ta','20');await p.click('dialog .btn:not(.sec)').catch(()=>{});await p.waitForTimeout(600);
+ok('after paying 20, balance 50 and a technician expense exists',await p.evaluate(()=>{const s=App.mineStats();return Math.abs(s.tech.t1.inst-s.tech.t1.paid-50)<0.01&&App.db.expenses.some(e=>e.techId==='t1'&&e.amount===20)}));
+// commission above the installations: the extra is a cost
+await p.evaluate(()=>{App.db.expenses.push({id:'e3',label:'Commission Marc',cat:'Commission technicien',techId:'t1',amount:80,currency:'USD',date:App.today()})});
+ok('commission 130 > installs 100: 30 absorbed by the company',await p.evaluate(()=>{const s=App.mineStats(),o=s.by[s.t];return Math.abs(o.cost-30)<0.01&&Math.abs(o.net-(306-50-30))<0.01}));
+await p.evaluate(()=>{App.db.expenses=App.db.expenses.filter(e=>e.id!=='e3')});
+// closing
+await p.evaluate(()=>App.actions.mine_close({m:window.__pm}));await p.waitForTimeout(500);
+ok('past month closed',await p.evaluate(()=>App.db.mcloses.length===1&&App.db.mcloses[0].month===window.__pm));
+ok('closed month blocks an expense dated in it',await p.evaluate(()=>App.closedGuard(window.__pm+'-15')===true));
+ok('current month still open',await p.evaluate(()=>App.closedGuard(App.today())===false));
+ok('current month cannot be closed',await p.evaluate(()=>{App.actions.mine_close({m:App.today().slice(0,7)});return App.db.mcloses.length===1}));
+await p.evaluate(()=>App.actions.mine_open({m:window.__pm}));await p.waitForTimeout(300);
+ok('reopened',await p.evaluate(()=>App.db.mcloses.length===0&&App.closedGuard(window.__pm+'-15')===false));
+ok('CSV table has one line per month + header',await p.evaluate(()=>{let got='';const o=App.download;App.download=(n,t)=>{got=t};App.actions.mine_csv();App.download=o;return got.split('\n').length===3&&/Part/.test(got)}));
 await p.evaluate(()=>{App.db.settings.company.name='Mon Magasin';App.go('mine')});await p.waitForTimeout(900);ok('title follows the company name',/Part de Mon Magasin/.test(await p.innerText('body'))&&/Revenu de Mon Magasin/.test(await p.innerText('.dhero')));
 await p.evaluate(()=>{App.go('more')});await p.waitForTimeout(500);ok('menu entry follows the company name',/Part de Mon Magasin/.test(await p.innerText('#view')));
 await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('more')});await p.waitForTimeout(500);
