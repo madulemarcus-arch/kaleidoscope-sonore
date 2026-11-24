@@ -51,6 +51,15 @@ ok('current month cannot be closed',await p.evaluate(()=>{App.actions.mine_close
 await p.evaluate(()=>App.actions.mine_open({m:window.__pm}));await p.waitForTimeout(300);
 ok('reopened',await p.evaluate(()=>App.db.mcloses.length===0&&App.closedGuard(window.__pm+'-15')===false));
 ok('CSV table has one line per month + header',await p.evaluate(()=>{let got='';const o=App.download;App.download=(n,t)=>{got=t};App.actions.mine_csv();App.download=o;return got.split('\n').length===3&&/Part/.test(got)}));
+// --- visibility: side menu entry and home card ---
+await p.evaluate(()=>{App.db.settings.company.name='CISPOLstore';App.refresh();App.go('home')});await p.waitForTimeout(900);
+ok('side menu has the entry, named after the company',await p.evaluate(()=>{const b=document.querySelector('#side [data-v=mine]');return !!b&&!b.hidden&&/Part de CISPOLstore/.test(b.textContent)}));
+ok('home card shows the part and the net',/Part de CISPOLstore : \d/.test(await p.innerText('#view')));
+await p.evaluate(()=>{App.db.settings.company.name='Mon Magasin';App.refresh()});await p.waitForTimeout(400);
+ok('side menu label follows a renamed company',await p.evaluate(()=>/Part de Mon Magasin/.test(document.querySelector('#side [data-v=mine]').textContent)));
+await p.evaluate(()=>{document.querySelector('#side [data-v=mine]').click()});await p.waitForTimeout(800);
+ok('clicking the side entry opens the screen',await p.evaluate(()=>App.state.view==='mine'));
+await p.evaluate(()=>{App.db.settings.company.name='CISPOLstore'});
 await p.evaluate(()=>{App.db.settings.company.name='Mon Magasin';App.go('mine')});await p.waitForTimeout(900);ok('title follows the company name',/Part de Mon Magasin/.test(await p.innerText('body'))&&/Revenu de Mon Magasin/.test(await p.innerText('.dhero')));
 await p.evaluate(()=>{App.go('more')});await p.waitForTimeout(500);ok('menu entry follows the company name',/Part de Mon Magasin/.test(await p.innerText('#view')));
 await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('more')});await p.waitForTimeout(500);

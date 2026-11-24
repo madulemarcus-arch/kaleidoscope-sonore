@@ -10,6 +10,9 @@
   const COMM = 'Commission technicien';
   const isAdmin = () => !App.multi() || (App.user && App.user.role === 'admin');
   App.mineName = () => ((App.db.settings.company || {}).name || '').trim() || 'CISPOLstore';
+  // the side menu label follows the company name
+  const paintSide = () => { const b = document.querySelector('#side [data-v=mine]'); if (b && b.lastChild) b.lastChild.textContent = 'Part de ' + App.mineName(); };
+  const origRefresh = App.refresh; App.refresh = function () { const r = origRefresh.apply(this, arguments); paintSide(); return r; }; paintSide();
   const closes = () => (App.db.mcloses = App.db.mcloses || []);
   const closing = m => closes().find(c => c.month === m);
   // a closed month no longer accepts payments or expenses (the administrator can reopen it)

@@ -105,7 +105,7 @@
   const SIDE = [['home', '🏠', 'Accueil'], ['clients', '👥', 'Clients'], ['subs', '📡', 'Abonnements'], ['relances', '💬', 'Relances du jour'], ['clientstats', '📊', 'Statistiques clients'], ['payeurs', '🎁', 'Gros clients'],
     ['-', 'Ventes et paiements'], ['invoices', '🧾', 'Factures'], ['quotes', '📝', 'Devis'], ['contracts', '📄', 'Contrats'], ['letters', '✉️', 'Lettres'], ['payments', '💰', 'Paiements'], ['deposits', '💼', 'Fonds en attente'], ['impayes', '⏳', 'Impayés'], ['importc', '📥', 'Importer des clients'], ['importf', '📥', 'Importer des factures'],
     ['-', 'Terrain et stock'], ['stock', '📦', 'Stock'], ['inventory', '📋', 'Inventaire'], ['reorder', '🛒', 'À commander'], ['livraisons', '🚚', 'Livraisons'], ['installs', '🔧', 'Installations'], ['technicians', '🧰', 'Techniciens'], ['suppliers', '🏭', 'Fournisseurs'],
-    ['-', 'Gestion'], ['finance', '🏦', 'Finance'], ['daily', '🌙', 'Clôture du jour'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['journal', '🕵️', "Journal d'activité"],
+    ['-', 'Gestion'], ['finance', '🏦', 'Finance'], ['mine', '💼', 'Part de l\'entreprise'], ['daily', '🌙', 'Clôture du jour'], ['expenses', '💸', 'Dépenses'], ['reports', '📊', 'Rapports'], ['rapportmois', '📑', 'Rapport mensuel'], ['journal', '🕵️', "Journal d'activité"],
     ['-', 'Application'], ['profile', '👤', 'Mon profil'], ['settings', '⚙️', 'Paramètres']];
   $('side').innerHTML = `<div class="sbrand"><img id="slogo" src="logo.png" alt="CISPOLstore"><b>CISPOLstore<small>Manager</small></b></div>
     <button class="btn full" data-act="quick">＋ Action rapide</button>
