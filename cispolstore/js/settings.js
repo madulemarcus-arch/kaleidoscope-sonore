@@ -137,6 +137,7 @@
       const keep = App.db.settings; // PIN, theme and auto-lock belong to this device
       d.settings = { ...(d.settings || {}), pin: keep.pin, users: keep.users, pinAsked: keep.pinAsked, theme: keep.theme, accent: keep.accent, sky: keep.sky, decor: keep.decor, bgs: keep.bgs, fx: keep.fx, lockMin: keep.lockMin };
       d.audit = App.db.audit || d.audit;   // the journal of this phone is never replaced by an older one
+      d.devices = App.db.devices || d.devices;   // nor the list of devices (a revoked phone must stay revoked)
       App.db = d; if (App.auditReset) { App.auditReset(); App.audit('edit', 'a restauré une sauvegarde (toutes les données remplacées)'); } App.save(); App.applyTheme(); App.toast('Données restaurées'); App.refresh(); return true;
     } catch (e) { App.toast('Fichier de sauvegarde invalide'); return false; }
   };

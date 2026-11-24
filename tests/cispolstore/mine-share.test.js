@@ -1,0 +1,26 @@
+const BASE = process.env.BASE_URL || 'http://localhost:8774';
+const { chromium, devices } = require('playwright');let f=0;const ok=(n,c,x='')=>{console.log((c?'PASS ':'FAIL ')+n+(x?' '+x:''));if(!c)f++};
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined});const ctx=await b.newContext({...devices['Pixel 5']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());
+await p.goto(BASE + '/index.html');await p.waitForTimeout(500);await p.click('[data-lk=skip]').catch(()=>{});
+await p.evaluate(()=>{const t=App.today();
+App.db.clients.push({id:'c1',code:'CL-1',type:'gere',first:'Jean',last:'A',name:'Jean A',phone:'1',acc:'A1',start:t,period:30,grace:15,subs:[],created:t,note:''});
+App.createInvoice({type:'abonnement',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Abonnement Illimité',qty:1,price:50,cost:0}],payAmount:50},0);
+App.createInvoice({type:'abonnement',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Abonnement Illimité',qty:1,price:30,cost:0}],payAmount:30},0);
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Kit',qty:1,price:300,cost:0}],payAmount:300},0);
+App.db.penalties.push({id:'pn1',clientId:'c1',amount:10,currency:'USD',reason:'Retard',date:t,paid:t,cost:4,rate:2400});App.save();App.go('more')});await p.waitForTimeout(500);
+ok('Plus has Dû à Starlink',/Dû à Starlink/.test(await p.innerText('#view')));
+ok('owed = 80 + 4 penalty share',await p.evaluate(()=>Math.abs(App.slStats().owed-84)<0.01));
+
+ok('Plus has Part de CISPOLstore',/Part de CISPOLstore/.test(await p.innerText('#view')));
+const st=await p.evaluate(()=>{const s=App.mineStats();return {cur:s.cur,total:s.total}});
+ok('mine = 300 kit + 6 penalty share = 306',Math.abs(st.cur-306)<0.01&&Math.abs(st.total-306)<0.01,JSON.stringify(st));
+ok('mine + starlink + technicians = all cash received (+ penalty)',await p.evaluate(()=>{const o=Object.values(App.mineStats().by)[0];return Math.abs(o.mine+o.sub+o.inst+4-(380+10))<0.01}));
+await p.evaluate(()=>App.go('mine'));await p.waitForTimeout(1300);
+let t=await p.innerText('#view');ok('hero shows 306',/306/.test(await p.innerText('.dhero')),t.replace(/\n/g,' | '));
+ok('month list shows Pour Starlink 80',/Pour Starlink 80/.test(t));
+await p.evaluate(()=>{App.db.settings.company.name='Mon Magasin';App.go('mine')});await p.waitForTimeout(900);ok('title follows the company name',/Part de Mon Magasin/.test(await p.innerText('body'))&&/Revenu de Mon Magasin/.test(await p.innerText('.dhero')));
+await p.evaluate(()=>{App.go('more')});await p.waitForTimeout(500);ok('menu entry follows the company name',/Part de Mon Magasin/.test(await p.innerText('#view')));
+await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('more')});await p.waitForTimeout(500);
+ok('vendeur does not see it',!/Part de CISPOLstore/.test(await p.innerText('#view')));
+ok('no page errors',errs.length===0,errs.join('|'));
+await b.close();process.exit(f?1:0)})();
