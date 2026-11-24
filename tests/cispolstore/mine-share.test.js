@@ -51,6 +51,21 @@ ok('current month cannot be closed',await p.evaluate(()=>{App.actions.mine_close
 await p.evaluate(()=>App.actions.mine_open({m:window.__pm}));await p.waitForTimeout(300);
 ok('reopened',await p.evaluate(()=>App.db.mcloses.length===0&&App.closedGuard(window.__pm+'-15')===false));
 ok('CSV table has one line per month + header',await p.evaluate(()=>{let got='';const o=App.download;App.download=(n,t)=>{got=t};App.actions.mine_csv();App.download=o;return got.split('\n').length===3&&/Part/.test(got)}));
+// --- breakdown by kit / item ---
+await p.evaluate(()=>{const t=App.today();
+App.db.products.push({id:'pk',name:'Kit Starlink Mini',cat:'Kits Starlink',unit:'pièce',qty:10,cost:100,price:200,min:1},{id:'pr',name:'Routeur Wifi',cat:'Accessoires',unit:'pièce',qty:10,cost:30,price:100,min:1});
+App.createInvoice({type:'complete',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'pk',desc:'Kit Starlink Mini',qty:1,price:200,cost:100},{pid:'pr',desc:'Routeur Wifi',qty:1,price:100,cost:30},{pid:'',desc:'Abonnement Illimité',qty:1,price:50,cost:0}],payAmount:350},0);App.save()});
+let bp=await p.evaluate(()=>{const d=App.mineParts(App.today().slice(0,7));return {cats:d.cats.map(c=>[c.cat,Math.round(c.total*100)/100,c.items.map(x=>[x.name,Math.round(x.amt*100)/100])]),total:Math.round(d.total*100)/100,mine:Math.round(d.mine*100)/100}});
+ok('breakdown: Kits Starlink > Kit Starlink Mini 200',bp.cats.some(c=>c[0]==='Kits Starlink'&&c[1]===200&&c[2].some(x=>x[0]==='Kit Starlink Mini'&&x[1]===200)),JSON.stringify(bp));
+ok('breakdown: Accessoires > Routeur Wifi 100',bp.cats.some(c=>c[0]==='Accessoires'&&c[2].some(x=>x[0]==='Routeur Wifi'&&x[1]===100)));
+ok('breakdown: penalties are an element',bp.cats.some(c=>c[0]==='Pénalités'&&c[1]===6));
+ok('breakdown adds up to the part',Math.abs(bp.total-bp.mine)<0.02,JSON.stringify([bp.total,bp.mine]));
+await p.evaluate(()=>App.go('rapportmois'));await p.waitForTimeout(900);let rt=await p.innerText('#view');
+ok('monthly report shows what the part is made of',/de quoi elle est faite/.test(rt)&&/Kit Starlink Mini/.test(rt)&&/Routeur Wifi/.test(rt)&&/Net du mois/.test(rt),rt.slice(0,200).replace(/\n/g,' | '));
+ok('monthly text (WhatsApp) has the breakdown',await p.evaluate(()=>/Part de CISPOLstore/.test(App.monthlyText())&&/Kit Starlink Mini/.test(App.monthlyText())&&/Net :/.test(App.monthlyText())));
+await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0]});
+ok('seller does not get the breakdown',await p.evaluate(()=>App.mineSection(App.today().slice(0,7))===''&&App.mineText(App.today().slice(0,7)).length===0));
+await p.evaluate(()=>{App.db.settings.users=[];App.user=null});
 // --- visibility: side menu entry and home card ---
 await p.evaluate(()=>{App.db.settings.company.name='CISPOLstore';App.refresh();App.go('home')});await p.waitForTimeout(900);
 ok('side menu has the entry, named after the company',await p.evaluate(()=>{const b=document.querySelector('#side [data-v=mine]');return !!b&&!b.hidden&&/Part de CISPOLstore/.test(b.textContent)}));
