@@ -18,6 +18,8 @@ ok('mine + starlink + technicians = all cash received (+ penalty)',await p.evalu
 await p.evaluate(()=>App.go('mine'));await p.waitForTimeout(1300);
 let t=await p.innerText('#view');ok('hero shows 306',/306/.test(await p.innerText('.dhero')),t.replace(/\n/g,' | '));
 ok('month list shows Pour Starlink 80',/Pour Starlink 80/.test(t));
+await p.evaluate(()=>{App.db.settings.company.name='Mon Magasin';App.go('mine')});await p.waitForTimeout(900);ok('title follows the company name',/Part de Mon Magasin/.test(await p.innerText('body'))&&/Revenu de Mon Magasin/.test(await p.innerText('.dhero')));
+await p.evaluate(()=>{App.go('more')});await p.waitForTimeout(500);ok('menu entry follows the company name',/Part de Mon Magasin/.test(await p.innerText('#view')));
 await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0];App.applyRole&&App.applyRole();App.go('more')});await p.waitForTimeout(500);
 ok('vendeur does not see it',!/Part de CISPOLstore/.test(await p.innerText('#view')));
 ok('no page errors',errs.length===0,errs.join('|'));
