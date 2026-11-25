@@ -13,11 +13,10 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  deploy:
+  # Deux jobs distincts : le paquet du site est envoyé dans « build », puis « deploy » le retrouve quelques secondes plus tard
+  # (publier dans le même job échouait souvent : « No artifacts named github-pages were found »).
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
@@ -31,5 +30,14 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Laisser à GitHub le temps d'enregistrer le paquet
+        run: sleep 20
       - id: deployment
         uses: actions/deploy-pages@v4
