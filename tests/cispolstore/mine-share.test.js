@@ -66,6 +66,19 @@ ok('monthly text (WhatsApp) has the breakdown',await p.evaluate(()=>/Part de CIS
 await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0]});
 ok('seller does not get the breakdown',await p.evaluate(()=>App.mineSection(App.today().slice(0,7))===''&&App.mineText(App.today().slice(0,7)).length===0));
 await p.evaluate(()=>{App.db.settings.users=[];App.user=null});
+// --- week by week and charts ---
+const wk=await p.evaluate(()=>{const m=App.today().slice(0,7),w=App.mineWeeks(m),d=App.mineParts(m);return {n:w.length,sum:Math.round(w.reduce((a,x)=>a+x.total,0)*100)/100,mine:Math.round(d.mine*100)/100,first:w[0].from,last:w[w.length-1].to,today:App.today(),hit:w.filter(x=>x.from<=App.today()&&App.today()<=x.to).length,exp:Math.round(w.reduce((a,x)=>a+x.exp,0)*100)/100}});
+ok('weeks cover the whole month once each',wk.n>=4&&wk.n<=6&&wk.first.endsWith('-01')&&wk.hit===1,JSON.stringify(wk));
+ok('weekly parts add up to the monthly part',Math.abs(wk.sum-wk.mine)<0.02,JSON.stringify([wk.sum,wk.mine]));
+ok('weekly expenses = month expenses without technician commissions (50 rent)',Math.abs(wk.exp-50)<0.02,String(wk.exp));
+await p.evaluate(()=>App.go('rapportmois'));await p.waitForTimeout(900);
+ok('monthly report: week-by-week section, bar chart and donut',await p.evaluate(()=>{const t=document.querySelector('#view').innerText;return /semaine par semaine/.test(t)&&/Semaine 1/.test(t)&&document.querySelectorAll('#view .cwrap.bars').length>=1&&document.querySelectorAll('#view .cwrap.donut').length>=1}));
+ok('monthly text has the week lines',await p.evaluate(()=>/Par semaine/.test(App.monthlyText())&&/S1 \(/.test(App.monthlyText())));
+await p.evaluate(()=>App.go('mine'));await p.waitForTimeout(900);
+ok('part screen has the month-after-month chart',await p.evaluate(()=>/Mois après mois/.test(document.querySelector('#view').innerText)&&document.querySelectorAll('#view .cwrap.bars').length>=1));
+await p.evaluate(()=>App.actions.mine_m({m:App.today().slice(0,7)}));await p.waitForTimeout(500);
+ok('month detail shows the donut and the weeks',await p.evaluate(()=>{const t=document.body.innerText;return /Semaine par semaine/.test(t)&&/Semaine 1/.test(t)}));
+await p.evaluate(()=>App.close());
 // --- visibility: side menu entry and home card ---
 await p.evaluate(()=>{App.db.settings.company.name='CISPOLstore';App.refresh();App.go('home')});await p.waitForTimeout(900);
 ok('side menu has the entry, named after the company',await p.evaluate(()=>{const b=document.querySelector('#side [data-v=mine]');return !!b&&!b.hidden&&/Part de CISPOLstore/.test(b.textContent)}));

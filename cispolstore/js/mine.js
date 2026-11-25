@@ -39,6 +39,8 @@
   App.mineStats = () => { const s = compute(); return { by: s.by, total: s.total, cur: s.cur.mine, prev: s.prev.mine, net: s.net, techDue: s.techDue, tech: s.tech, t: s.t, pm: s.pm }; };
   const ok = o => Math.abs(o.gap) < 0.015;
 
+  // last 12 months: part (green) and expenses (red)
+  const trend = s => { const ks = Object.keys(s.by).sort().slice(-12); if (ks.length < 2 || !App.chart) return ''; return App.chart.bars(ks.map(m => ({ l: M[+m.slice(5, 7) - 1].slice(0, 4), t: mlabel(m), v: s.by[m].mine, v2: s.by[m].other + s.by[m].cost })), { two: true, hl: false, names: ['Part', 'Dépenses'], title: 'Mois après mois', sub: '🟢 part · 🔴 dépenses' }); };
   App.views.mine = () => {
     const s = compute(), co = esc(App.mineName()), months = Object.keys(s.by).sort().reverse(), techs = App.db.technicians.filter(t => t.active !== false || (s.tech[t.id] && (s.tech[t.id].inst || s.tech[t.id].paid)));
     const bad = Object.keys(s.by).filter(m => !ok(s.by[m]));
@@ -49,6 +51,7 @@
         ${bad.length ? `<div class="card" style="border-left:4px solid var(--bad)"><b>⚠️ Contrôle : écart détecté</b><div class="mut">${bad.map(m => esc(mlabel(m))).join(', ')} : la somme des parts ne correspond pas à l'argent encaissé. Ouvrez le mois pour voir l'écart.</div></div>` : ''}
         <p class="mut" style="font-size:13px;margin:0 0 10px">Dans chaque paiement reçu, une partie va à Starlink (abonnement) et aux techniciens (installation) : le reste, avec la part de l'entreprise des pénalités payées, est ce qui revient à ${co}. Le net retire les dépenses enregistrées.</p>
         <div class="bar"><button class="btn sec sm" data-act="mine_csv">⬇️ Excel (CSV)</button><button class="btn sec sm" data-act="mine_pdf">📄 PDF</button></div>
+        ${trend(s)}
         <h2 class="sec">Revenu de ${co}, mois par mois</h2>
         ${months.length ? `<div class="list">${months.map(m => { const o = s.by[m], c = closing(m); return `<button class="item" data-act="mine_m" data-m="${m}"><span class="avatar">${c ? '🔒' : '💼'}</span><div class="grow"><b>${esc(mlabel(m))}${ok(o) ? '' : ' ⚠️'}</b><small>Part ${money(o.mine)} · dépenses ${money(o.other + o.cost)}</small><small>Starlink ${money(o.sub)} · techniciens ${money(o.inst)}</small></div><div class="end"><b class="${o.net < 0 ? 'bad' : 'ok'}">${money(o.net)}</b><small>net</small></div></button>`; }).join('')}</div>` : '<div class="empty">Aucun paiement pour le moment.</div>'}
         <h2 class="sec">Techniciens : reste à payer</h2>
@@ -58,20 +61,33 @@
   };
 
   // what the company's share of a month is made of: kits, hardware and other items (each payment's own part spread over its invoice lines), plus penalties
-  App.mineParts = m => {
+  const partsFor = inR => {
     const items = {}, add = (cat, name, amt) => { if (!(amt > 0.00001)) return; const k = cat + '|' + name; (items[k] = items[k] || { cat, name, amt: 0 }).amt += amt; };
     const isFee = l => !l.pid && (/install/i.test(l.desc || '') || /^abonnement/i.test(l.desc || ''));
-    App.db.payments.filter(p => p.date.slice(0, 7) === m).forEach(p => {
+    App.db.payments.filter(p => inR(p.date)).forEach(p => {
       const own = U(App.payParts(p).own, p.currency, p); if (!(own > 0)) return;
       const i = App.invoice(p.invoiceId), ls = i ? (i.lines || []).filter(l => !isFee(l)) : [], w = ls.map(l => Math.max(0, l.qty * l.price)), tot = w.reduce((a, b) => a + b, 0);
       if (!ls.length || !(tot > 0)) { add('Autres', i ? 'Autres éléments' : 'Paiements sans facture', own); return; }
       ls.forEach((l, k) => { const pr = l.pid && App.prod(l.pid); add(pr ? (pr.cat || 'Autres') : 'Autres', pr ? pr.name : (l.desc || 'Autre'), own * w[k] / tot); });
     });
-    (App.db.penalties || []).filter(p => p.paid && p.paid.slice(0, 7) === m).forEach(p => { const c = p.cost === undefined || p.cost === '' ? p.amount : p.cost; add('Pénalités', 'Pénalités payées', U(Math.max(0, p.amount - c), p.currency, p)); });
+    (App.db.penalties || []).filter(p => p.paid && inR(p.paid)).forEach(p => { const c = p.cost === undefined || p.cost === '' ? p.amount : p.cost; add('Pénalités', 'Pénalités payées', U(Math.max(0, p.amount - c), p.currency, p)); });
     const cats = {}; Object.values(items).forEach(x => { (cats[x.cat] = cats[x.cat] || { cat: x.cat, total: 0, items: [] }); cats[x.cat].total += x.amt; cats[x.cat].items.push(x); });
     const list = Object.values(cats).sort((a, b) => b.total - a.total); list.forEach(c => c.items.sort((a, b) => b.amt - a.amt));
-    const o = compute().by[m] || { mine: 0, other: 0, cost: 0, net: 0 };
-    return { cats: list, total: list.reduce((a, c) => a + c.total, 0), exp: o.other, cost: o.cost, net: o.net, mine: o.mine };
+    return { cats: list, total: list.reduce((a, c) => a + c.total, 0) };
+  };
+  App.mineParts = m => { const d = partsFor(x => x.slice(0, 7) === m), o = compute().by[m] || { mine: 0, other: 0, cost: 0, net: 0 };
+    return { cats: d.cats, total: d.total, exp: o.other, cost: o.cost, net: o.net, mine: o.mine }; };
+  // week by week (Monday to Sunday, cut at the month's edges): part, expenses (without technician commissions) and what the week was made of
+  const dow = d => (new Date(d + 'T00:00:00').getDay() + 6) % 7;
+  const dm = d => +d.slice(8) + ' ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][+d.slice(5, 7) - 1];
+  App.mineWeeks = m => {
+    const first = m + '-01', last = m + '-' + String(new Date(+m.slice(0, 4), +m.slice(5), 0).getDate()).padStart(2, '0'), weeks = [];
+    for (let ws = App.addDays(first, -dow(first)), k = 1; ws <= last; ws = App.addDays(ws, 7), k++) {
+      const from = ws < first ? first : ws, to = App.addDays(ws, 6) > last ? last : App.addDays(ws, 6), d = partsFor(x => x >= from && x <= to);
+      const exp = App.db.expenses.filter(e => e.cat !== COMM && e.date >= from && e.date <= to).reduce((a, e) => a + U(e.amount, e.currency, e), 0);
+      weeks.push({ k, from, to, label: from === to ? dm(from) : dm(from) + ' – ' + dm(to), total: d.total, cats: d.cats, exp, net: d.total - exp });
+    }
+    return weeks;
   };
   // the same breakdown as a block of HTML (monthly report, month detail) and as text (WhatsApp)
   App.mineSection = (m, bare) => {
@@ -79,12 +95,20 @@
     const pc = v => d.total > 0 ? Math.round(v / d.total * 100) + ' %' : '', row = (t, v, cls, sub) => `<div class="item"${sub ? ' style="padding-left:28px"' : ''}><div class="grow">${sub ? '<span class="mut">' + t + '</span>' : '<b>' + t + '</b>'}</div><b class="${cls || ''}">${v}</b></div>`;
     const body = `<div class="list">${d.cats.map(c => row(esc(c.cat) + ` <small class="mut">${pc(c.total)}</small>`, money(c.total)) + c.items.map(x => row(esc(x.name), money(x.amt), '', true)).join('')).join('')}
       ${row('Part de ' + esc(App.mineName()), money(d.total), 'ok')}${row('− Dépenses du mois', money(d.exp))}${d.cost > 0.004 ? row('− Commissions au-dessus des installations', money(d.cost)) : ''}${row('Net du mois', money(d.net), d.net < 0 ? 'bad' : 'ok')}</div>`;
-    return bare ? body : `<h2 class="sec">💼 Part de ${esc(App.mineName())} : de quoi elle est faite</h2>${body}`;
+    const donut = App.chart ? App.chart.donut(d.cats.map(c => ({ label: c.cat, value: c.total })), { top: money(d.total), sub: 'part', label: 'Répartition de la part' }) : '';
+    return bare ? donut + body : `<h2 class="sec">💼 Part de ${esc(App.mineName())} : de quoi elle est faite</h2>${donut}${body}`;
+  };
+  App.mineWeekSection = (m, bare) => {
+    if (!App.can('finance')) return ''; const w = App.mineWeeks(m); if (!w.some(x => x.total > 0 || x.exp > 0)) return '';
+    const chart = App.chart ? App.chart.bars(w.map(x => ({ l: 'S' + x.k, t: 'Semaine ' + x.k + ' (' + x.label + ')', v: x.total, v2: x.exp })), { two: true, hl: false, names: ['Part', 'Dépenses'], title: 'Semaine par semaine', sub: '🟢 part · 🔴 dépenses' }) : '';
+    const list = `<div class="list">${w.map(x => { const top = x.cats[0]; return `<div class="item"><div class="grow"><b>Semaine ${x.k} <small class="mut">${esc(x.label)}</small></b><small>Dépenses ${money(x.exp)}${top ? ' · surtout ' + esc(top.cat) + ' ' + money(top.total) : ''}</small></div><div class="end"><b>${money(x.total)}</b><small class="${x.net < 0 ? 'bad' : 'ok'}">net ${money(x.net)}</small></div></div>`; }).join('')}</div>`;
+    return (bare ? '' : `<h2 class="sec">📅 Part de ${esc(App.mineName())}, semaine par semaine</h2>`) + chart + list;
   };
   App.mineText = m => {
     if (!App.can('finance')) return []; const d = App.mineParts(m); if (!d.cats.length) return [];
     const L = [`💼 Part de ${App.mineName()} : ${money(d.total)}`];
     d.cats.forEach(c => { L.push(`• ${c.cat} : ${money(c.total)}`); c.items.forEach(x => L.push(`   – ${x.name} : ${money(x.amt)}`)); });
+    const wk = App.mineWeeks(m); if (wk.some(x => x.total > 0 || x.exp > 0)) { L.push('📅 Par semaine :'); wk.forEach(x => L.push(`   S${x.k} (${x.label}) : part ${money(x.total)} · dépenses ${money(x.exp)} · net ${money(x.net)}`)); }
     L.push(`− Dépenses : ${money(d.exp)}${d.cost > 0.004 ? ' · commissions au-dessus des installations ' + money(d.cost) : ''}`, `✅ Net : ${money(d.net)}`); return L;
   };
 
@@ -96,6 +120,7 @@
         <hr style="border:0;border-top:1px solid var(--line);margin:8px 0">${ok(o) ? '<div class="ok">✅ Contrôle : part + Starlink + techniciens = argent encaissé</div>' : `<div class="bad">⚠️ Écart de ${money(o.gap)} entre l'argent encaissé et la somme des parts (une facture dont l'installation + l'abonnement dépassent le paiement ?)</div>`}
         ${c ? `<div class="mut" style="margin-top:8px">Clôturé le ${App.fdate(c.date)}${c.by ? ' par ' + esc(c.by) : ''} : part ${money(c.mine)}, net ${money(c.net)}.${r2(c.mine - o.mine) !== 0 || r2(c.net - o.net) !== 0 ? ` <b class="bad">Les chiffres ont changé depuis (part ${money(o.mine)}, net ${money(o.net)}).</b>` : ''}</div>` : ''}</div>
       <h3 style="margin:10px 0 6px">De quoi est faite la part</h3>${App.mineSection(m, true)}
+      <h3 style="margin:10px 0 6px">Semaine par semaine</h3>${App.mineWeekSection(m, true)}
       ${c ? (isAdmin() ? `<div class="bar"><button type="button" class="btn sec" data-act="mine_open" data-m="${m}">🔓 Rouvrir le mois</button></div>` : '') : (m < App.today().slice(0, 7) && App.can('finance') ? `<div class="bar"><button type="button" class="btn" data-act="mine_close" data-m="${m}">🔒 Clôturer ${esc(mlabel(m))}</button></div><p class="mut" style="font-size:12px">Clôturer fige les chiffres : plus de paiement ni de dépense à une date de ce mois sans rouvrir le mois.</p>` : '<p class="mut" style="font-size:12px">Un mois se clôture une fois terminé.</p>')}`);
   };
   App.actions.mine_m = d => detail(d.m);
