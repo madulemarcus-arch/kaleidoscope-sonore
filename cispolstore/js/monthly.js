@@ -38,6 +38,7 @@
     L.push(`📡 Abonnements : ${d.sub.n} renouvelé(s), ${F(d.sub.amt)} facturés, marge ${F(d.sub.margin)}`, `   Actifs ${d.status.actif} · En sursis ${d.status.sursis} · Inactifs ${d.status.inactif}${d.toRenew != null ? ` · À renouveler d'ici fin de mois : ${d.toRenew}` : ''}`);
     L.push(`🔧 Installations : ${d.inst.n} (${F(d.inst.amt)})`, `📦 Ventes de matériel : ${F(d.matSales)}`, `👥 Nouveaux clients : ${d.newClients}`, '');
     L.push(`🧾 Impayés à ce jour : ${F(d.unpaid.total)} (${d.unpaid.n} facture(s)), dont ${F(d.unpaid.month)} facturés ce mois`, `⚠️ Pénalités : ${F(d.pen.paid)} payées ce mois · ${F(d.pen.due)} à payer`);
+    if (App.mineText) { const t = App.mineText(d.m); if (t.length) L.push('', ...t, ''); }
     if (d.deliveries.done || d.deliveries.pending) L.push(`🚚 Livraisons : ${d.deliveries.done} faite(s) ce mois · ${d.deliveries.pending} à faire`);
     if (d.lowStock.length) L.push(`📉 Stock bas : ${d.lowStock.join(', ')}`);
     return L.join('\n');
@@ -53,6 +54,7 @@
         <div class="grid two"><div class="stat"><small>💰 Total facturé</small><b>${F(d.ca)}</b><small>${d.nInv} facture(s)</small></div><div class="stat"><small>✅ CA réel</small><b class="ok">${F(d.real)}</b><small>kits, matériel</small></div><div class="stat"><small>✅ Bénéfice net</small><b class="${d.net >= 0 ? 'ok' : 'bad'}">${F(d.net)}</b><small>marge ${pct(d.net, d.ca)} %</small></div></div>
         <h2 class="sec">Finances</h2><div class="list">${row('Total facturé', F(d.ca))}${row('CA réel (sans abonnements ni installations)', F(d.real), 'ok')}${row('Coût (Starlink, marchandises)', F(d.cost))}${row('Marge brute', F(d.margin), d.margin >= 0 ? 'ok' : 'bad')}${row('Dépenses', F(d.exp))}${row('Bénéfice net', F(d.net), d.net >= 0 ? 'ok' : 'bad')}</div>
         ${d.exps.length ? `<div class="list" style="margin-top:8px">${d.exps.map(([k, v]) => row('<span class="mut">' + esc(k) + '</span>', F(v))).join('')}</div>` : ''}
+        ${App.mineSection ? App.mineSection(rm.m) : ''}
         <h2 class="sec">Abonnements</h2><div class="list">${row('Renouvellements facturés', d.sub.n)}${row('Montant des abonnements', F(d.sub.amt))}${row('Marge sur abonnements', F(d.sub.margin), 'ok')}${row('Actifs / sursis / inactifs', `${d.status.actif} / ${d.status.sursis} / ${d.status.inactif}`)}${d.toRenew != null ? row("À renouveler d'ici fin de mois", d.toRenew, d.toRenew ? 'warn' : '') : ''}</div>
         <h2 class="sec">Ventes et services</h2><div class="list">${row('Ventes de matériel', F(d.matSales))}${row('Installations', `${d.inst.n} · ${F(d.inst.amt)}`)}${row('Nouveaux clients', d.newClients)}${row('Livraisons faites', d.deliveries.done)}</div>
         <h2 class="sec">À encaisser</h2><div class="list">${row('Impayés à ce jour', `${F(d.unpaid.total)} · ${d.unpaid.n}`, d.unpaid.total ? 'warn' : 'ok')}${row('dont facturés ce mois', `${F(d.unpaid.month)} · ${d.unpaid.nMonth}`)}${row('Pénalités payées ce mois', `${F(d.pen.paid)} · ${d.pen.n}`)}${row('Pénalités à payer', F(d.pen.due), d.pen.due ? 'bad' : '')}</div>

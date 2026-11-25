@@ -10,6 +10,9 @@
   const COMM = 'Commission technicien';
   const isAdmin = () => !App.multi() || (App.user && App.user.role === 'admin');
   App.mineName = () => ((App.db.settings.company || {}).name || '').trim() || 'CISPOLstore';
+  // the side menu label follows the company name
+  const paintSide = () => { const b = document.querySelector('#side [data-v=mine]'); if (b && b.lastChild) b.lastChild.textContent = 'Part de ' + App.mineName(); };
+  const origRefresh = App.refresh; App.refresh = function () { const r = origRefresh.apply(this, arguments); paintSide(); return r; }; paintSide();
   const closes = () => (App.db.mcloses = App.db.mcloses || []);
   const closing = m => closes().find(c => c.month === m);
   // a closed month no longer accepts payments or expenses (the administrator can reopen it)
@@ -54,6 +57,37 @@
     };
   };
 
+  // what the company's share of a month is made of: kits, hardware and other items (each payment's own part spread over its invoice lines), plus penalties
+  App.mineParts = m => {
+    const items = {}, add = (cat, name, amt) => { if (!(amt > 0.00001)) return; const k = cat + '|' + name; (items[k] = items[k] || { cat, name, amt: 0 }).amt += amt; };
+    const isFee = l => !l.pid && (/install/i.test(l.desc || '') || /^abonnement/i.test(l.desc || ''));
+    App.db.payments.filter(p => p.date.slice(0, 7) === m).forEach(p => {
+      const own = U(App.payParts(p).own, p.currency, p); if (!(own > 0)) return;
+      const i = App.invoice(p.invoiceId), ls = i ? (i.lines || []).filter(l => !isFee(l)) : [], w = ls.map(l => Math.max(0, l.qty * l.price)), tot = w.reduce((a, b) => a + b, 0);
+      if (!ls.length || !(tot > 0)) { add('Autres', i ? 'Autres éléments' : 'Paiements sans facture', own); return; }
+      ls.forEach((l, k) => { const pr = l.pid && App.prod(l.pid); add(pr ? (pr.cat || 'Autres') : 'Autres', pr ? pr.name : (l.desc || 'Autre'), own * w[k] / tot); });
+    });
+    (App.db.penalties || []).filter(p => p.paid && p.paid.slice(0, 7) === m).forEach(p => { const c = p.cost === undefined || p.cost === '' ? p.amount : p.cost; add('Pénalités', 'Pénalités payées', U(Math.max(0, p.amount - c), p.currency, p)); });
+    const cats = {}; Object.values(items).forEach(x => { (cats[x.cat] = cats[x.cat] || { cat: x.cat, total: 0, items: [] }); cats[x.cat].total += x.amt; cats[x.cat].items.push(x); });
+    const list = Object.values(cats).sort((a, b) => b.total - a.total); list.forEach(c => c.items.sort((a, b) => b.amt - a.amt));
+    const o = compute().by[m] || { mine: 0, other: 0, cost: 0, net: 0 };
+    return { cats: list, total: list.reduce((a, c) => a + c.total, 0), exp: o.other, cost: o.cost, net: o.net, mine: o.mine };
+  };
+  // the same breakdown as a block of HTML (monthly report, month detail) and as text (WhatsApp)
+  App.mineSection = (m, bare) => {
+    if (!App.can('finance')) return ''; const d = App.mineParts(m); if (!d.cats.length) return '';
+    const pc = v => d.total > 0 ? Math.round(v / d.total * 100) + ' %' : '', row = (t, v, cls, sub) => `<div class="item"${sub ? ' style="padding-left:28px"' : ''}><div class="grow">${sub ? '<span class="mut">' + t + '</span>' : '<b>' + t + '</b>'}</div><b class="${cls || ''}">${v}</b></div>`;
+    const body = `<div class="list">${d.cats.map(c => row(esc(c.cat) + ` <small class="mut">${pc(c.total)}</small>`, money(c.total)) + c.items.map(x => row(esc(x.name), money(x.amt), '', true)).join('')).join('')}
+      ${row('Part de ' + esc(App.mineName()), money(d.total), 'ok')}${row('− Dépenses du mois', money(d.exp))}${d.cost > 0.004 ? row('− Commissions au-dessus des installations', money(d.cost)) : ''}${row('Net du mois', money(d.net), d.net < 0 ? 'bad' : 'ok')}</div>`;
+    return bare ? body : `<h2 class="sec">💼 Part de ${esc(App.mineName())} : de quoi elle est faite</h2>${body}`;
+  };
+  App.mineText = m => {
+    if (!App.can('finance')) return []; const d = App.mineParts(m); if (!d.cats.length) return [];
+    const L = [`💼 Part de ${App.mineName()} : ${money(d.total)}`];
+    d.cats.forEach(c => { L.push(`• ${c.cat} : ${money(c.total)}`); c.items.forEach(x => L.push(`   – ${x.name} : ${money(x.amt)}`)); });
+    L.push(`− Dépenses : ${money(d.exp)}${d.cost > 0.004 ? ' · commissions au-dessus des installations ' + money(d.cost) : ''}`, `✅ Net : ${money(d.net)}`); return L;
+  };
+
   const detail = m => {
     const s = compute(), o = s.by[m]; if (!o) return; const c = closing(m), co = esc(App.mineName());
     const L = (a, b, cls) => `<div class="spread"><span>${a}</span><b class="${cls || ''}">${b}</b></div>`;
@@ -61,6 +95,7 @@
         <hr style="border:0;border-top:1px solid var(--line);margin:8px 0">${L('Dépenses du mois', '− ' + money(o.other))}${o.cost > 0.004 ? L('Commissions au-dessus des installations', '− ' + money(o.cost)) : ''}${L('Net du mois', money(o.net), o.net < 0 ? 'bad' : 'ok')}
         <hr style="border:0;border-top:1px solid var(--line);margin:8px 0">${ok(o) ? '<div class="ok">✅ Contrôle : part + Starlink + techniciens = argent encaissé</div>' : `<div class="bad">⚠️ Écart de ${money(o.gap)} entre l'argent encaissé et la somme des parts (une facture dont l'installation + l'abonnement dépassent le paiement ?)</div>`}
         ${c ? `<div class="mut" style="margin-top:8px">Clôturé le ${App.fdate(c.date)}${c.by ? ' par ' + esc(c.by) : ''} : part ${money(c.mine)}, net ${money(c.net)}.${r2(c.mine - o.mine) !== 0 || r2(c.net - o.net) !== 0 ? ` <b class="bad">Les chiffres ont changé depuis (part ${money(o.mine)}, net ${money(o.net)}).</b>` : ''}</div>` : ''}</div>
+      <h3 style="margin:10px 0 6px">De quoi est faite la part</h3>${App.mineSection(m, true)}
       ${c ? (isAdmin() ? `<div class="bar"><button type="button" class="btn sec" data-act="mine_open" data-m="${m}">🔓 Rouvrir le mois</button></div>` : '') : (m < App.today().slice(0, 7) && App.can('finance') ? `<div class="bar"><button type="button" class="btn" data-act="mine_close" data-m="${m}">🔒 Clôturer ${esc(mlabel(m))}</button></div><p class="mut" style="font-size:12px">Clôturer fige les chiffres : plus de paiement ni de dépense à une date de ce mois sans rouvrir le mois.</p>` : '<p class="mut" style="font-size:12px">Un mois se clôture une fois terminé.</p>')}`);
   };
   App.actions.mine_m = d => detail(d.m);
