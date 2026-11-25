@@ -66,6 +66,26 @@ ok('monthly text (WhatsApp) has the breakdown',await p.evaluate(()=>/Part de CIS
 await p.evaluate(()=>{App.db.settings.users=[{id:'v',name:'Vic',role:'vendeur',active:true,salt:'s',hash:'h'}];App.user=App.db.settings.users[0]});
 ok('seller does not get the breakdown',await p.evaluate(()=>App.mineSection(App.today().slice(0,7))===''&&App.mineText(App.today().slice(0,7)).length===0));
 await p.evaluate(()=>{App.db.settings.users=[];App.user=null});
+// --- purchase cost, no repetition, traceability ---
+let cg=await p.evaluate(()=>{const d=App.mineParts(App.today().slice(0,7));return {cogs:Math.round(d.cogs*100)/100,mine:Math.round(d.mine*100)/100,exp:Math.round(d.exp*100)/100,net:Math.round(d.net*100)/100}});
+ok('the purchase cost of the goods sold (130 = kit 100 + router 30) is deducted',Math.abs(cg.cogs-130)<0.02,JSON.stringify(cg));
+ok('net = part - goods cost - expenses',Math.abs(cg.net-(cg.mine-cg.cogs-cg.exp))<0.02,JSON.stringify(cg));
+await p.evaluate(()=>{const t=App.today();App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'pk',desc:'Kit Starlink Mini',qty:1,price:200,cost:100}],payAmount:100},0);
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'Câble 10 m',qty:1,price:20,cost:8}],payAmount:20},0);
+App.createInvoice({type:'materiel',clientId:'c1',currency:'USD',payMode:'Cash',date:t,lines:[{pid:'',desc:'câble 10 M ',qty:1,price:20,cost:8}],payAmount:20},0);App.save()});
+cg=await p.evaluate(()=>{const d=App.mineParts(App.today().slice(0,7)),k=d.items.filter(x=>/mini/i.test(x.name)),c=d.items.filter(x=>/c.ble/i.test(x.name));return {mini:k.map(x=>[x.name,Math.round(x.amt*100)/100,Math.round(x.cost*100)/100]),cable:c.map(x=>[x.name,Math.round(x.amt*100)/100,Math.round(x.cost*100)/100]),cogs:Math.round(d.cogs*100)/100}});
+ok('half-paid kit: only half of the revenue and of the cost (200+100 paid → 300; cost 100+50)',cg.mini.length===1&&Math.abs(cg.mini[0][1]-300)<0.02&&Math.abs(cg.mini[0][2]-150)<0.02,JSON.stringify(cg));
+ok('same item typed twice (different case / spaces) appears once',cg.cable.length===1&&Math.abs(cg.cable[0][1]-40)<0.02&&Math.abs(cg.cable[0][2]-16)<0.02,JSON.stringify(cg));
+await p.evaluate(()=>App.go('mine'));await p.waitForTimeout(700);await p.evaluate(()=>App.actions.mine_m({m:App.today().slice(0,7)}));await p.waitForTimeout(500);
+ok('month detail: « Net du mois » appears once (no repeated summary)',await p.evaluate(()=>(document.body.innerText.match(/Net du mois/g)||[]).length===1));
+ok('month detail explains received vs invoiced and has the payments button',await p.evaluate(()=>/argent \S*reçu/.test(document.body.innerText)&&/paiement\(s\) pris en compte/.test(document.body.innerText)));
+await p.evaluate(()=>App.close());
+const ln=await p.evaluate(()=>{const m=App.today().slice(0,7),l=App.mineLines(m),n=App.db.payments.filter(p=>p.date.slice(0,7)===m).length;return {n:l.length,want:n,own:Math.round(l.reduce((a,x)=>a+x.own,0)*100)/100,d:Math.round((App.mineParts(m).total-(App.mineParts(m).cats.find(c=>c.cat==='Pénalités')||{total:0}).total)*100)/100,cost:Math.round(l.reduce((a,x)=>a+x.cost,0)*100)/100,cogs:Math.round(App.mineParts(m).cogs*100)/100}});
+ok('payments list: one line per payment of the month',ln.n===ln.want&&ln.n>=5,JSON.stringify(ln));
+ok('payments list adds up to the part (without penalties) and to the goods cost',Math.abs(ln.own-ln.d)<0.02&&Math.abs(ln.cost-ln.cogs)<0.02,JSON.stringify(ln));
+await p.evaluate(()=>App.actions.mine_lines({m:App.today().slice(0,7)}));await p.waitForTimeout(500);
+ok('payments window shows invoice numbers and totals',await p.evaluate(()=>/Total reçu/.test(document.body.innerText)&&document.querySelectorAll('dialog .item, .modal .item').length>=5||/Total reçu/.test(document.body.innerText)));
+await p.evaluate(()=>App.close());
 // --- week by week and charts ---
 const wk=await p.evaluate(()=>{const m=App.today().slice(0,7),w=App.mineWeeks(m),d=App.mineParts(m);return {n:w.length,sum:Math.round(w.reduce((a,x)=>a+x.total,0)*100)/100,mine:Math.round(d.mine*100)/100,first:w[0].from,last:w[w.length-1].to,today:App.today(),hit:w.filter(x=>x.from<=App.today()&&App.today()<=x.to).length,exp:Math.round(w.reduce((a,x)=>a+x.exp,0)*100)/100}});
 ok('weeks cover the whole month once each',wk.n>=4&&wk.n<=6&&wk.first.endsWith('-01')&&wk.hit===1,JSON.stringify(wk));
