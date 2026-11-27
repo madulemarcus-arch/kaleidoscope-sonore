@@ -168,7 +168,7 @@ add chain=forward action=drop connection-state=invalid comment="Invalides"
 add chain=forward action=drop src-address-list=partage-detecte comment="ANTI-PARTAGE: liste noire (forward)"
 add chain=forward action=drop in-interface-list=WAN connection-nat-state=!dstnat comment="WAN: pas de connexions entrantes"
 add chain=forward action=drop in-interface=bridge-hs dst-address=192.168.88.0/24 comment="Clients -> reseau admin interdit"
-add chain=forward action=drop in-interface=bridge-hs dst-address=172.16.0.0/22 comment="Isolation client a client"
+add chain=forward action=drop in-interface=bridge-hs dst-address=172.16.0.0/22 comment="Isolation client a client (trafic route seulement ; l'isolation Wi-Fi se fait sur l'AP)"
 # Limite de connexions par client (bloque torrent / gros partage)
 add chain=forward action=drop protocol=tcp src-address=172.16.0.0/22 connection-limit=300,32 comment="ANTI-ABUS: max 300 connexions TCP par client"
 add chain=forward action=drop protocol=udp src-address=172.16.0.0/22 connection-limit=300,32 comment="ANTI-ABUS: max 300 connexions UDP par client"
